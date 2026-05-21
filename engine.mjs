@@ -1,26 +1,24 @@
-// engine.mjs —— HeadHunter 引擎 (MiroMind 原生版)
-// 作用: 给一句招聘需求, 让 MiroMind 自己上网搜候选人 + 交叉验证其声称, 输出 JSON。
+// engine.mjs —— HeadHunter 引擎 (MiroMind 原生 · 流式版)
+// 作用: 给一句招聘需求, 让 MiroMind 自己上网搜候选人 + 交叉验证, 输出 JSON。
 //
-// 运行方式 (Node 22+):
-//   node --env-file=.env.local engine.mjs "Senior Rust engineer who contributed to tokio"
+// 为什么用流式: 深度研究要几分钟。非流式请求期间不传数据, 会被网络代理当成
+// "空闲连接"掐断 (SocketError: other side closed)。流式下持续有数据, 连接不会断,
+// 还能实时看到它在搜什么。
 //
-// 注意: 深度研究很慢, 一次可能要几分钟。先用它跑通, 之后再做 UI 和缓存。
+// 运行: node --env-file=.env.local engine.mjs "Senior Rust engineer who contributed to tokio"
 
 const BASE = process.env.MIROMIND_BASE_URL;
 const KEY = process.env.MIROMIND_API_KEY;
 const MODEL = process.env.MIROMIND_MODEL;
-
 if (!BASE || !KEY || !MODEL) {
-  console.error("缺少环境变量。请用: node --env-file=.env.local engine.mjs \"需求\"");
+  console.error("缺少环境变量。用: node --env-file=.env.local engine.mjs \"需求\"");
   process.exit(1);
 }
 
-// 招聘需求: 命令行参数, 没给就用默认演示需求
 const query =
   process.argv.slice(2).join(" ") ||
   "Senior Rust engineer who has contributed to the Tokio project, based in Europe";
 
-// 这是产品的"大脑": 让 MiroMind 找人 + 逐条交叉验证, 并只输出 JSON。
 const userPrompt = `You are a technical recruiting research agent.
 
 TASK: Find 3 real candidate engineers for this role: "${query}".
@@ -39,44 +37,105 @@ OUTPUT RULES (critical):
       "headline": "current role / one-line summary",
       "links": { "github": "url or null", "linkedin": "url or null", "other": "url or null" },
       "claims": [
-        {
-          "claim": "what the candidate appears to claim or is reputed for",
-          "verdict": "verified | unverified | contradicted",
-          "evidence": [ { "note": "what this source shows", "url": "https://..." } ]
-        }
+        { "claim": "...", "verdict": "verified | unverified | contradicted",
+          "evidence": [ { "note": "...", "url": "https://..." } ] }
       ],
       "summary": "2-sentence why-they-fit"
     }
   ]
 }`;
 
-console.error(`需求: ${query}`);
-console.error("调用 MiroMind 中... (深度研究可能要几分钟, 请耐心等)");
-const t0 = Date.now();
+// 发起一次流式请求, 边读边累积。返回 {content, searches, fetches, thinks, raw}
+async function callStream() {
+  const res = await fetch(`${BASE}/chat/completions`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${KEY}`, "Content-Type": "application/json" },
+    body: JSON.stringify({
+      model: MODEL,
+      stream: true,
+      messages: [{ role: "user", content: userPrompt }],
+    }),
+  });
+  if (!res.ok) throw new Error(`HTTP ${res.status}: ${await res.text()}`);
 
-const res = await fetch(`${BASE}/chat/completions`, {
-  method: "POST",
-  headers: { Authorization: `Bearer ${KEY}`, "Content-Type": "application/json" },
-  body: JSON.stringify({
-    model: MODEL,
-    stream: false,
-    messages: [{ role: "user", content: userPrompt }],
-  }),
-});
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let buf = "", content = "", raw = "";
+  let searches = 0, fetches = 0, thinks = 0;
 
-if (!res.ok) {
-  console.error(`HTTP ${res.status}: ${await res.text()}`);
-  process.exit(1);
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    const chunk = decoder.decode(value, { stream: true });
+    raw += chunk;
+    buf += chunk;
+    let nl;
+    while ((nl = buf.indexOf("\n")) >= 0) {
+      const line = buf.slice(0, nl).trim();
+      buf = buf.slice(nl + 1);
+      if (!line.startsWith("data:")) continue;
+      const data = line.slice(5).trim();
+      if (data === "[DONE]" || !data) continue;
+      let obj;
+      try { obj = JSON.parse(data); } catch { continue; }
+      const delta = obj.choices?.[0]?.delta ?? {};
+      if (typeof delta.content === "string") content += delta.content;
+      for (const s of delta.reasoning_steps ?? []) {
+        if (s.type === "web_search") {
+          searches++;
+          const q = s.query ?? s.keywords ?? s.thought ?? JSON.stringify(s).slice(0, 120);
+          process.stderr.write(`\n🔍 搜索#${searches}: ${String(q).slice(0, 120)}`);
+        } else if (s.type === "fetch_url_content") {
+          fetches++;
+          const u = s.url ?? s.link ?? JSON.stringify(s).slice(0, 120);
+          process.stderr.write(`\n📄 抓取#${fetches}: ${String(u).slice(0, 120)}`);
+        } else if (s.type === "thinking") {
+          thinks++;
+          if (thinks % 40 === 0) process.stderr.write(".");
+        }
+      }
+    }
+  }
+  return { content, searches, fetches, thinks, raw };
 }
 
-const json = await res.json();
-const msg = json.choices?.[0]?.message ?? {};
-const steps = msg.reasoning_steps ?? [];
-const searches = steps.filter((s) => s.type === "web_search").length;
-const fetches = steps.filter((s) => s.type === "fetch_url_content").length;
+console.error(`需求: ${query}`);
+console.error("调用 MiroMind 中 (流式, 几分钟)...");
+const t0 = Date.now();
 
+let out, lastErr;
+for (let attempt = 1; attempt <= 3; attempt++) {
+  try { out = await callStream(); break; }
+  catch (e) {
+    lastErr = e;
+    console.error(`\n[第 ${attempt} 次失败: ${e.message}] ${attempt < 3 ? "重试中..." : ""}`);
+  }
+}
+if (!out) { console.error("三次都失败:", lastErr?.message); process.exit(1); }
+
+const secs = ((Date.now() - t0) / 1000).toFixed(0);
 console.error(
-  `完成: 耗时 ${((Date.now() - t0) / 1000).toFixed(0)}s | 网页搜索 ${searches} 次 | 抓取 ${fetches} 次 | tokens ${json.usage?.total_tokens ?? "?"}`,
+  `\n完成: 耗时 ${secs}s | 搜索 ${out.searches} | 抓取 ${out.fetches} | 思考块 ${out.thinks}`,
 );
-console.error("--- 下面是 content (理想情况是 JSON) ---");
-console.log(msg.content ?? "(无 content)");
+
+// 保存原始流, 方便排查
+const { writeFileSync } = await import("node:fs");
+writeFileSync("last_run_raw.txt", out.raw);
+writeFileSync("last_run_content.txt", out.content);
+console.error("(原始流已存 last_run_raw.txt, content 已存 last_run_content.txt)");
+
+// 试着把 content 解析成 JSON; 不行就原样打印
+console.error("--- content ---");
+let parsed = null;
+try { parsed = JSON.parse(out.content); } catch {}
+if (!parsed) {
+  const m = out.content.match(/\{[\s\S]*\}/); // 抓第一个 {...}
+  if (m) { try { parsed = JSON.parse(m[0]); } catch {} }
+}
+if (parsed) {
+  console.error(`✅ content 是合法 JSON, 候选人数: ${parsed.candidates?.length ?? "?"}`);
+  console.log(JSON.stringify(parsed, null, 2));
+} else {
+  console.error("⚠️ content 不是干净 JSON (Day 2 要加格式化步骤)。原样打印:");
+  console.log(out.content || "(空 content)");
+}
