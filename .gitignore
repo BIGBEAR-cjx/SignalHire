@@ -13,6 +13,8 @@ out/
 # 引擎跑出来的大文件 (原始流可能几 MB)
 last_run_raw.txt
 last_run_content.txt
+last_verify_raw.txt
+last_verify_content.txt
 
 # os / editor
 .DS_Store
