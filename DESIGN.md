@@ -13,6 +13,10 @@ Mode: Builder (Hackathon)
 竞品 juicebox/lessie 给你 500 个简历。我们给你 5 个**已经被核实过**的人。
 这就是 Deep Research Track 的杀手锏。
 
+**产品两个模式(Day 2 后确定)：**
+1. **搜人**(`engine.mjs`)：一句招聘需求 → 3 个不同真人候选 + 每人交叉验证声称。慢(~4-8 分钟)。
+2. **验证候选人 / 打脸**(`verify.mjs`)：粘一份候选人自述 → 可信度报告(verified/contradicted/unverified + 红旗)。快(~2 分钟)，**是 demo 头牌** —— 现场粘一份注水简历，看它当场拆穿。
+
 ## Problem Statement
 
 招聘里最贵的不是"找到人"，是"核实人"。简历和 LinkedIn 上的自我描述经常注水
