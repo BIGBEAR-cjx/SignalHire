@@ -19,13 +19,27 @@ const query =
   process.argv.slice(2).join(" ") ||
   "Senior Rust engineer who has contributed to the Tokio project, based in Europe";
 
-const userPrompt = `You are a technical recruiting research agent.
+const userPrompt = `You are a technical recruiting research agent. You source candidates AND
+fact-check them honestly. Your value is catching exaggerations, not rubber-stamping resumes.
 
-TASK: Find 3 real candidate engineers for this role: "${query}".
+TASK: Find exactly 3 candidate engineers for this role: "${query}".
 
-For EACH candidate, research the open web and CROSS-VERIFY their key claims
-against MULTIPLE independent public sources (GitHub, personal sites, conference
-talks, papers, company pages). For every claim, give a verdict and cite source URLs.
+HARD RULES on who counts as a candidate:
+- Each candidate MUST be a single, real, individually-named human (first + last name).
+- NEVER return a team, group, organization, "contributors", or collective as a candidate.
+- The 3 candidates must be 3 DIFFERENT people.
+
+For EACH candidate, research the open web and CROSS-VERIFY their key claims against
+MULTIPLE independent public sources (GitHub, personal sites, conference talks, papers,
+company pages, LinkedIn). Extract 3 concrete claims per candidate and judge each:
+
+VERDICT RUBRIC (use precisely):
+- "verified"     = 2+ independent sources clearly confirm the claim.
+- "contradicted" = sources directly conflict with the claim (e.g. wrong creator,
+                   overstated tenure/role, claim of exclusivity that evidence disproves).
+- "unverified"   = no clear public evidence either way.
+Scrutinize seniority, tenure, "core/lead/creator", and exclusivity claims HARDEST —
+these are the most commonly exaggerated. Never mark a claim "verified" without a source URL.
 
 OUTPUT RULES (critical):
 - Respond with ONLY a single JSON object. No prose before or after.
@@ -33,14 +47,14 @@ OUTPUT RULES (critical):
 {
   "candidates": [
     {
-      "name": "string",
+      "name": "First Last (a real individual)",
       "headline": "current role / one-line summary",
       "links": { "github": "url or null", "linkedin": "url or null", "other": "url or null" },
       "claims": [
-        { "claim": "...", "verdict": "verified | unverified | contradicted",
-          "evidence": [ { "note": "...", "url": "https://..." } ] }
+        { "claim": "...", "verdict": "verified | contradicted | unverified",
+          "evidence": [ { "note": "what this source shows", "url": "https://..." } ] }
       ],
-      "summary": "2-sentence why-they-fit"
+      "summary": "2-sentence why-they-fit, mentioning any red flags found"
     }
   ]
 }`;
@@ -83,12 +97,12 @@ async function callStream() {
       for (const s of delta.reasoning_steps ?? []) {
         if (s.type === "web_search") {
           searches++;
-          const q = s.query ?? s.keywords ?? s.thought ?? JSON.stringify(s).slice(0, 120);
-          process.stderr.write(`\n🔍 搜索#${searches}: ${String(q).slice(0, 120)}`);
+          const q = s.web_search?.search_keywords ?? s.query ?? "";
+          process.stderr.write(`\n🔍 搜索#${searches}: ${String(q).slice(0, 100)}`);
         } else if (s.type === "fetch_url_content") {
           fetches++;
-          const u = s.url ?? s.link ?? JSON.stringify(s).slice(0, 120);
-          process.stderr.write(`\n📄 抓取#${fetches}: ${String(u).slice(0, 120)}`);
+          const u = s.fetch_url_content?.url ?? s.url ?? "";
+          process.stderr.write(`\n📄 抓取#${fetches}: ${String(u).slice(0, 100)}`);
         } else if (s.type === "thinking") {
           thinks++;
           if (thinks % 40 === 0) process.stderr.write(".");
@@ -118,24 +132,30 @@ console.error(
   `\n完成: 耗时 ${secs}s | 搜索 ${out.searches} | 抓取 ${out.fetches} | 思考块 ${out.thinks}`,
 );
 
-// 保存原始流, 方便排查
 const { writeFileSync } = await import("node:fs");
 writeFileSync("last_run_raw.txt", out.raw);
 writeFileSync("last_run_content.txt", out.content);
 console.error("(原始流已存 last_run_raw.txt, content 已存 last_run_content.txt)");
 
-// 试着把 content 解析成 JSON; 不行就原样打印
 console.error("--- content ---");
 let parsed = null;
 try { parsed = JSON.parse(out.content); } catch {}
 if (!parsed) {
-  const m = out.content.match(/\{[\s\S]*\}/); // 抓第一个 {...}
+  const m = out.content.match(/\{[\s\S]*\}/);
   if (m) { try { parsed = JSON.parse(m[0]); } catch {} }
 }
 if (parsed) {
-  console.error(`✅ content 是合法 JSON, 候选人数: ${parsed.candidates?.length ?? "?"}`);
+  const cs = parsed.candidates ?? [];
+  // Day 2 自检: 数量 / 是否有非个人 / 各 verdict 计数
+  const verdicts = {};
+  let groupish = 0;
+  for (const c of cs) {
+    for (const cl of c.claims ?? []) verdicts[cl.verdict] = (verdicts[cl.verdict] ?? 0) + 1;
+    if (/contributor|team|group|maintainers|collective/i.test(c.name ?? "")) groupish++;
+  }
+  console.error(`✅ 合法 JSON | 候选人 ${cs.length} | 疑似非个人 ${groupish} | verdicts ${JSON.stringify(verdicts)}`);
   console.log(JSON.stringify(parsed, null, 2));
 } else {
-  console.error("⚠️ content 不是干净 JSON (Day 2 要加格式化步骤)。原样打印:");
+  console.error("⚠️ content 不是干净 JSON。原样打印:");
   console.log(out.content || "(空 content)");
 }
