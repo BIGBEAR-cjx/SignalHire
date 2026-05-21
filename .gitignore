@@ -1,0 +1,18 @@
+# secrets — 永不提交
+.env
+.env.local
+.env.*.local
+*.key
+
+# deps / build
+node_modules/
+.next/
+dist/
+out/
+
+# os / editor
+.DS_Store
+*.log
+
+# 临时
+/tmp_*
