@@ -1,6 +1,6 @@
 // verify.mjs —— 验证一个候选人的"自述声称", 出可信度报告 (打脸功能)
 // 运行: node --env-file=.env.local verify.mjs "候选人自述..."  (不给参数则用内置测试 bio)
-import { runWithProgress, parseJson } from "./miro.mjs";
+import { runWithProgress, parseJson, normalizeResult } from "./miro.mjs";
 import { writeFileSync } from "node:fs";
 
 // 内置测试 bio: 含真+假混合, 用来验证它能不能抓出矛盾。
@@ -23,6 +23,10 @@ VERDICT RUBRIC:
 - "unverified"   = no public evidence found either way.
 Scrutinize creator/founder/lead, seniority, tenure, and credential (degree) claims HARDEST.
 
+VERDICT & EVIDENCE RULES (critical):
+- "verdict" MUST be EXACTLY one of: "verified", "contradicted", "unverified". Never any other value. If unsure, use "unverified".
+- Every evidence "url" MUST be a SPECIFIC source page that contains the fact. NEVER cite a search-results URL (nothing with google.com/search, bing.com/search, or a "?q=" query). If no concrete page exists, mark the claim "unverified".
+
 OUTPUT RULES (critical): respond with ONLY one JSON object, no prose, exactly this shape:
 {
   "candidate_name": "string",
@@ -43,7 +47,7 @@ const out = await runWithProgress(`验证候选人:\n${bio}`, prompt);
 writeFileSync("last_verify_raw.txt", out.raw);
 writeFileSync("last_verify_content.txt", out.content);
 
-const parsed = parseJson(out.content);
+const parsed = normalizeResult(parseJson(out.content));
 if (parsed) {
   const v = {};
   for (const c of parsed.claims ?? []) v[c.verdict] = (v[c.verdict] ?? 0) + 1;

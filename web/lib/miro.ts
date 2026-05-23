@@ -58,6 +58,38 @@ export function parseJson(content: string): any {
   return null;
 }
 
+// 兜底归一化: 即使模型不听 prompt, 也保证前端拿到干净数据。
+// 1) verdict 只允许 3 种, 未知一律降级 unverified (防模型自创 "partially verified")。
+// 2) 删掉搜索结果页那种假证据 (google/bing 搜索、带 ?q= 的) —— 搜索链接不是佐证。
+// 3) verified 但清完证据后没有任何具体来源 → 降级 unverified (没证据不算已验证)。
+const VERDICTS: Verdict[] = ["verified", "contradicted", "unverified"];
+
+export function isSearchUrl(u: unknown): boolean {
+  return (
+    typeof u === "string" &&
+    /(google|bing|duckduckgo)\.[a-z.]+\/(search|url)|[?&]q=/i.test(u)
+  );
+}
+
+function normalizeClaims(claims: any[]): void {
+  for (const cl of claims ?? []) {
+    cl.evidence = (cl.evidence ?? []).filter((e: any) => e?.url && !isSearchUrl(e.url));
+    let v = String(cl.verdict ?? "").toLowerCase().trim();
+    if (!VERDICTS.includes(v as Verdict)) v = "unverified";
+    if (v === "verified" && cl.evidence.length === 0) v = "unverified";
+    cl.verdict = v;
+  }
+}
+
+// 同时支持搜人结果 (candidates[].claims) 和验证结果 (顶层 claims)。原地修改并返回。
+export function normalizeResult<T>(data: T): T {
+  const d = data as any;
+  if (!d || typeof d !== "object") return data;
+  if (Array.isArray(d.candidates)) for (const c of d.candidates) normalizeClaims(c?.claims ?? []);
+  if (Array.isArray(d.claims)) normalizeClaims(d.claims);
+  return data;
+}
+
 // 带重试
 export async function withRetry<T>(fn: () => Promise<T>, tries = 3): Promise<T> {
   let last: unknown;
@@ -87,6 +119,10 @@ MULTIPLE independent public sources. Extract 3 concrete claims per candidate and
 Scrutinize seniority, tenure, "core/lead/creator", and exclusivity claims HARDEST.
 Never mark a claim "verified" without a source URL.
 
+VERDICT & EVIDENCE RULES (critical):
+- "verdict" MUST be EXACTLY one of: "verified", "contradicted", "unverified". Never any other value (no "partially verified"). If unsure, use "unverified".
+- Every evidence "url" MUST be a SPECIFIC source page (a real profile, repo, article, or company page that contains the fact). NEVER cite a search-results URL (nothing with google.com/search, bing.com/search, or a "?q=" query). If you cannot find a concrete page, mark the claim "unverified".
+
 OUTPUT RULES (critical): respond with ONLY a single JSON object, no prose, exactly this shape:
 {
   "candidates": [
@@ -113,6 +149,10 @@ VERDICT RUBRIC:
                    creator/author, the role/title/tenure is overstated, or the credential cannot be found).
 - "unverified"   = no public evidence found either way.
 Scrutinize creator/founder/lead, seniority, tenure, and credential (degree) claims HARDEST.
+
+VERDICT & EVIDENCE RULES (critical):
+- "verdict" MUST be EXACTLY one of: "verified", "contradicted", "unverified". Never any other value. If unsure, use "unverified".
+- Every evidence "url" MUST be a SPECIFIC source page that contains the fact. NEVER cite a search-results URL (nothing with google.com/search, bing.com/search, or a "?q=" query). If no concrete page exists, mark the claim "unverified".
 
 OUTPUT RULES (critical): respond with ONLY one JSON object, no prose, exactly this shape:
 {

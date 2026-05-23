@@ -54,6 +54,28 @@ export function parseJson(content) {
   return null;
 }
 
+// 兜底归一化 (web/lib/miro.ts 同款): verdict 只允许 3 种、删搜索链接假证据、
+// verified 无具体证据则降级。同时支持搜人(candidates[].claims)和验证(顶层 claims)。
+const VERDICTS = ["verified", "contradicted", "unverified"];
+export function isSearchUrl(u) {
+  return typeof u === "string" && /(google|bing|duckduckgo)\.[a-z.]+\/(search|url)|[?&]q=/i.test(u);
+}
+function normalizeClaims(claims) {
+  for (const cl of claims ?? []) {
+    cl.evidence = (cl.evidence ?? []).filter((e) => e?.url && !isSearchUrl(e.url));
+    let v = String(cl.verdict ?? "").toLowerCase().trim();
+    if (!VERDICTS.includes(v)) v = "unverified";
+    if (v === "verified" && cl.evidence.length === 0) v = "unverified";
+    cl.verdict = v;
+  }
+}
+export function normalizeResult(data) {
+  if (!data || typeof data !== "object") return data;
+  if (Array.isArray(data.candidates)) for (const c of data.candidates) normalizeClaims(c?.claims ?? []);
+  if (Array.isArray(data.claims)) normalizeClaims(data.claims);
+  return data;
+}
+
 // 命令行用: 带重试 + 实时进度打印, 跑一个 prompt
 export async function runWithProgress(label, userPrompt) {
   console.error(label);

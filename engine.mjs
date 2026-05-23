@@ -41,6 +41,10 @@ VERDICT RUBRIC (use precisely):
 Scrutinize seniority, tenure, "core/lead/creator", and exclusivity claims HARDEST —
 these are the most commonly exaggerated. Never mark a claim "verified" without a source URL.
 
+VERDICT & EVIDENCE RULES (critical):
+- "verdict" MUST be EXACTLY one of: "verified", "contradicted", "unverified". Never any other value (no "partially verified"). If unsure, use "unverified".
+- Every evidence "url" MUST be a SPECIFIC source page (real profile/repo/article/company page that contains the fact). NEVER cite a search-results URL (nothing with google.com/search, bing.com/search, or a "?q=" query). If no concrete page exists, mark the claim "unverified".
+
 OUTPUT RULES (critical):
 - Respond with ONLY a single JSON object. No prose before or after.
 - Use exactly this shape:
@@ -145,6 +149,8 @@ if (!parsed) {
   if (m) { try { parsed = JSON.parse(m[0]); } catch {} }
 }
 if (parsed) {
+  const { normalizeResult } = await import("./miro.mjs");
+  normalizeResult(parsed); // 兜底: 修非法 verdict + 删搜索链接假证据
   const cs = parsed.candidates ?? [];
   // Day 2 自检: 数量 / 是否有非个人 / 各 verdict 计数
   const verdicts = {};
