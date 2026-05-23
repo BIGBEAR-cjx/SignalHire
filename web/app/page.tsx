@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { SEARCH_SAMPLES } from "@/lib/cache";
 
 // ---- 类型 ----
 type Verdict = "verified" | "contradicted" | "unverified";
@@ -115,13 +116,15 @@ export default function Home() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [result, setResult] = useState<any>(null);
-  const [stats, setStats] = useState<{ searches: number; fetches: number } | null>(null);
+  const [stats, setStats] = useState<{ searches: number; fetches: number; cached?: boolean } | null>(null);
 
-  async function run() {
+  async function run(overrideQuery?: string) {
+    const q = overrideQuery ?? query;
+    if (overrideQuery !== undefined) setQuery(overrideQuery);
     setLoading(true); setError(""); setResult(null); setStats(null);
     try {
       const url = mode === "search" ? "/api/search" : "/api/verify";
-      const body = mode === "search" ? { query } : { bio };
+      const body = mode === "search" ? { query: q } : { bio };
       const res = await fetch(url, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -175,8 +178,25 @@ export default function Home() {
             className="w-full rounded-lg border border-gray-300 px-3 py-2 text-gray-900"
           />
         )}
+
+        {mode === "search" && (
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            <span className="text-xs text-gray-500">试试示例（秒出）:</span>
+            {SEARCH_SAMPLES.map((s) => (
+              <button
+                key={s.query}
+                onClick={() => run(s.query)}
+                disabled={loading}
+                className="rounded-full border border-gray-300 bg-gray-50 px-3 py-1 text-xs text-gray-700 hover:border-blue-400 disabled:opacity-50"
+              >
+                {s.label}
+              </button>
+            ))}
+          </div>
+        )}
+
         <button
-          onClick={run}
+          onClick={() => run()}
           disabled={loading}
           className="mt-3 rounded-lg bg-blue-600 px-5 py-2 font-medium text-white disabled:opacity-50"
         >
@@ -193,7 +213,17 @@ export default function Home() {
 
       {result && (
         <div className="mt-6 space-y-4">
-          {stats && <p className="text-xs text-gray-500">本次研究: 网页搜索 {stats.searches} 次 · 抓取 {stats.fetches} 次</p>}
+          {stats && (
+            <p className="flex items-center gap-2 text-xs text-gray-500">
+              {stats.cached ? (
+                <span className="rounded-full border border-green-300 bg-green-100 px-2 py-0.5 font-medium text-green-800">
+                  预缓存 · 秒出
+                </span>
+              ) : (
+                <span>本次研究: 网页搜索 {stats.searches} 次 · 抓取 {stats.fetches} 次</span>
+              )}
+            </p>
+          )}
           {mode === "search"
             ? (result.candidates ?? []).map((c: Candidate, i: number) => <CandidateCard key={i} c={c} />)
             : <TrustReportView r={result} />}

@@ -1,12 +1,19 @@
 import { streamResearch, parseJson, normalizeResult, withRetry, searchPrompt } from "@/lib/miro";
+import { findCachedSearch } from "@/lib/cache";
 
 export const runtime = "nodejs";
-export const maxDuration = 300; // 秒。本地不限; Vercel 上搜人可能超时 (见 NOTES, Day 7 用缓存/回放)
+export const maxDuration = 300; // 秒。本地不限; Vercel 上搜人可能超时 → 命中缓存可秒回
 
 export async function POST(req: Request) {
   let query = "";
   try { ({ query } = await req.json()); } catch {}
   if (!query?.trim()) return Response.json({ error: "缺少 query" }, { status: 400 });
+
+  // 先查预缓存: 命中就秒回 (demo 用, 也兜底实时 API 超时/挂掉)。
+  const cached = findCachedSearch(query);
+  if (cached) {
+    return Response.json({ data: cached, stats: { searches: 0, fetches: 0, cached: true } });
+  }
 
   try {
     const out = await withRetry(() => streamResearch(searchPrompt(query)));

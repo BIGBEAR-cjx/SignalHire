@@ -1,0 +1,229 @@
+{
+  "query": "Senior Rust engineer who has contributed to the Tokio project",
+  "candidates": [
+    {
+      "name": "Carl Lerche",
+      "headline": "Principal Engineer at AWS; creator and lead maintainer of Tokio",
+      "links": {
+        "github": "https://github.com/carllerche",
+        "linkedin": "https://www.linkedin.com/in/carllerche",
+        "other": "https://en.wikipedia.org/wiki/Tokio_(software)"
+      },
+      "claims": [
+        {
+          "claim": "Creator and primary maintainer of the Tokio async runtime for Rust",
+          "verdict": "verified",
+          "evidence": [
+            {
+              "note": "Wikipedia’s Tokio (software) page states that Tokio was developed by Carl Lerche and describes it as an asynchronous runtime for Rust.",
+              "url": "https://en.wikipedia.org/wiki/Tokio_(software)"
+            },
+            {
+              "note": "Podcast description explicitly calls Carl Lerche the creator and maintainer of Tokio, the widely used async runtime for Rust.",
+              "url": "https://www.heavybit.com/library/podcasts/high-leverage/ep-6-async-runtime-for-rust-with-carl-lerche-of-tokio"
+            },
+            {
+              "note": "TokioConf 2026 speaker page describes him as best known for his open source Rust libraries, primarily Tokio, the async I/O runtime for Rust.",
+              "url": "https://www.tokioconf.com/speakers"
+            },
+            {
+              "note": "GitHub profile lists multiple tokio-rs and related repos (tokio, mio, bytes) as pinned projects, indicating direct authorship and maintenance.",
+              "url": "https://github.com/carllerche"
+            }
+          ]
+        },
+        {
+          "claim": "Holds a senior/principal-level engineering role at Amazon Web Services (AWS), working in Rust and async systems",
+          "verdict": "verified",
+          "evidence": [
+            {
+              "note": "QCon SF speaker page and multiple conference bios call him a Principal Engineer at AWS and highlight his work on Tokio and Rust-based systems.",
+              "url": "https://qconsf.com/speakers/carllerche"
+            },
+            {
+              "note": "TokioConf 2026 speaker list refers to him as a Principal Engineer at AWS.",
+              "url": "https://www.tokioconf.com/speakers"
+            },
+            {
+              "note": "AWS Open Source blog posts (e.g., 'Sustainability with Rust') and AWS re:Invent material feature him presenting as an AWS engineering leader on Rust topics.",
+              "url": "https://aws.amazon.com/blogs/opensource/sustainability-with-rust/"
+            }
+          ]
+        },
+        {
+          "claim": "Described as a 'Senior Software Engineer' in at least one public context",
+          "verdict": "verified",
+          "evidence": [
+            {
+              "note": "QCon New York speaker bio labels him 'Senior Software Engineer' and credits him with authoring and contributing to many Rust libraries including Tokio.",
+              "url": "https://archive.qconnewyork.com/ny2018/speakers/carl-lerche"
+            }
+          ]
+        },
+        {
+          "claim": "Currently titles himself explicitly as a 'Senior Rust Engineer'",
+          "verdict": "contradicted",
+          "evidence": [
+            {
+              "note": "TokioConf and QCon bios, as well as conference and podcast material, consistently call him 'Principal Engineer' at AWS or 'open-source engineer,' not 'Senior Rust Engineer'.",
+              "url": "https://www.tokioconf.com/speakers"
+            },
+            {
+              "note": "LinkedIn profile excerpt shows AWS as employer but does not expose a 'Senior Rust Engineer' title in the visible content.",
+              "url": "https://www.linkedin.com/in/carllerche"
+            }
+          ]
+        }
+      ],
+      "summary": "Carl Lerche clearly exceeds the 'Senior Rust engineer' bar and is the original creator and long‑term maintainer of Tokio, making him an archetypal fit for a role centered on Tokio internals. Public sources consistently confirm his principal-level role at AWS and deep authorship of Tokio and related Rust infrastructure."
+    },
+    {
+      "name": "Alice Ryhl",
+      "headline": "Software Engineer at Google; core/lead maintainer of Tokio",
+      "links": {
+        "github": null,
+        "linkedin": "https://dk.linkedin.com/in/aliceryhl/da",
+        "other": "https://ryhl.io/"
+      },
+      "claims": [
+        {
+          "claim": "Software engineer on Google’s Android Rust team",
+          "verdict": "verified",
+          "evidence": [
+            {
+              "note": "Personal front page states: 'I am a Software Engineer at Google' and elsewhere 'working on Android and Rust for Linux'.",
+              "url": "https://ryhl.io/"
+            },
+            {
+              "note": "RustLab and RustNL speaker bios describe her as a software engineer at Google working on Android/Rust and the Linux kernel.",
+              "url": "https://rustlab.it/speakers/ryhl"
+            }
+          ]
+        },
+        {
+          "claim": "Core maintainer / lead maintainer of the Tokio async runtime",
+          "verdict": "verified",
+          "evidence": [
+            {
+              "note": "Her front page describes her as 'a member of the core maintainer team for Tokio'.",
+              "url": "https://ryhl.io/"
+            },
+            {
+              "note": "RustLab speaker bio calls her 'a core maintainer of the widely used Tokio library'.",
+              "url": "https://rustlab.it/speakers/ryhl"
+            },
+            {
+              "note": "Multiple independent writeups (Pragmatic Engineer newsletter and social posts) explicitly describe her as a core maintainer of Tokio, the most widely used async runtime.",
+              "url": "https://newsletter.pragmaticengineer.com/p/why-rust-is-different-with-alice"
+            },
+            {
+              "note": "Tokio blog post 'Welcoming Alice Ryhl as the first paid Tokio contributor' announces that Tokio will fund Alice Ryhl to work on Tokio, confirming recognized contributor status.",
+              "url": "https://tokio.rs/blog/2021-04-welcome-alice"
+            }
+          ]
+        },
+        {
+          "claim": "First paid contributor funded by the Tokio project",
+          "verdict": "verified",
+          "evidence": [
+            {
+              "note": "Tokio’s official blog article 'Welcoming Alice Ryhl as the first paid Tokio contributor' states that she is the first contributor Tokio is funding to devote more time to the project.",
+              "url": "https://tokio.rs/blog/2021-04-welcome-alice"
+            },
+            {
+              "note": "The same announcement is mirrored in the tokio-rs/website repo’s blog content on GitHub, independently confirming the statement.",
+              "url": "https://github.com/tokio-rs/website/blob/master/content/blog/2021-04-welcome-alice.md"
+            }
+          ]
+        },
+        {
+          "claim": "Holds a job title explicitly labeled 'Senior Rust Engineer'",
+          "verdict": "contradicted",
+          "evidence": [
+            {
+              "note": "Her own site and event bios consistently use 'Software Engineer at Google' (Android Rust / Rust for Linux) and 'core maintainer of Tokio'; none of the public bios inspected use the title 'Senior Rust Engineer'.",
+              "url": "https://ryhl.io/"
+            },
+            {
+              "note": "Conference listings (RustLab, RustNL, Kernel developer roundtables) refer to her as 'software engineer at Google' or 'software engineer', not 'Senior Rust Engineer'.",
+              "url": "https://rustlab.it/speakers/ryhl"
+            }
+          ]
+        }
+      ],
+      "summary": "Alice Ryhl is an experienced Rust engineer at Google and a core/lead maintainer of Tokio, with both the Tokio project and multiple third‑party sources confirming her ongoing contributions. While her formal title is 'Software Engineer' rather than 'Senior Rust Engineer', her role, visibility, and responsibilities around Tokio clearly place her at a senior technical level for this stack."
+    },
+    {
+      "name": "Matilda Smeds",
+      "headline": "Senior Server Engineer and Rust/Tokio contributor",
+      "links": {
+        "github": "https://github.com/matildasmeds",
+        "linkedin": "https://es.linkedin.com/in/matildasmeds",
+        "other": "https://www.matildasmeds.com/"
+      },
+      "claims": [
+        {
+          "claim": "Works as a Senior Server Engineer with Rust as a primary language",
+          "verdict": "verified",
+          "evidence": [
+            {
+              "note": "GitHub profile bio states 'Senior Server Engineer and Rust enthusiast, with broad technical interests from concurrency to networking.'",
+              "url": "https://github.com/matildasmeds"
+            },
+            {
+              "note": "LinkedIn headline describes her as a Senior Software Engineer (Backend Development), aligning with a senior server/backend focus.",
+              "url": "https://es.linkedin.com/in/matildasmeds"
+            }
+          ]
+        },
+        {
+          "claim": "Has contributed to the Tokio project",
+          "verdict": "unverified",
+          "evidence": [
+            {
+              "note": "GitHub bio calls her a 'Tokio contributor' and shows a pinned fork of tokio-rs/tokio on her profile.",
+              "url": "https://github.com/matildasmeds"
+            },
+            {
+              "note": "LinkedIn summary states: 'Within the Rust ecosystem, I've made contributions to tokio and tracing crates, focusing on good developer experience and performance.'",
+              "url": "https://es.linkedin.com/in/matildasmeds"
+            },
+            {
+              "note": "Detailed inspection summary of her GitHub profile notes only a pinned fork of Tokio and recent contributions to her own and unrelated repositories, and does not enumerate concrete merged PRs to tokio-rs/tokio itself in the visible data.",
+              "url": "https://github.com/matildasmeds"
+            }
+          ]
+        },
+        {
+          "claim": "Active author of Rust content around the Tokio/tracing ecosystem (logging and observability)",
+          "verdict": "verified",
+          "evidence": [
+            {
+              "note": "Her personal blog post 'My logging recipe for server side Rust' describes using the tracing crate from the Tokio ecosystem to instrument backend code.",
+              "url": "https://www.matildasmeds.com/posts/rust-logging-recipe/"
+            },
+            {
+              "note": "LinkedIn and GitHub bios emphasize Rust, concurrency, networking and mention contributions to tracing, consistent with her publishing about tracing-based logging patterns.",
+              "url": "https://es.linkedin.com/in/matildasmeds"
+            }
+          ]
+        },
+        {
+          "claim": "Has substantial recent code merged into the core tokio-rs/tokio repository",
+          "verdict": "contradicted",
+          "evidence": [
+            {
+              "note": "Scraped summary of her GitHub activity shows 89 contributions in the last year but lists contributions only to her own repos (e.g., link_checker, personal site, sqlx-with-testcontainers) and mentions no direct activity on tokio-rs/tokio in the examined period.",
+              "url": "https://github.com/matildasmeds"
+            },
+            {
+              "note": "No independent sources (Tokio blog, maintainers lists, conference bios) were found that list her among core Tokio maintainers or highlight specific merged features into the main Tokio repo, suggesting contributions are likely smaller or indirect (documentation, forks, or ecosystem crates) rather than substantial core work.",
+              "url": "https://github.com/tokio-rs/tokio"
+            }
+          ]
+        }
+      ],
+      "summary": "Matilda is a self-described Senior Server Engineer working heavily with Rust, and she publicly claims contributions to Tokio and tracing, with at least light‑weight evidence (bio statements, forks, and articles) tying her to that ecosystem. While we cannot independently verify significant merged code into the core Tokio repository, her senior backend Rust experience and demonstrated focus on Tokio/tracing make her a plausible candidate, especially for roles that value ecosystem familiarity over deep maintainer status."
+    }
+  ]
+}

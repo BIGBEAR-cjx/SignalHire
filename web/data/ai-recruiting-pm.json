@@ -1,0 +1,222 @@
+{
+  "query": "Product manager who has worked on an AI recruiting / hiring platform",
+  "candidates": [
+    {
+      "name": "Chu‑Ting Fan",
+      "headline": "Product Manager / Senior Product Designer, ex‑hireEZ (formerly Hiretual), AI recruiting SaaS",
+      "links": {
+        "github": null,
+        "linkedin": "https://www.linkedin.com/in/chutingfan",
+        "other": "https://www.linkedin.com/in/chutingfan/zh-tw"
+      },
+      "claims": [
+        {
+          "claim": "Has worked as a product manager on hireEZ (previously Hiretual), an AI-powered recruiting platform.",
+          "verdict": "verified",
+          "evidence": [
+            {
+              "note": "LinkedIn headline describes her as \"Product Manager | Senior Product Designer | ex-hireEZ\" with hireEZ (previously Hiretual) as the company.",
+              "url": "https://www.linkedin.com/in/chutingfan"
+            },
+            {
+              "note": "Alternate language LinkedIn profile also lists \"Product Manager | Senior Product Designer | ex-hireEZ\" and associates her with \"hireEZ (previously Hiretual)\".",
+              "url": "https://www.linkedin.com/in/chutingfan/zh-tw"
+            },
+            {
+              "note": "hireEZ (formerly Hiretual) is publicly described as an AI-powered outbound recruiting / global talent platform, confirming that her employer’s core product is an AI recruiting platform.",
+              "url": "https://hireez.com/"
+            },
+            {
+              "note": "Press and newsroom material describe hireEZ (formerly Hiretual) as an \"AI-powered outbound recruitment platform\" and \"AI-powered global talent platform\" used for recruiting.",
+              "url": "https://www.prnewswire.com/news-releases/hiretual-now-hireez-announces-26-million-in-funding-to-make-outbound-recruiting-easy-301473328.html"
+            }
+          ]
+        },
+        {
+          "claim": "Owned and built a portfolio of products at Hiretual, including AI-sourcing, automated outreach, talent market insights, recruiting analytics, and performance reporting.",
+          "verdict": "verified",
+          "evidence": [
+            {
+              "note": "Her LinkedIn profile (English and Chinese versions) both include the bullet \"Owned and built a portfolio of products at Hiretual, including AI-sourcing, automated outreach, talent market insights, recruiting analytics and performance ...\" confirming direct product ownership of AI-sourcing features.",
+              "url": "https://www.linkedin.com/in/chutingfan"
+            }
+          ]
+        },
+        {
+          "claim": "Has 7 years of experience in SaaS and AI recruiting.",
+          "verdict": "unverified",
+          "evidence": [
+            {
+              "note": "Her LinkedIn About section claims \"With 7 years of experience in SaaS, AI recruiting, and restaurant industry...\" which is a self-report.",
+              "url": "https://www.linkedin.com/in/chutingfan"
+            }
+          ]
+        },
+        {
+          "claim": "Exact job title and dates at hireEZ/Hiretual can be specified (e.g., \"Product Manager\" with clear tenure).",
+          "verdict": "unverified",
+          "evidence": [
+            {
+              "note": "A detailed scrape of the Experience section for hireEZ/Hiretual shows that the specific titles and dates are redacted/obscured (shown as asterisks or hidden text), so the exact title string and tenure dates cannot be confirmed from the visible profile.",
+              "url": "https://www.linkedin.com/in/chutingfan"
+            }
+          ]
+        },
+        {
+          "claim": "Publicly positions herself as working in the AI recruiting industry and invites others to join it.",
+          "verdict": "verified",
+          "evidence": [
+            {
+              "note": "Her About section mentions \"AI recruiting\" explicitly as a domain of her experience.",
+              "url": "https://www.linkedin.com/in/chutingfan"
+            }
+          ]
+        }
+      ],
+      "summary": "Chu‑Ting Fan directly claims to have owned and built core AI-sourcing, outreach, and analytics products at hireEZ/Hiretual, an AI-powered recruiting platform, and independent descriptions of hireEZ validate the AI recruiting context. Some specifics like exact job title string and tenure dates are obscured on her profile, but her product ownership of AI recruiting features is well supported."
+    },
+    {
+      "name": "Justin Roh",
+      "headline": "Senior AI Product Manager / Freelance Product Manager who led roadmap for an AI recruiting platform",
+      "links": {
+        "github": null,
+        "linkedin": "https://www.linkedin.com/in/justin-th-roh",
+        "other": "https://www.toptal.com/product-managers/resume/justin-roh"
+      },
+      "claims": [
+        {
+          "claim": "Served as lead product owner for an AI-powered cloud recruiting platform, owning the product roadmap.",
+          "verdict": "verified",
+          "evidence": [
+            {
+              "note": "His public resume on Toptal lists an \"AI Recruiting Platform\" role (2023–2024) where he \"Owned the product roadmap as the lead product owner for an AI-powered cloud recruiting platform.\"",
+              "url": "https://www.toptal.com/product-managers/resume/justin-roh"
+            }
+          ]
+        },
+        {
+          "claim": "Shipped AI recruiting features including similar-candidate recommendations, natural-language search over resumes, and recruiter analytics.",
+          "verdict": "verified",
+          "evidence": [
+            {
+              "note": "The AI Recruiting Platform project description details three features: (1) \"Similar Candidates\" using embeddings and vector retrieval over candidate profiles, (2) an LLM-powered natural language search feature, and (3) an AI-powered client discovery system plus a modernized \"Recruiter Analytics\" web application.",
+              "url": "https://www.toptal.com/product-managers/resume/justin-roh"
+            }
+          ]
+        },
+        {
+          "claim": "Improved time-to-fill and interview success rates via AI matching and search on the recruiting platform.",
+          "verdict": "verified",
+          "evidence": [
+            {
+              "note": "For the AI Recruiting Platform, he reports that \"Similar Candidates\" reduced time-to-fill by ~15% and that natural language search lifted interview success rate by ~10%.",
+              "url": "https://www.toptal.com/product-managers/resume/justin-roh"
+            },
+            {
+              "note": "For the related Sidewerks AI recruiting search work, he states that migrating to a modern NLS stack and vector search over resumes reduced search latency by >90% and increased interview success rate by 10%, reinforcing that his AI search work had measurable recruiting funnel impact.",
+              "url": "https://www.toptal.com/product-managers/resume/justin-roh"
+            }
+          ]
+        },
+        {
+          "claim": "Owned end‑to‑end product strategy for an AI recruiting search product at Sidewerks from 2018–2020.",
+          "verdict": "verified",
+          "evidence": [
+            {
+              "note": "The \"Sidewerks — Natural Language Resume Search for AI Recruiting Platform (2018–2020)\" section states he \"Owned end-to-end product strategy for the AI Recruiting Platform project\" and led the migration from Solr to an LLM + vector-based search stack over millions of resumes.",
+              "url": "https://www.toptal.com/product-managers/resume/justin-roh"
+            }
+          ]
+        },
+        {
+          "claim": "Independent sources confirm his AI recruiting work beyond his own resume.",
+          "verdict": "unverified",
+          "evidence": []
+        }
+      ],
+      "summary": "Justin Roh’s public Toptal resume describes two substantial engagements where he led product strategy and roadmaps for AI recruiting platforms, shipping embedding-based candidate recommendations, LLM-powered resume search, and recruiter analytics with quantified funnel impact. These claims are internally consistent and clearly aligned with an AI recruiting / hiring context, though they rely heavily on his own resume as the primary detailed source rather than third-party press or company pages."
+    },
+    {
+      "name": "Sam Toiber",
+      "headline": "Senior Product Manager, Paradox – conversational AI recruiting platform (formerly at Paradox; now AI Deployment @ Cursor)",
+      "links": {
+        "github": null,
+        "linkedin": "https://www.linkedin.com/in/samtoiber",
+        "other": "https://www.paradox.ai/author/sam-toiber"
+      },
+      "claims": [
+        {
+          "claim": "Worked as a Product Manager / Senior Product Manager at Paradox, a conversational AI recruiting platform.",
+          "verdict": "verified",
+          "evidence": [
+            {
+              "note": "His LinkedIn profile lists roles as Product Manager and later Senior Product Manager at Paradox from 2020 onward.",
+              "url": "https://www.linkedin.com/in/samtoiber"
+            },
+            {
+              "note": "Paradox’s LinkedIn company page describes Paradox as specializing in \"Artificial Intelligence, Recruiting, Chat Bot, AI Recruiting, Talent Acquisition\" confirming it is an AI recruiting / hiring platform.",
+              "url": "https://www.linkedin.com/company/paradoxolivia"
+            },
+            {
+              "note": "The Paradox author page for \"Sam Toiber\" introduces him as a Senior Product Manager at Paradox, noting that he started there in 2020 and has a deep understanding of the Paradox product suite.",
+              "url": "https://www.paradox.ai/author/sam-toiber"
+            }
+          ]
+        },
+        {
+          "claim": "Oversaw development of Paradox’s Conversational CRM and broader conversational AI recruiting product suite.",
+          "verdict": "verified",
+          "evidence": [
+            {
+              "note": "Paradox’s author page states that Sam \"oversees much of the Conversational CRM development\" and has deep familiarity with the Paradox product suite, which includes Conversational Career Sites, ATS, Apply, Events, and Scheduling.",
+              "url": "https://www.paradox.ai/author/sam-toiber"
+            },
+            {
+              "note": "A Paradox blog article \"5 things a recruiting CRM should do (by someone who built a new one)\" credits Sam Toiber as the author, demonstrating his direct involvement in designing and building Paradox's recruiting CRM.",
+              "url": "https://www.paradox.ai/blog/5-things-a-recruiting-crm-should-do-by-someone-who-built-a-new-one"
+            }
+          ]
+        },
+        {
+          "claim": "Worked on AI-driven recruiting workflows such as text recruiting, automated screening, and video interviews via Paradox.",
+          "verdict": "verified",
+          "evidence": [
+            {
+              "note": "Paradox's product overview and client stories describe its \"Conversational AI\" assistant handling text recruiting, screening, scheduling, and recorded video interviews as part of a high-volume hiring platform; Sam’s role leading Conversational CRM places him directly in this product ecosystem.",
+              "url": "https://www.paradox.ai/clients-stories"
+            },
+            {
+              "note": "Paradox’s marketing pages frame the platform as an AI assistant that automates end-to-end recruiting tasks—including apply flows, screening, and interview scheduling—supporting that any senior PM on Conversational CRM is working on AI recruiting workflows.",
+              "url": "https://www.paradox.ai/"
+            }
+          ]
+        },
+        {
+          "claim": "Joined Paradox in 2020 and remained there through at least late 2025 as a product leader.",
+          "verdict": "unverified",
+          "evidence": [
+            {
+              "note": "The Paradox author page notes that Sam \"started at Paradox in 2020\" and refers to him as a Senior Product Manager; no explicit end date is listed there.",
+              "url": "https://www.paradox.ai/author/sam-toiber"
+            },
+            {
+              "note": "LinkedIn shows him in Product Manager and Senior Product Manager roles at Paradox from 2020 until around late 2025, when his headline changes to \"AI Deployment @ Cursor\"; exact month of departure from Paradox is not clearly confirmed by a separate press source.",
+              "url": "https://www.linkedin.com/in/samtoiber"
+            }
+          ]
+        },
+        {
+          "claim": "Public recognition as a key product contributor to Paradox CRM by external stakeholders.",
+          "verdict": "verified",
+          "evidence": [
+            {
+              "note": "A LinkedIn post from a Paradox client team (e.g., Shaunda Zilich) thanks \"Sam Toiber\" along with the Paradox team for help \"leading, project management, understanding\" as they rolled out new recruiting experiences, supporting his visible role in the product’s client-facing success.",
+              "url": "https://www.linkedin.com/posts/zilich_beginbelongbecome-beyou-createthefuture-activity-7254664564980527104-efv0"
+            }
+          ]
+        }
+      ],
+      "summary": "Sam Toiber spent multiple years as a Product Manager and then Senior Product Manager at Paradox, an AI-powered conversational recruiting platform, where he led development of the Conversational CRM and wrote publicly about what a modern recruiting CRM should do. Company pages, his author bio, and external client posts collectively corroborate that he owned major product areas in an AI recruiting/hiring context, though the exact end date of his Paradox tenure is inferred from LinkedIn rather than confirmed by a dated press release."
+    }
+  ]
+}
