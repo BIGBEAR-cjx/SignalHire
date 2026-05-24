@@ -46,28 +46,63 @@ export interface RecentRun {
 }
 
 // 精确 flat_key 查找 (模糊匹配只留给 cache.ts 的 2 个静态头牌, 避免库变大后误命中)。
-export async function findRun(kind: RunKind, flatKey: string): Promise<unknown | null> {
+// 返回 {id, result} —— id 用于生成可分享报告链接 /r/[id]。
+export async function findRun(kind: RunKind, flatKey: string): Promise<{ id: string; result: unknown } | null> {
   if (!client) return null;
   try {
     const { data, error } = await client.database
       .from(TABLE)
-      .select("result")
+      .select("id,result")
       .eq("cache_key", cacheKey(kind, flatKey))
       .limit(1);
     if (error || !data || data.length === 0) return null;
-    return (data[0] as { result?: unknown }).result ?? null;
+    const row = data[0] as { id: string; result?: unknown };
+    return { id: row.id, result: row.result ?? null };
   } catch {
     return null;
   }
 }
 
-// upsert: (kind, flat_key) 唯一, 重复查询只更新不新增行。
-export async function saveRun(row: SaveRunInput): Promise<void> {
-  if (!client) return;
+// 只取 id (静态缓存命中时, 为已 seed 的同 key 行拿分享链接 id)。
+export async function findRunId(kind: RunKind, flatKey: string): Promise<string | null> {
+  if (!client) return null;
+  try {
+    const { data, error } = await client.database
+      .from(TABLE).select("id").eq("cache_key", cacheKey(kind, flatKey)).limit(1);
+    if (error || !data || data.length === 0) return null;
+    return (data[0] as { id: string }).id ?? null;
+  } catch {
+    return null;
+  }
+}
+
+// 按 id 取整行 (可分享报告页 /r/[id] 用)。
+export async function getRunById(id: string): Promise<{
+  kind: RunKind; query_text: string; label: string; summary: string;
+  result: unknown; stats: unknown; updated_at: string;
+} | null> {
+  if (!client) return null;
+  try {
+    const { data, error } = await client.database
+      .from(TABLE)
+      .select("kind,query_text,label,summary,result,stats,updated_at")
+      .eq("id", id)
+      .limit(1);
+    if (error || !data || data.length === 0) return null;
+    return data[0] as never;
+  } catch {
+    return null;
+  }
+}
+
+// upsert: cache_key 唯一, 重复查询只更新不新增行。返回该行 id (供分享链接)。
+export async function saveRun(row: SaveRunInput): Promise<string | null> {
+  if (!client) return null;
+  const ck = cacheKey(row.kind, row.flatKey);
   try {
     await client.database.from(TABLE).upsert(
       {
-        cache_key: cacheKey(row.kind, row.flatKey),
+        cache_key: ck,
         kind: row.kind,
         flat_key: row.flatKey,
         query_text: row.queryText,
@@ -79,8 +114,10 @@ export async function saveRun(row: SaveRunInput): Promise<void> {
       },
       { onConflict: "cache_key" },
     );
+    return await findRunId(row.kind, row.flatKey);
   } catch {
     // 静默: 写库失败不能影响给用户返回结果
+    return null;
   }
 }
 

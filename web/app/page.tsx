@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import Landing from "./Landing";
 import { SEARCH_SAMPLES, VERIFY_SAMPLES, HERO_BIO } from "@/lib/cache";
+import { CandidateCard, TrustReportView, type Candidate } from "@/components/result";
 
 type FeedItem = { id: number; kind: "search" | "fetch"; info: string };
 type HistoryItem = {
@@ -12,158 +13,6 @@ type HistoryItem = {
   query_text: string;
   updated_at: string;
 };
-
-// ---- 类型 ----
-type Verdict = "verified" | "contradicted" | "unverified";
-type Evidence = { note: string; url: string };
-type Claim = { claim: string; verdict: Verdict; evidence: Evidence[] };
-type Candidate = {
-  name: string;
-  headline: string;
-  links: { github?: string | null; linkedin?: string | null; other?: string | null };
-  claims: Claim[];
-  summary: string;
-};
-type VerifyReport = {
-  candidate_name: string;
-  overall_trust: "high" | "medium" | "low";
-  claims: Claim[];
-  red_flags: string[];
-};
-
-// ---- 设计令牌: 裁决语义色 (与 DESIGN-SYSTEM.md 一致) ----
-const VERDICT: Record<Verdict, { label: string; icon: string; chip: string; bar: string }> = {
-  verified: { label: "已验证", icon: "✓", chip: "bg-emerald-50 text-emerald-700 ring-emerald-200", bar: "border-l-emerald-400" },
-  contradicted: { label: "矛盾", icon: "✕", chip: "bg-red-50 text-red-700 ring-red-200", bar: "border-l-red-400" },
-  unverified: { label: "查无实据", icon: "?", chip: "bg-amber-50 text-amber-700 ring-amber-200", bar: "border-l-amber-400" },
-};
-
-function host(url: string): string {
-  try { return new URL(url).hostname.replace(/^www\./, ""); } catch { return "来源"; }
-}
-
-// ---- 小组件 ----
-function VerdictBadge({ v }: { v: Verdict }) {
-  const m = VERDICT[v] ?? VERDICT.unverified;
-  return (
-    <span className={`inline-flex shrink-0 items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-semibold ring-1 ${m.chip}`}>
-      <span className="font-bold">{m.icon}</span>
-      {m.label}
-    </span>
-  );
-}
-
-// 候选人卡头部的裁决统计
-function Tally({ claims }: { claims: Claim[] }) {
-  const counts = claims.reduce((a, c) => ((a[c.verdict] = (a[c.verdict] ?? 0) + 1), a), {} as Record<Verdict, number>);
-  const order: Verdict[] = ["verified", "unverified", "contradicted"];
-  return (
-    <div className="flex flex-wrap gap-1.5">
-      {order.filter((v) => counts[v]).map((v) => (
-        <span key={v} className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold ring-1 ${VERDICT[v].chip}`}>
-          <span className="font-bold">{VERDICT[v].icon}</span>
-          {counts[v]} {VERDICT[v].label}
-        </span>
-      ))}
-    </div>
-  );
-}
-
-function ClaimBlock({ c }: { c: Claim }) {
-  const m = VERDICT[c.verdict] ?? VERDICT.unverified;
-  return (
-    <div className={`rounded-xl border-l-2 bg-gray-50/70 p-3.5 ${m.bar}`}>
-      <div className="flex items-start justify-between gap-3">
-        <p className="text-sm leading-relaxed text-gray-900">{c.claim}</p>
-        <VerdictBadge v={c.verdict} />
-      </div>
-      {c.evidence?.length > 0 && (
-        <ul className="mt-2.5 space-y-1.5">
-          {c.evidence.map((e, i) => (
-            <li key={i} className="text-xs leading-relaxed text-gray-500">
-              {e.note}
-              {e.url && (
-                <a
-                  href={e.url}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="ml-1.5 inline-flex items-center gap-0.5 rounded-md bg-white px-1.5 py-0.5 font-medium text-blue-600 ring-1 ring-gray-200 hover:ring-blue-300"
-                >
-                  {host(e.url)} ↗
-                </a>
-              )}
-            </li>
-          ))}
-        </ul>
-      )}
-    </div>
-  );
-}
-
-function LinkPill({ href, children }: { href: string; children: React.ReactNode }) {
-  return (
-    <a href={href} target="_blank" rel="noreferrer" className="rounded-lg bg-gray-100 px-2.5 py-1 text-xs font-medium text-gray-700 hover:bg-gray-200">
-      {children}
-    </a>
-  );
-}
-
-function CandidateCard({ c }: { c: Candidate }) {
-  return (
-    <article className="rounded-2xl border border-gray-100 bg-white p-5 shadow-[0_8px_30px_rgba(0,0,0,0.06)]">
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <h3 className="text-lg font-semibold text-gray-900">{c.name}</h3>
-          <p className="mt-0.5 text-sm text-gray-500">{c.headline}</p>
-        </div>
-        <div className="flex shrink-0 gap-2">
-          {c.links?.github && <LinkPill href={c.links.github}>GitHub</LinkPill>}
-          {c.links?.linkedin && <LinkPill href={c.links.linkedin}>LinkedIn</LinkPill>}
-          {c.links?.other && <LinkPill href={c.links.other}>主页</LinkPill>}
-        </div>
-      </div>
-      {c.claims?.length > 0 && <div className="mt-3"><Tally claims={c.claims} /></div>}
-      <div className="mt-3 space-y-2.5">
-        {c.claims?.map((cl, i) => <ClaimBlock key={i} c={cl} />)}
-      </div>
-      <p className="mt-4 border-t border-gray-100 pt-3 text-sm italic text-gray-500">{c.summary}</p>
-    </article>
-  );
-}
-
-function TrustReportView({ r }: { r: VerifyReport }) {
-  const trust: Record<string, { ring: string; label: string }> = {
-    high: { ring: "bg-emerald-50 text-emerald-700 ring-emerald-200", label: "高" },
-    medium: { ring: "bg-amber-50 text-amber-700 ring-amber-200", label: "中" },
-    low: { ring: "bg-red-50 text-red-700 ring-red-200", label: "低" },
-  };
-  const t = trust[r.overall_trust] ?? trust.low;
-  return (
-    <article className="rounded-2xl border border-gray-100 bg-white p-5 shadow-[0_8px_30px_rgba(0,0,0,0.06)]">
-      <div className="flex items-center justify-between gap-3">
-        <div>
-          <h3 className="text-lg font-semibold text-gray-900">{r.candidate_name}</h3>
-          {r.claims?.length > 0 && <div className="mt-2"><Tally claims={r.claims} /></div>}
-        </div>
-        <div className={`flex shrink-0 flex-col items-center justify-center rounded-2xl px-4 py-2 ring-1 ${t.ring}`}>
-          <span className="text-[10px] font-medium uppercase tracking-wide opacity-70">可信度</span>
-          <span className="text-lg font-bold leading-none">{t.label}</span>
-        </div>
-      </div>
-      <div className="mt-4 space-y-2.5">
-        {r.claims?.map((cl, i) => <ClaimBlock key={i} c={cl} />)}
-      </div>
-      {r.red_flags?.length > 0 && (
-        <div className="mt-4 rounded-xl border border-red-100 bg-red-50/60 p-4">
-          <p className="text-sm font-semibold text-red-700">🚩 红旗</p>
-          <ul className="mt-1.5 list-disc space-y-1 pl-5 text-sm text-red-600/90">
-            {r.red_flags.map((f, i) => <li key={i}>{f}</li>)}
-          </ul>
-        </div>
-      )}
-    </article>
-  );
-}
 
 // ---- 主页面 ----
 export default function Home() {
@@ -177,6 +26,8 @@ export default function Home() {
   const [feed, setFeed] = useState<FeedItem[]>([]); // 实时研究流: 它在搜什么/抓什么
   const [live, setLive] = useState<{ searches: number; fetches: number } | null>(null);
   const [history, setHistory] = useState<HistoryItem[]>([]);
+  const [runId, setRunId] = useState<string | null>(null); // 可分享报告 id
+  const [copied, setCopied] = useState(false);
   const idRef = useRef(0);
 
   async function loadHistory() {
@@ -202,7 +53,7 @@ export default function Home() {
       else setBio(override);
     }
     setLoading(true); setError(""); setResult(null); setStats(null);
-    setFeed([]); setLive(null);
+    setFeed([]); setLive(null); setRunId(null); setCopied(false);
     try {
       const url = m === "search" ? "/api/search" : "/api/verify";
       const body = m === "search" ? { query: q } : { bio: b };
@@ -237,6 +88,7 @@ export default function Home() {
           } else if (ev.type === "done") {
             setResult(ev.data);
             setStats(ev.stats ?? null);
+            setRunId(ev.runId ?? null);
           } else if (ev.type === "error") {
             setError(ev.error || "出错了");
           }
@@ -365,17 +217,31 @@ export default function Home() {
 
       {result && (
         <div className="mt-6 space-y-4">
-          {stats && (
-            <p className="flex items-center gap-2 text-xs text-gray-500">
-              {stats.cached ? (
-                <span className="rounded-full border border-green-300 bg-green-100 px-2 py-0.5 font-medium text-green-800">
-                  预缓存 · 秒出
-                </span>
-              ) : (
-                <span>本次研究: 网页搜索 {stats.searches} 次 · 抓取 {stats.fetches} 次</span>
-              )}
-            </p>
-          )}
+          <div className="flex items-center justify-between gap-3">
+            {stats ? (
+              <p className="flex items-center gap-2 text-xs text-gray-500">
+                {stats.cached ? (
+                  <span className="rounded-full bg-emerald-50 px-2 py-0.5 font-medium text-emerald-700 ring-1 ring-emerald-200">
+                    预缓存 · 秒出
+                  </span>
+                ) : (
+                  <span>本次研究: 网页搜索 {stats.searches} 次 · 抓取 {stats.fetches} 次</span>
+                )}
+              </p>
+            ) : <span />}
+            {runId && (
+              <button
+                onClick={() => {
+                  navigator.clipboard?.writeText(`${location.origin}/r/${runId}`);
+                  setCopied(true);
+                  setTimeout(() => setCopied(false), 2000);
+                }}
+                className="shrink-0 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 hover:border-gray-900"
+              >
+                {copied ? "✓ 链接已复制" : "🔗 分享报告"}
+              </button>
+            )}
+          </div>
           {mode === "search"
             ? (result.candidates ?? []).map((c: Candidate, i: number) => <CandidateCard key={i} c={c} />)
             : <TrustReportView r={result} />}

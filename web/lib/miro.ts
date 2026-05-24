@@ -59,9 +59,11 @@ export async function streamResearch(userPrompt: string, onStep: OnStep = () => 
 export function researchStream(opts: {
   cached?: unknown;
   prompt?: string;
-  // 实时研究完成时调用 (发送 done 之前), 用于把结果写进 DB。缓存路径不调用。
+  // 命中缓存/DB 时已知的行 id, 随 done 返回供前端生成分享链接 /r/[id]。
+  runId?: string | null;
+  // 实时研究完成时调用 (发送 done 之前), 用于把结果写进 DB 并返回该行 id。缓存路径不调用。
   // DB 无关: 具体写库逻辑由 route 注入; 失败由 onDone 内部吞掉, 不影响返回。
-  onDone?: (data: unknown, stats: { searches: number; fetches: number }) => Promise<void>;
+  onDone?: (data: unknown, stats: { searches: number; fetches: number }) => Promise<string | null | undefined>;
 }): Response {
   const enc = new TextEncoder();
   const stream = new ReadableStream({
@@ -69,7 +71,7 @@ export function researchStream(opts: {
       const send = (o: unknown) => controller.enqueue(enc.encode(JSON.stringify(o) + "\n"));
       try {
         if (opts.cached) {
-          send({ type: "done", data: opts.cached, stats: { searches: 0, fetches: 0, cached: true } });
+          send({ type: "done", data: opts.cached, stats: { searches: 0, fetches: 0, cached: true }, runId: opts.runId ?? null });
           return;
         }
         // 自己用去重计数 (避免分块流式导致同一步重复计数), 让 feed 计数与最终一致。
@@ -88,9 +90,10 @@ export function researchStream(opts: {
         const data = parseJson(out.content);
         if (!data) { send({ type: "error", error: "模型输出不是干净 JSON" }); return; }
         normalizeResult(data);
-        // 写库 (实时结果才写); onDone 自身已吞错, 这里再包一层确保绝不影响返回。
-        if (opts.onDone) { try { await opts.onDone(data, { searches, fetches }); } catch {} }
-        send({ type: "done", data, stats: { searches, fetches } });
+        // 写库 (实时结果才写) 并拿回行 id; onDone 自身已吞错, 这里再包一层确保绝不影响返回。
+        let runId: string | null = null;
+        if (opts.onDone) { try { runId = (await opts.onDone(data, { searches, fetches })) ?? null; } catch {} }
+        send({ type: "done", data, stats: { searches, fetches }, runId });
       } catch (e) {
         send({ type: "error", error: (e as Error).message });
       } finally {
