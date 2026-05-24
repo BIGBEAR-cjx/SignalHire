@@ -39,7 +39,15 @@ export default function Home() {
   // 异步任务: 每 2s 轮询 /api/status, 用 progress 喂实时 feed, 完成/失败时收尾。
   function beginPolling(jobId: string) {
     stopPolling();
+    const startedAt = Date.now();
     pollRef.current = setInterval(async () => {
+      // 兜底: 转太久(worker 未上线/卡住)就停, 友好提示去历史看, 不无限转圈。
+      if (Date.now() - startedAt > 15 * 60 * 1000) {
+        stopPolling();
+        setError("研究排队/运行时间较长。完成后会出现在下方「搜索历史」，可稍后回来查看。");
+        setLoading(false);
+        return;
+      }
       try {
         const r = await fetch(`/api/status?id=${jobId}`);
         const j = await r.json();
