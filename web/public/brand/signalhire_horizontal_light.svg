@@ -1,0 +1,13 @@
+<svg width="1400" height="400" viewBox="0 0 1400 400" xmlns="http://www.w3.org/2000/svg">
+<rect width="1400" height="400" fill="#FFFFFF"/>
+<g transform="translate(70,50)">
+<g stroke="#111111" stroke-width="8" fill="none" stroke-linecap="round">
+<circle cx="150" cy="150" r="100"/>
+<path d="M100 150a50 50 0 1 1 50 50"/>
+<path d="M70 150h25M205 150h25M150 70v25M150 205v25"/>
+<circle cx="150" cy="150" r="8" fill="#9EFF4F" stroke="none"/>
+</g>
+<text x="320" y="175" fill="#111111" font-size="110" font-family="Inter, Arial, sans-serif">SignalHire</text>
+<text x="325" y="235" fill="#666666" font-size="34" font-family="Inter, Arial, sans-serif" letter-spacing="6">FIND SIGNALS. NOT RESUMES.</text>
+</g>
+</svg>

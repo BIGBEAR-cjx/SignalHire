@@ -41,6 +41,20 @@ const STRIP: Src[] = [
   { Icon: SiSubstack, color: "", label: "Substack" },
 ];
 
+// 品牌雷达标 (透明底, 深色描边 + 青柠中心点) —— 浅色导航/正文用。
+function LogoMark({ className = "" }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 512 512" className={className} aria-hidden="true">
+      <g stroke="#111111" strokeWidth={22} fill="none" strokeLinecap="round">
+        <circle cx="256" cy="256" r="130" />
+        <circle cx="256" cy="256" r="70" />
+        <path d="M186 256a70 70 0 1 0 70-70" />
+      </g>
+      <circle cx="256" cy="256" r="16" fill="#9EFF4F" />
+    </svg>
+  );
+}
+
 function Bubble({ Icon, color, label, size }: Src & { size: number }) {
   return (
     <div
@@ -59,8 +73,8 @@ export default function Landing() {
       {/* 顶部浮动导航 */}
       <nav className="sticky top-3 z-30 mx-auto mt-3 flex max-w-5xl items-center justify-between rounded-2xl border border-gray-100 bg-white/80 px-5 py-3 shadow-[0_8px_30px_rgba(0,0,0,0.06)] backdrop-blur">
         <a href="#top" className="flex items-center gap-2 font-semibold text-gray-900">
-          <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-gray-900 text-sm font-bold text-white">H</span>
-          HeadHunter
+          <LogoMark className="h-8 w-8" />
+          <span className="text-[17px] tracking-tight">SignalHire</span>
         </a>
         <div className="hidden items-center gap-7 text-sm text-gray-600 md:flex">
           <a href="#tool" className="hover:text-gray-900">开始使用</a>
