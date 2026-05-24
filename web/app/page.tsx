@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { SEARCH_SAMPLES } from "@/lib/cache";
+import { SEARCH_SAMPLES, VERIFY_SAMPLES, HERO_BIO } from "@/lib/cache";
 
 // ---- 类型 ----
 type Verdict = "verified" | "contradicted" | "unverified";
@@ -20,10 +20,6 @@ type VerifyReport = {
   claims: Claim[];
   red_flags: string[];
 };
-
-const SAMPLE_BIO = `Jordan Smith — Staff Software Engineer at Google.
-I am the original creator of the Tokio asynchronous runtime for Rust, which I started in 2016.
-I have 12 years of professional Rust experience and hold a PhD in Computer Science from Stanford.`;
 
 // ---- 小组件 ----
 function VerdictBadge({ v }: { v: Verdict }) {
@@ -112,19 +108,24 @@ function TrustReportView({ r }: { r: VerifyReport }) {
 export default function Home() {
   const [mode, setMode] = useState<"search" | "verify">("verify");
   const [query, setQuery] = useState("Senior Rust engineer who has contributed to the Tokio project");
-  const [bio, setBio] = useState(SAMPLE_BIO);
+  const [bio, setBio] = useState(HERO_BIO);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [result, setResult] = useState<any>(null);
   const [stats, setStats] = useState<{ searches: number; fetches: number; cached?: boolean } | null>(null);
 
-  async function run(overrideQuery?: string) {
-    const q = overrideQuery ?? query;
-    if (overrideQuery !== undefined) setQuery(overrideQuery);
+  // override: 点示例芯片时传入 —— 搜人模式当作 query, 验证模式当作 bio。
+  async function run(override?: string) {
+    const q = mode === "search" ? (override ?? query) : query;
+    const b = mode === "verify" ? (override ?? bio) : bio;
+    if (override !== undefined) {
+      if (mode === "search") setQuery(override);
+      else setBio(override);
+    }
     setLoading(true); setError(""); setResult(null); setStats(null);
     try {
       const url = mode === "search" ? "/api/search" : "/api/verify";
-      const body = mode === "search" ? { query: q } : { bio };
+      const body = mode === "search" ? { query: q } : { bio: b };
       const res = await fetch(url, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -186,6 +187,22 @@ export default function Home() {
               <button
                 key={s.query}
                 onClick={() => run(s.query)}
+                disabled={loading}
+                className="rounded-full border border-gray-300 bg-gray-50 px-3 py-1 text-xs text-gray-700 hover:border-blue-400 disabled:opacity-50"
+              >
+                {s.label}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {mode === "verify" && (
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            <span className="text-xs text-gray-500">试试示例（秒出）:</span>
+            {VERIFY_SAMPLES.map((s) => (
+              <button
+                key={s.label}
+                onClick={() => run(s.bio)}
                 disabled={loading}
                 className="rounded-full border border-gray-300 bg-gray-50 px-3 py-1 text-xs text-gray-700 hover:border-blue-400 disabled:opacity-50"
               >

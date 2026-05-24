@@ -1,4 +1,5 @@
 import { streamResearch, parseJson, normalizeResult, withRetry, verifyPrompt } from "@/lib/miro";
+import { findCachedVerify } from "@/lib/cache";
 
 export const runtime = "nodejs";
 export const maxDuration = 300; // 验证约 2 分钟, Vercel Pro 上限内可跑
@@ -7,6 +8,12 @@ export async function POST(req: Request) {
   let bio = "";
   try { ({ bio } = await req.json()); } catch {}
   if (!bio?.trim()) return Response.json({ error: "缺少 bio" }, { status: 400 });
+
+  // 先查预缓存: 命中就秒回 (demo 头牌用, 也兜底实时 API 超时/挂掉)。
+  const cached = findCachedVerify(bio);
+  if (cached) {
+    return Response.json({ data: cached, stats: { searches: 0, fetches: 0, cached: true } });
+  }
 
   try {
     const out = await withRetry(() => streamResearch(verifyPrompt(bio)));

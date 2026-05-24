@@ -25,3 +25,4 @@ last_verify_content.txt
 
 # 第三方参考克隆 (不用其代码, 保留本地参考, 不提交到 repo)
 deep-research/
+.gstack/

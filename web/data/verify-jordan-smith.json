@@ -1,0 +1,90 @@
+{
+  "candidate_name": "Jordan Smith",
+  "overall_trust": "low",
+  "claims": [
+    {
+      "claim": "Jordan Smith is a Staff Software Engineer at Google.",
+      "verdict": "contradicted",
+      "evidence": [
+        {
+          "note": "RocketReach lists a Jordan Smith as a Software Engineer at Google (not Staff Software Engineer, and no mention of Rust/Tokio); this is a lower, different title than claimed.",
+          "url": "https://rocketreach.co/jordan-smith-email_80164634"
+        },
+        {
+          "note": "LinkedIn profiles for various people named Jordan Smith show roles such as Software Engineer at Nvidia, Software Executive at Google, Senior Developer Advocate at MongoDB, etc., but none list the title 'Staff Software Engineer' at Google.",
+          "url": "https://www.linkedin.com/in/jordan-smith-project-incur"
+        }
+      ]
+    },
+    {
+      "claim": "Jordan Smith is the original creator of the Tokio asynchronous runtime for Rust.",
+      "verdict": "contradicted",
+      "evidence": [
+        {
+          "note": "Wikipedia’s Tokio (software) article states that Tokio was developed by Carl Lerche, not Jordan Smith.",
+          "url": "https://en.wikipedia.org/wiki/Tokio_(software)"
+        },
+        {
+          "note": "Heavybit podcast description explicitly calls Carl Lerche 'the creator and maintainer of Tokio, the widely used asynchronous runtime for Rust'.",
+          "url": "https://www.heavybit.com/library/podcasts/high-leverage/ep-6-async-runtime-for-rust-with-carl-lerche-of-tokio"
+        },
+        {
+          "note": "Carl Lerche’s X (Twitter) profile describes him as 'Creator of @tokio_rs', attributing Tokio’s creation to him.",
+          "url": "https://x.com/carllerche"
+        }
+      ]
+    },
+    {
+      "claim": "Jordan Smith started Tokio in 2016.",
+      "verdict": "contradicted",
+      "evidence": [
+        {
+          "note": "Wikipedia notes that Tokio was released in August 2016 and developed by Carl Lerche, with no mention of Jordan Smith.",
+          "url": "https://en.wikipedia.org/wiki/Tokio_(software)"
+        },
+        {
+          "note": "Carl Lerche’s 'Announcing Tokio' blog post on Medium introduces Tokio as his project, again attributing origin to Carl in 2016.",
+          "url": "https://medium.com/@carllerche/announcing-tokio-df6bb4ddb34"
+        }
+      ]
+    },
+    {
+      "claim": "Jordan Smith has 12 years of professional Rust experience.",
+      "verdict": "unverified",
+      "evidence": [
+        {
+          "note": "A crates.io page for a Rust crate 'exchange-apiws' credits a Jordan Smith (nuniesmith) as the author of a Rust networking-related crate, indicating some Rust involvement but not establishing 12 years of professional experience.",
+          "url": "https://crates.io/crates/exchange-apiws/0.1.2"
+        },
+        {
+          "note": "Multiple developer profiles for people named Jordan Smith (e.g., TaskRabbit engineer, mobile/web developers) do not document long-term Rust-specific professional history or a clear 12-year Rust career timeline.",
+          "url": "https://medium.com/dev-color/real-talk-with-jordan-smith-ae1490e24f4c"
+        }
+      ]
+    },
+    {
+      "claim": "Jordan Smith holds a PhD in Computer Science from Stanford.",
+      "verdict": "contradicted",
+      "evidence": [
+        {
+          "note": "A JSON Resume registry entry for a Jordan Smith lists 'Computer Science, PhD, Stanford University' as education, but this appears as an unverified, self-authored resume and not as an official Stanford or institutional record.",
+          "url": "https://registry.jsonresume.org/tudorjnu"
+        },
+        {
+          "note": "Stanford Law School’s profile for a Jordan Smith lists her as a non-residential fellow in the Program in Law, Science & Technology with no indication of a PhD in Computer Science.",
+          "url": "https://law.stanford.edu/jordan-smith/"
+        },
+        {
+          "note": "Stanford’s Law, Science & Technology program people page lists Jordan Smith as a non-residential fellow but does not describe her as holding a Stanford Computer Science PhD.",
+          "url": "https://law.stanford.edu/stanford-program-in-law-science-technology/"
+        }
+      ]
+    }
+  ],
+  "red_flags": [
+    "Claiming to be the original creator of Tokio directly contradicts multiple independent sources that attribute creation to Carl Lerche.",
+    "Asserting a Staff Software Engineer title at Google is not supported by public profiles; only a generic Software Engineer listing appears.",
+    "PhD in Computer Science from Stanford appears only in a self-authored resume entry and is not corroborated by Stanford or other authoritative records.",
+    "Magnitude of experience and credentials (creator of Tokio, 12 years Rust, Google staff-level role, Stanford CS PhD) combined with lack of matching public footprint strongly suggests overstatement or fabrication."
+  ]
+}
