@@ -45,10 +45,12 @@ function labelSummary(kind, queryText, data) {
 for (const s of SEEDS) {
   const data = JSON.parse(readFileSync(new URL(`../data/${s.file}`, import.meta.url), "utf8"));
   const { label, summary } = labelSummary(s.kind, s.queryText, data);
+  const flatKey = flatten(s.queryText);
   const { error } = await client.database.from("research_runs").upsert(
     {
+      cache_key: `${s.kind}:${flatKey}`,
       kind: s.kind,
-      flat_key: flatten(s.queryText),
+      flat_key: flatKey,
       query_text: s.queryText,
       label,
       summary,
@@ -56,7 +58,7 @@ for (const s of SEEDS) {
       stats: { searches: 0, fetches: 0 },
       updated_at: new Date().toISOString(),
     },
-    { onConflict: "kind,flat_key" },
+    { onConflict: "cache_key" },
   );
   console.log(`${s.file}: ${error ? "ERR " + error.message : "ok (" + summary + ")"}`);
 }

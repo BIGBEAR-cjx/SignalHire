@@ -22,6 +22,9 @@ const client =
 
 const TABLE = "research_runs";
 
+// 单列唯一键 (Insforge 不支持复合唯一约束), 用于 upsert 去重。
+const cacheKey = (kind: string, flatKey: string) => `${kind}:${flatKey}`;
+
 export type RunKind = "search" | "verify";
 
 export interface SaveRunInput {
@@ -49,8 +52,7 @@ export async function findRun(kind: RunKind, flatKey: string): Promise<unknown |
     const { data, error } = await client.database
       .from(TABLE)
       .select("result")
-      .eq("kind", kind)
-      .eq("flat_key", flatKey)
+      .eq("cache_key", cacheKey(kind, flatKey))
       .limit(1);
     if (error || !data || data.length === 0) return null;
     return (data[0] as { result?: unknown }).result ?? null;
@@ -65,6 +67,7 @@ export async function saveRun(row: SaveRunInput): Promise<void> {
   try {
     await client.database.from(TABLE).upsert(
       {
+        cache_key: cacheKey(row.kind, row.flatKey),
         kind: row.kind,
         flat_key: row.flatKey,
         query_text: row.queryText,
@@ -74,7 +77,7 @@ export async function saveRun(row: SaveRunInput): Promise<void> {
         stats: row.stats,
         updated_at: new Date().toISOString(),
       },
-      { onConflict: "kind,flat_key" },
+      { onConflict: "cache_key" },
     );
   } catch {
     // 静默: 写库失败不能影响给用户返回结果
