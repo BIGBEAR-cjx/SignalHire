@@ -1,7 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { SEARCH_SAMPLES, VERIFY_SAMPLES, HERO_BIO } from "@/lib/cache";
+
+type FeedItem = { id: number; kind: "search" | "fetch"; info: string };
 
 // ---- 类型 ----
 type Verdict = "verified" | "contradicted" | "unverified";
@@ -113,6 +115,9 @@ export default function Home() {
   const [error, setError] = useState("");
   const [result, setResult] = useState<any>(null);
   const [stats, setStats] = useState<{ searches: number; fetches: number; cached?: boolean } | null>(null);
+  const [feed, setFeed] = useState<FeedItem[]>([]); // 实时研究流: 它在搜什么/抓什么
+  const [live, setLive] = useState<{ searches: number; fetches: number } | null>(null);
+  const idRef = useRef(0);
 
   // override: 点示例芯片时传入 —— 搜人模式当作 query, 验证模式当作 bio。
   async function run(override?: string) {
@@ -123,6 +128,7 @@ export default function Home() {
       else setBio(override);
     }
     setLoading(true); setError(""); setResult(null); setStats(null);
+    setFeed([]); setLive(null);
     try {
       const url = mode === "search" ? "/api/search" : "/api/verify";
       const body = mode === "search" ? { query: q } : { bio: b };
@@ -131,10 +137,37 @@ export default function Home() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
       });
-      const json = await res.json();
-      if (!res.ok) throw new Error(json.error ?? `HTTP ${res.status}`);
-      setResult(json.data);
-      setStats(json.stats ?? null);
+      // 错误响应是普通 JSON (非流)
+      if (!res.ok || !res.body) {
+        const j = await res.json().catch(() => ({}));
+        throw new Error(j.error ?? `HTTP ${res.status}`);
+      }
+      // 逐行读取 NDJSON 流: step 事件实时更新 feed, done 事件给最终结果
+      const reader = res.body.getReader();
+      const dec = new TextDecoder();
+      let buf = "";
+      for (;;) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buf += dec.decode(value, { stream: true });
+        let nl: number;
+        while ((nl = buf.indexOf("\n")) >= 0) {
+          const line = buf.slice(0, nl).trim();
+          buf = buf.slice(nl + 1);
+          if (!line) continue;
+          let ev: any;
+          try { ev = JSON.parse(line); } catch { continue; }
+          if (ev.type === "step") {
+            setLive({ searches: ev.searches, fetches: ev.fetches });
+            setFeed((f) => [...f, { id: idRef.current++, kind: ev.kind, info: ev.info }].slice(-50));
+          } else if (ev.type === "done") {
+            setResult(ev.data);
+            setStats(ev.stats ?? null);
+          } else if (ev.type === "error") {
+            setError(ev.error || "出错了");
+          }
+        }
+      }
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -222,9 +255,34 @@ export default function Home() {
       </div>
 
       {loading && (
-        <p className="mt-4 text-sm text-gray-500">
-          MiroMind 正在全网搜索 + 交叉核对，搜人约 4-8 分钟、验证约 2 分钟，请耐心等。
-        </p>
+        <div className="mt-4 rounded-xl border border-gray-200 bg-gray-50 p-4">
+          <div className="flex items-center gap-2 text-sm font-medium text-gray-800">
+            <span className="inline-block h-2 w-2 animate-pulse rounded-full bg-blue-600" />
+            MiroMind 正在全网搜索 + 交叉核对…
+            {live && (
+              <span className="text-gray-500">
+                （搜索 {live.searches} 次 · 抓取 {live.fetches} 次）
+              </span>
+            )}
+          </div>
+          {feed.length === 0 ? (
+            <p className="mt-2 text-xs text-gray-500">启动深度研究中，几秒后开始出现实时进度…</p>
+          ) : (
+            <ul className="mt-3 max-h-64 space-y-1 overflow-auto font-mono text-xs">
+              {feed
+                .slice()
+                .reverse()
+                .map((s) => (
+                  <li key={s.id} className="flex gap-2 text-gray-600">
+                    <span>{s.kind === "search" ? "🔍" : "📄"}</span>
+                    <span className="truncate" title={s.info}>
+                      {s.info || (s.kind === "search" ? "(搜索中)" : "(抓取中)")}
+                    </span>
+                  </li>
+                ))}
+            </ul>
+          )}
+        </div>
       )}
       {error && <p className="mt-4 rounded-lg bg-red-50 p-3 text-sm text-red-700">出错: {error}</p>}
 

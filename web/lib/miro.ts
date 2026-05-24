@@ -50,6 +50,55 @@ export async function streamResearch(userPrompt: string, onStep: OnStep = () => 
   return { content, searches, fetches, thinks };
 }
 
+// 把一次研究封装成"流式 NDJSON 响应"给前端: 每行一个 JSON 事件。
+//   {"type":"step","kind":"search"|"fetch","info":"...","searches":N,"fetches":M}
+//   {"type":"done","data":{...},"stats":{searches,fetches,cached?}}
+//   {"type":"error","error":"..."}
+// 命中缓存时只发一个 done (秒回); 否则边研究边把搜索/抓取进度推给前端 (把等待变表演)。
+// 前端只需处理这一种流, 缓存与实时走同一条代码路径。
+export function researchStream(opts: { cached?: unknown; prompt?: string }): Response {
+  const enc = new TextEncoder();
+  const stream = new ReadableStream({
+    async start(controller) {
+      const send = (o: unknown) => controller.enqueue(enc.encode(JSON.stringify(o) + "\n"));
+      try {
+        if (opts.cached) {
+          send({ type: "done", data: opts.cached, stats: { searches: 0, fetches: 0, cached: true } });
+          return;
+        }
+        // 自己用去重计数 (避免分块流式导致同一步重复计数), 让 feed 计数与最终一致。
+        let searches = 0, fetches = 0, lastS = "", lastF = "";
+        const out = await streamResearch(opts.prompt!, (kind, info = "") => {
+          if (kind === "search") {
+            if (info && info === lastS) return;
+            lastS = info; searches++;
+            send({ type: "step", kind, info, searches, fetches });
+          } else if (kind === "fetch") {
+            if (info && info === lastF) return;
+            lastF = info; fetches++;
+            send({ type: "step", kind, info, searches, fetches });
+          }
+        });
+        const data = parseJson(out.content);
+        if (!data) { send({ type: "error", error: "模型输出不是干净 JSON" }); return; }
+        normalizeResult(data);
+        send({ type: "done", data, stats: { searches, fetches } });
+      } catch (e) {
+        send({ type: "error", error: (e as Error).message });
+      } finally {
+        controller.close();
+      }
+    },
+  });
+  return new Response(stream, {
+    headers: {
+      "Content-Type": "application/x-ndjson; charset=utf-8",
+      "Cache-Control": "no-cache, no-transform",
+      "X-Accel-Buffering": "no", // 关掉反向代理缓冲, 保证逐步推送
+    },
+  });
+}
+
 // content 解析成 JSON (容错: 抓第一个 {...})
 export function parseJson(content: string): any {
   try { return JSON.parse(content); } catch {}
