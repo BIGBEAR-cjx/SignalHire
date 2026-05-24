@@ -31,32 +31,65 @@ type VerifyReport = {
   red_flags: string[];
 };
 
+// ---- 设计令牌: 裁决语义色 (与 DESIGN-SYSTEM.md 一致) ----
+const VERDICT: Record<Verdict, { label: string; icon: string; chip: string; bar: string }> = {
+  verified: { label: "已验证", icon: "✓", chip: "bg-emerald-50 text-emerald-700 ring-emerald-200", bar: "border-l-emerald-400" },
+  contradicted: { label: "矛盾", icon: "✕", chip: "bg-red-50 text-red-700 ring-red-200", bar: "border-l-red-400" },
+  unverified: { label: "查无实据", icon: "?", chip: "bg-amber-50 text-amber-700 ring-amber-200", bar: "border-l-amber-400" },
+};
+
+function host(url: string): string {
+  try { return new URL(url).hostname.replace(/^www\./, ""); } catch { return "来源"; }
+}
+
 // ---- 小组件 ----
 function VerdictBadge({ v }: { v: Verdict }) {
-  const map: Record<Verdict, { label: string; cls: string }> = {
-    verified: { label: "✅ 已验证", cls: "bg-green-100 text-green-800 border-green-300" },
-    contradicted: { label: "❌ 矛盾", cls: "bg-red-100 text-red-800 border-red-300" },
-    unverified: { label: "⚠️ 查无实据", cls: "bg-amber-100 text-amber-800 border-amber-300" },
-  };
-  const { label, cls } = map[v] ?? map.unverified;
-  return <span className={`inline-block rounded-full border px-2 py-0.5 text-xs font-medium ${cls}`}>{label}</span>;
+  const m = VERDICT[v] ?? VERDICT.unverified;
+  return (
+    <span className={`inline-flex shrink-0 items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-semibold ring-1 ${m.chip}`}>
+      <span className="font-bold">{m.icon}</span>
+      {m.label}
+    </span>
+  );
+}
+
+// 候选人卡头部的裁决统计
+function Tally({ claims }: { claims: Claim[] }) {
+  const counts = claims.reduce((a, c) => ((a[c.verdict] = (a[c.verdict] ?? 0) + 1), a), {} as Record<Verdict, number>);
+  const order: Verdict[] = ["verified", "unverified", "contradicted"];
+  return (
+    <div className="flex flex-wrap gap-1.5">
+      {order.filter((v) => counts[v]).map((v) => (
+        <span key={v} className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold ring-1 ${VERDICT[v].chip}`}>
+          <span className="font-bold">{VERDICT[v].icon}</span>
+          {counts[v]} {VERDICT[v].label}
+        </span>
+      ))}
+    </div>
+  );
 }
 
 function ClaimBlock({ c }: { c: Claim }) {
+  const m = VERDICT[c.verdict] ?? VERDICT.unverified;
   return (
-    <div className="rounded-lg border border-gray-200 p-3">
-      <div className="flex items-start justify-between gap-2">
-        <p className="text-sm text-gray-900">{c.claim}</p>
+    <div className={`rounded-xl border-l-2 bg-gray-50/70 p-3.5 ${m.bar}`}>
+      <div className="flex items-start justify-between gap-3">
+        <p className="text-sm leading-relaxed text-gray-900">{c.claim}</p>
         <VerdictBadge v={c.verdict} />
       </div>
       {c.evidence?.length > 0 && (
-        <ul className="mt-2 space-y-1">
+        <ul className="mt-2.5 space-y-1.5">
           {c.evidence.map((e, i) => (
-            <li key={i} className="text-xs text-gray-600">
-              • {e.note}{" "}
+            <li key={i} className="text-xs leading-relaxed text-gray-500">
+              {e.note}
               {e.url && (
-                <a href={e.url} target="_blank" rel="noreferrer" className="text-blue-600 underline break-all">
-                  来源
+                <a
+                  href={e.url}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="ml-1.5 inline-flex items-center gap-0.5 rounded-md bg-white px-1.5 py-0.5 font-medium text-blue-600 ring-1 ring-gray-200 hover:ring-blue-300"
+                >
+                  {host(e.url)} ↗
                 </a>
               )}
             </li>
@@ -67,50 +100,68 @@ function ClaimBlock({ c }: { c: Claim }) {
   );
 }
 
+function LinkPill({ href, children }: { href: string; children: React.ReactNode }) {
+  return (
+    <a href={href} target="_blank" rel="noreferrer" className="rounded-lg bg-gray-100 px-2.5 py-1 text-xs font-medium text-gray-700 hover:bg-gray-200">
+      {children}
+    </a>
+  );
+}
+
 function CandidateCard({ c }: { c: Candidate }) {
   return (
-    <div className="rounded-xl border border-gray-300 bg-white p-4 shadow-sm">
-      <h3 className="text-lg font-semibold text-gray-900">{c.name}</h3>
-      <p className="text-sm text-gray-600">{c.headline}</p>
-      <div className="mt-1 flex gap-3 text-xs">
-        {c.links?.github && <a href={c.links.github} target="_blank" rel="noreferrer" className="text-blue-600 underline">GitHub</a>}
-        {c.links?.linkedin && <a href={c.links.linkedin} target="_blank" rel="noreferrer" className="text-blue-600 underline">LinkedIn</a>}
-        {c.links?.other && <a href={c.links.other} target="_blank" rel="noreferrer" className="text-blue-600 underline">其他</a>}
+    <article className="rounded-2xl border border-gray-100 bg-white p-5 shadow-[0_8px_30px_rgba(0,0,0,0.06)]">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <h3 className="text-lg font-semibold text-gray-900">{c.name}</h3>
+          <p className="mt-0.5 text-sm text-gray-500">{c.headline}</p>
+        </div>
+        <div className="flex shrink-0 gap-2">
+          {c.links?.github && <LinkPill href={c.links.github}>GitHub</LinkPill>}
+          {c.links?.linkedin && <LinkPill href={c.links.linkedin}>LinkedIn</LinkPill>}
+          {c.links?.other && <LinkPill href={c.links.other}>主页</LinkPill>}
+        </div>
       </div>
-      <div className="mt-3 space-y-2">
+      {c.claims?.length > 0 && <div className="mt-3"><Tally claims={c.claims} /></div>}
+      <div className="mt-3 space-y-2.5">
         {c.claims?.map((cl, i) => <ClaimBlock key={i} c={cl} />)}
       </div>
-      <p className="mt-3 text-sm italic text-gray-700">{c.summary}</p>
-    </div>
+      <p className="mt-4 border-t border-gray-100 pt-3 text-sm italic text-gray-500">{c.summary}</p>
+    </article>
   );
 }
 
 function TrustReportView({ r }: { r: VerifyReport }) {
-  const trust: Record<string, string> = {
-    high: "bg-green-100 text-green-800 border-green-300",
-    medium: "bg-amber-100 text-amber-800 border-amber-300",
-    low: "bg-red-100 text-red-800 border-red-300",
+  const trust: Record<string, { ring: string; label: string }> = {
+    high: { ring: "bg-emerald-50 text-emerald-700 ring-emerald-200", label: "高" },
+    medium: { ring: "bg-amber-50 text-amber-700 ring-amber-200", label: "中" },
+    low: { ring: "bg-red-50 text-red-700 ring-red-200", label: "低" },
   };
+  const t = trust[r.overall_trust] ?? trust.low;
   return (
-    <div className="rounded-xl border border-gray-300 bg-white p-4 shadow-sm">
-      <div className="flex items-center justify-between">
-        <h3 className="text-lg font-semibold text-gray-900">{r.candidate_name}</h3>
-        <span className={`rounded-full border px-3 py-1 text-sm font-semibold ${trust[r.overall_trust] ?? trust.low}`}>
-          可信度: {r.overall_trust}
-        </span>
+    <article className="rounded-2xl border border-gray-100 bg-white p-5 shadow-[0_8px_30px_rgba(0,0,0,0.06)]">
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <h3 className="text-lg font-semibold text-gray-900">{r.candidate_name}</h3>
+          {r.claims?.length > 0 && <div className="mt-2"><Tally claims={r.claims} /></div>}
+        </div>
+        <div className={`flex shrink-0 flex-col items-center justify-center rounded-2xl px-4 py-2 ring-1 ${t.ring}`}>
+          <span className="text-[10px] font-medium uppercase tracking-wide opacity-70">可信度</span>
+          <span className="text-lg font-bold leading-none">{t.label}</span>
+        </div>
       </div>
-      <div className="mt-3 space-y-2">
+      <div className="mt-4 space-y-2.5">
         {r.claims?.map((cl, i) => <ClaimBlock key={i} c={cl} />)}
       </div>
       {r.red_flags?.length > 0 && (
-        <div className="mt-4 rounded-lg border border-red-200 bg-red-50 p-3">
-          <p className="text-sm font-semibold text-red-800">🚩 红旗</p>
-          <ul className="mt-1 list-disc pl-5 text-sm text-red-700">
+        <div className="mt-4 rounded-xl border border-red-100 bg-red-50/60 p-4">
+          <p className="text-sm font-semibold text-red-700">🚩 红旗</p>
+          <ul className="mt-1.5 list-disc space-y-1 pl-5 text-sm text-red-600/90">
             {r.red_flags.map((f, i) => <li key={i}>{f}</li>)}
           </ul>
         </div>
       )}
-    </div>
+    </article>
   );
 }
 
@@ -203,16 +254,18 @@ export default function Home() {
     <>
       <Landing />
       <main id="tool" className="mx-auto max-w-3xl scroll-mt-24 px-4 pb-16 pt-6">
-      <div className="flex gap-2">
+      <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-[0_8px_30px_rgba(0,0,0,0.06)]">
+      {/* 模式切换: 分段控件 */}
+      <div className="inline-flex rounded-xl bg-gray-100 p-1">
         <button
           onClick={() => setMode("verify")}
-          className={`rounded-lg px-4 py-2 text-sm font-medium ${mode === "verify" ? "bg-gray-900 text-white" : "bg-gray-100 text-gray-700"}`}
+          className={`rounded-lg px-4 py-1.5 text-sm font-medium transition ${mode === "verify" ? "bg-white text-gray-900 shadow-sm" : "text-gray-500 hover:text-gray-800"}`}
         >
           验证候选人 (打脸)
         </button>
         <button
           onClick={() => setMode("search")}
-          className={`rounded-lg px-4 py-2 text-sm font-medium ${mode === "search" ? "bg-gray-900 text-white" : "bg-gray-100 text-gray-700"}`}
+          className={`rounded-lg px-4 py-1.5 text-sm font-medium transition ${mode === "search" ? "bg-white text-gray-900 shadow-sm" : "text-gray-500 hover:text-gray-800"}`}
         >
           搜人
         </button>
@@ -224,7 +277,7 @@ export default function Home() {
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="例如: Senior Rust engineer who contributed to tokio"
-            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-gray-900"
+            className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-gray-900 outline-none transition placeholder:text-gray-400 focus:border-gray-900 focus:bg-white"
           />
         ) : (
           <textarea
@@ -232,7 +285,7 @@ export default function Home() {
             onChange={(e) => setBio(e.target.value)}
             rows={5}
             placeholder="粘贴候选人的自述 / 简历 / LinkedIn 介绍..."
-            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-gray-900"
+            className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-gray-900 outline-none transition placeholder:text-gray-400 focus:border-gray-900 focus:bg-white"
           />
         )}
 
@@ -244,7 +297,7 @@ export default function Home() {
                 key={s.query}
                 onClick={() => run(s.query)}
                 disabled={loading}
-                className="rounded-full border border-gray-300 bg-gray-50 px-3 py-1 text-xs text-gray-700 hover:border-blue-400 disabled:opacity-50"
+                className="rounded-full border border-gray-200 bg-white px-3 py-1 text-xs font-medium text-gray-600 transition hover:border-gray-900 hover:text-gray-900 disabled:opacity-50"
               >
                 {s.label}
               </button>
@@ -260,7 +313,7 @@ export default function Home() {
                 key={s.label}
                 onClick={() => run(s.bio)}
                 disabled={loading}
-                className="rounded-full border border-gray-300 bg-gray-50 px-3 py-1 text-xs text-gray-700 hover:border-blue-400 disabled:opacity-50"
+                className="rounded-full border border-gray-200 bg-white px-3 py-1 text-xs font-medium text-gray-600 transition hover:border-gray-900 hover:text-gray-900 disabled:opacity-50"
               >
                 {s.label}
               </button>
@@ -271,16 +324,17 @@ export default function Home() {
         <button
           onClick={() => run()}
           disabled={loading}
-          className="mt-3 rounded-lg bg-blue-600 px-5 py-2 font-medium text-white disabled:opacity-50"
+          className="mt-4 w-full rounded-xl bg-gray-900 px-5 py-3 font-medium text-white transition hover:bg-gray-800 disabled:opacity-50 sm:w-auto"
         >
-          {loading ? "深度研究中..." : mode === "search" ? "搜索候选人" : "验证"}
+          {loading ? "深度研究中…" : mode === "search" ? "搜索候选人" : "验证候选人"}
         </button>
+      </div>
       </div>
 
       {loading && (
-        <div className="mt-4 rounded-xl border border-gray-200 bg-gray-50 p-4">
+        <div className="mt-5 rounded-2xl border border-gray-100 bg-white p-5 shadow-[0_8px_30px_rgba(0,0,0,0.06)]">
           <div className="flex items-center gap-2 text-sm font-medium text-gray-800">
-            <span className="inline-block h-2 w-2 animate-pulse rounded-full bg-blue-600" />
+            <span className="inline-block h-2 w-2 animate-pulse rounded-full bg-emerald-500" />
             MiroMind 正在全网搜索 + 交叉核对…
             {live && (
               <span className="text-gray-500">
@@ -307,7 +361,7 @@ export default function Home() {
           )}
         </div>
       )}
-      {error && <p className="mt-4 rounded-lg bg-red-50 p-3 text-sm text-red-700">出错: {error}</p>}
+      {error && <p className="mt-5 rounded-xl border border-red-100 bg-red-50 p-4 text-sm text-red-700">出错: {error}</p>}
 
       {result && (
         <div className="mt-6 space-y-4">
