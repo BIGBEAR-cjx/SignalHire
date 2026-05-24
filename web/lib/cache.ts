@@ -46,7 +46,8 @@ function tokens(s: string): Set<string> {
       .filter((w) => w.length > 1 && !STOP.has(w)),
   );
 }
-function flatten(s: string): string {
+// 归一化成查找键: 小写、去标点、压空白。db.ts 也用它生成 DB 的 flat_key, 保持一致。
+export function flatten(s: string): string {
   return s.toLowerCase().replace(/[^a-z0-9一-龥]+/g, " ").trim();
 }
 

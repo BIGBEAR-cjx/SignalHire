@@ -56,7 +56,13 @@ export async function streamResearch(userPrompt: string, onStep: OnStep = () => 
 //   {"type":"error","error":"..."}
 // 命中缓存时只发一个 done (秒回); 否则边研究边把搜索/抓取进度推给前端 (把等待变表演)。
 // 前端只需处理这一种流, 缓存与实时走同一条代码路径。
-export function researchStream(opts: { cached?: unknown; prompt?: string }): Response {
+export function researchStream(opts: {
+  cached?: unknown;
+  prompt?: string;
+  // 实时研究完成时调用 (发送 done 之前), 用于把结果写进 DB。缓存路径不调用。
+  // DB 无关: 具体写库逻辑由 route 注入; 失败由 onDone 内部吞掉, 不影响返回。
+  onDone?: (data: unknown, stats: { searches: number; fetches: number }) => Promise<void>;
+}): Response {
   const enc = new TextEncoder();
   const stream = new ReadableStream({
     async start(controller) {
@@ -82,6 +88,8 @@ export function researchStream(opts: { cached?: unknown; prompt?: string }): Res
         const data = parseJson(out.content);
         if (!data) { send({ type: "error", error: "模型输出不是干净 JSON" }); return; }
         normalizeResult(data);
+        // 写库 (实时结果才写); onDone 自身已吞错, 这里再包一层确保绝不影响返回。
+        if (opts.onDone) { try { await opts.onDone(data, { searches, fetches }); } catch {} }
         send({ type: "done", data, stats: { searches, fetches } });
       } catch (e) {
         send({ type: "error", error: (e as Error).message });

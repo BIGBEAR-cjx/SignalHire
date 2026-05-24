@@ -1,9 +1,16 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { SEARCH_SAMPLES, VERIFY_SAMPLES, HERO_BIO } from "@/lib/cache";
 
 type FeedItem = { id: number; kind: "search" | "fetch"; info: string };
+type HistoryItem = {
+  kind: "search" | "verify";
+  label: string;
+  summary: string;
+  query_text: string;
+  updated_at: string;
+};
 
 // ---- 类型 ----
 type Verdict = "verified" | "contradicted" | "unverified";
@@ -117,21 +124,36 @@ export default function Home() {
   const [stats, setStats] = useState<{ searches: number; fetches: number; cached?: boolean } | null>(null);
   const [feed, setFeed] = useState<FeedItem[]>([]); // 实时研究流: 它在搜什么/抓什么
   const [live, setLive] = useState<{ searches: number; fetches: number } | null>(null);
+  const [history, setHistory] = useState<HistoryItem[]>([]);
   const idRef = useRef(0);
 
-  // override: 点示例芯片时传入 —— 搜人模式当作 query, 验证模式当作 bio。
-  async function run(override?: string) {
-    const q = mode === "search" ? (override ?? query) : query;
-    const b = mode === "verify" ? (override ?? bio) : bio;
+  async function loadHistory() {
+    try {
+      const r = await fetch("/api/history");
+      const j = await r.json();
+      setHistory(j.runs ?? []);
+    } catch {
+      // 历史拉取失败不影响主流程
+    }
+  }
+  useEffect(() => { loadHistory(); }, []);
+
+  // override: 点示例芯片/历史时传入 —— 搜人模式当作 query, 验证模式当作 bio。
+  // forceMode: 点历史记录时强制切到该条所属模式 (search/verify)。
+  async function run(override?: string, forceMode?: "search" | "verify") {
+    const m = forceMode ?? mode;
+    if (forceMode && forceMode !== mode) setMode(forceMode);
+    const q = m === "search" ? (override ?? query) : query;
+    const b = m === "verify" ? (override ?? bio) : bio;
     if (override !== undefined) {
-      if (mode === "search") setQuery(override);
+      if (m === "search") setQuery(override);
       else setBio(override);
     }
     setLoading(true); setError(""); setResult(null); setStats(null);
     setFeed([]); setLive(null);
     try {
-      const url = mode === "search" ? "/api/search" : "/api/verify";
-      const body = mode === "search" ? { query: q } : { bio: b };
+      const url = m === "search" ? "/api/search" : "/api/verify";
+      const body = m === "search" ? { query: q } : { bio: b };
       const res = await fetch(url, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -172,6 +194,7 @@ export default function Home() {
       setError((e as Error).message);
     } finally {
       setLoading(false);
+      loadHistory(); // 实时研究完成会写库 → 刷新历史面板
     }
   }
 
@@ -303,6 +326,40 @@ export default function Home() {
             ? (result.candidates ?? []).map((c: Candidate, i: number) => <CandidateCard key={i} c={c} />)
             : <TrustReportView r={result} />}
         </div>
+      )}
+
+      {history.length > 0 && (
+        <section className="mt-10 border-t border-gray-200 pt-6">
+          <h2 className="text-sm font-semibold text-gray-700">搜索历史</h2>
+          <p className="mt-0.5 text-xs text-gray-400">点击任意一条可秒速重新打开（已存入数据库）</p>
+          <ul className="mt-3 space-y-2">
+            {history.map((h, i) => (
+              <li key={i}>
+                <button
+                  onClick={() => run(h.query_text, h.kind)}
+                  disabled={loading}
+                  className="flex w-full items-center justify-between gap-3 rounded-lg border border-gray-200 bg-white px-3 py-2 text-left hover:border-blue-400 disabled:opacity-50"
+                >
+                  <span className="flex min-w-0 items-center gap-2">
+                    <span
+                      className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-medium ${
+                        h.kind === "verify"
+                          ? "bg-amber-100 text-amber-800"
+                          : "bg-blue-100 text-blue-800"
+                      }`}
+                    >
+                      {h.kind === "verify" ? "验证" : "搜人"}
+                    </span>
+                    <span className="truncate text-sm text-gray-800" title={h.query_text}>
+                      {h.label}
+                    </span>
+                  </span>
+                  <span className="shrink-0 text-xs text-gray-400">{h.summary}</span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        </section>
       )}
     </main>
   );
