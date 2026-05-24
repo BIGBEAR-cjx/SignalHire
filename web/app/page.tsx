@@ -29,6 +29,42 @@ export default function Home() {
   const [runId, setRunId] = useState<string | null>(null); // 可分享报告 id
   const [copied, setCopied] = useState(false);
   const idRef = useRef(0);
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  function stopPolling() {
+    if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null; }
+  }
+  useEffect(() => stopPolling, []); // 卸载时清理轮询
+
+  // 异步任务: 每 2s 轮询 /api/status, 用 progress 喂实时 feed, 完成/失败时收尾。
+  function beginPolling(jobId: string) {
+    stopPolling();
+    pollRef.current = setInterval(async () => {
+      try {
+        const r = await fetch(`/api/status?id=${jobId}`);
+        const j = await r.json();
+        const p = j.progress;
+        if (p) {
+          setLive({ searches: p.searches ?? 0, fetches: p.fetches ?? 0 });
+          setFeed((p.recent ?? []).map((x: { kind: "search" | "fetch"; info: string }, i: number) => ({ id: i, kind: x.kind, info: x.info })));
+        }
+        if (j.status === "done") {
+          stopPolling();
+          setResult(j.result);
+          setStats(p ? { searches: p.searches, fetches: p.fetches } : null);
+          setRunId(j.runId ?? jobId);
+          setLoading(false);
+          loadHistory();
+        } else if (j.status === "error") {
+          stopPolling();
+          setError(j.error || "研究失败，请重试");
+          setLoading(false);
+        }
+      } catch {
+        // 网络抖动忽略, 下次轮询继续
+      }
+    }, 2000);
+  }
 
   async function loadHistory() {
     try {
@@ -52,6 +88,7 @@ export default function Home() {
       if (m === "search") setQuery(override);
       else setBio(override);
     }
+    stopPolling();
     setLoading(true); setError(""); setResult(null); setStats(null);
     setFeed([]); setLive(null); setRunId(null); setCopied(false);
     try {
@@ -62,43 +99,51 @@ export default function Home() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
       });
-      // 错误响应是普通 JSON (非流)
-      if (!res.ok || !res.body) {
-        const j = await res.json().catch(() => ({}));
-        throw new Error(j.error ?? `HTTP ${res.status}`);
-      }
-      // 逐行读取 NDJSON 流: step 事件实时更新 feed, done 事件给最终结果
-      const reader = res.body.getReader();
-      const dec = new TextDecoder();
-      let buf = "";
-      for (;;) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        buf += dec.decode(value, { stream: true });
-        let nl: number;
-        while ((nl = buf.indexOf("\n")) >= 0) {
-          const line = buf.slice(0, nl).trim();
-          buf = buf.slice(nl + 1);
-          if (!line) continue;
-          let ev: any;
-          try { ev = JSON.parse(line); } catch { continue; }
-          if (ev.type === "step") {
-            setLive({ searches: ev.searches, fetches: ev.fetches });
-            setFeed((f) => [...f, { id: idRef.current++, kind: ev.kind, info: ev.info }].slice(-50));
-          } else if (ev.type === "done") {
-            setResult(ev.data);
-            setStats(ev.stats ?? null);
-            setRunId(ev.runId ?? null);
-          } else if (ev.type === "error") {
-            setError(ev.error || "出错了");
+      const ct = res.headers.get("content-type") || "";
+
+      if (ct.includes("ndjson") && res.body) {
+        // 缓存命中: 读 NDJSON 流 (通常单个 done 事件)
+        const reader = res.body.getReader();
+        const dec = new TextDecoder();
+        let buf = "";
+        for (;;) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          buf += dec.decode(value, { stream: true });
+          let nl: number;
+          while ((nl = buf.indexOf("\n")) >= 0) {
+            const line = buf.slice(0, nl).trim();
+            buf = buf.slice(nl + 1);
+            if (!line) continue;
+            let ev: any;
+            try { ev = JSON.parse(line); } catch { continue; }
+            if (ev.type === "step") {
+              setLive({ searches: ev.searches, fetches: ev.fetches });
+              setFeed((f) => [...f, { id: idRef.current++, kind: ev.kind, info: ev.info }].slice(-50));
+            } else if (ev.type === "done") {
+              setResult(ev.data);
+              setStats(ev.stats ?? null);
+              setRunId(ev.runId ?? null);
+            } else if (ev.type === "error") {
+              setError(ev.error || "出错了");
+            }
           }
+        }
+        setLoading(false);
+        loadHistory();
+      } else {
+        // JSON: 要么入队成功(转轮询), 要么错误
+        const j = await res.json().catch(() => ({}));
+        if (!res.ok) { setError(j.error ?? `HTTP ${res.status}`); setLoading(false); return; }
+        if (j.queued && j.jobId) {
+          beginPolling(j.jobId); // loading 保持 true, 轮询完成/失败时再关闭
+        } else {
+          setError(j.error ?? "出错了"); setLoading(false);
         }
       }
     } catch (e) {
       setError((e as Error).message);
-    } finally {
       setLoading(false);
-      loadHistory(); // 实时研究完成会写库 → 刷新历史面板
     }
   }
 
@@ -195,7 +240,7 @@ export default function Home() {
             )}
           </div>
           {feed.length === 0 ? (
-            <p className="mt-2 text-xs text-gray-500">启动深度研究中，几秒后开始出现实时进度…</p>
+            <p className="mt-2 text-xs text-gray-500">已进入研究队列，深度研究约几分钟，进度会实时显示、完成后自动出结果…</p>
           ) : (
             <ul className="mt-3 max-h-64 space-y-1 overflow-auto font-mono text-xs">
               {feed

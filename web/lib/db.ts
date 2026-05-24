@@ -121,13 +121,54 @@ export async function saveRun(row: SaveRunInput): Promise<string | null> {
   }
 }
 
-// 历史面板: 最近的运行 (按更新时间倒序)。
+// 入队一个异步任务 (实时查询缓存未命中时): 插 status='queued' 行, 返回 id 供前端轮询。
+// worker (Insforge Compute) 会认领并跑完, 写回 result + status='done'。
+export async function enqueue(input: {
+  kind: RunKind; flatKey: string; queryText: string; label: string;
+}): Promise<string | null> {
+  if (!client) return null;
+  const ck = cacheKey(input.kind, input.flatKey);
+  try {
+    await client.database.from(TABLE).upsert(
+      {
+        cache_key: ck, kind: input.kind, flat_key: input.flatKey,
+        query_text: input.queryText, label: input.label,
+        summary: "研究中…", result: null, stats: null,
+        status: "queued", error: null, progress: null,
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: "cache_key" },
+    );
+    return await findRunId(input.kind, input.flatKey);
+  } catch {
+    return null;
+  }
+}
+
+// 前端轮询: 按 id 取任务状态/进度/结果。
+export async function getStatus(id: string): Promise<{
+  status: string; progress: unknown; result: unknown; error: string | null;
+} | null> {
+  if (!client) return null;
+  try {
+    const { data, error } = await client.database
+      .from(TABLE).select("status,progress,result,error").eq("id", id).limit(1);
+    if (error || !data || data.length === 0) return null;
+    const r = data[0] as { status?: string; progress?: unknown; result?: unknown; error?: string | null };
+    return { status: r.status ?? "done", progress: r.progress ?? null, result: r.result ?? null, error: r.error ?? null };
+  } catch {
+    return null;
+  }
+}
+
+// 历史面板: 最近的运行 (按更新时间倒序)。只显示已完成的 (status=done)。
 export async function recentRuns(limit = 20): Promise<RecentRun[]> {
   if (!client) return [];
   try {
     const { data, error } = await client.database
       .from(TABLE)
       .select("kind,label,summary,query_text,updated_at")
+      .eq("status", "done")
       .order("updated_at", { ascending: false })
       .limit(limit);
     if (error || !data) return [];

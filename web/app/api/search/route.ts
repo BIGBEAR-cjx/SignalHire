@@ -1,6 +1,6 @@
-import { researchStream, searchPrompt } from "@/lib/miro";
+import { researchStream } from "@/lib/miro";
 import { findCachedSearch, flatten } from "@/lib/cache";
-import { findRun, findRunId, saveRun } from "@/lib/db";
+import { findRun, findRunId, enqueue } from "@/lib/db";
 
 export const runtime = "nodejs";
 export const maxDuration = 300; // 秒。Vercel 上实时搜人可能超时 → 命中缓存可秒回
@@ -21,20 +21,13 @@ export async function POST(req: Request) {
   const dbHit = await findRun("search", flatKey);
   if (dbHit) return researchStream({ cached: dbHit.result, runId: dbHit.id });
 
-  // ③ 实时研究; 完成时写库并拿回行 id
-  return researchStream({
-    prompt: searchPrompt(query),
-    onDone: (data, stats) => {
-      const n = Array.isArray((data as any)?.candidates) ? (data as any).candidates.length : 0;
-      return saveRun({
-        kind: "search",
-        flatKey,
-        queryText: query,
-        label: query.length > 60 ? query.slice(0, 60) + "…" : query,
-        summary: `${n} 位候选人`,
-        result: data,
-        stats,
-      });
-    },
+  // ③ 实时研究太慢(4-10分钟)会超 Vercel 时限 → 入队, 立刻返回 jobId, 由后台 worker 跑完, 前端轮询。
+  const jobId = await enqueue({
+    kind: "search",
+    flatKey,
+    queryText: query,
+    label: query.length > 60 ? query.slice(0, 60) + "…" : query,
   });
+  if (!jobId) return Response.json({ error: "队列暂不可用 (DB 未配置)，请试试示例查询" }, { status: 503 });
+  return Response.json({ queued: true, jobId });
 }

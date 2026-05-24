@@ -1,0 +1,12 @@
+{
+  "name": "signalhire-worker",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node index.mjs"
+  },
+  "dependencies": {
+    "@insforge/sdk": "^1.2.10"
+  }
+}

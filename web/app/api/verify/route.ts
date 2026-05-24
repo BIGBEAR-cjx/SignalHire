@@ -1,6 +1,6 @@
-import { researchStream, verifyPrompt } from "@/lib/miro";
+import { researchStream } from "@/lib/miro";
 import { findCachedVerify, flatten } from "@/lib/cache";
-import { findRun, findRunId, saveRun } from "@/lib/db";
+import { findRun, findRunId, enqueue } from "@/lib/db";
 
 export const runtime = "nodejs";
 export const maxDuration = 300; // 验证约 2 分钟, Vercel Pro 上限内可跑
@@ -21,24 +21,13 @@ export async function POST(req: Request) {
   const dbHit = await findRun("verify", flatKey);
   if (dbHit) return researchStream({ cached: dbHit.result, runId: dbHit.id });
 
-  // ③ 实时核查; 完成时写库并拿回行 id
-  return researchStream({
-    prompt: verifyPrompt(bio),
-    onDone: (data, stats) => {
-      const d = data as any;
-      const claims = Array.isArray(d?.claims) ? d.claims : [];
-      const contra = claims.filter((c: any) => c?.verdict === "contradicted").length;
-      const trust = d?.overall_trust ?? "?";
-      const name = d?.candidate_name || (bio.length > 40 ? bio.slice(0, 40) + "…" : bio);
-      return saveRun({
-        kind: "verify",
-        flatKey,
-        queryText: bio,
-        label: name,
-        summary: `可信度 ${trust}${contra ? ` · ${contra} 矛盾` : ""}`,
-        result: data,
-        stats,
-      });
-    },
+  // ③ 实时核查太慢 → 入队, 立刻返回 jobId, 由后台 worker 跑完, 前端轮询。
+  const jobId = await enqueue({
+    kind: "verify",
+    flatKey,
+    queryText: bio,
+    label: bio.length > 40 ? bio.slice(0, 40) + "…" : bio,
   });
+  if (!jobId) return Response.json({ error: "队列暂不可用 (DB 未配置)，请试试示例查询" }, { status: 503 });
+  return Response.json({ queued: true, jobId });
 }
