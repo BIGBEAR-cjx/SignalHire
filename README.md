@@ -1,10 +1,12 @@
-# HeadHunter
+# SignalHire
+
+*Find signals. Not resumes.*
 
 **Competitors hand you 500 résumés. We hand you 5 people who have already been fact-checked.**
 > 竞品给你 500 份简历。我们给你 5 个**已被核实过**的人。
 
 A technical recruiting tool built on the **MiroMind Deep Research** API. You describe a role in one
-sentence; HeadHunter searches the open web for real candidates and **cross-verifies every claim they
+sentence; SignalHire searches the open web for real candidates and **cross-verifies every claim they
 make** against multiple independent public sources — labelling each as ✅ verified, ⚠️ unverified, or
 ❌ contradicted, with a clickable evidence link for every verdict.
 
@@ -17,7 +19,7 @@ Built for **UCWS 2026 · MiroMind Deep Research Track**.
 The expensive part of hiring isn't *finding* people — it's *verifying* them. Résumés and LinkedIn
 profiles routinely overstate ("core contributor", "5 years at a big tech company"). Existing AI
 recruiting tools (Juicebox, Lessie) are strong on **breadth** (they find a lot) but weak on
-**trust** (they don't check). HeadHunter's edge is exactly that gap: honest, evidence-backed
+**trust** (they don't check). SignalHire's edge is exactly that gap: honest, evidence-backed
 verification.
 
 ## The "wow" moment

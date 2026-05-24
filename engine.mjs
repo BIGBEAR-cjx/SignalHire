@@ -1,4 +1,4 @@
-// engine.mjs —— HeadHunter 引擎 (MiroMind 原生 · 流式版)
+// engine.mjs —— SignalHire 引擎 (MiroMind 原生 · 流式版)
 // 作用: 给一句招聘需求, 让 MiroMind 自己上网搜候选人 + 交叉验证, 输出 JSON。
 //
 // 为什么用流式: 深度研究要几分钟。非流式请求期间不传数据, 会被网络代理当成

@@ -1,5 +1,5 @@
 // Landing.tsx —— 首页落地区 (浅色 SaaS 风, 仿 Deflexai)。
-// 环绕的 logo 气泡 = HeadHunter 交叉验证候选人时引用的公开数据来源,
+// 环绕的 logo 气泡 = SignalHire 交叉验证候选人时引用的公开数据来源,
 // 视觉上直接讲出差异化: 我们横跨这些来源做交叉核实。
 import type { IconType } from "react-icons";
 import {

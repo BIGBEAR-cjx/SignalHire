@@ -1,4 +1,4 @@
-# HeadHunter 设计系统 (v1)
+# SignalHire 设计系统 (v1)
 
 方向：**现代浅色 SaaS**（参考 Deflexai/Linear/Vercel 气质）。干净、留白多、可信、融资 demo 级。
 
