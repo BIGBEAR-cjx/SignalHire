@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import Landing from "./Landing";
 import { SEARCH_SAMPLES, VERIFY_SAMPLES, HERO_BIO } from "@/lib/cache";
 
 type FeedItem = { id: number; kind: "search" | "fetch"; info: string };
@@ -199,11 +200,10 @@ export default function Home() {
   }
 
   return (
-    <main className="mx-auto max-w-3xl px-4 py-10">
-      <h1 className="text-3xl font-bold text-gray-900">HeadHunter</h1>
-      <p className="mt-1 text-gray-600">用 MiroMind 深度搜索 + 跨源交叉验证候选人。每条结论都附证据。</p>
-
-      <div className="mt-6 flex gap-2">
+    <>
+      <Landing />
+      <main id="tool" className="mx-auto max-w-3xl scroll-mt-24 px-4 pb-16 pt-6">
+      <div className="flex gap-2">
         <button
           onClick={() => setMode("verify")}
           className={`rounded-lg px-4 py-2 text-sm font-medium ${mode === "verify" ? "bg-gray-900 text-white" : "bg-gray-100 text-gray-700"}`}
@@ -361,6 +361,7 @@ export default function Home() {
           </ul>
         </section>
       )}
-    </main>
+      </main>
+    </>
   );
 }
