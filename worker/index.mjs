@@ -6,8 +6,14 @@
 // 环境变量: INSFORGE_API_BASE_URL, INSFORGE_API_KEY, MIROMIND_API_KEY/BASE_URL/MODEL
 // 本地跑: node --env-file=../web/.env.local index.mjs   (或自备 .env)
 
+import { createServer } from "node:http";
 import { createClient } from "@insforge/sdk";
 import { streamResearch, parseJson, normalizeResult, searchPrompt, verifyPrompt } from "./lib.mjs";
+
+// 极简健康端口: 满足 Compute/Render 等"需要监听端口"的平台 (worker 本身是轮询, 不靠 HTTP)。
+const PORT = process.env.PORT || 8080;
+createServer((_req, res) => { res.writeHead(200, { "content-type": "text/plain" }); res.end("signalhire-worker ok\n"); })
+  .listen(PORT, () => console.log(`health server on :${PORT}`));
 
 const BASE = process.env.INSFORGE_API_BASE_URL;
 const KEY = process.env.INSFORGE_API_KEY;
