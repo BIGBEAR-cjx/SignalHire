@@ -4,8 +4,7 @@
 import type { IconType } from "react-icons";
 import {
   SiGithub, SiWikipedia, SiStackoverflow, SiX, SiMedium,
-  SiGooglescholar, SiArxiv, SiCrunchbase, SiOrcid, SiReddit,
-  SiYoutube, SiSubstack,
+  SiGooglescholar, SiArxiv, SiCrunchbase, SiOrcid,
 } from "react-icons/si";
 import { FaLinkedin } from "react-icons/fa6";
 
@@ -23,22 +22,6 @@ const ORBIT: (Src & { top: string; left: string; size: number })[] = [
   { Icon: SiArxiv, color: "#B31B1B", label: "arXiv", top: "56%", left: "92%", size: 52 },
   { Icon: SiOrcid, color: "#A6CE39", label: "ORCID", top: "73%", left: "83%", size: 54 },
   { Icon: SiMedium, color: "#0F0F0F", label: "Medium", top: "86%", left: "68%", size: 50 },
-];
-
-// 底部信任条用的来源 (灰度)
-const STRIP: Src[] = [
-  { Icon: SiGithub, color: "", label: "GitHub" },
-  { Icon: FaLinkedin, color: "", label: "LinkedIn" },
-  { Icon: SiWikipedia, color: "", label: "Wikipedia" },
-  { Icon: SiStackoverflow, color: "", label: "Stack Overflow" },
-  { Icon: SiCrunchbase, color: "", label: "Crunchbase" },
-  { Icon: SiGooglescholar, color: "", label: "Scholar" },
-  { Icon: SiArxiv, color: "", label: "arXiv" },
-  { Icon: SiX, color: "", label: "X" },
-  { Icon: SiMedium, color: "", label: "Medium" },
-  { Icon: SiReddit, color: "", label: "Reddit" },
-  { Icon: SiYoutube, color: "", label: "YouTube" },
-  { Icon: SiSubstack, color: "", label: "Substack" },
 ];
 
 // 品牌雷达标 (透明底, 深色描边 + 青柠中心点) —— 浅色导航/正文用。
@@ -78,7 +61,6 @@ export default function Landing() {
         </a>
         <div className="hidden items-center gap-7 text-sm text-gray-600 md:flex">
           <a href="#tool" className="hover:text-gray-900">开始使用</a>
-          <a href="#sources" className="hover:text-gray-900">数据来源</a>
           <a href="https://github.com/BIGBEAR-cjx/SignalHire" target="_blank" rel="noreferrer" className="hover:text-gray-900">GitHub</a>
         </div>
         <a href="#tool" className="rounded-xl bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-800">
@@ -114,15 +96,6 @@ export default function Landing() {
 
         {/* 中央内容 */}
         <div className="sh-fade-in-up relative z-10 mx-auto max-w-2xl">
-          <div className="mb-6 flex flex-wrap items-center justify-center gap-x-5 gap-y-2 text-sm text-gray-500">
-            <span className="flex items-center gap-1.5">
-              <span className="h-2 w-2 rounded-full bg-emerald-500" /> 由 MiroMind 深度研究驱动
-            </span>
-            <span className="flex items-center gap-1.5">
-              <span className="h-2 w-2 rounded-full bg-blue-500" /> 跨 12+ 公开来源核实
-            </span>
-          </div>
-
           <h1 className="text-5xl font-extrabold leading-[1.1] tracking-tight text-gray-900 sm:text-6xl">
             AI 找人，<br />每句声称都查证
           </h1>
@@ -159,19 +132,6 @@ export default function Landing() {
               </div>
             </div>
           </div>
-        </div>
-      </section>
-
-      {/* 信任条: 数据来源 */}
-      <section id="sources" className="mx-auto max-w-5xl px-4 pb-12 text-center">
-        <p className="text-sm text-gray-400">跨这些公开来源交叉验证每一条声称</p>
-        <div className="mt-5 flex flex-wrap items-center justify-center gap-x-8 gap-y-4 text-gray-400">
-          {STRIP.map((s, i) => (
-            <span key={i} className="flex items-center gap-2 grayscale transition hover:grayscale-0" title={s.label}>
-              <s.Icon size={22} />
-              <span className="text-sm font-medium">{s.label}</span>
-            </span>
-          ))}
         </div>
       </section>
     </div>
