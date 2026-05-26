@@ -73,7 +73,7 @@ export default async function ReportPage({ params }: { params: Promise<{ id: str
             <div className="mt-6 space-y-4">
               {row.kind === "search"
                 ? ((row.result as { candidates?: Candidate[] })?.candidates ?? []).map((c, i) => (
-                    <CandidateCard key={i} c={c} />
+                    <CandidateCard key={i} c={c} delay={i * 90} />
                   ))
                 : <TrustReportView r={row.result as VerifyReport} />}
             </div>

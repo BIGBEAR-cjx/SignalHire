@@ -296,7 +296,7 @@ export default function Home() {
             )}
           </div>
           {mode === "search"
-            ? (result.candidates ?? []).map((c: Candidate, i: number) => <CandidateCard key={i} c={c} />)
+            ? (result.candidates ?? []).map((c: Candidate, i: number) => <CandidateCard key={i} c={c} delay={i * 90} />)
             : <TrustReportView r={result} />}
         </div>
       )}
@@ -323,7 +323,7 @@ export default function Home() {
                     >
                       {h.kind === "verify" ? "验证" : "搜人"}
                     </span>
-                    <span className="truncate text-sm text-gray-800" title={h.query_text}>
+                    <span className="min-w-0 truncate text-sm text-gray-800" title={h.query_text}>
                       {h.label}
                     </span>
                   </span>

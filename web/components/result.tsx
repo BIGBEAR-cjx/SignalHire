@@ -98,9 +98,12 @@ function LinkPill({ href, children }: { href: string; children: React.ReactNode 
   );
 }
 
-export function CandidateCard({ c }: { c: Candidate }) {
+export function CandidateCard({ c, delay = 0 }: { c: Candidate; delay?: number }) {
   return (
-    <article className="rounded-2xl border border-gray-100 bg-white p-5 shadow-[0_8px_30px_rgba(0,0,0,0.06)]">
+    <article
+      style={{ animationDelay: `${delay}ms` }}
+      className="sh-fade-in-up rounded-2xl border border-gray-100 bg-white p-5 shadow-[0_8px_30px_rgba(0,0,0,0.06)]"
+    >
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <h3 className="text-lg font-semibold text-gray-900">{c.name}</h3>
@@ -146,7 +149,7 @@ function TrustRing({ level }: { level: "high" | "medium" | "low" }) {
 
 export function TrustReportView({ r }: { r: VerifyReport }) {
   return (
-    <article className="rounded-2xl border border-gray-100 bg-white p-5 shadow-[0_8px_30px_rgba(0,0,0,0.06)]">
+    <article className="sh-fade-in-up rounded-2xl border border-gray-100 bg-white p-5 shadow-[0_8px_30px_rgba(0,0,0,0.06)]">
       <div className="flex items-center justify-between gap-3">
         <div>
           <h3 className="text-lg font-semibold text-gray-900">{r.candidate_name}</h3>

@@ -101,16 +101,20 @@ export default function Landing() {
 
         {/* 环绕的数据来源 logo (桌面端) */}
         <div className="pointer-events-none absolute inset-0 hidden lg:block">
-          {ORBIT.map((s) => (
-            <div key={s.label} style={{ top: s.top, left: s.left }} className="absolute">
+          {ORBIT.map((s, i) => (
+            <div
+              key={s.label}
+              style={{ top: s.top, left: s.left, animationDelay: `${(i % 5) * 0.5}s` }}
+              className="sh-float absolute"
+            >
               <Bubble {...s} />
             </div>
           ))}
         </div>
 
         {/* 中央内容 */}
-        <div className="relative z-10 mx-auto max-w-2xl">
-          <div className="mb-6 flex items-center justify-center gap-5 text-sm text-gray-500">
+        <div className="sh-fade-in-up relative z-10 mx-auto max-w-2xl">
+          <div className="mb-6 flex flex-wrap items-center justify-center gap-x-5 gap-y-2 text-sm text-gray-500">
             <span className="flex items-center gap-1.5">
               <span className="h-2 w-2 rounded-full bg-emerald-500" /> 由 MiroMind 深度研究驱动
             </span>
