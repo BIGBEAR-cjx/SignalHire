@@ -129,10 +129,10 @@ export default function Landing({
                     if (v) onSearch(v);
                   }
                 }}
-                rows={8}
-                placeholder="描述你要找的人，例如：给 Tokio 贡献过代码、常驻欧洲的资深 Rust 工程师。也可以直接粘贴一整段岗位要求或候选人简介——框够大，完整看得到。"
+                rows={6}
+                placeholder="描述你要找的人，例如：给 Tokio 贡献过代码、常驻欧洲的资深 Rust 工程师。也可以直接粘贴一段岗位要求或候选人简介。"
                 aria-label="搜索候选人"
-                className="block max-h-[60vh] min-h-[200px] w-full resize-y rounded-xl bg-transparent px-3 py-2.5 text-[15px] leading-relaxed text-gray-900 outline-none placeholder:text-gray-400"
+                className="block max-h-[40vh] min-h-[150px] w-full resize-y overflow-y-auto rounded-xl bg-transparent px-3 py-2.5 text-[15px] leading-relaxed text-gray-900 outline-none placeholder:text-gray-400"
               />
               <div className="mt-1 flex items-center justify-between gap-2 px-1">
                 <span className="text-xs text-gray-400">{q.length} 字 · ⌘/Ctrl + Enter 搜索</span>
