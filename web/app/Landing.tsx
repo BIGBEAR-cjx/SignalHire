@@ -112,23 +112,34 @@ export default function Landing({
             MiroMind 全网深度搜索候选人，并对每条声称做跨源交叉验证——亮出可点击的证据，而不是又一份没核实的简历。
           </p>
 
-          {/* 直接搜索输入框 (缩短转化路径) */}
+          {/* 直接搜索输入框 (缩短转化路径; 多行大框, 完整看到长输入) */}
           <form
-            className="relative mx-auto mt-9 max-w-xl"
+            className="relative mx-auto mt-9 max-w-2xl text-left"
             onSubmit={(e) => { e.preventDefault(); const v = q.trim(); if (v) onSearch(v); }}
           >
             <div className="absolute -inset-3 -z-10 rounded-full bg-gradient-to-tr from-blue-200/30 via-emerald-100/30 to-transparent blur-2xl" />
-            <div className="flex gap-2 rounded-2xl border border-gray-200 bg-white p-2 shadow-[0_12px_40px_rgba(0,0,0,0.08)]">
-              <input
+            <div className="rounded-2xl border border-gray-200 bg-white p-2.5 shadow-[0_12px_40px_rgba(0,0,0,0.08)]">
+              <textarea
                 value={q}
                 onChange={(e) => setQ(e.target.value)}
-                placeholder="描述你要找的人，例如：给 Tokio 贡献过代码的资深 Rust 工程师"
+                onKeyDown={(e) => {
+                  if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
+                    e.preventDefault();
+                    const v = q.trim();
+                    if (v) onSearch(v);
+                  }
+                }}
+                rows={8}
+                placeholder="描述你要找的人，例如：给 Tokio 贡献过代码、常驻欧洲的资深 Rust 工程师。也可以直接粘贴一整段岗位要求或候选人简介——框够大，完整看得到。"
                 aria-label="搜索候选人"
-                className="min-w-0 flex-1 rounded-xl bg-transparent px-3 py-2.5 text-gray-900 outline-none placeholder:text-gray-400"
+                className="block max-h-[60vh] min-h-[200px] w-full resize-y rounded-xl bg-transparent px-3 py-2.5 text-[15px] leading-relaxed text-gray-900 outline-none placeholder:text-gray-400"
               />
-              <button type="submit" className="shrink-0 rounded-xl bg-gray-900 px-6 py-2.5 font-medium text-white hover:bg-gray-800">
-                搜索
-              </button>
+              <div className="mt-1 flex items-center justify-between gap-2 px-1">
+                <span className="text-xs text-gray-400">{q.length} 字 · ⌘/Ctrl + Enter 搜索</span>
+                <button type="submit" className="shrink-0 rounded-xl bg-gray-900 px-6 py-2.5 font-medium text-white hover:bg-gray-800">
+                  搜索
+                </button>
+              </div>
             </div>
           </form>
           <button
