@@ -1,6 +1,8 @@
+"use client";
+
 // Landing.tsx —— 首页落地区 (浅色 SaaS 风, 仿 Deflexai)。
-// 环绕的 logo 气泡 = SignalHire 交叉验证候选人时引用的公开数据来源,
-// 视觉上直接讲出差异化: 我们横跨这些来源做交叉核实。
+// hero 直接给搜索输入框, 缩短转化路径; 环绕 logo = 交叉验证的公开数据来源。
+import { useState } from "react";
 import type { IconType } from "react-icons";
 import {
   SiGithub, SiWikipedia, SiStackoverflow, SiX, SiMedium,
@@ -50,7 +52,14 @@ function Bubble({ Icon, color, label, size }: Src & { size: number }) {
   );
 }
 
-export default function Landing() {
+export default function Landing({
+  onSearch,
+  onDemo,
+}: {
+  onSearch: (q: string) => void; // hero 输入框提交 → 跑搜人
+  onDemo: () => void; // "看验证示例" → 跑打脸 demo
+}) {
+  const [q, setQ] = useState("");
   return (
     <div className="relative overflow-hidden">
       {/* 顶部浮动导航 */}
@@ -103,35 +112,31 @@ export default function Landing() {
             MiroMind 全网深度搜索候选人，并对每条声称做跨源交叉验证——亮出可点击的证据，而不是又一份没核实的简历。
           </p>
 
-          <div className="mt-8 flex items-center justify-center gap-3">
-            <a href="#tool" className="rounded-xl bg-gray-900 px-6 py-3 font-medium text-white shadow-sm hover:bg-gray-800">
-              开始搜索
-            </a>
-            <a href="#tool" className="rounded-xl border border-gray-300 bg-white px-6 py-3 font-medium text-gray-800 hover:border-gray-400">
-              看验证示例
-            </a>
-          </div>
-
-          {/* 浮动示例卡片: 验证 vs 打脸 */}
-          <div className="relative mx-auto mt-12 max-w-md">
-            <div className="absolute -inset-6 -z-10 rounded-full bg-gradient-to-tr from-blue-200/40 via-emerald-100/40 to-transparent blur-2xl" />
-            <div className="space-y-2 rounded-2xl border border-gray-100 bg-white/90 p-3 text-left shadow-[0_12px_40px_rgba(0,0,0,0.10)] backdrop-blur">
-              <div className="flex items-center justify-between gap-3 rounded-xl bg-gray-50 px-3 py-2.5">
-                <div className="min-w-0">
-                  <p className="truncate text-sm font-medium text-gray-900">Carl Lerche — Tokio 创建者</p>
-                  <p className="truncate text-xs text-gray-500">Wikipedia · tokio.rs · 会议演讲</p>
-                </div>
-                <span className="shrink-0 rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-semibold text-emerald-700">✓ 已验证</span>
-              </div>
-              <div className="flex items-center justify-between gap-3 rounded-xl bg-gray-50 px-3 py-2.5">
-                <div className="min-w-0">
-                  <p className="truncate text-sm font-medium text-gray-900">某候选人 — 自称创建 Tokio</p>
-                  <p className="truncate text-xs text-gray-500">真作者是 Carl Lerche，多源佐证</p>
-                </div>
-                <span className="shrink-0 rounded-full bg-red-100 px-2 py-0.5 text-xs font-semibold text-red-700">✕ 矛盾</span>
-              </div>
+          {/* 直接搜索输入框 (缩短转化路径) */}
+          <form
+            className="relative mx-auto mt-9 max-w-xl"
+            onSubmit={(e) => { e.preventDefault(); const v = q.trim(); if (v) onSearch(v); }}
+          >
+            <div className="absolute -inset-3 -z-10 rounded-full bg-gradient-to-tr from-blue-200/30 via-emerald-100/30 to-transparent blur-2xl" />
+            <div className="flex gap-2 rounded-2xl border border-gray-200 bg-white p-2 shadow-[0_12px_40px_rgba(0,0,0,0.08)]">
+              <input
+                value={q}
+                onChange={(e) => setQ(e.target.value)}
+                placeholder="描述你要找的人，例如：给 Tokio 贡献过代码的资深 Rust 工程师"
+                aria-label="搜索候选人"
+                className="min-w-0 flex-1 rounded-xl bg-transparent px-3 py-2.5 text-gray-900 outline-none placeholder:text-gray-400"
+              />
+              <button type="submit" className="shrink-0 rounded-xl bg-gray-900 px-6 py-2.5 font-medium text-white hover:bg-gray-800">
+                搜索
+              </button>
             </div>
-          </div>
+          </form>
+          <button
+            onClick={onDemo}
+            className="mt-4 text-sm text-gray-500 underline-offset-4 transition hover:text-gray-900 hover:underline"
+          >
+            或看一个验证示例（打脸）→
+          </button>
         </div>
       </section>
     </div>

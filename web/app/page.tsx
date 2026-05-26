@@ -157,7 +157,16 @@ export default function Home() {
 
   return (
     <>
-      <Landing />
+      <Landing
+        onSearch={(query) => {
+          run(query, "search");
+          document.getElementById("tool")?.scrollIntoView({ behavior: "smooth" });
+        }}
+        onDemo={() => {
+          run(HERO_BIO, "verify");
+          document.getElementById("tool")?.scrollIntoView({ behavior: "smooth" });
+        }}
+      />
       <main id="tool" className="mx-auto max-w-3xl scroll-mt-24 px-4 pb-16 pt-6">
       <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-[0_8px_30px_rgba(0,0,0,0.06)]">
       {/* 模式切换: 分段控件 */}
