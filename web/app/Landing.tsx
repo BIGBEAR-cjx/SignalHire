@@ -2,9 +2,8 @@
 
 // Landing.tsx —— 首页落地区 (浅色 SaaS 风, 仿 Deflexai)。
 // hero 直接给搜索输入框, 缩短转化路径; 环绕 logo = 交叉验证的公开数据来源。
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import type { IconType } from "react-icons";
-import { currentUser, logout } from "@/lib/auth";
 import {
   SiGithub, SiWikipedia, SiStackoverflow, SiX, SiMedium,
   SiGooglescholar, SiArxiv, SiCrunchbase, SiOrcid,
@@ -56,13 +55,17 @@ function Bubble({ Icon, color, label, size }: Src & { size: number }) {
 export default function Landing({
   onSearch,
   onDemo,
+  user,
+  onLoginClick,
+  onLogout,
 }: {
   onSearch: (q: string) => void; // hero 输入框提交 → 跑搜人
   onDemo: () => void; // "看验证示例" → 跑打脸 demo
+  user: { email: string } | null;
+  onLoginClick: () => void; // 打开登录弹窗
+  onLogout: () => void; // 退出
 }) {
   const [q, setQ] = useState("");
-  const [user, setUser] = useState<{ email: string } | null>(null);
-  useEffect(() => { currentUser().then(setUser); }, []);
   return (
     <div className="relative overflow-hidden">
       {/* 顶部浮动导航 */}
@@ -79,16 +82,19 @@ export default function Landing({
           <div className="flex items-center gap-3 text-sm">
             <span className="hidden max-w-[160px] truncate text-gray-500 sm:inline" title={user.email}>{user.email}</span>
             <button
-              onClick={async () => { await logout(); location.href = "/login"; }}
+              onClick={onLogout}
               className="rounded-xl border border-gray-200 px-3 py-2 font-medium text-gray-700 hover:border-gray-900"
             >
               退出
             </button>
           </div>
         ) : (
-          <a href="#tool" className="rounded-xl bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-800">
-            开始搜索
-          </a>
+          <button
+            onClick={onLoginClick}
+            className="rounded-xl bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-800"
+          >
+            登录
+          </button>
         )}
       </nav>
 

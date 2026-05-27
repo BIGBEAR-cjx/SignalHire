@@ -2,6 +2,8 @@
 
 import { useEffect, useRef, useState } from "react";
 import Landing from "./Landing";
+import AuthModal from "@/components/AuthModal";
+import { currentUser, logout } from "@/lib/auth";
 import { SEARCH_SAMPLES, VERIFY_SAMPLES, HERO_BIO } from "@/lib/cache";
 import { CandidateCard, TrustReportView, type Candidate } from "@/components/result";
 
@@ -28,8 +30,27 @@ export default function Home() {
   const [history, setHistory] = useState<HistoryItem[]>([]);
   const [runId, setRunId] = useState<string | null>(null); // 可分享报告 id
   const [copied, setCopied] = useState(false);
+  const [user, setUser] = useState<{ email: string } | null>(null); // 登录态
+  const [authOpen, setAuthOpen] = useState(false); // 登录弹窗
+  const pendingRef = useRef<{ override?: string; forceMode?: "search" | "verify" } | null>(null); // 登录后续跑
   const idRef = useRef(0);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  useEffect(() => { currentUser().then(setUser); }, []);
+
+  // 登录成功 → 关弹窗 + 续跑挂起的搜索/验证
+  function handleAuthed(u: { email: string }) {
+    setUser(u);
+    setAuthOpen(false);
+    const p = pendingRef.current;
+    pendingRef.current = null;
+    if (p) run(p.override, p.forceMode, true);
+  }
+
+  async function handleLogout() {
+    await logout();
+    setUser(null);
+  }
 
   function stopPolling() {
     if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null; }
@@ -87,7 +108,13 @@ export default function Home() {
 
   // override: 点示例芯片/历史时传入 —— 搜人模式当作 query, 验证模式当作 bio。
   // forceMode: 点历史记录时强制切到该条所属模式 (search/verify)。
-  async function run(override?: string, forceMode?: "search" | "verify") {
+  async function run(override?: string, forceMode?: "search" | "verify", bypassAuth = false) {
+    // 未登录 → 暂存这次动作, 弹出登录, 登录成功后自动续跑
+    if (!bypassAuth && !user) {
+      pendingRef.current = { override, forceMode };
+      setAuthOpen(true);
+      return;
+    }
     const m = forceMode ?? mode;
     if (forceMode && forceMode !== mode) setMode(forceMode);
     const q = m === "search" ? (override ?? query) : query;
@@ -158,6 +185,9 @@ export default function Home() {
   return (
     <>
       <Landing
+        user={user}
+        onLoginClick={() => setAuthOpen(true)}
+        onLogout={handleLogout}
         onSearch={(query) => {
           run(query, "search");
           document.getElementById("tool")?.scrollIntoView({ behavior: "smooth" });
@@ -166,6 +196,11 @@ export default function Home() {
           run(HERO_BIO, "verify");
           document.getElementById("tool")?.scrollIntoView({ behavior: "smooth" });
         }}
+      />
+      <AuthModal
+        open={authOpen}
+        onClose={() => { pendingRef.current = null; setAuthOpen(false); }}
+        onAuthed={handleAuthed}
       />
       <main id="tool" className="mx-auto max-w-3xl scroll-mt-24 px-4 pb-16 pt-6">
       <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-[0_8px_30px_rgba(0,0,0,0.06)]">
