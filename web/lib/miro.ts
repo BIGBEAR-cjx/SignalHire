@@ -6,6 +6,28 @@ export type OnStep = (kind: StepKind, info?: string) => void;
 
 export type Verdict = "verified" | "contradicted" | "unverified";
 
+type MiroReasoningStep = {
+  type?: string;
+  web_search?: { search_keywords?: unknown };
+  fetch_url_content?: { url?: unknown };
+};
+type MiroStreamChunk = {
+  choices?: Array<{
+    delta?: {
+      content?: unknown;
+      reasoning_steps?: MiroReasoningStep[];
+    };
+  }>;
+};
+type EvidenceLike = { url?: unknown; [key: string]: unknown };
+type ClaimLike = { evidence?: EvidenceLike[]; verdict?: unknown; [key: string]: unknown };
+type CandidateLike = { claims?: ClaimLike[]; [key: string]: unknown };
+type ResultLike = {
+  candidates?: CandidateLike[];
+  claims?: ClaimLike[];
+  [key: string]: unknown;
+};
+
 export async function streamResearch(userPrompt: string, onStep: OnStep = () => {}) {
   const BASE = process.env.MIROMIND_BASE_URL;
   const KEY = process.env.MIROMIND_API_KEY;
@@ -36,7 +58,7 @@ export async function streamResearch(userPrompt: string, onStep: OnStep = () => 
       if (!line.startsWith("data:")) continue;
       const data = line.slice(5).trim();
       if (data === "[DONE]" || !data) continue;
-      let obj: any;
+      let obj: MiroStreamChunk;
       try { obj = JSON.parse(data); } catch { continue; }
       const delta = obj.choices?.[0]?.delta ?? {};
       if (typeof delta.content === "string") content += delta.content;
@@ -111,7 +133,7 @@ export function researchStream(opts: {
 }
 
 // content 解析成 JSON (容错: 抓第一个 {...})
-export function parseJson(content: string): any {
+export function parseJson(content: string): unknown {
   try { return JSON.parse(content); } catch {}
   const m = content.match(/\{[\s\S]*\}/);
   if (m) { try { return JSON.parse(m[0]); } catch {} }
@@ -131,9 +153,9 @@ export function isSearchUrl(u: unknown): boolean {
   );
 }
 
-function normalizeClaims(claims: any[]): void {
+function normalizeClaims(claims: ClaimLike[]): void {
   for (const cl of claims ?? []) {
-    cl.evidence = (cl.evidence ?? []).filter((e: any) => e?.url && !isSearchUrl(e.url));
+    cl.evidence = (cl.evidence ?? []).filter((e) => e?.url && !isSearchUrl(e.url));
     let v = String(cl.verdict ?? "").toLowerCase().trim();
     if (!VERDICTS.includes(v as Verdict)) v = "unverified";
     if (v === "verified" && cl.evidence.length === 0) v = "unverified";
@@ -143,8 +165,8 @@ function normalizeClaims(claims: any[]): void {
 
 // 同时支持搜人结果 (candidates[].claims) 和验证结果 (顶层 claims)。原地修改并返回。
 export function normalizeResult<T>(data: T): T {
-  const d = data as any;
-  if (!d || typeof d !== "object") return data;
+  if (!data || typeof data !== "object") return data;
+  const d = data as ResultLike;
   if (Array.isArray(d.candidates)) for (const c of d.candidates) normalizeClaims(c?.claims ?? []);
   if (Array.isArray(d.claims)) normalizeClaims(d.claims);
   return data;

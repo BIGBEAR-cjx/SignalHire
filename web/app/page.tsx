@@ -5,9 +5,17 @@ import Landing from "./Landing";
 import AuthModal from "@/components/AuthModal";
 import { currentUser, logout } from "@/lib/auth";
 import { SEARCH_SAMPLES, VERIFY_SAMPLES, HERO_BIO } from "@/lib/cache";
-import { CandidateCard, TrustReportView, type Candidate } from "@/components/result";
+import { CandidateCard, TrustReportView, type Candidate, type VerifyReport } from "@/components/result";
 
 type FeedItem = { id: number; kind: "search" | "fetch"; info: string };
+type SearchResult = { candidates?: Candidate[] };
+type AppResult = SearchResult | VerifyReport;
+type RunStats = { searches: number; fetches: number; cached?: boolean };
+type ResearchStepEvent = { type: "step"; kind: "search" | "fetch"; info: string; searches: number; fetches: number };
+type ResearchDoneEvent = { type: "done"; data: AppResult; stats?: RunStats | null; runId?: string | null };
+type ResearchErrorEvent = { type: "error"; error?: string };
+type ResearchEvent = ResearchStepEvent | ResearchDoneEvent | ResearchErrorEvent;
+type QueueResponse = { queued?: boolean; jobId?: string; error?: string };
 type HistoryItem = {
   kind: "search" | "verify";
   label: string;
@@ -16,6 +24,10 @@ type HistoryItem = {
   updated_at: string;
 };
 
+function isVerifyReport(result: AppResult): result is VerifyReport {
+  return "claims" in result;
+}
+
 // ---- 主页面 ----
 export default function Home() {
   const [mode, setMode] = useState<"search" | "verify">("verify");
@@ -23,8 +35,8 @@ export default function Home() {
   const [bio, setBio] = useState(HERO_BIO);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [result, setResult] = useState<any>(null);
-  const [stats, setStats] = useState<{ searches: number; fetches: number; cached?: boolean } | null>(null);
+  const [result, setResult] = useState<AppResult | null>(null);
+  const [stats, setStats] = useState<RunStats | null>(null);
   const [feed, setFeed] = useState<FeedItem[]>([]); // 实时研究流: 它在搜什么/抓什么
   const [live, setLive] = useState<{ searches: number; fetches: number } | null>(null);
   const [history, setHistory] = useState<HistoryItem[]>([]);
@@ -150,7 +162,7 @@ export default function Home() {
             const line = buf.slice(0, nl).trim();
             buf = buf.slice(nl + 1);
             if (!line) continue;
-            let ev: any;
+            let ev: ResearchEvent;
             try { ev = JSON.parse(line); } catch { continue; }
             if (ev.type === "step") {
               setLive({ searches: ev.searches, fetches: ev.fetches });
@@ -168,7 +180,7 @@ export default function Home() {
         loadHistory();
       } else {
         // JSON: 要么入队成功(转轮询), 要么错误
-        const j = await res.json().catch(() => ({}));
+        const j: QueueResponse = await res.json().catch(() => ({}));
         if (!res.ok) { setError(j.error ?? `HTTP ${res.status}`); setLoading(false); return; }
         if (j.queued && j.jobId) {
           beginPolling(j.jobId); // loading 保持 true, 轮询完成/失败时再关闭
@@ -340,8 +352,8 @@ export default function Home() {
             )}
           </div>
           {mode === "search"
-            ? (result.candidates ?? []).map((c: Candidate, i: number) => <CandidateCard key={i} c={c} delay={i * 90} />)
-            : <TrustReportView r={result} />}
+            ? ("candidates" in result ? result.candidates ?? [] : []).map((c: Candidate, i: number) => <CandidateCard key={i} c={c} delay={i * 90} />)
+            : isVerifyReport(result) && <TrustReportView r={result} />}
         </div>
       )}
 
