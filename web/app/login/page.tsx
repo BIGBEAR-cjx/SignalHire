@@ -30,7 +30,7 @@ export default function LoginPage() {
     const r = await login(email.trim(), pw);
     if (r.ok) {
       const next = new URLSearchParams(location.search).get("next") || "/";
-      location.href = next; // 整页跳转, 让 middleware 看到新 cookie
+      location.href = next; // 整页跳转, 让页面和服务端请求读取新 cookie
     } else {
       setErr(r.error);
       setLoading(false);

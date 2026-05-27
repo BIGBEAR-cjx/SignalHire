@@ -35,7 +35,8 @@ Mode: Builder (Hackathon)
 
 - **时间**：2026-05-21 → 2026-06-01，每天约 2 小时，总计约 20 小时。
 - **开发者**：编程小白，只用 Claude Code vibe coding。
-- **裁掉一切非核心**：无登录、无数据库、无多用户、无设置页。一个能跑通的演示流程就是全部目标。
+- **裁掉一切非核心**：登录只做软提示，不做全站强拦截；数据库只承载 `research_runs`
+  的缓存、历史、分享链接和队列。一个能跑通的演示流程就是全部目标。
 
 ## Premises (已确认)
 
@@ -100,7 +101,7 @@ API 接入已验证 ✅ (OpenAI 兼容、key 可用、能自主全网搜索)。*
 
 | 阶段 | 目标里程碑 | 关键动作 |
 |------|-----------|---------|
-| **Day 1 ✅** | API 跑通 + 骨架 + 最小引擎 | (已完成) API 验证、密钥配置、`engine.mjs`、项目挪到 ~/headhunter。**你剩的事**：跑一次 `node --env-file=.env.local engine.mjs "..."` 看完整输出 |
+| **Day 1 ✅** | API 跑通 + 骨架 + 最小引擎 | 历史记录：API 验证、密钥配置、`engine.mjs`、CLI 引擎跑通。当前运行方式见根 README。 |
 | **Day 2** | prompt 调到稳定输出 3 候选人 + 每人验证声称的**干净 JSON** | 迭代 engine.mjs 的 prompt；JSON 不干净就加格式化步骤 |
 | **Day 3** | Next.js 骨架：搜索框 → 调引擎 → 显示原始结果 | Claude Code 搭前端 + API route |
 | **Day 4** | 候选人卡片 UI + 验证徽章(✅/⚠️/❌) + 可点证据链接 | 核心"哇"的可视化 |
@@ -129,7 +130,7 @@ API 接入已验证 ✅ (OpenAI 兼容、key 可用、能自主全网搜索)。*
 
 跑一次引擎，亲眼看完整输出：
 ```bash
-cd ~/headhunter
+cd /Users/jianxiongchen/Desktop/signalhire
 node --env-file=.env.local engine.mjs "Senior Rust engineer who contributed to tokio"
 ```
 看它返回的 content 是不是干净 JSON、慢不慢、证据 URL 真不真。这决定 Day 2 要不要加格式化步骤。

@@ -1,8 +1,7 @@
 # NOTES —— 关键发现 & 怎么跑
 
-> ⚠️ 项目位置: `~/headhunter` (原来在 ~/Desktop, 但 macOS 隐私保护 TCC 挡住了命令行
-> 对 Desktop 的访问, 所以挪到了 home 下。如想放回 Desktop, 需给终端 App 授予
-> 系统设置 → 隐私与安全性 → 完全磁盘访问权限, 然后重启终端。)
+> 历史记录：早期为了绕过 macOS Desktop 权限，项目曾短暂放在 home 目录下。
+> 当前工作区在 `/Users/jianxiongchen/Desktop/signalhire`；运行方式以根 README 为准。
 
 ## MiroMind API (已验证可用)
 
@@ -34,7 +33,7 @@ usage.total_tokens
 
 ## 怎么跑引擎
 ```bash
-cd ~/headhunter
+cd /Users/jianxiongchen/Desktop/signalhire
 node --env-file=.env.local engine.mjs "Senior Rust engineer who contributed to tokio"
 ```
 (慢, 几分钟。理想输出是候选人 JSON。)

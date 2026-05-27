@@ -14,9 +14,22 @@
 
 ```bash
 cd worker
-npm install
+npm ci
 node --env-file=../web/.env.local index.mjs
 ```
+
+## Runtime contract
+
+The worker is the long-running runtime for non-cached live research.
+
+- It expects Insforge `research_runs` rows with `status='queued'`.
+- It claims one row by changing `status` from `queued` to `running`.
+- While MiroMind streams, it writes research activity into `progress`.
+- On success, it writes `status='done'` plus `result`, `stats`, and `summary`.
+- On failure, it writes `status='error'` plus `error`.
+
+One worker is enough for the demo. Multiple workers should be safe because each worker only proceeds
+after the queued-row claim condition succeeds.
 
 ## 部署到 Insforge Compute(方案 A)
 

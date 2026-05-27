@@ -5,7 +5,7 @@ import { createClient } from "@insforge/sdk";
 const BASE = process.env.NEXT_PUBLIC_INSFORGE_API_BASE_URL;
 const client = createClient({ baseUrl: BASE });
 
-// 把 token 写进服务端 httpOnly cookie (middleware 据此放行)。
+// 把 token 写进服务端 httpOnly cookie, 供服务端路由读取登录态。
 async function setSession(accessToken: string) {
   await fetch("/api/auth/session", {
     method: "POST",

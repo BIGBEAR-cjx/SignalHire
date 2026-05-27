@@ -48,10 +48,12 @@ Every verdict carries a real, clickable source URL. That turns "the AI is making
 
 ```
 One sentence (role or bio)
-  └─> a single prompt to the MiroMind Deep Research agent, which autonomously:
+  └─> web/ Next.js app checks the built-in cache first
+  └─> cache miss creates an Insforge research_runs row with status='queued'
+  └─> worker/ claims the row and sends a single prompt to the MiroMind Deep Research agent, which autonomously:
         · searches the open web (~85 searches/query) and fetches pages (~15/query)
         · extracts each claim and cross-checks it against multiple independent sources
-        · returns a verdict + evidence URLs as one clean JSON object
+        · streams progress and returns a verdict + evidence URLs as one clean JSON object
   └─> normalizeResult() guardrail: enforces the 3 allowed verdicts and drops any
       "evidence" that is just a search-results URL (a search link is not proof)
   └─> UI renders candidate cards with ✅/⚠️/❌ badges + clickable evidence links
@@ -69,68 +71,84 @@ cross-verification itself. No separate scraper or search loop is needed.
   (`web_search` / `fetch_url_content`), which we surface as real-time research progress.
 - **OpenAI-compatible API** — model `mirothinker-1-7-deepresearch-mini` at `https://api.miromind.ai/v1`.
 
+## Current architecture
+
+SignalHire currently runs as three runtime pieces:
+
+1. `web/` Next.js app: serves the product UI, soft login/auth modal, cached demo examples, history,
+   share pages, and API routes that enqueue cache misses.
+2. Insforge persistence and queue: `research_runs` stores cached examples, user history, shareable
+   report links, queued work, progress, results, and errors.
+3. `worker/` long-running Node process: polls `research_runs`, claims queued rows, runs MiroMind
+   research without a serverless timeout, and writes progress/results back to Insforge.
+
+The app is cache-first. Built-in demo examples and fuzzy matches should work immediately without
+live MiroMind calls. Non-cached inputs require Insforge DB access plus a running worker with
+MiroMind credentials.
+
 ## Quick start
 
 Requirements: **Node 22+** (uses `--env-file`).
 
-### 1. Set your MiroMind credentials
+### 1. Configure the web environment
 
-Create `.env.local` in the repo root (and a copy in `web/`):
-
-```bash
-cp .env.example .env.local
-cp .env.example web/.env.local
-# then edit both and paste your key
-```
-
-```ini
-MIROMIND_API_KEY=your-key-here
-MIROMIND_BASE_URL=https://api.miromind.ai/v1
-MIROMIND_MODEL=mirothinker-1-7-deepresearch-mini
-```
-
-> `.env.local` is gitignored — never commit your key.
-
-### 2. Run from the command line
+Create `web/.env.local` from the example and fill in the services you want to use:
 
 ```bash
-# Search for candidates (deep research, ~4-10 min)
-node --env-file=.env.local engine.mjs "Senior Rust engineer who contributed to Tokio"
-
-# Verify a candidate's bio (~2 min) — "打脸" mode
-node --env-file=.env.local verify.mjs "Jordan Smith — I created the Tokio runtime, PhD from Stanford..."
+cp web/.env.example web/.env.local
 ```
 
-### 3. Run the web app
+MiroMind variables are required by the worker for non-cached live research. Insforge server-side
+variables are required for history, share links, and queued live research. The public
+`NEXT_PUBLIC_INSFORGE_API_BASE_URL` value is used by the browser auth SDK.
+
+> `.env.local` is gitignored. Never commit real keys.
+
+### 2. Run the web app
 
 ```bash
 cd web
-npm install
-npm run dev      # http://localhost:3000
+npm ci
+npm run dev
 ```
 
-In the web app, the **example chips** in Search mode return pre-cached, fact-checked results
-instantly (no waiting on live research) — see "Demo notes" below.
+The built-in example chips in Search and Verify modes return pre-cached, fact-checked results
+without the worker.
+
+### 3. Run the worker for live research
+
+```bash
+cd worker
+npm ci
+node --env-file=../web/.env.local index.mjs
+```
+
+### 4. Validate production build
+
+```bash
+cd web
+npm run lint
+npm run build
+```
 
 ## Project structure
 
 ```
-miro.mjs        Shared MiroMind streaming client + JSON parsing + normalizeResult() guardrail
-engine.mjs      CLI: search mode
-verify.mjs      CLI: verify ("打脸") mode
 web/            Next.js app (App Router + Tailwind)
-  lib/miro.ts   Server-side MiroMind client + prompts + guardrail (web equivalent of miro.mjs)
   lib/cache.ts  Pre-cached, verified demo results + fuzzy query matching
-  app/api/      /api/search and /api/verify routes
-  app/page.tsx  Single-page UI: dual mode, verdict badges, evidence links
+  lib/db.ts     Insforge server-side access to research_runs
+  lib/miro.ts   Server-side MiroMind client + prompts + normalizeResult() guardrail
+  app/api/      Search, verify, status, history, and auth session routes
+  app/r/[id]/   Shareable report page backed by research_runs
+worker/         Long-running Node worker for queued non-cached research
 ```
 
 ## Demo notes
 
 Live deep research is slow (a search query takes ~4-10 minutes; verification ~2 minutes) — too long
 to wait for on stage. So the web app is **cache-first**: example queries return verified, pre-computed
-results in ~0.1s, which also serves as a fallback if the live API times out. Free-text queries that
-fuzzily match a cached one are served instantly too; anything else runs live.
+results in ~0.1s. Free-text queries that fuzzily match a cached one are served instantly too.
+Anything else is queued in Insforge and processed by the worker.
 
 ---
 

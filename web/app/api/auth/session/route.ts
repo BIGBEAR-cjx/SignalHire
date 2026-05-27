@@ -1,5 +1,5 @@
 // /api/auth/session —— 登录态 cookie。POST 设置, DELETE 清除。
-// 用 httpOnly cookie 存 accessToken (比 localStorage 抗 XSS); middleware 据此放行。
+// 用 httpOnly cookie 存 accessToken (比 localStorage 抗 XSS), 供服务端路由读取登录态。
 import { cookies } from "next/headers";
 
 export const runtime = "nodejs";
