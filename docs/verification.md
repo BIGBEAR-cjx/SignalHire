@@ -93,8 +93,8 @@ than the shared stale threshold, or the server cannot read Insforge.
 
 Vercel Cron calls `/api/cron/worker-health` on the production deployment. It requires `CRON_SECRET`
 in the Vercel environment because the route checks `Authorization: Bearer $CRON_SECRET`. The current
-`web/vercel.json` schedule is hourly (`0 * * * *`); if the project is on Vercel Hobby, change it to a
-daily schedule before deploying because Hobby cron jobs cannot run hourly.
+`web/vercel.json` schedule is daily (`0 0 * * *`) so it remains valid on Vercel Hobby; use the
+`verify:worker-health` script for on-demand checks during incidents.
 
 Railway production worker check:
 
