@@ -1,99 +1,99 @@
-# SignalHire v1 Product Design
+# SignalHire v1 产品设计
 
-Date: 2026-05-28
+日期：2026-05-28
 
-## Product Positioning
+## 产品定位
 
-SignalHire v1 is a global AI talent search and evidence delivery platform for company HR teams and headhunters.
+SignalHire v1 是一个面向公司 HR 和猎头的全球 AI 人才搜索与证据交付平台。
 
-The product starts from a hiring brief, searches broad public sources for AI talent signals, returns a small high-quality shortlist, and packages the evidence into a shareable report. It is no longer constrained by hackathon demo requirements.
+产品从岗位画像出发，围绕全球公开来源搜索 AI 人才信号，返回一份小而精的候选人 shortlist，并把证据整理成可分享的交付报告。后续产品迭代不再受黑客松 demo 约束。
 
-Core promise:
+核心承诺：
 
-> Find 10-15 globally relevant AI candidates with evidence-backed signals from papers, open source, product practice, work history, and public profiles.
+> 从论文、开源、实践项目、工作经历和公开 profile 中，找到 10-15 位全球相关 AI 候选人，并给出可解释、可验证的证据。
 
-SignalHire should not compete as a generic people database. Its differentiation is broad public-source coverage, cross-verification, explainable scoring, and report-quality delivery.
+SignalHire 不应该做成泛化的人才数据库。它的差异化是：广泛公开来源覆盖、交叉验证、可解释评分，以及适合交付给客户或 hiring manager 的报告形态。
 
-## Primary User
+## 目标用户
 
-The v1 user is either:
+v1 的目标用户包括：
 
-- A headhunter preparing a client-facing AI candidate shortlist.
-- A company HR or talent partner sourcing candidates for an AI role and sharing findings with a hiring manager.
+- 猎头：为客户准备 AI 候选人 shortlist。
+- 公司 HR / Talent Partner：为内部 AI 岗位找人，并把结果分享给 hiring manager。
 
-v1 serves both, but prioritizes report/share/export delivery quality over high-volume CRM workflow.
+v1 同时服务这两类用户，但优先保证报告、分享和导出的交付感，而不是先做高频 CRM 工作流。
 
-## Primary Workflow
+## 主流程
 
-1. User enters a hiring brief in natural language.
-2. SignalHire parses the brief into a structured search profile.
-3. SignalHire searches broad public sources for candidate signals.
-4. SignalHire extracts candidates and evidence.
-5. SignalHire cross-verifies papers, open-source work, product practice, work history, and profile identity.
-6. SignalHire groups candidates by AI talent direction.
-7. SignalHire returns a 10-15 person shortlist.
-8. User reviews candidates, removes weak fits, opens candidate profiles, and shares a web report.
+1. 用户用自然语言输入岗位画像。
+2. SignalHire 把岗位画像解析成结构化搜索 profile。
+3. SignalHire 从广泛公开来源中搜索候选人信号。
+4. SignalHire 抽取候选人和证据。
+5. SignalHire 交叉验证论文、开源、产品实践、工作经历和身份 profile。
+6. SignalHire 按 AI 人才方向对候选人分层。
+7. SignalHire 返回 10-15 人高质量 shortlist。
+8. 用户审阅候选人、移除弱匹配、打开候选人详情页，并分享 Web 报告。
 
-## v1 Product Scope
+## v1 产品范围
 
 ### P0
 
-- Search Brief input and parsing.
-- AI talent direction grouping.
-- 10-15 high-quality candidate shortlist.
-- Explainable match score.
-- Candidate cards with strongest signals and evidence quality.
-- Candidate Profile with Evidence Audit.
-- Shortlist save/remove behavior.
-- Shareable web report link.
-- Public-source evidence and cross-verification.
-- Optional display of public contact/profile links.
+- Search Brief 输入与解析。
+- AI 人才方向分层。
+- 10-15 人高质量候选人 shortlist。
+- 可解释 match score。
+- 候选人卡片展示 strongest signals 和 evidence quality。
+- Candidate Profile + Evidence Audit。
+- Shortlist 保存 / 移除。
+- Web share link。
+- 公开来源证据与交叉验证。
+- 可选展示公开联系方式和公开 profile 链接。
 
 ### P1
 
-- PDF export.
-- CSV or Excel export.
-- Whole-shortlist evidence audit summary.
-- Paid or authorized enrichment integrations.
-- Saved search alerts.
-- Outreach opener generation.
-- Team collaboration.
-- ATS or CRM integrations.
+- PDF 导出。
+- CSV / Excel 导出。
+- 整份 shortlist 的证据审计摘要。
+- 付费或授权 enrichment 集成。
+- Saved search alerts。
+- Outreach opener 生成。
+- 团队协作。
+- ATS / CRM 集成。
 
-## Non-Goals for v1
+## v1 非目标
 
-- Do not build a high-volume people CRM.
-- Do not make outreach automation the core product.
-- Do not infer or guess private email addresses.
-- Do not let paid enrichment sources become the only evidence for a match.
-- Do not preserve the old "Verify candidate" tab as a primary product entry.
-- Do not optimize for hackathon demo constraints or pre-cached-only flows.
+- 不做高容量 people CRM。
+- 不把 outreach 自动化作为核心产品。
+- 不推断或猜测私人邮箱。
+- 不允许付费 enrichment 来源成为候选人匹配的唯一证据。
+- 不保留旧的 “Verify candidate” tab 作为主入口。
+- 不再围绕黑客松 demo 或预缓存流程优化。
 
 ## Search Brief
 
-The main entry point is a hiring brief, not a Boolean query builder.
+主入口是岗位画像，而不是 Boolean query builder。
 
-Example:
+示例：
 
-> Find senior engineers with LLM inference or serving experience, ideally with vLLM, Triton, TensorRT-LLM, Kubernetes, or distributed systems work. North America or Europe preferred, remote acceptable.
+> 找 senior engineers，要求有 LLM inference 或 serving 经验，最好做过 vLLM、Triton、TensorRT-LLM、Kubernetes 或 distributed systems。北美或欧洲优先，可远程。
 
-The parsed brief should include:
+解析后的 brief 应包含：
 
-- Target AI direction.
-- Required and preferred skills.
-- Seniority.
-- Geography or remote constraints.
-- Evidence preferences.
-- Exclusion criteria.
-- Adjacent talent pools worth exploring.
+- 目标 AI 方向。
+- 必备技能和加分技能。
+- 资历要求。
+- 地区或远程约束。
+- 证据偏好。
+- 排除条件。
+- 值得探索的相邻人才池。
 
-The parsed brief should be visible and editable enough for the user to understand what the system is searching for.
+解析结果需要让用户看得懂，并且至少具备基础可编辑能力，让用户知道系统接下来会搜什么。
 
-## AI Talent Directions
+## AI 人才方向
 
-Search results are grouped by AI direction. The grouping helps users understand the talent market while still producing a shortlist.
+搜索结果按 AI 方向分层展示。这个分层的目标是帮助用户理解人才市场，同时服务 shortlist 筛选。
 
-Initial direction taxonomy:
+初始方向分类：
 
 - AI Infrastructure / LLM Systems
 - AI Research / Applied Science
@@ -103,175 +103,175 @@ Initial direction taxonomy:
 - AI Product / Solutions
 - Founder / Builder
 
-Each search should identify:
+每次搜索应识别：
 
-- Primary matching direction.
-- Adjacent transferable directions.
-- High-potential candidate sources.
+- 主匹配方向。
+- 相邻可迁移方向。
+- 高潜力候选人来源。
 
-The final 10-15 candidates do not need to be evenly distributed across directions. Distribution should follow the brief.
+最终 10-15 位候选人不需要在各方向平均分布，分布应跟随岗位画像。
 
-## Search Result Delivery
+## 搜索结果交付
 
-v1 results should feel like a hiring shortlist, not raw search results.
+v1 的结果应该像一份 hiring shortlist，而不是原始搜索结果。
 
-Each candidate card should show:
+每张候选人卡片应展示：
 
-- Name.
-- Current role and company when available.
-- Location or region when publicly available.
-- AI direction tags.
-- Match score.
-- Strongest signals.
-- Evidence quality.
-- Main uncertainty or risk.
-- Public profile/contact links when available.
-- Add/remove shortlist action.
-- Link to Candidate Profile.
+- 姓名。
+- 当前角色和公司，如果公开可得。
+- 地区或区域，如果公开可得。
+- AI 方向标签。
+- Match score。
+- Strongest signals。
+- Evidence quality。
+- 主要不确定点或风险。
+- 公开 profile / contact links，如果公开可得。
+- 加入 / 移出 shortlist。
+- Candidate Profile 入口。
 
-The default result volume is 10-15 candidates. This keeps review cost low and supports high-confidence delivery.
+默认结果数量为 10-15 位候选人。这个数量能降低人工审阅成本，也更符合高质量交付定位。
 
 ## Match Score
 
-The score is composite and explainable. The default weight favors real-world achievement signals over resume keywords.
+评分是综合加权，并且必须可解释。默认权重应让真实成果信号高于简历关键词。
 
-Suggested v1 weighting:
+v1 建议权重：
 
-- Real achievement signals: 40%
-- Hiring brief skill match: 25%
-- Work history relevance: 20%
-- Evidence quality: 15%
+- 真实成果信号：40%
+- 岗位技能匹配：25%
+- 工作经历相关性：20%
+- 证据质量：15%
 
-Real achievement signals include papers, accepted conference work, open-source contributions, Hugging Face models or datasets, shipped projects, technical writing, benchmark participation, demos, and public product work.
+真实成果信号包括论文、会议录用、开源贡献、Hugging Face 模型或数据集、已上线项目、技术文章、benchmark 参与、demo 和公开产品实践。
 
-Every score should include a short explanation:
+每个 score 都应包含简短解释：
 
-- Why this candidate matched.
-- Which signals drove the score.
-- Which evidence is strong.
-- Which claims remain uncertain.
+- 为什么这个候选人匹配。
+- 哪些信号拉高了评分。
+- 哪些证据较强。
+- 哪些结论仍然不确定。
 
 ## Candidate Profile
 
-Candidate Profile is the deep-dive page for a single person.
+Candidate Profile 是单个候选人的深度详情页。
 
-It should include:
+它应包含：
 
-- Candidate summary.
-- Direction and skill tags.
-- Why the candidate matches the brief.
-- Paper and research signals.
-- Open-source and engineering practice signals.
-- Product or applied work signals.
-- Work history signals.
-- Public profile links.
-- Public contact links when clearly available.
-- Evidence Audit.
-- Suggested outreach angle.
+- 候选人摘要。
+- 方向和技能标签。
+- 为什么该候选人匹配当前 brief。
+- 论文和研究信号。
+- 开源和工程实践信号。
+- 产品或应用实践信号。
+- 工作经历信号。
+- 公开 profile 链接。
+- 明确公开的联系方式。
+- Evidence Audit。
+- 建议联系角度。
 
-The page should be useful as an internal reviewer page and as source material for a client-facing report.
+这个页面既要适合内部审阅，也要能作为客户交付报告的素材来源。
 
 ## Evidence Audit
 
-The old standalone "Verify candidate" mode becomes a Candidate Profile action, not a top-level product entry.
+旧的独立 “Verify candidate” 模式应变成 Candidate Profile 中的动作，而不是顶层入口。
 
-v1 uses the entry and language:
+v1 使用的入口和语言：
 
-- Candidate Profile contains "Evidence Audit" or "Verify Evidence".
-- The audit is candidate-level in P0.
-- Whole-shortlist audit summary is P1.
+- Candidate Profile 中包含 “Evidence Audit” 或 “Verify Evidence”。
+- P0 先做单候选人级别的证据审计。
+- P1 再做整份 shortlist 的证据审计摘要。
 
-Evidence Audit should answer:
+Evidence Audit 应回答：
 
-- Which important claims are verified?
-- Which claims are unverified?
-- Which claims are contradicted?
-- Which conclusions rely on only one source?
-- Is there a possible identity mismatch?
-- Is the public profile recent enough?
-- Are the strongest signals relevant to the hiring brief?
+- 哪些关键声称已验证？
+- 哪些声称未验证？
+- 哪些声称被证据反驳？
+- 哪些结论只依赖单一来源？
+- 是否存在同名误配或身份混淆？
+- 公开 profile 是否足够近期？
+- 最强信号是否真的和岗位画像相关？
 
-## Data Source Strategy
+## 数据源策略
 
-P0 uses public, verifiable sources. P1 may add paid or authorized enrichment.
+P0 使用公开、可验证来源。P1 可加入付费或授权 enrichment。
 
-Public-source categories:
+公开来源类别：
 
-- Papers and research: arXiv, OpenReview, Semantic Scholar, Google Scholar, conference pages, lab pages.
-- Open source and engineering: GitHub, Hugging Face, Papers with Code, project pages, benchmark pages, release notes, issue and PR activity.
-- Product and practice: demos, technical blogs, company engineering blogs, launch posts, documentation, talks, slides, case studies.
-- Work history: LinkedIn when publicly visible, company team pages, personal sites, news, podcasts, interviews.
-- Community and influence: X/Twitter, YouTube, Substack, Medium, Hacker News, conference speaker bios.
-- Identity signals: personal domains, Scholar profiles, GitHub profiles, ORCID, company pages, conference bios.
+- 论文和研究：arXiv、OpenReview、Semantic Scholar、Google Scholar、会议页面、实验室页面。
+- 开源和工程：GitHub、Hugging Face、Papers with Code、项目主页、benchmark 页面、release notes、issue 和 PR 活动。
+- 产品和实践：demo、技术博客、公司工程博客、launch post、文档、演讲、slides、case study。
+- 工作经历：公开可见 LinkedIn、公司 team 页面、个人主页、新闻、播客、访谈。
+- 社区和影响力：X/Twitter、YouTube、Substack、Medium、Hacker News、会议 speaker bio。
+- 身份信号：个人域名、Scholar profile、GitHub profile、ORCID、公司页面、会议 bio。
 
-Evidence rules:
+证据规则：
 
-- Key conclusions need source URLs.
-- Strong claims should be cross-verified across independent sources when possible.
-- Paid or authorized enrichment can supplement, but cannot be the only support for a candidate match.
-- Unverified or weak evidence must be labeled as such.
-- Search-result URLs are not evidence.
+- 关键结论必须有 source URL。
+- 强声称应尽可能由独立来源交叉验证。
+- 付费或授权 enrichment 可以补充，但不能成为候选人匹配的唯一支撑。
+- 未验证或弱证据必须明确标注。
+- 搜索结果页 URL 不是证据。
 
-## Contact Information
+## 联系信息
 
-v1 displays public contact and profile links when available:
+v1 展示公开可得的联系方式和 profile 链接：
 
-- Personal website.
-- LinkedIn.
-- GitHub.
-- Google Scholar.
-- Hugging Face.
-- X/Twitter.
-- Public email only when clearly published by the candidate or affiliated page.
+- 个人网站。
+- LinkedIn。
+- GitHub。
+- Google Scholar。
+- Hugging Face。
+- X/Twitter。
+- 只有候选人或其关联页面明确公开时才展示邮箱。
 
-v1 should not guess private email addresses.
+v1 不猜测私人邮箱。
 
-## Shareable Client Report
+## 可分享客户报告
 
-P0 delivery is a web share link.
+P0 交付格式是 Web share link。
 
-The share report should include:
+分享报告应包含：
 
-- Hiring brief summary.
-- Search strategy summary.
-- AI direction distribution.
-- Shortlist candidates.
-- Candidate-level match explanations.
-- Evidence summaries.
-- Known uncertainties.
+- 岗位画像摘要。
+- 搜索策略摘要。
+- AI 方向分布。
+- Shortlist 候选人。
+- 候选人级别 match explanation。
+- 证据摘要。
+- 已知不确定点。
 
-P1 adds PDF and CSV/Excel exports.
+P1 增加 PDF 和 CSV / Excel 导出。
 
-## Existing Product Migration
+## 现有产品迁移
 
-The current Search mode maps to the new Search Brief and Shortlist workflow.
+当前 Search mode 映射到新的 Search Brief 和 Shortlist 工作流。
 
-The current Verify mode should be removed from the main navigation or de-emphasized. Its functionality becomes Candidate Profile Evidence Audit.
+当前 Verify mode 应从主导航中移除或弱化，它的能力迁移到 Candidate Profile 的 Evidence Audit。
 
-The existing `/r/[id]` report concept can evolve into shareable candidate and shortlist reports.
+现有 `/r/[id]` report 概念可以演进成候选人和 shortlist 的可分享报告。
 
-The existing worker queue remains useful because deeper public-source search will still be long-running.
+现有 worker queue 仍然有价值，因为更深的公开来源搜索仍会是长任务。
 
-## Success Criteria
+## 成功标准
 
-v1 is successful when a user can:
+v1 成功时，用户应能：
 
-- Enter one AI hiring brief.
-- Receive 10-15 plausible global AI candidates.
-- Understand why each candidate matched.
-- See evidence across multiple source types.
-- Identify uncertainty or risk before sharing.
-- Save or remove candidates from a shortlist.
-- Share a web report with a hiring manager or client.
+- 输入一个 AI 岗位画像。
+- 收到 10-15 位可信的全球 AI 候选人。
+- 理解每个候选人为什么匹配。
+- 看到来自多种来源类型的证据。
+- 在分享前识别不确定点或风险。
+- 保存或移除 shortlist 中的候选人。
+- 把 Web 报告分享给 hiring manager 或客户。
 
-The result should feel closer to a consultant-quality shortlist than a raw search dump.
+结果体验应该更接近顾问交付的高质量 shortlist，而不是原始搜索结果堆叠。
 
-## Open Implementation Questions
+## 实现计划阶段待定问题
 
-These should be resolved during implementation planning:
+以下问题应在后续实现计划中解决：
 
-- Whether Search Brief parsing should be deterministic schema extraction, LLM-only extraction, or hybrid.
-- Whether candidate and source records need separate tables before the first v1 implementation.
-- Whether the first shortlist report should be one `research_runs` result payload or a new project-oriented data model.
-- How to cache source-level evidence so reruns are cheaper.
-- Which AI direction taxonomy should be user-editable in the first release.
+- Search Brief 解析应使用确定性 schema extraction、纯 LLM extraction，还是混合方案。
+- 第一版实现前是否需要单独的 candidate 和 source records 表。
+- 第一版 shortlist report 应继续使用一个 `research_runs` result payload，还是改成 project-oriented data model。
+- 如何缓存 source-level evidence，降低重复搜索成本。
+- 第一版 AI 方向 taxonomy 是否允许用户编辑。
