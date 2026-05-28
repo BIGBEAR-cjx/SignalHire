@@ -10,6 +10,7 @@
 //   .select().eq().order().limit() / .insert() / .upsert(...,{onConflict}) → {data,error}。
 
 import { createClient } from "@insforge/sdk";
+import { DEFAULT_MAX_ATTEMPTS, buildRetryUpdate, describeJobStatus } from "./job-state.mjs";
 
 const BASE = process.env.INSFORGE_API_BASE_URL;
 const KEY = process.env.INSFORGE_API_KEY; // 服务端 access key, 绝不进 NEXT_PUBLIC
@@ -45,6 +46,26 @@ export interface RecentRun {
   updated_at: string;
 }
 
+export interface RunStatus {
+  status: string;
+  progress: unknown;
+  result: unknown;
+  error: string | null;
+  last_error: string | null;
+  attempt_count: number;
+  max_attempts: number;
+  locked_at: string | null;
+  started_at: string | null;
+  finished_at: string | null;
+  updated_at: string | null;
+  status_view: {
+    phase: "queued" | "running" | "retrying" | "done" | "error";
+    label: string;
+    detail: string;
+    canRetry: boolean;
+  };
+}
+
 // 精确 flat_key 查找 (模糊匹配只留给 cache.ts 的 2 个静态头牌, 避免库变大后误命中)。
 // 返回 {id, result} —— id 用于生成可分享报告链接 /r/[id]。
 export async function findRun(kind: RunKind, flatKey: string): Promise<{ id: string; result: unknown } | null> {
@@ -52,12 +73,14 @@ export async function findRun(kind: RunKind, flatKey: string): Promise<{ id: str
   try {
     const { data, error } = await client.database
       .from(TABLE)
-      .select("id,result")
+      .select("id,result,status")
       .eq("cache_key", cacheKey(kind, flatKey))
+      .eq("status", "done")
       .limit(1);
     if (error || !data || data.length === 0) return null;
-    const row = data[0] as { id: string; result?: unknown };
-    return { id: row.id, result: row.result ?? null };
+    const row = data[0] as { id: string; result?: unknown; status?: string };
+    if (!row.result) return null;
+    return { id: row.id, result: row.result };
   } catch {
     return null;
   }
@@ -110,6 +133,12 @@ export async function saveRun(row: SaveRunInput): Promise<string | null> {
         summary: row.summary,
         result: row.result,
         stats: row.stats,
+        status: "done",
+        error: null,
+        last_error: null,
+        progress: null,
+        locked_at: null,
+        finished_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       },
       { onConflict: "cache_key" },
@@ -134,7 +163,9 @@ export async function enqueue(input: {
         cache_key: ck, kind: input.kind, flat_key: input.flatKey,
         query_text: input.queryText, label: input.label,
         summary: "研究中…", result: null, stats: null,
-        status: "queued", error: null, progress: null,
+        status: "queued", error: null, last_error: null, progress: null,
+        attempt_count: 0, max_attempts: DEFAULT_MAX_ATTEMPTS,
+        locked_at: null, started_at: null, finished_at: null,
         updated_at: new Date().toISOString(),
       },
       { onConflict: "cache_key" },
@@ -146,16 +177,54 @@ export async function enqueue(input: {
 }
 
 // 前端轮询: 按 id 取任务状态/进度/结果。
-export async function getStatus(id: string): Promise<{
-  status: string; progress: unknown; result: unknown; error: string | null;
-} | null> {
+export async function getStatus(id: string): Promise<RunStatus | null> {
   if (!client) return null;
   try {
     const { data, error } = await client.database
-      .from(TABLE).select("status,progress,result,error").eq("id", id).limit(1);
+      .from(TABLE)
+      .select("status,progress,result,error,last_error,attempt_count,max_attempts,locked_at,started_at,finished_at,updated_at")
+      .eq("id", id)
+      .limit(1);
     if (error || !data || data.length === 0) return null;
-    const r = data[0] as { status?: string; progress?: unknown; result?: unknown; error?: string | null };
-    return { status: r.status ?? "done", progress: r.progress ?? null, result: r.result ?? null, error: r.error ?? null };
+    const r = data[0] as {
+      status?: string; progress?: unknown; result?: unknown; error?: string | null;
+      last_error?: string | null; attempt_count?: number | null; max_attempts?: number | null;
+      locked_at?: string | null; started_at?: string | null; finished_at?: string | null;
+      updated_at?: string | null;
+    };
+    const normalized = {
+      status: r.status ?? "done",
+      progress: r.progress ?? null,
+      result: r.result ?? null,
+      error: r.error ?? null,
+      last_error: r.last_error ?? null,
+      attempt_count: r.attempt_count ?? 0,
+      max_attempts: r.max_attempts ?? DEFAULT_MAX_ATTEMPTS,
+      locked_at: r.locked_at ?? null,
+      started_at: r.started_at ?? null,
+      finished_at: r.finished_at ?? null,
+      updated_at: r.updated_at ?? null,
+    };
+    return { ...normalized, status_view: describeJobStatus(normalized) as RunStatus["status_view"] };
+  } catch {
+    return null;
+  }
+}
+
+// 手动重试失败任务: 只允许 error 行重新入队。返回最新状态供前端继续轮询。
+export async function retryRun(id: string): Promise<RunStatus | null> {
+  if (!client) return null;
+  try {
+    const current = await getStatus(id);
+    if (!current || current.status !== "error") return current;
+    const { data, error } = await client.database
+      .from(TABLE)
+      .update(buildRetryUpdate())
+      .eq("id", id)
+      .eq("status", "error")
+      .select("id");
+    if (error || !data || data.length === 0) return null;
+    return await getStatus(id);
   } catch {
     return null;
   }

@@ -18,6 +18,12 @@ node --check index.mjs
 node --check lib.mjs
 ```
 
+Run the shared job-state checks after queue or worker changes:
+
+```bash
+node --test job-state.test.mjs
+```
+
 ## Known local environment note
 
 In restricted sandboxes, `next build` can fail with a Turbopack panic mentioning `binding to a port` and `Operation not permitted`. If that happens, rerun the build in an unrestricted local terminal before treating it as a product failure.
@@ -55,3 +61,12 @@ cd worker && node --env-file=../web/.env.local index.mjs
 ```
 
 Expected: logs show worker startup and processing progress, with status updates reflecting the worker behavior.
+
+## Research job reliability checks
+
+For a non-cached query with real credentials:
+
+- `/api/search` or `/api/verify` returns `{ queued: true, jobId }`.
+- `/api/status?id=<jobId>` returns `status_view.phase` as the job moves through `queued`, `running`, `retrying`, `done`, or `error`.
+- If the worker crashes while a row is `running`, a later worker loop moves the stale row back to `retrying`.
+- If a row ends in `error`, `POST /api/retry` with `{ "id": "<jobId>" }` returns it to `queued`.

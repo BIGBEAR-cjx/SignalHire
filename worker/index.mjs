@@ -1,7 +1,7 @@
 // worker/index.mjs —— SignalHire 异步研究 worker。
 // 跑在 Insforge Compute (长时容器, 无请求超时) 或任意能跑 Node 的地方 (Railway 等)。
-// 职责: 轮询 research_runs 里 status='queued' 的任务 → 认领 → 跑 MiroMind 深度研究(4-10分钟)
-//        → 期间把进度写回该行 → 跑完写 result + status='done'(或 'error')。
+// 职责: 轮询 research_runs 里 queued/retrying 的任务 → 认领 → 跑 MiroMind 深度研究(4-10分钟)
+//        → 期间把进度写回该行 → 跑完写 result + status='done'(或 retrying/error)。
 //
 // 环境变量: INSFORGE_API_BASE_URL, INSFORGE_API_KEY, MIROMIND_API_KEY/BASE_URL/MODEL
 // 本地跑: node --env-file=../web/.env.local index.mjs   (或自备 .env)
@@ -9,6 +9,13 @@
 import { createServer } from "node:http";
 import { createClient } from "@insforge/sdk";
 import { streamResearch, parseJson, normalizeResult, searchPrompt, verifyPrompt } from "./lib.mjs";
+import {
+  buildRunFailureUpdate,
+  buildRunStartUpdate,
+  buildStaleRecoveryUpdate,
+  isStaleRunningJob,
+  maxAttempts,
+} from "../web/lib/job-state.mjs";
 
 // 极简健康端口: 满足 Compute/Render 等"需要监听端口"的平台 (worker 本身是轮询, 不靠 HTTP)。
 const PORT = process.env.PORT || 8080;
@@ -28,22 +35,58 @@ const PROGRESS_MS = 3000; // 进度写库节流
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-// 认领一个排队任务: 取最老的 queued, 原子置 running。返回任务行或 null。
-async function claimNext() {
+// 恢复卡在 running 太久的任务, 避免 worker 崩溃后永远转圈。
+async function recoverStaleRunning() {
   const { data } = await db.from(TABLE)
-    .select("id,kind,query_text")
-    .eq("status", "queued")
+    .select("id,status,attempt_count,max_attempts,locked_at,started_at,updated_at")
+    .eq("status", "running")
+    .order("updated_at", { ascending: true })
+    .limit(10);
+  const stale = (data ?? []).filter((row) => isStaleRunningJob(row));
+  for (const row of stale) {
+    const { data: upd } = await db.from(TABLE)
+      .update(buildStaleRecoveryUpdate(row))
+      .eq("id", row.id)
+      .eq("status", "running")
+      .select("id");
+    if (upd && upd.length > 0) {
+      console.warn(`[${new Date().toISOString()}] 恢复超时任务 ${row.id}, 重新排队重试`);
+    }
+  }
+}
+
+// 认领一个排队/待重试任务: 取最老任务, 原子置 running。返回任务行或 null。
+async function claimByStatus(status) {
+  const { data } = await db.from(TABLE)
+    .select("id,kind,query_text,attempt_count,max_attempts")
+    .eq("status", status)
     .order("created_at", { ascending: true })
     .limit(1);
   const job = data?.[0];
   if (!job) return null;
-  // 原子认领: 仅当仍是 queued 时置 running
+  const nextAttempt = Number(job.attempt_count ?? 0) + 1;
+  const max = maxAttempts(job);
+  if (nextAttempt > max) {
+    await db.from(TABLE).update({
+      status: "error",
+      error: "已达到最大重试次数",
+      last_error: "已达到最大重试次数",
+      updated_at: new Date().toISOString(),
+    }).eq("id", job.id).eq("status", status).select("id");
+    return null;
+  }
+  // 原子认领: 仅当仍是目标状态时置 running
   const { data: claimed } = await db.from(TABLE)
-    .update({ status: "running", updated_at: new Date().toISOString() })
-    .eq("id", job.id).eq("status", "queued")
+    .update({ ...buildRunStartUpdate(), attempt_count: nextAttempt, max_attempts: max })
+    .eq("id", job.id).eq("status", status)
     .select("id");
   if (!claimed || claimed.length === 0) return null; // 被别人抢了
-  return job;
+  return { ...job, attempt_count: nextAttempt, max_attempts: max };
+}
+
+async function claimNext() {
+  await recoverStaleRunning();
+  return (await claimByStatus("queued")) ?? (await claimByStatus("retrying"));
 }
 
 function summarize(kind, data) {
@@ -93,6 +136,9 @@ async function runJob(job) {
       progress: { searches: out.searches, fetches: out.fetches, recent },
       status: "done",
       error: null,
+      last_error: null,
+      locked_at: null,
+      finished_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     };
     // 关键写库: 用 .select() 确认真的更新了行, 没成功就重试 (代理偶发会黑洞掉 PATCH 却返回 OK)。
@@ -110,16 +156,20 @@ async function runJob(job) {
     if (!saved) throw new Error("结果写库失败 (多次重试未成功)");
     console.log(`[${new Date().toISOString()}] 完成 ${job.id}: 搜索 ${out.searches} 抓取 ${out.fetches}`);
   } catch (e) {
-    // 标记失败 (await + try, 确保不把任务孤儿在 running)。重试一次以防同一次网络抖动连写库都掐了。
-    const errStr = String(e?.message || e).slice(0, 500);
+    // 标记失败或待重试 (await + try, 确保不把任务孤儿在 running)。
+    const failureRow = buildRunFailureUpdate({
+      attemptCount: Number(job.attempt_count ?? 1),
+      maxAttempts: maxAttempts(job),
+      error: e,
+    });
     for (let i = 0; i < 3; i++) {
       try {
-        const { data: upd } = await db.from(TABLE).update({ status: "error", error: errStr, updated_at: new Date().toISOString() }).eq("id", job.id).select("id");
+        const { data: upd } = await db.from(TABLE).update(failureRow).eq("id", job.id).select("id");
         if (upd && upd.length > 0) break;
       } catch {}
       await sleep(1500);
     }
-    console.error(`[${new Date().toISOString()}] 任务 ${job.id} 失败:`, errStr);
+    console.error(`[${new Date().toISOString()}] 任务 ${job.id} ${failureRow.status === "retrying" ? "等待重试" : "失败"}:`, failureRow.last_error);
   }
 }
 

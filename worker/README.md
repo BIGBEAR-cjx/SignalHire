@@ -1,6 +1,6 @@
 # SignalHire 异步研究 worker
 
-跑长任务的后台 worker:轮询 `research_runs` 里 `status='queued'` 的任务 → 跑 MiroMind 深度研究(4-10 分钟,无超时)→ 把进度/结果写回 Insforge。Vercel 函数有 60s 超时跑不完,所以长研究放这里。
+跑长任务的后台 worker:轮询 `research_runs` 里 `status='queued'`/`status='retrying'` 的任务 → 跑 MiroMind 深度研究(4-10 分钟,无超时)→ 把进度/结果写回 Insforge。Vercel 函数有 60s 超时跑不完,所以长研究放这里。
 
 ## 环境变量
 
@@ -23,13 +23,15 @@ node --env-file=../web/.env.local index.mjs
 The worker is the long-running runtime for non-cached live research.
 
 - It expects Insforge `research_runs` rows with `status='queued'`.
-- It claims one row by changing `status` from `queued` to `running`.
+- It claims one row by changing `status` from `queued` or `retrying` to `running`.
 - While MiroMind streams, it writes research activity into `progress`.
 - On success, it writes `status='done'` plus `result`, `stats`, and `summary`.
-- On failure, it writes `status='error'` plus `error`.
+- On transient failure, it writes `status='retrying'` plus `last_error` until `max_attempts` is reached.
+- On final failure, it writes `status='error'` plus `error`.
+- On each loop, it recovers stale `running` rows so worker crashes do not leave jobs orphaned.
 
 One worker is enough for the demo. Multiple workers should be safe because each worker only proceeds
-after the queued-row claim condition succeeds.
+after the status-guarded claim condition succeeds.
 
 ## 部署到 Insforge Compute(方案 A)
 
@@ -42,7 +44,7 @@ after the queued-row claim condition succeeds.
 
 ## 设计要点
 
-- **认领防并发**:`update status=running where id=? and status='queued'` + `.select()` 确认。
-- **重试**:MiroMind 长连接偶发被网络掐断 → 整次研究最多重试 3 次。
+- **认领防并发**:`update status=running where id=? and status in ('queued','retrying')` + `.select()` 确认。
+- **重试**:MiroMind 长连接偶发被网络掐断 → 单次 worker 尝试内有短重试；整条任务按 `attempt_count/max_attempts` 做有界重试。
 - **写库确认**:关键的"完成"写库用 `.select()` 校验行数 + 失败重试,杜绝"以为写了其实没写"。
-- **失败兜底**:多次失败标 `status='error'`,前端停止轮询并报错,不会把任务孤儿在 running。
+- **失败兜底**:失败先标 `status='retrying'`,达到上限后标 `status='error'`; 每轮会恢复超时 `running` 任务,不会把任务孤儿在 running。

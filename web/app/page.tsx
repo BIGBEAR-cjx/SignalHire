@@ -16,6 +16,21 @@ type ResearchDoneEvent = { type: "done"; data: AppResult; stats?: RunStats | nul
 type ResearchErrorEvent = { type: "error"; error?: string };
 type ResearchEvent = ResearchStepEvent | ResearchDoneEvent | ResearchErrorEvent;
 type QueueResponse = { queued?: boolean; jobId?: string; error?: string };
+type JobStatusView = {
+  phase: "queued" | "running" | "retrying" | "done" | "error";
+  label: string;
+  detail: string;
+  canRetry: boolean;
+};
+type StatusResponse = {
+  runId?: string;
+  status?: string;
+  progress?: { searches?: number; fetches?: number; recent?: Array<{ kind: "search" | "fetch"; info: string }> } | null;
+  result?: AppResult;
+  error?: string | null;
+  last_error?: string | null;
+  status_view?: JobStatusView;
+};
 type HistoryItem = {
   kind: "search" | "verify";
   label: string;
@@ -41,6 +56,8 @@ export default function Home() {
   const [live, setLive] = useState<{ searches: number; fetches: number } | null>(null);
   const [history, setHistory] = useState<HistoryItem[]>([]);
   const [runId, setRunId] = useState<string | null>(null); // 可分享报告 id
+  const [jobStatus, setJobStatus] = useState<JobStatusView | null>(null);
+  const [currentJobId, setCurrentJobId] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [user, setUser] = useState<{ email: string } | null>(null); // 登录态
   const [authOpen, setAuthOpen] = useState(false); // 登录弹窗
@@ -83,7 +100,8 @@ export default function Home() {
       }
       try {
         const r = await fetch(`/api/status?id=${jobId}`);
-        const j = await r.json();
+        const j: StatusResponse = await r.json();
+        if (j.status_view) setJobStatus(j.status_view);
         const p = j.progress;
         if (p) {
           setLive({ searches: p.searches ?? 0, fetches: p.fetches ?? 0 });
@@ -91,8 +109,13 @@ export default function Home() {
         }
         if (j.status === "done") {
           stopPolling();
+          if (!j.result) {
+            setError("研究完成但结果为空，请重新研究");
+            setLoading(false);
+            return;
+          }
           setResult(j.result);
-          setStats(p ? { searches: p.searches, fetches: p.fetches } : null);
+          setStats(p ? { searches: p.searches ?? 0, fetches: p.fetches ?? 0 } : null);
           setRunId(j.runId ?? jobId);
           setLoading(false);
           loadHistory();
@@ -137,7 +160,7 @@ export default function Home() {
     }
     stopPolling();
     setLoading(true); setError(""); setResult(null); setStats(null);
-    setFeed([]); setLive(null); setRunId(null); setCopied(false);
+    setFeed([]); setLive(null); setRunId(null); setCurrentJobId(null); setJobStatus(null); setCopied(false);
     try {
       const url = m === "search" ? "/api/search" : "/api/verify";
       const body = m === "search" ? { query: q } : { bio: b };
@@ -183,11 +206,42 @@ export default function Home() {
         const j: QueueResponse = await res.json().catch(() => ({}));
         if (!res.ok) { setError(j.error ?? `HTTP ${res.status}`); setLoading(false); return; }
         if (j.queued && j.jobId) {
+          setCurrentJobId(j.jobId);
+          setJobStatus({ phase: "queued", label: "已进入研究队列", detail: "等待 worker 认领任务。", canRetry: false });
           beginPolling(j.jobId); // loading 保持 true, 轮询完成/失败时再关闭
         } else {
           setError(j.error ?? "出错了"); setLoading(false);
         }
       }
+    } catch (e) {
+      setError((e as Error).message);
+      setLoading(false);
+    }
+  }
+
+  async function retryCurrentJob() {
+    if (!currentJobId) return;
+    stopPolling();
+    setLoading(true);
+    setError("");
+    setResult(null);
+    setFeed([]);
+    setLive(null);
+    setJobStatus({ phase: "queued", label: "已重新入队", detail: "等待 worker 重新认领任务。", canRetry: false });
+    try {
+      const res = await fetch("/api/retry", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: currentJobId }),
+      });
+      const j: StatusResponse & { retried?: boolean } = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setError(j.error || `HTTP ${res.status}`);
+        setLoading(false);
+        return;
+      }
+      if (j.status_view) setJobStatus(j.status_view);
+      beginPolling(currentJobId);
     } catch (e) {
       setError((e as Error).message);
       setLoading(false);
@@ -296,15 +350,18 @@ export default function Home() {
         <div className="mt-5 rounded-2xl border border-gray-100 bg-white p-5 shadow-[0_8px_30px_rgba(0,0,0,0.06)]">
           <div className="flex items-center gap-2 text-sm font-medium text-gray-800">
             <span className="inline-block h-2 w-2 animate-pulse rounded-full bg-emerald-500" />
-            MiroMind 正在全网搜索 + 交叉核对…
+            {jobStatus?.label ?? "MiroMind 正在全网搜索 + 交叉核对…"}
             {live && (
               <span className="text-gray-500">
                 （搜索 {live.searches} 次 · 抓取 {live.fetches} 次）
               </span>
             )}
           </div>
+          {jobStatus?.detail && (
+            <p className="mt-2 text-xs text-gray-500">{jobStatus.detail}</p>
+          )}
           {feed.length === 0 ? (
-            <p className="mt-2 text-xs text-gray-500">已进入研究队列，深度研究约几分钟，进度会实时显示、完成后自动出结果…</p>
+            <p className="mt-2 text-xs text-gray-500">深度研究通常需要几分钟，进度会实时显示、完成后自动出结果。</p>
           ) : (
             <ul className="mt-3 max-h-64 space-y-1 overflow-auto font-mono text-xs">
               {feed
@@ -322,7 +379,19 @@ export default function Home() {
           )}
         </div>
       )}
-      {error && <p className="mt-5 rounded-xl border border-red-100 bg-red-50 p-4 text-sm text-red-700">出错: {error}</p>}
+      {error && (
+        <div className="mt-5 rounded-xl border border-red-100 bg-red-50 p-4 text-sm text-red-700">
+          <p>出错: {error}</p>
+          {jobStatus?.canRetry && currentJobId && (
+            <button
+              onClick={retryCurrentJob}
+              className="mt-3 rounded-lg bg-red-700 px-3 py-1.5 text-xs font-medium text-white hover:bg-red-800"
+            >
+              重新研究
+            </button>
+          )}
+        </div>
+      )}
 
       {result && (
         <div className="mt-6 space-y-4">

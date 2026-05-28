@@ -15,9 +15,15 @@
 | `summary` | Short report summary; queued rows may use an in-progress placeholder until completion. |
 | `result` | Generated report payload. `null` while queued/running; populated when `status` is `done`. |
 | `stats` | Run statistics such as search and fetch counts. |
-| `status` | Queue state: `queued`, `running`, `done`, or `error`. |
+| `status` | Queue state: `queued`, `running`, `retrying`, `done`, or `error`. |
 | `progress` | Worker progress payload for polling clients, including counters and recent steps when available. |
 | `error` | Error message for failed jobs; `null` for queued/running/done rows. |
+| `last_error` | Last transient failure reason, preserved across retrying jobs for user-visible diagnostics. |
+| `attempt_count` | Number of worker attempts already started for this row. |
+| `max_attempts` | Maximum attempts before the row becomes `error`. Default is `3`. |
+| `locked_at` | Timestamp set when a worker claims the job. Cleared when the job leaves `running`. |
+| `started_at` | Timestamp for the latest attempt start. |
+| `finished_at` | Timestamp for successful completion. |
 | `created_at` | Creation timestamp used by the worker to claim queued jobs oldest first. |
 | `updated_at` | Last-update timestamp used for cache/report freshness and recent-run ordering. |
 
@@ -28,7 +34,7 @@
 
 ## State Flow
 
-API routes enqueue cache misses as rows with `status = "queued"`. The worker claims queued rows and moves them through `queued -> running -> done` on success, or `queued -> running -> error` on failure. The status route reads `status`, `progress`, `result`, and `error` by `id`; the report page reads the completed report by `id`.
+API routes enqueue cache misses as rows with `status = "queued"`. The worker claims queued rows and moves them through `queued -> running -> done` on success. Transient failures move `running -> retrying`; the worker later claims retrying rows and either completes them or marks `error` after `max_attempts`. Stale `running` rows older than the shared timeout are moved back to `retrying` so they are not orphaned. The status route reads `status`, retry metadata, `progress`, `result`, and errors by `id`; the report page reads the completed report by `id`.
 
 ## Seeded Demo Rows
 
