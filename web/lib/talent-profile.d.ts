@@ -1,0 +1,14 @@
+export type Verdict = "verified" | "contradicted" | "unverified";
+export type EvidenceQuality = "high" | "medium" | "low";
+export type TalentEvidence = { note: string; url: string; source_type: string };
+export type TalentClaim = { claim: string; verdict: Verdict; evidence: TalentEvidence[] };
+export type TalentSearchBrief = { original_query: string; target_directions: string[]; required_skills: string[]; preferred_skills: string[]; seniority: string | null; geography: string | null; evidence_preferences: string[]; exclusions: string[] };
+export type TalentMapItem = { direction: string; fit: string; candidate_count: number; rationale: string };
+export type ScoreBreakdown = { achievement_signals: number; skill_match: number; work_history: number; evidence_quality: number };
+export type EvidenceAudit = { verified_claims: string[]; unverified_claims: string[]; contradicted_claims: string[]; single_source_claims: string[]; identity_risks: string[]; recency_notes: string[]; overall_evidence_quality: EvidenceQuality };
+export type TalentCandidate = { name: string; headline: string; location: string | null; current_role: string | null; current_company: string | null; ai_directions: string[]; match_score: number; score_breakdown: ScoreBreakdown; strongest_signals: string[]; uncertainties: string[]; links: { github: string | null; linkedin: string | null; scholar: string | null; huggingface: string | null; website: string | null; other: string | null }; claims: TalentClaim[]; evidence_audit: EvidenceAudit; outreach_angle: string; summary: string };
+export type TalentSearchResult = { search_brief: TalentSearchBrief; talent_map: TalentMapItem[]; candidates: TalentCandidate[] };
+export const AI_DIRECTIONS: string[];
+export function normalizeTalentSearchResult(data: unknown): TalentSearchResult;
+export function isTalentSearchResult(data: unknown): data is TalentSearchResult;
+export function isSearchUrl(url: unknown): boolean;
