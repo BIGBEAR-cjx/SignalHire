@@ -6,7 +6,10 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "verify:schema": "node --env-file-if-exists=.env.local scripts/check-research-runs-schema.mjs",
+    "verify:live": "node --env-file-if-exists=.env.local scripts/verify-live-research-job.mjs",
+    "verify:retry": "node --env-file-if-exists=.env.local scripts/verify-retry-api.mjs"
   },
   "dependencies": {
     "@insforge/sdk": "^1.2.10",

@@ -47,7 +47,7 @@ Expected: all three JSON seed files print `ok`.
 Command:
 
 ```bash
-cd web && node --env-file=.env.local scripts/check-research-runs-schema.mjs
+cd web && npm run verify:schema
 ```
 
 Expected: `research_runs schema ok`. If it fails with a missing column, add the v1 columns listed in `docs/insforge-research-runs.md` before running live jobs.
@@ -80,3 +80,14 @@ For a non-cached query with real credentials:
 - `/api/status?id=<jobId>` returns `status_view.phase` as the job moves through `queued`, `running`, `retrying`, `done`, or `error`.
 - If the worker crashes while a row is `running`, a later worker loop moves the stale row back to `retrying`.
 - If a row ends in `error`, `POST /api/retry` with `{ "id": "<jobId>" }` returns it to `queued`.
+
+Scripted checks:
+
+```bash
+cd web
+npm run verify:schema
+npm run verify:live
+npm run verify:retry
+```
+
+`verify:live` expects the web server and worker to already be running. It submits a unique non-cached job and polls `/api/status` until `done` or `error`. `verify:retry` creates one synthetic `error` row, calls `/api/retry`, checks the row returns to `queued`, then deletes the synthetic row.
