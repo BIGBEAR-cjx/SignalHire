@@ -42,6 +42,16 @@ cd web && node --env-file=.env.local scripts/seed-db.mjs
 
 Expected: all three JSON seed files print `ok`.
 
+## Check research_runs schema
+
+Command:
+
+```bash
+cd web && node --env-file=.env.local scripts/check-research-runs-schema.mjs
+```
+
+Expected: `research_runs schema ok`. If it fails with a missing column, add the v1 columns listed in `docs/insforge-research-runs.md` before running live jobs.
+
 ## Run web app
 
 Command:
