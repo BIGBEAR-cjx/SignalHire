@@ -91,8 +91,9 @@ async function claimNext() {
 
 function summarize(kind, data) {
   if (kind === "search") {
-    const n = Array.isArray(data?.candidates) ? data.candidates.length : 0;
-    return `${n} 位候选人`;
+    const candidates = Array.isArray(data?.candidates) ? data.candidates : [];
+    const top = candidates.slice(0, 3).map((c) => `${c?.name ?? "候选人"} ${c?.match_score ?? 0}`).join(", ");
+    return `${candidates.length} 位 AI 候选人${top ? ` · ${top}` : ""}`;
   }
   const claims = Array.isArray(data?.claims) ? data.claims : [];
   const contra = claims.filter((c) => c?.verdict === "contradicted").length;
