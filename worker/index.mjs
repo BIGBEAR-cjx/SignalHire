@@ -15,7 +15,7 @@ import {
   buildStaleRecoveryUpdate,
   isStaleRunningJob,
   maxAttempts,
-} from "../web/lib/job-state.mjs";
+} from "./job-state.mjs";
 
 // 极简健康端口: 满足 Compute/Render 等"需要监听端口"的平台 (worker 本身是轮询, 不靠 HTTP)。
 const PORT = process.env.PORT || 8080;
