@@ -8,6 +8,7 @@ const APP_BASE_URL = process.env.APP_BASE_URL || "http://127.0.0.1:3000";
 const MODE = process.env.RESEARCH_VERIFY_MODE || "search";
 const POLL_MS = Number(process.env.RESEARCH_VERIFY_POLL_MS || 5000);
 const TIMEOUT_MS = Number(process.env.RESEARCH_VERIFY_TIMEOUT_MS || 20 * 60 * 1000);
+const BYPASS_SECRET = process.env.VERCEL_AUTOMATION_BYPASS_SECRET;
 const unique = new Date().toISOString();
 
 const input =
@@ -26,7 +27,9 @@ const input =
       };
 
 async function jsonFetch(path, init) {
-  const res = await fetch(new URL(path, APP_BASE_URL), init);
+  const headers = new Headers(init?.headers);
+  if (BYPASS_SECRET) headers.set("x-vercel-protection-bypass", BYPASS_SECRET);
+  const res = await fetch(new URL(path, APP_BASE_URL), { ...init, headers });
   const text = await res.text();
   let body = null;
   try {

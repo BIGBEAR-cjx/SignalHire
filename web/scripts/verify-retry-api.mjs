@@ -7,6 +7,7 @@ import { createClient } from "@insforge/sdk";
 const BASE = process.env.INSFORGE_API_BASE_URL;
 const KEY = process.env.INSFORGE_API_KEY;
 const APP_BASE_URL = process.env.APP_BASE_URL || "http://127.0.0.1:3000";
+const BYPASS_SECRET = process.env.VERCEL_AUTOMATION_BYPASS_SECRET;
 
 if (!BASE || !KEY) {
   console.error("缺少 INSFORGE_API_BASE_URL / INSFORGE_API_KEY。用: node --env-file=.env.local scripts/verify-retry-api.mjs");
@@ -21,7 +22,9 @@ const cacheKey = `verify:${flatKey}`;
 let rowId = null;
 
 async function jsonFetch(path, init) {
-  const res = await fetch(new URL(path, APP_BASE_URL), init);
+  const headers = new Headers(init?.headers);
+  if (BYPASS_SECRET) headers.set("x-vercel-protection-bypass", BYPASS_SECRET);
+  const res = await fetch(new URL(path, APP_BASE_URL), { ...init, headers });
   const text = await res.text();
   let body = null;
   try {
