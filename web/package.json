@@ -8,6 +8,7 @@
     "start": "next start",
     "lint": "eslint",
     "verify:schema": "node --env-file-if-exists=.env.local scripts/check-research-runs-schema.mjs",
+    "verify:worker-health": "node --env-file-if-exists=.env.local scripts/check-worker-health.mjs",
     "verify:live": "node --env-file-if-exists=.env.local scripts/verify-live-research-job.mjs",
     "verify:retry": "node --env-file-if-exists=.env.local scripts/verify-retry-api.mjs"
   },

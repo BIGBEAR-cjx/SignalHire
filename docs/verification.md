@@ -8,6 +8,7 @@ Run the web checks:
 cd web
 npm run lint
 npm run build
+npm run verify:worker-health
 ```
 
 Run the worker syntax checks:
@@ -72,6 +73,39 @@ cd worker && node --env-file=../web/.env.local index.mjs
 
 Expected: logs show worker startup and processing progress, with status updates reflecting the worker behavior.
 
+## Worker health and production monitoring
+
+Public health summary:
+
+```bash
+curl -fsS "$APP_BASE_URL/api/worker-health"
+```
+
+Scripted check:
+
+```bash
+cd web
+APP_BASE_URL=https://your-production-host npm run verify:worker-health
+```
+
+Expected: JSON with `"ok": true`. A non-2xx response means queued, retrying, or running jobs are older
+than the shared stale threshold, or the server cannot read Insforge.
+
+Vercel Cron calls `/api/cron/worker-health` on the production deployment. It requires `CRON_SECRET`
+in the Vercel environment because the route checks `Authorization: Bearer $CRON_SECRET`. The current
+`web/vercel.json` schedule is hourly (`0 * * * *`); if the project is on Vercel Hobby, change it to a
+daily schedule before deploying because Hobby cron jobs cannot run hourly.
+
+Railway production worker check:
+
+```bash
+npx -y @railway/cli@4.65.0 service status --project e994adce-23d2-40e4-bedb-67ab7031b415 --service SignalHire --environment production --json
+```
+
+The Railway CLI mapping observed on 2026-05-28 was project `sublime-enthusiasm`, service `SignalHire`,
+environment `production`. The worker Docker build context is `worker/`, so worker code must not import
+files from `../web`.
+
 ## Research job reliability checks
 
 For a non-cached query with real credentials:
@@ -91,3 +125,8 @@ npm run verify:retry
 ```
 
 `verify:live` expects the web server and worker to already be running. It submits a unique non-cached job and polls `/api/status` until `done` or `error`. `verify:retry` creates one synthetic `error` row, calls `/api/retry`, checks the row returns to `queued`, then deletes the synthetic row.
+
+`verify:live` keeps the human-facing query stable and realistic. It sends a private
+`x-signalhire-verify-run-id` header to bypass the DB cache for smoke tests without putting timestamps
+or random IDs into the prompt that MiroMind researches. It also retries transient fetch/TLS/5xx
+failures with exponential backoff.

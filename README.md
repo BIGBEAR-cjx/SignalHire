@@ -81,10 +81,12 @@ SignalHire currently runs as three runtime pieces:
    report links, queued work, progress, results, and errors.
 3. `worker/` long-running Node process: polls `research_runs`, claims queued rows, runs MiroMind
    research without a serverless timeout, and writes progress/results back to Insforge.
+4. Vercel worker-health routes: `/api/worker-health` exposes a redacted queue health summary, while
+   `/api/cron/worker-health` is called by Vercel Cron and fails when queued/running jobs are stale.
 
 The app is cache-first. Built-in demo examples and fuzzy matches should work immediately without
 live MiroMind calls. Non-cached inputs require Insforge DB access plus a running worker with
-MiroMind credentials.
+MiroMind credentials. In production, set `CRON_SECRET` on Vercel so the cron route can authenticate.
 
 ## Quick start
 
@@ -123,12 +125,18 @@ npm ci
 node --env-file=../web/.env.local index.mjs
 ```
 
+Production worker deployment is currently on Railway. The Railway CLI mapping observed on 2026-05-28
+was project `sublime-enthusiasm` (`e994adce-23d2-40e4-bedb-67ab7031b415`), service `SignalHire`,
+environment `production`. Railway builds the `worker/` directory as its own context, so worker code
+must stay self-contained and must not import from `../web`.
+
 ### 4. Validate production build
 
 ```bash
 cd web
 npm run lint
 npm run build
+npm run verify:worker-health
 ```
 
 ## Project structure

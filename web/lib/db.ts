@@ -10,7 +10,14 @@
 //   .select().eq().order().limit() / .insert() / .upsert(...,{onConflict}) → {data,error}。
 
 import { createClient } from "@insforge/sdk";
-import { DEFAULT_MAX_ATTEMPTS, buildRetryUpdate, describeJobStatus } from "./job-state.mjs";
+import {
+  DEFAULT_MAX_ATTEMPTS,
+  RUN_STATUSES,
+  STALE_AFTER_MS,
+  buildRetryUpdate,
+  describeJobStatus,
+  isStaleRunningJob,
+} from "./job-state.mjs";
 
 const BASE = process.env.INSFORGE_API_BASE_URL;
 const KEY = process.env.INSFORGE_API_KEY; // 服务端 access key, 绝不进 NEXT_PUBLIC
@@ -25,6 +32,17 @@ const TABLE = "research_runs";
 
 // 单列唯一键 (Insforge 不支持复合唯一约束), 用于 upsert 去重。
 const cacheKey = (kind: string, flatKey: string) => `${kind}:${flatKey}`;
+
+function dateMs(value: string | null | undefined): number | null {
+  if (!value) return null;
+  const ms = new Date(value).getTime();
+  return Number.isFinite(ms) ? ms : null;
+}
+
+function ageMs(row: { created_at?: string | null; updated_at?: string | null }, now: Date) {
+  const basis = dateMs(row.updated_at) ?? dateMs(row.created_at);
+  return basis === null ? null : Math.max(0, now.getTime() - basis);
+}
 
 export type RunKind = "search" | "verify";
 
@@ -63,6 +81,67 @@ export interface RunStatus {
     label: string;
     detail: string;
     canRetry: boolean;
+  };
+}
+
+export interface WorkerHealthJob {
+  id: string;
+  kind: RunKind;
+  status: string;
+  label: string;
+  created_at: string | null;
+  updated_at: string | null;
+  locked_at: string | null;
+  started_at: string | null;
+  attempt_count: number;
+  max_attempts: number;
+  age_ms: number | null;
+}
+
+export interface WorkerHealth {
+  ok: boolean;
+  checked_at: string;
+  stale_after_ms: number;
+  reason: string | null;
+  queue: {
+    queued: number;
+    retrying: number;
+    running: number;
+  };
+  stale_jobs: WorkerHealthJob[];
+  recent_done: {
+    id: string;
+    kind: RunKind;
+    label: string;
+    finished_at: string | null;
+    updated_at: string | null;
+  } | null;
+}
+
+function normalizeHealthJob(row: {
+  id?: string;
+  kind?: RunKind;
+  status?: string;
+  label?: string | null;
+  created_at?: string | null;
+  updated_at?: string | null;
+  locked_at?: string | null;
+  started_at?: string | null;
+  attempt_count?: number | null;
+  max_attempts?: number | null;
+}, now: Date): WorkerHealthJob {
+  return {
+    id: row.id ?? "",
+    kind: row.kind ?? "search",
+    status: row.status ?? RUN_STATUSES.QUEUED,
+    label: row.label ?? "",
+    created_at: row.created_at ?? null,
+    updated_at: row.updated_at ?? null,
+    locked_at: row.locked_at ?? null,
+    started_at: row.started_at ?? null,
+    attempt_count: row.attempt_count ?? 0,
+    max_attempts: row.max_attempts ?? DEFAULT_MAX_ATTEMPTS,
+    age_ms: ageMs(row, now),
   };
 }
 
@@ -244,5 +323,89 @@ export async function recentRuns(limit = 20): Promise<RecentRun[]> {
     return data as RecentRun[];
   } catch {
     return [];
+  }
+}
+
+async function healthRows(status: string): Promise<WorkerHealthJob[]> {
+  if (!client) return [];
+  const now = new Date();
+  const { data, error } = await client.database
+    .from(TABLE)
+    .select("id,kind,status,label,created_at,updated_at,locked_at,started_at,attempt_count,max_attempts")
+    .eq("status", status)
+    .order("updated_at", { ascending: true })
+    .limit(50);
+  if (error || !data) throw error ?? new Error(`failed to read ${status} jobs`);
+  return (data as Array<Parameters<typeof normalizeHealthJob>[0]>).map((row) => normalizeHealthJob(row, now));
+}
+
+// Worker health is stricter than product read paths: failures should surface to cron/ops.
+export async function workerHealth(): Promise<WorkerHealth> {
+  const checkedAt = new Date();
+  if (!client) {
+    return {
+      ok: false,
+      checked_at: checkedAt.toISOString(),
+      stale_after_ms: STALE_AFTER_MS,
+      reason: "Insforge credentials are not configured",
+      queue: { queued: 0, retrying: 0, running: 0 },
+      stale_jobs: [],
+      recent_done: null,
+    };
+  }
+
+  try {
+    const [queued, retrying, running, doneRows] = await Promise.all([
+      healthRows(RUN_STATUSES.QUEUED),
+      healthRows(RUN_STATUSES.RETRYING),
+      healthRows(RUN_STATUSES.RUNNING),
+      client.database
+        .from(TABLE)
+        .select("id,kind,label,finished_at,updated_at")
+        .eq("status", RUN_STATUSES.DONE)
+        .order("updated_at", { ascending: false })
+        .limit(1),
+    ]);
+
+    const staleQueued = queued.filter((row) => (row.age_ms ?? 0) > STALE_AFTER_MS);
+    const staleRetrying = retrying.filter((row) => (row.age_ms ?? 0) > STALE_AFTER_MS);
+    const staleRunning = running.filter((row) => isStaleRunningJob(row, checkedAt, STALE_AFTER_MS));
+    const staleJobs = [...staleQueued, ...staleRetrying, ...staleRunning];
+    if (doneRows.error) throw doneRows.error;
+    const recent = doneRows.data?.[0] as
+      | { id: string; kind: RunKind; label: string; finished_at?: string | null; updated_at?: string | null }
+      | undefined;
+
+    return {
+      ok: staleJobs.length === 0,
+      checked_at: checkedAt.toISOString(),
+      stale_after_ms: STALE_AFTER_MS,
+      reason: staleJobs.length === 0 ? null : `${staleJobs.length} job(s) stale past worker threshold`,
+      queue: {
+        queued: queued.length,
+        retrying: retrying.length,
+        running: running.length,
+      },
+      stale_jobs: staleJobs,
+      recent_done: recent
+        ? {
+            id: recent.id,
+            kind: recent.kind,
+            label: recent.label,
+            finished_at: recent.finished_at ?? null,
+            updated_at: recent.updated_at ?? null,
+          }
+        : null,
+    };
+  } catch (e) {
+    return {
+      ok: false,
+      checked_at: checkedAt.toISOString(),
+      stale_after_ms: STALE_AFTER_MS,
+      reason: (e as Error).message || "Worker health check failed",
+      queue: { queued: 0, retrying: 0, running: 0 },
+      stale_jobs: [],
+      recent_done: null,
+    };
   }
 }

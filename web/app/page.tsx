@@ -39,8 +39,28 @@ type HistoryItem = {
   updated_at: string;
 };
 
+const WORKER_DELAY_MS = 2 * 60 * 1000;
+const JOB_TIMEOUT_MS = 15 * 60 * 1000;
+
 function isVerifyReport(result: AppResult): result is VerifyReport {
   return "claims" in result;
+}
+
+function userFacingStatus(view: JobStatusView, elapsedMs: number): JobStatusView {
+  if (view.phase === "queued" && elapsedMs > WORKER_DELAY_MS) {
+    return {
+      ...view,
+      label: "研究服务暂时繁忙",
+      detail: "任务还在队列中，worker 可能正在处理上一条或暂时离线。页面会继续自动等待，完成后也会进入搜索历史。",
+    };
+  }
+  if (view.phase === "retrying" && elapsedMs > WORKER_DELAY_MS) {
+    return {
+      ...view,
+      detail: `${view.detail} 页面会继续自动等待；如果最终失败，会提供重新研究按钮。`,
+    };
+  }
+  return view;
 }
 
 // ---- 主页面 ----
@@ -90,18 +110,21 @@ export default function Home() {
   function beginPolling(jobId: string) {
     stopPolling();
     const startedAt = Date.now();
+    let pollFailures = 0;
     pollRef.current = setInterval(async () => {
       // 兜底: 转太久(worker 未上线/卡住)就停, 友好提示去历史看, 不无限转圈。
-      if (Date.now() - startedAt > 15 * 60 * 1000) {
+      const elapsedMs = Date.now() - startedAt;
+      if (elapsedMs > JOB_TIMEOUT_MS) {
         stopPolling();
-        setError("研究排队/运行时间较长。完成后会出现在下方「搜索历史」，可稍后回来查看。");
+        setError("研究服务暂时繁忙或 worker 离线较久。任务仍保留在后台，完成后会出现在下方「搜索历史」，也可以稍后重新研究。");
         setLoading(false);
         return;
       }
       try {
         const r = await fetch(`/api/status?id=${jobId}`);
         const j: StatusResponse = await r.json();
-        if (j.status_view) setJobStatus(j.status_view);
+        pollFailures = 0;
+        if (j.status_view) setJobStatus(userFacingStatus(j.status_view, elapsedMs));
         const p = j.progress;
         if (p) {
           setLive({ searches: p.searches ?? 0, fetches: p.fetches ?? 0 });
@@ -125,7 +148,15 @@ export default function Home() {
           setLoading(false);
         }
       } catch {
-        // 网络抖动忽略, 下次轮询继续
+        pollFailures += 1;
+        if (pollFailures >= 3) {
+          setJobStatus({
+            phase: "queued",
+            label: "正在重新连接状态服务",
+            detail: "状态查询连接不稳定，研究任务仍在后台继续。页面会自动重试。",
+            canRetry: false,
+          });
+        }
       }
     }, 2000);
   }

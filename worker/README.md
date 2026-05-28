@@ -42,6 +42,31 @@ after the status-guarded claim condition succeeds.
 
 > worker 与宿主无关:若 Compute 部署不顺,把 `worker/` 原样部到 Railway/Render(直接跑 Node,`git push` 自动部署)也行,环境变量一致即可。
 
+## 部署到 Railway(当前生产)
+
+当前 Railway CLI 看到的生产映射:
+
+| 项 | 值 |
+|----|----|
+| Project ID | `e994adce-23d2-40e4-bedb-67ab7031b415` |
+| Project name | `sublime-enthusiasm` |
+| Service | `SignalHire` |
+| Environment | `production` |
+
+Railway 的 build context 是 `worker/`, Dockerfile 是 `worker/Dockerfile`。因此 worker 必须自包含:
+
+- 可以 import `./job-state.mjs`、`./lib.mjs` 等 `worker/` 内文件。
+- 不要 import `../web/...`; Railway 构建时不会把 `web/` 放进 worker 镜像 context。
+- 部署后日志应出现 `SignalHire worker 启动, 轮询 research_runs...` 和 `health server on :$PORT`。
+
+常用检查:
+
+```bash
+npx -y @railway/cli@4.65.0 service status --project e994adce-23d2-40e4-bedb-67ab7031b415 --service SignalHire --environment production --json
+```
+
+若 Railway/Vercel/Insforge token 曾在聊天或截图里暴露,在平台后台轮换并删除旧 token。不要把真实 secret 写入仓库、README、issue 或 PR 描述。
+
 ## 设计要点
 
 - **认领防并发**:`update status=running where id=? and status in ('queued','retrying')` + `.select()` 确认。
