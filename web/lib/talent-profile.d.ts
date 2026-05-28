@@ -9,6 +9,8 @@ export type EvidenceAudit = { verified_claims: string[]; unverified_claims: stri
 export type TalentCandidate = { name: string; headline: string; location: string | null; current_role: string | null; current_company: string | null; ai_directions: string[]; match_score: number; score_breakdown: ScoreBreakdown; strongest_signals: string[]; uncertainties: string[]; links: { github: string | null; linkedin: string | null; scholar: string | null; huggingface: string | null; website: string | null; other: string | null }; claims: TalentClaim[]; evidence_audit: EvidenceAudit; outreach_angle: string; summary: string };
 export type TalentSearchResult = { search_brief: TalentSearchBrief; talent_map: TalentMapItem[]; candidates: TalentCandidate[] };
 export const AI_DIRECTIONS: string[];
+export const VERDICTS: Verdict[];
+export const EVIDENCE_QUALITY: EvidenceQuality[];
 export function normalizeTalentSearchResult(data: unknown): TalentSearchResult;
 export function isTalentSearchResult(data: unknown): data is TalentSearchResult;
 export function isSearchUrl(url: unknown): boolean;
