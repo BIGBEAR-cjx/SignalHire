@@ -4,7 +4,7 @@ export const runtime = "nodejs";
 
 const TOKEN_SHA256 = "06dc996ebd2f202ac45df853e954d8641d0cb6f4435db42b9f2018cbae929321";
 const MIGRATION_VERSION = "20260528090000";
-const MIGRATION_NAME = "research_runs_job_reliability_v1";
+const MIGRATION_NAME = "research-runs-job-reliability-v1";
 const MIGRATION_SQL = `
 alter table public.research_runs
   add column if not exists status text not null default 'done',
