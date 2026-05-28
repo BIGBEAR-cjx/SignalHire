@@ -18,6 +18,10 @@ export function isSearchUrl(url) {
   );
 }
 
+function isPlainObject(value) {
+  return Boolean(value && typeof value === "object" && !Array.isArray(value));
+}
+
 function cleanString(value) {
   return typeof value === "string" ? value.trim() : "";
 }
@@ -52,6 +56,7 @@ function normalizeClaim(claim) {
 }
 
 function normalizeLinks(links = {}) {
+  links = isPlainObject(links) ? links : {};
   return {
     github: cleanString(links.github) || null,
     linkedin: cleanString(links.linkedin) || null,
@@ -63,6 +68,7 @@ function normalizeLinks(links = {}) {
 }
 
 function normalizeScoreBreakdown(score = {}) {
+  score = isPlainObject(score) ? score : {};
   return {
     achievement_signals: clampScore(score.achievement_signals),
     skill_match: clampScore(score.skill_match),
@@ -72,6 +78,7 @@ function normalizeScoreBreakdown(score = {}) {
 }
 
 function normalizeAudit(audit = {}) {
+  audit = isPlainObject(audit) ? audit : {};
   const quality = cleanString(audit.overall_evidence_quality).toLowerCase();
   return {
     verified_claims: Array.isArray(audit.verified_claims) ? audit.verified_claims.map(cleanString).filter(Boolean) : [],
@@ -85,6 +92,7 @@ function normalizeAudit(audit = {}) {
 }
 
 function normalizeCandidate(candidate = {}) {
+  candidate = isPlainObject(candidate) ? candidate : {};
   const claims = (Array.isArray(candidate.claims) ? candidate.claims : []).map(normalizeClaim);
   return {
     name: cleanString(candidate.name) || "Unknown candidate",
@@ -112,6 +120,7 @@ function normalizeCandidate(candidate = {}) {
 }
 
 function normalizeBrief(brief = {}) {
+  brief = isPlainObject(brief) ? brief : {};
   return {
     original_query: cleanString(brief.original_query),
     target_directions: Array.isArray(brief.target_directions) ? brief.target_directions.map(cleanString).filter(Boolean) : [],
@@ -125,16 +134,19 @@ function normalizeBrief(brief = {}) {
 }
 
 function normalizeTalentMap(map = []) {
-  return (Array.isArray(map) ? map : []).map((item) => ({
-    direction: cleanString(item.direction),
-    fit: cleanString(item.fit) || "adjacent",
-    candidate_count: Math.max(0, Number(item.candidate_count) || 0),
-    rationale: cleanString(item.rationale),
-  })).filter((item) => item.direction);
+  return (Array.isArray(map) ? map : []).map((item) => {
+    item = isPlainObject(item) ? item : {};
+    return {
+      direction: cleanString(item.direction),
+      fit: cleanString(item.fit) || "adjacent",
+      candidate_count: Math.max(0, Number(item.candidate_count) || 0),
+      rationale: cleanString(item.rationale),
+    };
+  }).filter((item) => item.direction);
 }
 
 export function normalizeTalentSearchResult(data) {
-  const source = data && typeof data === "object" ? data : {};
+  const source = isPlainObject(data) ? data : {};
   return {
     search_brief: normalizeBrief(source.search_brief),
     talent_map: normalizeTalentMap(source.talent_map),
@@ -144,9 +156,8 @@ export function normalizeTalentSearchResult(data) {
 
 export function isTalentSearchResult(data) {
   return Boolean(
-    data &&
-    typeof data === "object" &&
+    isPlainObject(data) &&
     Array.isArray(data.candidates) &&
-    (data.search_brief || data.talent_map || data.candidates.some((candidate) => "match_score" in candidate)),
+    (data.search_brief || data.talent_map || data.candidates.some((candidate) => isPlainObject(candidate) && "match_score" in candidate)),
   );
 }

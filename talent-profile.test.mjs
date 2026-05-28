@@ -95,3 +95,26 @@ test("filters search-result URLs from evidence", () => {
   assert.equal(result.candidates[0].claims[0].evidence.length, 1);
   assert.equal(result.candidates[0].claims[0].evidence[0].source_type, "paper");
 });
+
+test("handles malformed nested objects without throwing", () => {
+  const result = normalizeTalentSearchResult({
+    search_brief: null,
+    talent_map: [null, { direction: "AI Research / Applied Science", candidate_count: -2 }],
+    candidates: [null, { name: "", links: null, score_breakdown: null, evidence_audit: null, claims: [null] }],
+  });
+
+  assert.equal(result.search_brief.original_query, "");
+  assert.equal(result.talent_map.length, 1);
+  assert.equal(result.talent_map[0].candidate_count, 0);
+  assert.equal(result.candidates.length, 2);
+  assert.equal(result.candidates[0].name, "Unknown candidate");
+  assert.equal(result.candidates[1].links.github, null);
+  assert.equal(result.candidates[1].claims[0].verdict, "unverified");
+});
+
+test("detects v1 talent payloads without misclassifying legacy reports", () => {
+  assert.equal(isTalentSearchResult({ candidate_name: "Ada", claims: [] }), false);
+  assert.equal(isTalentSearchResult({ candidates: [{ name: "Ada", claims: [] }] }), false);
+  assert.equal(isTalentSearchResult({ candidates: [null] }), false);
+  assert.equal(isTalentSearchResult({ candidates: [{ name: "Ada", match_score: 80 }] }), true);
+});
