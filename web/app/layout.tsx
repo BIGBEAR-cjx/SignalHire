@@ -8,7 +8,7 @@ import "./globals.css";
 export const metadata: Metadata = {
   title: "SignalHire — Find signals. Not resumes.",
   description:
-    "用 MiroMind 深度搜索候选人，并对每条声称做跨源交叉验证，亮出可点击的证据。Find signals, not resumes. UCWS 2026 · MiroMind Deep Research Track。",
+    "面向公司 HR 和猎头的全球 AI 人才搜索平台，生成候选人 shortlist、人才地图和可审计的交叉验证证据。",
 };
 
 export default function RootLayout({
