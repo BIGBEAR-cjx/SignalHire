@@ -11,7 +11,7 @@ import {
   type Candidate,
   type VerifyReport,
 } from "@/components/result";
-import type { TalentSearchResult } from "@/lib/talent-profile.mjs";
+import { normalizeTalentSearchResult, type TalentSearchResult } from "@/lib/talent-profile.mjs";
 
 export const runtime = "nodejs";
 
@@ -55,6 +55,12 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
 export default async function ReportPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const row = await getRunById(id);
+  const talentResult: TalentSearchResult | null = row?.kind === "search" && isTalentSearchResult(row.result)
+    ? normalizeTalentSearchResult(row.result)
+    : null;
+  const legacyCandidates = row?.kind === "search" && !talentResult && Array.isArray((row.result as { candidates?: unknown }).candidates)
+    ? (row.result as { candidates: Candidate[] }).candidates
+    : [];
   const cta = row?.kind === "verify"
     ? {
         title: "想审计你自己的候选人证据？",
@@ -105,17 +111,19 @@ export default async function ReportPage({ params }: { params: Promise<{ id: str
             {/* 结果 */}
             <div className="mt-6 space-y-4">
               {row.kind === "search" ? (
-                isTalentSearchResult(row.result) ? (
+                talentResult ? (
                   <>
-                    <TalentMapView result={row.result} />
-                    {(row.result as TalentSearchResult).candidates.map((candidate, index) => (
+                    <TalentMapView result={talentResult} />
+                    {talentResult.candidates.map((candidate, index) => (
                       <CandidateProfileView key={`${candidate.name}-${index}`} candidate={candidate} />
                     ))}
                   </>
+                ) : legacyCandidates.length > 0 ? (
+                  legacyCandidates.map((c, i) => <CandidateCard key={i} c={c} delay={i * 90} />)
                 ) : (
-                  ((row.result as { candidates?: Candidate[] })?.candidates ?? []).map((c, i) => (
-                    <CandidateCard key={i} c={c} delay={i * 90} />
-                  ))
+                  <p className="rounded-xl border border-gray-100 bg-white p-4 text-sm text-gray-500">
+                    这份报告没有可展示的候选人结果。
+                  </p>
                 )
               ) : (
                 <TrustReportView r={row.result as VerifyReport} />
