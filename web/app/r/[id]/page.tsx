@@ -3,7 +3,15 @@
 import Link from "next/link";
 import type { Metadata } from "next";
 import { getRunById } from "@/lib/db";
-import { CandidateCard, TrustReportView, type Candidate, type VerifyReport } from "@/components/result";
+import {
+  CandidateCard,
+  CandidateProfileView,
+  TalentMapView,
+  TrustReportView,
+  type Candidate,
+  type VerifyReport,
+} from "@/components/result";
+import type { TalentSearchResult } from "@/lib/talent-profile.mjs";
 
 export const runtime = "nodejs";
 
@@ -20,13 +28,17 @@ function LogoMark({ className = "" }: { className?: string }) {
   );
 }
 
+function isTalentSearchResult(result: unknown): result is TalentSearchResult {
+  return Boolean(result && typeof result === "object" && "talent_map" in result && "search_brief" in result);
+}
+
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
   const { id } = await params;
   const row = await getRunById(id);
   if (!row) return { title: "报告不存在 · SignalHire" };
   return {
     title: `${row.label} — 核实报告 · SignalHire`,
-    description: row.summary || "用 MiroMind 深度研究 + 跨源交叉验证生成的候选人核实报告。",
+    description: row.summary || "SignalHire 生成的 AI 人才 shortlist 与公开证据报告。",
   };
 }
 
@@ -42,7 +54,7 @@ export default async function ReportPage({ params }: { params: Promise<{ id: str
           <LogoMark className="h-8 w-8" />
           <span className="text-[17px] tracking-tight">SignalHire</span>
         </Link>
-        <span className="rounded-full bg-gray-100 px-3 py-1 text-xs font-medium text-gray-600">核实报告</span>
+        <span className="rounded-full bg-gray-100 px-3 py-1 text-xs font-medium text-gray-600">AI 人才报告</span>
       </header>
 
       <main className="mx-auto max-w-3xl px-4 pb-20">
@@ -59,31 +71,42 @@ export default async function ReportPage({ params }: { params: Promise<{ id: str
             {/* 上下文 */}
             <div className="mt-2">
               <p className="text-xs font-medium uppercase tracking-wide text-gray-400">
-                {row.kind === "search" ? "招聘需求" : "待核实的候选人自述"}
+                {row.kind === "search" ? "岗位画像" : "候选人证据审计"}
               </p>
               <blockquote className="mt-2 whitespace-pre-line rounded-xl border-l-2 border-gray-200 bg-gray-50 p-4 text-sm text-gray-700">
                 {row.query_text}
               </blockquote>
               <p className="mt-2 text-xs text-gray-400">
-                由 MiroMind 深度研究 + 跨源交叉验证生成 · 每条结论都附可点击证据
+                SignalHire 基于公开来源生成 · 候选人按 AI 方向分层 · 关键结论附可点击证据
               </p>
             </div>
 
             {/* 结果 */}
             <div className="mt-6 space-y-4">
-              {row.kind === "search"
-                ? ((row.result as { candidates?: Candidate[] })?.candidates ?? []).map((c, i) => (
+              {row.kind === "search" ? (
+                isTalentSearchResult(row.result) ? (
+                  <>
+                    <TalentMapView result={row.result} />
+                    {(row.result as TalentSearchResult).candidates.map((candidate, index) => (
+                      <CandidateProfileView key={`${candidate.name}-${index}`} candidate={candidate} />
+                    ))}
+                  </>
+                ) : (
+                  ((row.result as { candidates?: Candidate[] })?.candidates ?? []).map((c, i) => (
                     <CandidateCard key={i} c={c} delay={i * 90} />
                   ))
-                : <TrustReportView r={row.result as VerifyReport} />}
+                )
+              ) : (
+                <TrustReportView r={row.result as VerifyReport} />
+              )}
             </div>
 
             {/* CTA */}
             <div className="mt-10 rounded-2xl border border-gray-100 bg-gradient-to-tr from-gray-50 to-white p-6 text-center shadow-[0_8px_30px_rgba(0,0,0,0.06)]">
-              <p className="text-base font-semibold text-gray-900">想这样核实你自己的候选人？</p>
-              <p className="mt-1 text-sm text-gray-500">SignalHire 全网深度搜索 + 跨源交叉验证，亮出证据，而非又一份没核实的简历。</p>
+              <p className="text-base font-semibold text-gray-900">想为你的 AI 岗位生成这样的 shortlist？</p>
+              <p className="mt-1 text-sm text-gray-500">SignalHire 从公开来源搜索全球 AI 人才，并把论文、开源、实践和工作经历证据整理成可交付报告。</p>
               <Link href="/" className="mt-4 inline-block rounded-xl bg-gray-900 px-6 py-3 text-sm font-medium text-white hover:bg-gray-800">
-                免费试用 SignalHire →
+                生成 AI 人才 shortlist →
               </Link>
             </div>
           </>
