@@ -113,11 +113,11 @@ export function researchStream(opts: {
         });
         const data = parseJson(out.content);
         if (!data) { send({ type: "error", error: "模型输出不是干净 JSON" }); return; }
-        normalizeResult(data);
+        const normalized = normalizeResult(data);
         // 写库 (实时结果才写) 并拿回行 id; onDone 自身已吞错, 这里再包一层确保绝不影响返回。
         let runId: string | null = null;
-        if (opts.onDone) { try { runId = (await opts.onDone(data, { searches, fetches })) ?? null; } catch {} }
-        send({ type: "done", data, stats: { searches, fetches }, runId });
+        if (opts.onDone) { try { runId = (await opts.onDone(normalized, { searches, fetches })) ?? null; } catch {} }
+        send({ type: "done", data: normalized, stats: { searches, fetches }, runId });
       } catch (e) {
         send({ type: "error", error: (e as Error).message });
       } finally {

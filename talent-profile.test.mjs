@@ -5,6 +5,7 @@ import {
   normalizeTalentSearchResult,
   isTalentSearchResult,
 } from "./web/lib/talent-profile.mjs";
+import { researchStream } from "./web/lib/miro.ts";
 
 test("normalizes talent shortlist shape and clamps scores", () => {
   const result = normalizeTalentSearchResult({
@@ -117,4 +118,70 @@ test("detects v1 talent payloads without misclassifying legacy reports", () => {
   assert.equal(isTalentSearchResult({ candidates: [{ name: "Ada", claims: [] }] }), false);
   assert.equal(isTalentSearchResult({ candidates: [null] }), false);
   assert.equal(isTalentSearchResult({ candidates: [{ name: "Ada", match_score: 80 }] }), true);
+});
+
+test("normalizes v1 talent payload for web streaming output", async () => {
+  const originalFetch = globalThis.fetch;
+  const originalEnv = {
+    MIROMIND_BASE_URL: process.env.MIROMIND_BASE_URL,
+    MIROMIND_API_KEY: process.env.MIROMIND_API_KEY,
+    MIROMIND_MODEL: process.env.MIROMIND_MODEL,
+  };
+  const payload = {
+    search_brief: { original_query: "Find AI infra talent" },
+    candidates: [
+      {
+        name: "Ada Lovelace",
+        match_score: 140,
+        claims: [
+          {
+            claim: "Maintains an AI infra project",
+            verdict: "verified",
+            evidence: [
+              { note: "search", url: "https://www.google.com/search?q=ada+ai", source_type: "search" },
+              { note: "project", url: "https://example.com/project", source_type: "project" },
+            ],
+          },
+          {
+            claim: "Has an unsupported claim",
+            verdict: "verified",
+            evidence: [],
+          },
+        ],
+      },
+    ],
+  };
+  const sse = `data: ${JSON.stringify({ choices: [{ delta: { content: JSON.stringify(payload) } }] })}\n\ndata: [DONE]\n\n`;
+  let saved;
+
+  process.env.MIROMIND_BASE_URL = "https://miro.example";
+  process.env.MIROMIND_API_KEY = "test-key";
+  process.env.MIROMIND_MODEL = "test-model";
+  globalThis.fetch = async () => new Response(new TextEncoder().encode(sse), { status: 200 });
+
+  try {
+    const res = researchStream({
+      prompt: "Find AI infra talent",
+      onDone: async (data) => {
+        saved = data;
+        return "run-1";
+      },
+    });
+    const events = (await res.text()).trim().split("\n").map((line) => JSON.parse(line));
+    const done = events.find((event) => event.type === "done");
+
+    assert.equal(saved.candidates[0].match_score, 100);
+    assert.equal(saved.candidates[0].claims[0].evidence.length, 1);
+    assert.equal(saved.candidates[0].claims[0].evidence[0].url, "https://example.com/project");
+    assert.equal(saved.candidates[0].claims[1].verdict, "unverified");
+    assert.equal(done.data.candidates[0].match_score, 100);
+    assert.equal(done.data.candidates[0].claims[0].evidence.length, 1);
+    assert.equal(done.data.candidates[0].claims[1].verdict, "unverified");
+  } finally {
+    globalThis.fetch = originalFetch;
+    for (const [key, value] of Object.entries(originalEnv)) {
+      if (value === undefined) delete process.env[key];
+      else process.env[key] = value;
+    }
+  }
 });
