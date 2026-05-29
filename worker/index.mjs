@@ -58,7 +58,7 @@ async function recoverStaleRunning() {
 // 认领一个排队/待重试任务: 取最老任务, 原子置 running。返回任务行或 null。
 async function claimByStatus(status) {
   const { data } = await db.from(TABLE)
-    .select("id,kind,query_text,attempt_count,max_attempts")
+    .select("id,kind,query_text,progress,attempt_count,max_attempts")
     .eq("status", status)
     .order("created_at", { ascending: true })
     .limit(1);
@@ -102,7 +102,8 @@ function summarize(kind, data) {
 
 async function runJob(job) {
   console.log(`[${new Date().toISOString()}] 认领任务 ${job.id} (${job.kind})`);
-  const prompt = job.kind === "search" ? searchPrompt(job.query_text) : verifyPrompt(job.query_text);
+  const queryText = typeof job.progress?.original_query === "string" ? job.progress.original_query : job.query_text;
+  const prompt = job.kind === "search" ? searchPrompt(queryText) : verifyPrompt(queryText);
 
   const recent = [];
   let lastWrite = 0;
