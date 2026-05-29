@@ -10,6 +10,7 @@
 //   .select().eq().order().limit() / .insert() / .upsert(...,{onConflict}) → {data,error}。
 
 import { createClient } from "@insforge/sdk";
+import { createHash } from "node:crypto";
 import {
   DEFAULT_MAX_ATTEMPTS,
   RUN_STATUSES,
@@ -29,9 +30,54 @@ const client =
   BASE && KEY ? createClient({ baseUrl: BASE, anonKey: KEY, isServerMode: true }) : null;
 
 const TABLE = "research_runs";
+const MAX_CACHE_KEY_LENGTH = 240;
+const MAX_FLAT_KEY_LENGTH = 220;
+const MAX_QUERY_TEXT_LENGTH = 240;
+const MAX_LABEL_LENGTH = 80;
+
+function shortHash(value: string): string {
+  return createHash("sha256").update(value).digest("hex").slice(0, 16);
+}
+
+function truncateText(value: string, maxLength: number): string {
+  const clean = String(value ?? "").trim();
+  if (clean.length <= maxLength) return clean;
+  return `${clean.slice(0, Math.max(0, maxLength - 1)).trimEnd()}…`;
+}
+
+function compactKey(value: string, maxLength: number): string {
+  const clean = String(value ?? "").trim();
+  if (clean.length <= maxLength) return clean;
+  const hash = shortHash(clean);
+  const prefix = clean.slice(0, Math.max(0, maxLength - hash.length - 1)).trimEnd();
+  return `${prefix}:${hash}`;
+}
+
+// Build DB-safe fields before touching research_runs. Some Insforge string columns are
+// varchar-sized, so long user briefs must not become oversized cache/flat/query fields.
+export function buildRunStorageFields(input: {
+  kind: RunKind;
+  flatKey: string;
+  queryText: string;
+  label: string;
+}) {
+  const flatKey = compactKey(input.flatKey, MAX_FLAT_KEY_LENGTH);
+  return {
+    cacheKey: compactKey(`${input.kind}:${input.flatKey}`, MAX_CACHE_KEY_LENGTH),
+    flatKey,
+    queryText: truncateText(input.queryText, MAX_QUERY_TEXT_LENGTH),
+    label: truncateText(input.label, MAX_LABEL_LENGTH),
+    queuedProgress: { original_query: input.queryText },
+  };
+}
 
 // 单列唯一键 (Insforge 不支持复合唯一约束), 用于 upsert 去重。
-const cacheKey = (kind: string, flatKey: string) => `${kind}:${flatKey}`;
+const cacheKey = (kind: RunKind, flatKey: string) => buildRunStorageFields({
+  kind,
+  flatKey,
+  queryText: "",
+  label: "",
+}).cacheKey;
 
 function dateMs(value: string | null | undefined): number | null {
   if (!value) return null;
@@ -200,15 +246,15 @@ export async function getRunById(id: string): Promise<{
 // upsert: cache_key 唯一, 重复查询只更新不新增行。返回该行 id (供分享链接)。
 export async function saveRun(row: SaveRunInput): Promise<string | null> {
   if (!client) return null;
-  const ck = cacheKey(row.kind, row.flatKey);
+  const storage = buildRunStorageFields(row);
   try {
     await client.database.from(TABLE).upsert(
       {
-        cache_key: ck,
+        cache_key: storage.cacheKey,
         kind: row.kind,
-        flat_key: row.flatKey,
-        query_text: row.queryText,
-        label: row.label,
+        flat_key: storage.flatKey,
+        query_text: storage.queryText,
+        label: storage.label,
         summary: row.summary,
         result: row.result,
         stats: row.stats,
@@ -235,14 +281,14 @@ export async function enqueue(input: {
   kind: RunKind; flatKey: string; queryText: string; label: string;
 }): Promise<string | null> {
   if (!client) return null;
-  const ck = cacheKey(input.kind, input.flatKey);
+  const storage = buildRunStorageFields(input);
   try {
     await client.database.from(TABLE).upsert(
       {
-        cache_key: ck, kind: input.kind, flat_key: input.flatKey,
-        query_text: input.queryText, label: input.label,
+        cache_key: storage.cacheKey, kind: input.kind, flat_key: storage.flatKey,
+        query_text: storage.queryText, label: storage.label,
         summary: "研究中…", result: null, stats: null,
-        status: "queued", error: null, last_error: null, progress: null,
+        status: "queued", error: null, last_error: null, progress: storage.queuedProgress,
         attempt_count: 0, max_attempts: DEFAULT_MAX_ATTEMPTS,
         locked_at: null, started_at: null, finished_at: null,
         updated_at: new Date().toISOString(),
