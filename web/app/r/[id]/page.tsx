@@ -8,10 +8,15 @@ import {
   CandidateProfileView,
   TalentMapView,
   TrustReportView,
+  type Claim,
   type Candidate,
   type VerifyReport,
 } from "@/components/result";
-import { normalizeTalentSearchResult, type TalentSearchResult } from "@/lib/talent-profile.mjs";
+import {
+  isTalentSearchResult,
+  normalizeTalentSearchResult,
+  type TalentSearchResult,
+} from "@/lib/talent-profile.mjs";
 
 export const runtime = "nodejs";
 
@@ -28,14 +33,47 @@ function LogoMark({ className = "" }: { className?: string }) {
   );
 }
 
-function isTalentSearchResult(result: unknown): result is TalentSearchResult {
-  return Boolean(
-    result &&
-      typeof result === "object" &&
-      Array.isArray((result as Partial<TalentSearchResult>).talent_map) &&
-      Array.isArray((result as Partial<TalentSearchResult>).candidates) &&
-      "search_brief" in result,
-  );
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value && typeof value === "object" && !Array.isArray(value));
+}
+
+function cleanString(value: unknown): string {
+  return typeof value === "string" ? value : "";
+}
+
+function normalizeLegacyClaim(claim: unknown): Claim | null {
+  if (!isRecord(claim)) return null;
+  const verdict = cleanString(claim.verdict);
+  return {
+    claim: cleanString(claim.claim),
+    verdict: verdict === "verified" || verdict === "contradicted" ? verdict : "unverified",
+    evidence: Array.isArray(claim.evidence)
+      ? claim.evidence.filter(isRecord).map((evidence) => ({
+          note: cleanString(evidence.note),
+          url: cleanString(evidence.url),
+        }))
+      : [],
+  };
+}
+
+function normalizeLegacyCandidates(result: unknown): Candidate[] {
+  if (!isRecord(result) || !Array.isArray(result.candidates)) return [];
+  return result.candidates.filter(isRecord).map((candidate) => {
+    const links = isRecord(candidate.links) ? candidate.links : {};
+    return {
+      name: cleanString(candidate.name) || "Unknown candidate",
+      headline: cleanString(candidate.headline),
+      links: {
+        github: cleanString(links.github) || null,
+        linkedin: cleanString(links.linkedin) || null,
+        other: cleanString(links.other) || null,
+      },
+      claims: Array.isArray(candidate.claims)
+        ? candidate.claims.map(normalizeLegacyClaim).filter((claim): claim is Claim => Boolean(claim))
+        : [],
+      summary: cleanString(candidate.summary),
+    };
+  });
 }
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
@@ -58,8 +96,8 @@ export default async function ReportPage({ params }: { params: Promise<{ id: str
   const talentResult: TalentSearchResult | null = row?.kind === "search" && isTalentSearchResult(row.result)
     ? normalizeTalentSearchResult(row.result)
     : null;
-  const legacyCandidates = row?.kind === "search" && !talentResult && Array.isArray((row.result as { candidates?: unknown }).candidates)
-    ? (row.result as { candidates: Candidate[] }).candidates
+  const legacyCandidates = row?.kind === "search" && !talentResult
+    ? normalizeLegacyCandidates(row.result)
     : [];
   const cta = row?.kind === "verify"
     ? {

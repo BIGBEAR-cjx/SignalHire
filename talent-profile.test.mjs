@@ -185,3 +185,36 @@ test("normalizes v1 talent payload for web streaming output", async () => {
     }
   }
 });
+
+test("normalizes cached v1 talent payload for web streaming output", async () => {
+  const res = researchStream({
+    cached: {
+      search_brief: { original_query: "Find AI infra talent" },
+      candidates: [
+        {
+          name: "Ada Lovelace",
+          match_score: 140,
+          claims: [
+            {
+              claim: "Maintains an AI infra project",
+              verdict: "verified",
+              evidence: [
+                { note: "search", url: "https://www.google.com/search?q=ada+ai", source_type: "search" },
+                { note: "project", url: "https://example.com/project", source_type: "project" },
+              ],
+            },
+          ],
+        },
+      ],
+    },
+    runId: "cached-run",
+  });
+  const events = (await res.text()).trim().split("\n").map((line) => JSON.parse(line));
+  const done = events.find((event) => event.type === "done");
+
+  assert.equal(done.runId, "cached-run");
+  assert.equal(done.stats.cached, true);
+  assert.equal(done.data.candidates[0].match_score, 100);
+  assert.equal(done.data.candidates[0].claims[0].evidence.length, 1);
+  assert.equal(done.data.candidates[0].claims[0].evidence[0].url, "https://example.com/project");
+});

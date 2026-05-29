@@ -95,7 +95,8 @@ export function researchStream(opts: {
       const send = (o: unknown) => controller.enqueue(enc.encode(JSON.stringify(o) + "\n"));
       try {
         if (opts.cached) {
-          send({ type: "done", data: opts.cached, stats: { searches: 0, fetches: 0, cached: true }, runId: opts.runId ?? null });
+          const normalized = normalizeResult(opts.cached);
+          send({ type: "done", data: normalized, stats: { searches: 0, fetches: 0, cached: true }, runId: opts.runId ?? null });
           return;
         }
         // 自己用去重计数 (避免分块流式导致同一步重复计数), 让 feed 计数与最终一致。
