@@ -1,6 +1,13 @@
 // components/result.tsx —— 候选人/验证结果的展示组件 (纯展示, 无 hooks)。
 // 同时被 app/page.tsx (客户端工具) 和 app/r/[id]/page.tsx (服务端可分享报告) 复用。
 
+declare module "@/lib/talent-profile.mjs" {
+  export type TalentCandidate = import("@/lib/talent-profile").TalentCandidate;
+  export type TalentSearchResult = import("@/lib/talent-profile").TalentSearchResult;
+}
+
+import type { TalentCandidate, TalentSearchResult } from "@/lib/talent-profile.mjs";
+
 export type Verdict = "verified" | "contradicted" | "unverified";
 export type Evidence = { note: string; url: string };
 export type Claim = { claim: string; verdict: Verdict; evidence: Evidence[] };
@@ -95,6 +102,214 @@ function LinkPill({ href, children }: { href: string; children: React.ReactNode 
     <a href={href} target="_blank" rel="noreferrer" className="rounded-lg bg-gray-100 px-2.5 py-1 text-xs font-medium text-gray-700 hover:bg-gray-200">
       {children}
     </a>
+  );
+}
+
+const QUALITY: Record<string, string> = {
+  high: "bg-emerald-50 text-emerald-700 ring-emerald-200",
+  medium: "bg-amber-50 text-amber-700 ring-amber-200",
+  low: "bg-red-50 text-red-700 ring-red-200",
+};
+
+function ScorePill({ score }: { score: number }) {
+  const tone = score >= 80 ? "bg-emerald-600" : score >= 65 ? "bg-amber-500" : "bg-gray-500";
+  return (
+    <span className={`inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-xl text-sm font-bold text-white ${tone}`}>
+      {score}
+    </span>
+  );
+}
+
+function QualityPill({ value }: { value: string }) {
+  const label = value === "high" ? "证据强" : value === "low" ? "证据弱" : "证据中等";
+  return (
+    <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-semibold ring-1 ${QUALITY[value] ?? QUALITY.medium}`}>
+      {label}
+    </span>
+  );
+}
+
+export function TalentMapView({ result }: { result: TalentSearchResult }) {
+  return (
+    <section className="rounded-2xl border border-gray-100 bg-white p-5 shadow-[0_8px_30px_rgba(0,0,0,0.06)]">
+      <div>
+        <h2 className="text-lg font-semibold text-gray-900">AI 人才方向分布</h2>
+        <p className="mt-1 text-sm text-gray-500">按岗位画像识别主匹配、相邻可迁移和高潜力人才池。</p>
+      </div>
+      <div className="mt-4 grid gap-3 md:grid-cols-3">
+        {result.talent_map.map((item) => (
+          <article key={item.direction} className="rounded-xl border border-gray-100 bg-gray-50/70 p-4">
+            <div className="flex items-start justify-between gap-3">
+              <h3 className="text-sm font-semibold text-gray-900">{item.direction}</h3>
+              <span className="rounded-full bg-white px-2 py-0.5 text-xs font-semibold text-gray-600 ring-1 ring-gray-200">
+                {item.candidate_count} 人
+              </span>
+            </div>
+            <p className="mt-2 text-xs font-medium text-blue-600">{item.fit}</p>
+            <p className="mt-2 text-sm leading-relaxed text-gray-600">{item.rationale}</p>
+          </article>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function CandidateMeta({ candidate }: { candidate: TalentCandidate }) {
+  const parts = [candidate.current_role, candidate.current_company, candidate.location].filter(Boolean);
+  if (parts.length === 0) return null;
+  return <p className="mt-1 text-sm text-gray-500">{parts.join(" / ")}</p>;
+}
+
+export function ShortlistCard({
+  candidate,
+  selected,
+  onToggle,
+  onOpen,
+}: {
+  candidate: TalentCandidate;
+  selected: boolean;
+  onToggle?: () => void;
+  onOpen?: () => void;
+}) {
+  const uncertainty = candidate.uncertainties[0];
+  const topSignals = candidate.strongest_signals.slice(0, 3);
+
+  return (
+    <article className="rounded-2xl border border-gray-100 bg-white p-5 shadow-[0_8px_30px_rgba(0,0,0,0.06)]">
+      <div className="flex items-start gap-3">
+        <ScorePill score={candidate.match_score} />
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-2">
+            <h3 className="text-lg font-semibold text-gray-900">{candidate.name}</h3>
+            <QualityPill value={candidate.evidence_audit.overall_evidence_quality} />
+          </div>
+          {candidate.headline && <p className="mt-1 text-sm leading-relaxed text-gray-700">{candidate.headline}</p>}
+          <CandidateMeta candidate={candidate} />
+        </div>
+      </div>
+
+      {candidate.ai_directions.length > 0 && (
+        <div className="mt-4 flex flex-wrap gap-1.5">
+          {candidate.ai_directions.map((direction) => (
+            <span key={direction} className="rounded-full bg-blue-50 px-2 py-0.5 text-xs font-medium text-blue-700 ring-1 ring-blue-100">
+              {direction}
+            </span>
+          ))}
+        </div>
+      )}
+
+      {topSignals.length > 0 && (
+        <ul className="mt-4 space-y-1.5">
+          {topSignals.map((signal) => (
+            <li key={signal} className="text-sm leading-relaxed text-gray-700">
+              <span className="mr-1.5 font-semibold text-emerald-600">✓</span>
+              {signal}
+            </li>
+          ))}
+        </ul>
+      )}
+
+      {uncertainty && (
+        <p className="mt-3 rounded-xl bg-amber-50 px-3 py-2 text-sm leading-relaxed text-amber-700 ring-1 ring-amber-100">
+          {uncertainty}
+        </p>
+      )}
+
+      <div className="mt-4 flex flex-wrap gap-2 border-t border-gray-100 pt-4">
+        <button
+          type="button"
+          onClick={onOpen}
+          disabled={!onOpen}
+          className="rounded-lg bg-gray-900 px-3 py-2 text-sm font-semibold text-white hover:bg-gray-800 disabled:cursor-not-allowed disabled:bg-gray-300"
+        >
+          查看详情
+        </button>
+        <button
+          type="button"
+          onClick={onToggle}
+          disabled={!onToggle}
+          className={`rounded-lg px-3 py-2 text-sm font-semibold ring-1 disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-gray-400 disabled:ring-gray-200 ${
+            selected
+              ? "bg-red-50 text-red-700 ring-red-200 hover:bg-red-100"
+              : "bg-emerald-50 text-emerald-700 ring-emerald-200 hover:bg-emerald-100"
+          }`}
+        >
+          {selected ? "移出 shortlist" : "加入 shortlist"}
+        </button>
+      </div>
+    </article>
+  );
+}
+
+export function EvidenceAuditView({ audit }: { audit: TalentCandidate["evidence_audit"] }) {
+  const rows = [
+    { label: "已验证", items: audit.verified_claims, chip: "bg-emerald-50 text-emerald-700 ring-emerald-200" },
+    { label: "未验证", items: audit.unverified_claims, chip: "bg-amber-50 text-amber-700 ring-amber-200" },
+    { label: "矛盾", items: audit.contradicted_claims, chip: "bg-red-50 text-red-700 ring-red-200" },
+    { label: "单一来源", items: audit.single_source_claims, chip: "bg-blue-50 text-blue-700 ring-blue-200" },
+    { label: "身份风险", items: audit.identity_risks, chip: "bg-purple-50 text-purple-700 ring-purple-200" },
+    { label: "时效说明", items: audit.recency_notes, chip: "bg-gray-50 text-gray-700 ring-gray-200" },
+  ];
+
+  return (
+    <section className="rounded-xl border border-gray-100 bg-gray-50/70 p-4">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h4 className="text-sm font-semibold text-gray-900">证据审计</h4>
+        <QualityPill value={audit.overall_evidence_quality} />
+      </div>
+      <div className="mt-3 space-y-3">
+        {rows.map((row) => (
+          <div key={row.label}>
+            <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-semibold ring-1 ${row.chip}`}>
+              {row.label}
+            </span>
+            {row.items.length > 0 ? (
+              <ul className="mt-1.5 list-disc space-y-1 pl-5 text-sm leading-relaxed text-gray-600">
+                {row.items.map((item) => <li key={item}>{item}</li>)}
+              </ul>
+            ) : (
+              <p className="mt-1.5 text-sm text-gray-400">无</p>
+            )}
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+export function CandidateProfileView({ candidate }: { candidate: TalentCandidate }) {
+  return (
+    <article className="rounded-2xl border border-gray-100 bg-white p-5 shadow-[0_8px_30px_rgba(0,0,0,0.06)]">
+      <div className="flex items-start gap-3">
+        <ScorePill score={candidate.match_score} />
+        <div className="min-w-0">
+          <h3 className="text-lg font-semibold text-gray-900">{candidate.name}</h3>
+          {candidate.summary ? (
+            <p className="mt-1 text-sm leading-relaxed text-gray-700">{candidate.summary}</p>
+          ) : (
+            candidate.headline && <p className="mt-1 text-sm leading-relaxed text-gray-700">{candidate.headline}</p>
+          )}
+          <CandidateMeta candidate={candidate} />
+        </div>
+      </div>
+
+      {candidate.outreach_angle && (
+        <div className="mt-4 rounded-xl border border-blue-100 bg-blue-50/70 p-4">
+          <p className="text-sm font-semibold text-blue-700">Outreach angle</p>
+          <p className="mt-1 text-sm leading-relaxed text-blue-900">{candidate.outreach_angle}</p>
+        </div>
+      )}
+
+      <div className="mt-4">
+        <EvidenceAuditView audit={candidate.evidence_audit} />
+      </div>
+
+      {candidate.claims.length > 0 && (
+        <div className="mt-4 space-y-2.5">
+          {candidate.claims.map((claim, i) => <ClaimBlock key={i} c={claim} />)}
+        </div>
+      )}
+    </article>
   );
 }
 
