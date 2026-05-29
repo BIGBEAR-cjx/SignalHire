@@ -1,6 +1,8 @@
 // lib/miro.ts —— 调 MiroMind 流式接口 (服务端用)。两个 API route 共享。
 // 必须 stream:true: 非流式几分钟不传数据会被网络代理掐断。
 
+import { isTalentSearchResult, normalizeTalentSearchResult } from "./talent-profile.mjs";
+
 type StepKind = "search" | "fetch" | "think";
 export type OnStep = (kind: StepKind, info?: string) => void;
 
@@ -93,7 +95,8 @@ export function researchStream(opts: {
       const send = (o: unknown) => controller.enqueue(enc.encode(JSON.stringify(o) + "\n"));
       try {
         if (opts.cached) {
-          send({ type: "done", data: opts.cached, stats: { searches: 0, fetches: 0, cached: true }, runId: opts.runId ?? null });
+          const normalized = normalizeResult(opts.cached);
+          send({ type: "done", data: normalized, stats: { searches: 0, fetches: 0, cached: true }, runId: opts.runId ?? null });
           return;
         }
         // 自己用去重计数 (避免分块流式导致同一步重复计数), 让 feed 计数与最终一致。
@@ -111,11 +114,11 @@ export function researchStream(opts: {
         });
         const data = parseJson(out.content);
         if (!data) { send({ type: "error", error: "模型输出不是干净 JSON" }); return; }
-        normalizeResult(data);
+        const normalized = normalizeResult(data);
         // 写库 (实时结果才写) 并拿回行 id; onDone 自身已吞错, 这里再包一层确保绝不影响返回。
         let runId: string | null = null;
-        if (opts.onDone) { try { runId = (await opts.onDone(data, { searches, fetches })) ?? null; } catch {} }
-        send({ type: "done", data, stats: { searches, fetches }, runId });
+        if (opts.onDone) { try { runId = (await opts.onDone(normalized, { searches, fetches })) ?? null; } catch {} }
+        send({ type: "done", data: normalized, stats: { searches, fetches }, runId });
       } catch (e) {
         send({ type: "error", error: (e as Error).message });
       } finally {
@@ -166,6 +169,7 @@ function normalizeClaims(claims: ClaimLike[]): void {
 // 同时支持搜人结果 (candidates[].claims) 和验证结果 (顶层 claims)。原地修改并返回。
 export function normalizeResult<T>(data: T): T {
   if (!data || typeof data !== "object") return data;
+  if (isTalentSearchResult(data)) return normalizeTalentSearchResult(data) as T;
   const d = data as ResultLike;
   if (Array.isArray(d.candidates)) for (const c of d.candidates) normalizeClaims(c?.claims ?? []);
   if (Array.isArray(d.claims)) normalizeClaims(d.claims);
@@ -183,40 +187,115 @@ export async function withRetry<T>(fn: () => Promise<T>, tries = 3): Promise<T> 
 
 // ===== 两个模式的 prompt =====
 
-export const searchPrompt = (query: string) => `You are a technical recruiting research agent. You source candidates AND
-fact-check them honestly. Your value is catching exaggerations, not rubber-stamping resumes.
+export const searchPrompt = (query: string) => `You are SignalHire, an AI talent sourcing and evidence-audit agent for HR teams and headhunters.
 
-TASK: Find exactly 3 candidate engineers for this role: "${query}".
+TASK:
+Search globally for 10 to 15 real AI talent candidates for this hiring brief:
+"${query}"
 
-HARD RULES on who counts as a candidate:
-- Each candidate MUST be a single, real, individually-named human (first + last name).
-- NEVER return a team, group, organization, "contributors", or collective as a candidate.
-- The 3 candidates must be 3 DIFFERENT people.
+The result must feel like a high-quality hiring shortlist, not raw search results.
 
-For EACH candidate, research the open web and CROSS-VERIFY their key claims against
-MULTIPLE independent public sources. Extract 3 concrete claims per candidate and judge each:
-- "verified"     = 2+ independent sources clearly confirm.
-- "contradicted" = sources directly conflict with the claim.
-- "unverified"   = no clear public evidence either way.
-Scrutinize seniority, tenure, "core/lead/creator", and exclusivity claims HARDEST.
-Never mark a claim "verified" without a source URL.
+SEARCH STRATEGY:
+- Prefer public, verifiable achievement signals over resume keywords.
+- Search broadly across papers, arXiv, OpenReview, Semantic Scholar, conference pages, GitHub, Hugging Face, Papers with Code, personal sites, technical blogs, company engineering blogs, project pages, benchmark pages, talks, podcasts, interviews, and public profile pages.
+- Group candidates by AI talent direction.
+- Include primary matches and adjacent transferable candidates when useful.
+- Every candidate must be a single real named person.
+- Never return teams, organizations, unnamed contributors, or collectives.
+- Do not guess private email addresses.
 
-VERDICT & EVIDENCE RULES (critical):
-- "verdict" MUST be EXACTLY one of: "verified", "contradicted", "unverified". Never any other value (no "partially verified"). If unsure, use "unverified".
-- Every evidence "url" MUST be a SPECIFIC source page (a real profile, repo, article, or company page that contains the fact). NEVER cite a search-results URL (nothing with google.com/search, bing.com/search, or a "?q=" query). If you cannot find a concrete page, mark the claim "unverified".
+AI DIRECTIONS:
+- AI Infrastructure / LLM Systems
+- AI Research / Applied Science
+- Applied AI / Agents
+- ML Platform / MLOps
+- Data / Evaluation / Safety
+- AI Product / Solutions
+- Founder / Builder
 
-OUTPUT RULES (critical): respond with ONLY a single JSON object, no prose, exactly this shape:
+SCORING:
+Return match_score from 0 to 100.
+Use this weighting:
+- achievement_signals: 40
+- skill_match: 25
+- work_history: 20
+- evidence_quality: 15
+
+EVIDENCE RULES:
+- Key claims need specific source URLs.
+- A search-results URL is not evidence.
+- "verified" means public evidence clearly supports the claim.
+- "contradicted" means public evidence conflicts with the claim.
+- "unverified" means the claim is plausible but not supported by clear public evidence.
+- If a claim has no concrete evidence URL, use "unverified".
+
+OUTPUT RULES:
+Respond with only one JSON object and no prose.
+Use exactly this shape:
 {
+  "search_brief": {
+    "original_query": "string",
+    "target_directions": ["string"],
+    "required_skills": ["string"],
+    "preferred_skills": ["string"],
+    "seniority": "string or null",
+    "geography": "string or null",
+    "evidence_preferences": ["string"],
+    "exclusions": ["string"]
+  },
+  "talent_map": [
+    {
+      "direction": "AI Infrastructure / LLM Systems",
+      "fit": "primary | adjacent | high_potential",
+      "candidate_count": 0,
+      "rationale": "string"
+    }
+  ],
   "candidates": [
     {
-      "name": "First Last (a real individual)",
-      "headline": "current role / one-line summary",
-      "links": { "github": "url or null", "linkedin": "url or null", "other": "url or null" },
+      "name": "First Last",
+      "headline": "current role / concise summary",
+      "location": "city, region, country or null",
+      "current_role": "string or null",
+      "current_company": "string or null",
+      "ai_directions": ["AI Infrastructure / LLM Systems"],
+      "match_score": 0,
+      "score_breakdown": {
+        "achievement_signals": 0,
+        "skill_match": 0,
+        "work_history": 0,
+        "evidence_quality": 0
+      },
+      "strongest_signals": ["3 to 5 concrete signals"],
+      "uncertainties": ["known gaps or risks"],
+      "links": {
+        "github": "url or null",
+        "linkedin": "url or null",
+        "scholar": "url or null",
+        "huggingface": "url or null",
+        "website": "url or null",
+        "other": "url or null"
+      },
       "claims": [
-        { "claim": "...", "verdict": "verified | contradicted | unverified",
-          "evidence": [ { "note": "what this source shows", "url": "https://..." } ] }
+        {
+          "claim": "concrete factual claim",
+          "verdict": "verified | contradicted | unverified",
+          "evidence": [
+            { "note": "what the source proves", "url": "https://example.com/source-page", "source_type": "paper | code | profile | company | talk | blog | project | other" }
+          ]
+        }
       ],
-      "summary": "2-sentence why-they-fit, mentioning any red flags found"
+      "evidence_audit": {
+        "verified_claims": ["string"],
+        "unverified_claims": ["string"],
+        "contradicted_claims": ["string"],
+        "single_source_claims": ["string"],
+        "identity_risks": ["string"],
+        "recency_notes": ["string"],
+        "overall_evidence_quality": "high | medium | low"
+      },
+      "outreach_angle": "one specific reason to contact this person",
+      "summary": "2 sentence explanation of fit and evidence strength"
     }
   ]
 }`;

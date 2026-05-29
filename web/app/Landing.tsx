@@ -60,7 +60,7 @@ export default function Landing({
   onLogout,
 }: {
   onSearch: (q: string) => void; // hero 输入框提交 → 跑搜人
-  onDemo: () => void; // "看验证示例" → 跑打脸 demo
+  onDemo: () => void; // "看验证示例" → 跑候选人核验示例
   user: { email: string } | null;
   onLoginClick: () => void; // 打开登录弹窗
   onLogout: () => void; // 退出
@@ -167,7 +167,7 @@ export default function Landing({
             onClick={onDemo}
             className="mt-4 text-sm text-gray-500 underline-offset-4 transition hover:text-gray-900 hover:underline"
           >
-            或看一个验证示例（打脸）→
+            或查看候选人核验示例 →
           </button>
         </div>
       </section>

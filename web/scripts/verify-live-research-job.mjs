@@ -24,9 +24,47 @@ const input =
     : {
         path: "/api/search",
         body: {
-          query: "Senior distributed systems reliability engineer with public open source database or Kubernetes work",
+          query:
+            "Senior AI infrastructure engineer with public LLM serving, inference optimization, vLLM, Triton, or Kubernetes work; North America or Europe preferred",
         },
       };
+
+function assertTalentPayload(status) {
+  const result = status?.result;
+  if (!result || typeof result !== "object" || Array.isArray(result)) {
+    throw new Error(`Job reached done without object result: ${JSON.stringify(status)}`);
+  }
+  if (!("search_brief" in result)) {
+    throw new Error(`Job result missing search_brief: ${JSON.stringify(result)}`);
+  }
+  if (!Array.isArray(result.talent_map)) {
+    throw new Error(`Job result missing talent_map array: ${JSON.stringify(result)}`);
+  }
+  if (!Array.isArray(result.candidates)) {
+    throw new Error(`Job result missing candidates array: ${JSON.stringify(result)}`);
+  }
+  if (result.candidates.length < 10 || result.candidates.length > 15) {
+    throw new Error(`Expected 10-15 candidates, got ${result.candidates.length}`);
+  }
+
+  result.candidates.forEach((candidate, index) => {
+    if (!candidate || typeof candidate !== "object" || Array.isArray(candidate)) {
+      throw new Error(`Candidate ${index} must be an object: ${JSON.stringify(candidate)}`);
+    }
+    if (!candidate.name) {
+      throw new Error(`Candidate ${index} missing name: ${JSON.stringify(candidate)}`);
+    }
+    if (!Number.isFinite(Number(candidate.match_score))) {
+      throw new Error(`Candidate ${index} missing finite match_score: ${JSON.stringify(candidate)}`);
+    }
+    if (!("evidence_audit" in candidate)) {
+      throw new Error(`Candidate ${index} missing evidence_audit: ${JSON.stringify(candidate)}`);
+    }
+    if (!Array.isArray(candidate.claims)) {
+      throw new Error(`Candidate ${index} missing claims array: ${JSON.stringify(candidate)}`);
+    }
+  });
+}
 
 function isRetryable(error) {
   const status = Number(error?.status);
@@ -102,7 +140,11 @@ for (;;) {
   }
 
   if (status.status === "done") {
-    if (!status.result) throw new Error("Job reached done without result");
+    if (MODE === "verify") {
+      if (!status.result) throw new Error("Job reached done without result");
+    } else {
+      assertTalentPayload(status);
+    }
     console.log(`live research job ok: ${queued.jobId}`);
     break;
   }

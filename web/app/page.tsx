@@ -4,11 +4,20 @@ import { useEffect, useRef, useState } from "react";
 import Landing from "./Landing";
 import AuthModal from "@/components/AuthModal";
 import { currentUser, logout } from "@/lib/auth";
-import { SEARCH_SAMPLES, VERIFY_SAMPLES, HERO_BIO } from "@/lib/cache";
-import { CandidateCard, TrustReportView, type Candidate, type VerifyReport } from "@/components/result";
+import { HERO_BIO } from "@/lib/cache";
+import {
+  CandidateCard,
+  CandidateProfileView,
+  ShortlistCard,
+  TalentMapView,
+  TrustReportView,
+  type Candidate,
+  type VerifyReport,
+} from "@/components/result";
+import type { TalentCandidate, TalentSearchResult } from "@/lib/talent-profile.mjs";
 
 type FeedItem = { id: number; kind: "search" | "fetch"; info: string };
-type SearchResult = { candidates?: Candidate[] };
+type SearchResult = { candidates?: Candidate[] } | TalentSearchResult;
 type AppResult = SearchResult | VerifyReport;
 type RunStats = { searches: number; fetches: number; cached?: boolean };
 type ResearchStepEvent = { type: "step"; kind: "search" | "fetch"; info: string; searches: number; fetches: number };
@@ -46,6 +55,10 @@ function isVerifyReport(result: AppResult): result is VerifyReport {
   return "claims" in result;
 }
 
+function isTalentSearchResult(result: AppResult | null): result is TalentSearchResult {
+  return Boolean(result && "talent_map" in result && "search_brief" in result && Array.isArray((result as TalentSearchResult).candidates));
+}
+
 function userFacingStatus(view: JobStatusView, elapsedMs: number): JobStatusView {
   if (view.phase === "queued" && elapsedMs > WORKER_DELAY_MS) {
     return {
@@ -65,12 +78,14 @@ function userFacingStatus(view: JobStatusView, elapsedMs: number): JobStatusView
 
 // ---- 主页面 ----
 export default function Home() {
-  const [mode, setMode] = useState<"search" | "verify">("verify");
-  const [query, setQuery] = useState("Senior Rust engineer who has contributed to the Tokio project");
+  const [mode, setMode] = useState<"search" | "verify">("search");
+  const [query, setQuery] = useState("找做过 LLM inference / serving、熟悉 vLLM 或 Triton、能做 AI infra 落地的 senior engineer，北美或欧洲优先，可远程");
   const [bio, setBio] = useState(HERO_BIO);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [result, setResult] = useState<AppResult | null>(null);
+  const [selectedCandidateIndex, setSelectedCandidateIndex] = useState<number | null>(null);
+  const [shortlist, setShortlist] = useState<number[]>([]);
   const [stats, setStats] = useState<RunStats | null>(null);
   const [feed, setFeed] = useState<FeedItem[]>([]); // 实时研究流: 它在搜什么/抓什么
   const [live, setLive] = useState<{ searches: number; fetches: number } | null>(null);
@@ -190,7 +205,7 @@ export default function Home() {
       else setBio(override);
     }
     stopPolling();
-    setLoading(true); setError(""); setResult(null); setStats(null);
+    setLoading(true); setError(""); setResult(null); setStats(null); setSelectedCandidateIndex(null); setShortlist([]);
     setFeed([]); setLive(null); setRunId(null); setCurrentJobId(null); setJobStatus(null); setCopied(false);
     try {
       const url = m === "search" ? "/api/search" : "/api/verify";
@@ -301,78 +316,35 @@ export default function Home() {
       />
       <main id="tool" className="mx-auto max-w-3xl scroll-mt-24 px-4 pb-16 pt-6">
       <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-[0_8px_30px_rgba(0,0,0,0.06)]">
-      {/* 模式切换: 分段控件 */}
-      <div className="inline-flex rounded-xl bg-gray-100 p-1">
-        <button
-          onClick={() => setMode("verify")}
-          className={`rounded-lg px-4 py-1.5 text-sm font-medium transition ${mode === "verify" ? "bg-white text-gray-900 shadow-sm" : "text-gray-500 hover:text-gray-800"}`}
-        >
-          验证候选人 (打脸)
-        </button>
-        <button
-          onClick={() => setMode("search")}
-          className={`rounded-lg px-4 py-1.5 text-sm font-medium transition ${mode === "search" ? "bg-white text-gray-900 shadow-sm" : "text-gray-500 hover:text-gray-800"}`}
-        >
-          搜人
-        </button>
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <p className="text-xs font-medium uppercase tracking-wide text-gray-400">Search Brief</p>
+          <h2 className="mt-1 text-lg font-semibold text-gray-900">全球 AI 人才搜索</h2>
+        </div>
+        <span className="rounded-full bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700 ring-1 ring-blue-100">
+          10-15 人 shortlist
+        </span>
       </div>
 
       <div className="mt-4">
-        {mode === "search" ? (
-          <input
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="例如: Senior Rust engineer who contributed to tokio"
-            className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-gray-900 outline-none transition placeholder:text-gray-400 focus:border-gray-900 focus:bg-white"
-          />
-        ) : (
-          <textarea
-            value={bio}
-            onChange={(e) => setBio(e.target.value)}
-            rows={5}
-            placeholder="粘贴候选人的自述 / 简历 / LinkedIn 介绍..."
-            className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-gray-900 outline-none transition placeholder:text-gray-400 focus:border-gray-900 focus:bg-white"
-          />
-        )}
-
-        {mode === "search" && (
-          <div className="mt-3 flex flex-wrap items-center gap-2">
-            <span className="text-xs text-gray-500">试试示例（秒出）:</span>
-            {SEARCH_SAMPLES.map((s) => (
-              <button
-                key={s.query}
-                onClick={() => run(s.query)}
-                disabled={loading}
-                className="rounded-full border border-gray-200 bg-white px-3 py-1 text-xs font-medium text-gray-600 transition hover:border-gray-900 hover:text-gray-900 disabled:opacity-50"
-              >
-                {s.label}
-              </button>
-            ))}
-          </div>
-        )}
-
-        {mode === "verify" && (
-          <div className="mt-3 flex flex-wrap items-center gap-2">
-            <span className="text-xs text-gray-500">试试示例（秒出）:</span>
-            {VERIFY_SAMPLES.map((s) => (
-              <button
-                key={s.label}
-                onClick={() => run(s.bio)}
-                disabled={loading}
-                className="rounded-full border border-gray-200 bg-white px-3 py-1 text-xs font-medium text-gray-600 transition hover:border-gray-900 hover:text-gray-900 disabled:opacity-50"
-              >
-                {s.label}
-              </button>
-            ))}
-          </div>
-        )}
+        <textarea
+          value={query}
+          onChange={(e) => {
+            setQuery(e.target.value);
+            setMode("search");
+          }}
+          rows={5}
+          placeholder="例如：找做过 LLM inference / serving、熟悉 vLLM 或 Triton、能做 AI infra 落地的 senior engineer，北美或欧洲优先，可远程"
+          className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-gray-900 outline-none transition placeholder:text-gray-400 focus:border-gray-900 focus:bg-white"
+        />
 
         <button
-          onClick={() => run()}
+          type="button"
+          onClick={() => run(undefined, "search")}
           disabled={loading}
           className="mt-4 w-full rounded-xl bg-gray-900 px-5 py-3 font-medium text-white transition hover:bg-gray-800 disabled:opacity-50 sm:w-auto"
         >
-          {loading ? "深度研究中…" : mode === "search" ? "搜索候选人" : "验证候选人"}
+          {loading ? "正在搜索全球 AI 候选人…" : "生成 AI 人才 shortlist"}
         </button>
       </div>
       </div>
@@ -451,16 +423,67 @@ export default function Home() {
               </button>
             )}
           </div>
-          {mode === "search"
-            ? ("candidates" in result ? result.candidates ?? [] : []).map((c: Candidate, i: number) => <CandidateCard key={i} c={c} delay={i * 90} />)
-            : isVerifyReport(result) && <TrustReportView r={result} />}
+          {isTalentSearchResult(result) ? (
+            <>
+              <TalentMapView result={result} />
+              <section className="space-y-3">
+                <div className="flex flex-wrap items-end justify-between gap-3">
+                  <div>
+                    <h2 className="text-lg font-semibold text-gray-900">Shortlist</h2>
+                    <p className="mt-1 text-sm text-gray-500">
+                      已选 {shortlist.length} / {result.candidates.length} 人
+                    </p>
+                  </div>
+                  {result.search_brief.target_directions.length > 0 && (
+                    <div className="flex flex-wrap gap-1.5">
+                      {result.search_brief.target_directions.map((direction) => (
+                        <span key={direction} className="rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600">
+                          {direction}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(320px,0.85fr)]">
+                  <div className="space-y-4">
+                    {result.candidates.map((candidate: TalentCandidate, i: number) => (
+                      <ShortlistCard
+                        key={`${candidate.name}-${i}`}
+                        candidate={candidate}
+                        selected={shortlist.includes(i)}
+                        onOpen={() => setSelectedCandidateIndex(i)}
+                        onToggle={() => {
+                          setShortlist((items) =>
+                            items.includes(i) ? items.filter((item) => item !== i) : [...items, i],
+                          );
+                        }}
+                      />
+                    ))}
+                  </div>
+                  <div className="lg:sticky lg:top-6 lg:self-start">
+                    {selectedCandidateIndex === null ? (
+                      <div className="rounded-2xl border border-dashed border-gray-200 bg-white p-5 text-sm text-gray-500">
+                        点击候选人的「查看详情」打开证据画像。
+                      </div>
+                    ) : (
+                      <CandidateProfileView candidate={result.candidates[selectedCandidateIndex]} />
+                    )}
+                  </div>
+                </div>
+              </section>
+            </>
+          ) : isVerifyReport(result) ? (
+            <TrustReportView r={result} />
+          ) : (
+            (result.candidates ?? []).map((c: Candidate, i: number) => <CandidateCard key={i} c={c} delay={i * 90} />)
+          )}
         </div>
       )}
 
       {history.length > 0 && (
         <section className="mt-10 border-t border-gray-200 pt-6">
-          <h2 className="text-sm font-semibold text-gray-700">搜索历史</h2>
-          <p className="mt-0.5 text-xs text-gray-400">点击任意一条可秒速重新打开（已存入数据库）</p>
+          <h2 className="text-sm font-semibold text-gray-700">搜索项目历史</h2>
+          <p className="mt-0.5 text-xs text-gray-400">点击任意一条重新打开已完成的 shortlist 或证据报告</p>
           <ul className="mt-3 space-y-2">
             {history.map((h, i) => (
               <li key={i}>
