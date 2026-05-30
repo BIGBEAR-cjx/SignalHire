@@ -82,7 +82,8 @@ export default function ResearchTool({
   const [error, setError] = useState("");
   const [result, setResult] = useState<AppResult | null>(null);
   const [selectedCandidateIndex, setSelectedCandidateIndex] = useState<number | null>(null);
-  const [shortlist, setShortlist] = useState<number[]>([]);
+  const [shortlist, setShortlist] = useState<number[]>([]); // 已收藏的 candidate_index 集合
+  const [savingIdx, setSavingIdx] = useState<Set<number>>(new Set()); // 正在写 API 的 index (防重复点击)
   const [stats, setStats] = useState<RunStats | null>(null);
   const [feed, setFeed] = useState<FeedItem[]>([]);
   const [live, setLive] = useState<{ searches: number; fetches: number } | null>(null);
@@ -241,6 +242,45 @@ export default function ResearchTool({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [autoRun, initialInput]);
 
+  // 拿到结果 (search) 且有 runId → 加载该用户已收藏的 candidate_index 集合, 回填高亮
+  useEffect(() => {
+    if (mode !== "search") return;
+    if (!runId) { setShortlist([]); return; }
+    let cancelled = false;
+    fetch(`/api/shortlist?run=${encodeURIComponent(runId)}`)
+      .then((r) => r.ok ? r.json() : { indices: [] })
+      .then((j) => { if (!cancelled) setShortlist(Array.isArray(j.indices) ? j.indices : []); })
+      .catch(() => { if (!cancelled) setShortlist([]); });
+    return () => { cancelled = true; };
+  }, [mode, runId]);
+
+  // 收藏 toggle: 调 API 持久化 + 乐观更新; 失败回滚。
+  async function toggleShortlist(idx: number, candidate: unknown) {
+    if (savingIdx.has(idx)) return;
+    const wasSaved = shortlist.includes(idx);
+    // 乐观更新
+    setShortlist((items) => wasSaved ? items.filter((i) => i !== idx) : [...items, idx]);
+    setSavingIdx((s) => { const n = new Set(s); n.add(idx); return n; });
+    try {
+      if (wasSaved) {
+        const r = await fetch(`/api/shortlist?run=${encodeURIComponent(runId ?? "")}&idx=${idx}`, { method: "DELETE" });
+        if (!r.ok) throw new Error("delete failed");
+      } else {
+        const r = await fetch("/api/shortlist", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ source_run_id: runId, candidate_index: idx, candidate }),
+        });
+        if (!r.ok) throw new Error("save failed");
+      }
+    } catch {
+      // 回滚
+      setShortlist((items) => wasSaved ? [...items, idx] : items.filter((i) => i !== idx));
+    } finally {
+      setSavingIdx((s) => { const n = new Set(s); n.delete(idx); return n; });
+    }
+  }
+
   const isSearch = mode === "search";
 
   return (
@@ -392,11 +432,7 @@ export default function ResearchTool({
                         candidate={candidate}
                         selected={shortlist.includes(i)}
                         onOpen={() => setSelectedCandidateIndex(i)}
-                        onToggle={() => {
-                          setShortlist((items) =>
-                            items.includes(i) ? items.filter((item) => item !== i) : [...items, i],
-                          );
-                        }}
+                        onToggle={() => toggleShortlist(i, candidate)}
                       />
                     ))}
                   </div>
