@@ -1,66 +1,215 @@
 "use client";
 
-// 控制台总览页(Phase 1.4 才填实功能, 现在先给最简占位)
+// 控制台总览 (Phase 1.4)
+// 4 KPI + 进行中任务 + 最近研究; 顶部 + 新建。
+import { useEffect, useState } from "react";
 import Link from "next/link";
 
-const QUICK_ACTIONS = [
-  {
-    href: "/app/search",
-    icon: "🔍",
-    title: "智能搜人",
-    desc: "给一段招聘需求, MiroMind 全网帮你找 10-15 个候选人, 并自动核验关键声称。",
-    cta: "开始搜人 →",
-    accent: "bg-blue-50 ring-blue-100 text-blue-700",
-  },
-  {
-    href: "/app/verify",
-    icon: "✅",
-    title: "核验台",
-    desc: "粘贴一个候选人的自述/简历/LinkedIn, 我们对每条声称做跨源核实, 揭示红旗。",
-    cta: "核验候选人 →",
-    accent: "bg-amber-50 ring-amber-100 text-amber-800",
-  },
-  {
-    href: "/app/shortlist",
-    icon: "📋",
-    title: "候选池",
-    desc: "管理你收藏的候选人, 标记状态、备注、复盘报告。",
-    cta: "查看候选池 →",
-    accent: "bg-emerald-50 ring-emerald-100 text-emerald-700",
-  },
+interface Kpi {
+  searches_this_month: number;
+  verifies_total: number;
+  shortlist_total: number;
+  red_flags_total: number;
+}
+interface ActiveJob {
+  id: string;
+  kind: "search" | "verify";
+  label: string;
+  status: string;
+  updated_at: string | null;
+}
+interface RecentRun {
+  kind: "search" | "verify";
+  label: string;
+  summary: string;
+  query_text: string;
+  updated_at: string;
+}
+interface OverviewData {
+  kpi: Kpi;
+  active_jobs: ActiveJob[];
+  recent: RecentRun[];
+}
+
+const KPI_CONFIG: { key: keyof Kpi; label: string; sub: string; accent: string; icon: string }[] = [
+  { key: "searches_this_month", label: "本月搜人",       sub: "次研究",      accent: "from-blue-100/60",     icon: "🔍" },
+  { key: "verifies_total",      label: "已核验候选人",   sub: "份报告",      accent: "from-amber-100/60",    icon: "✅" },
+  { key: "shortlist_total",     label: "候选池",         sub: "人",          accent: "from-emerald-100/60",  icon: "📋" },
+  { key: "red_flags_total",     label: "红旗",           sub: "个 (打脸)",   accent: "from-rose-100/60",     icon: "🚩" },
 ];
 
+function KindBadge({ kind }: { kind: "search" | "verify" }) {
+  if (kind === "search") return <span className="shrink-0 rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-800">搜人</span>;
+  return <span className="shrink-0 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800">核验</span>;
+}
+
+function StatusDot({ status }: { status: string }) {
+  const color =
+    status === "running" ? "bg-blue-500" :
+    status === "retrying" ? "bg-amber-500" :
+    "bg-gray-400";
+  const label =
+    status === "running" ? "运行中" :
+    status === "retrying" ? "重试中" :
+    "排队中";
+  return (
+    <span className="inline-flex items-center gap-1.5 text-xs text-gray-500">
+      <span className={`h-1.5 w-1.5 animate-pulse rounded-full ${color}`} />
+      {label}
+    </span>
+  );
+}
+
 export default function Overview() {
+  const [data, setData] = useState<OverviewData | null>(null);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    fetch("/api/overview")
+      .then((r) => r.ok ? r.json() : Promise.reject(new Error(`HTTP ${r.status}`)))
+      .then(setData)
+      .catch((e) => setError((e as Error).message));
+  }, []);
+
+  // 进行中任务实时性: 有 active jobs 时, 每 5s 轻量重新拉一次 (用户不会一直盯着, 但回来时数字是新的)
+  useEffect(() => {
+    if (!data?.active_jobs?.length) return;
+    const t = setInterval(() => {
+      fetch("/api/overview").then((r) => r.ok ? r.json() : null).then((j) => j && setData(j)).catch(() => {});
+    }, 5000);
+    return () => clearInterval(t);
+  }, [data?.active_jobs?.length]);
+
+  const empty = data && data.kpi.searches_this_month === 0 && data.kpi.verifies_total === 0 && data.kpi.shortlist_total === 0;
+
   return (
     <div className="space-y-8">
-      <header>
-        <h1 className="text-2xl font-bold tracking-tight text-gray-900">欢迎回来 👋</h1>
-        <p className="mt-1 text-sm text-gray-500">从下面选一个动作开始,或从左侧导航进入功能。</p>
+      {/* 顶部 hero */}
+      <header className="flex flex-wrap items-end justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight text-gray-900">总览</h1>
+          <p className="mt-1 text-sm text-gray-500">你的招聘工作台。从这里开始一次新研究, 或回到进行中/最近完成的任务。</p>
+        </div>
+        <div className="flex gap-2">
+          <Link href="/app/search" className="rounded-xl bg-gray-900 px-4 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-gray-800">
+            + 新建搜人
+          </Link>
+          <Link href="/app/verify" className="rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition hover:border-gray-900">
+            + 新建核验
+          </Link>
+        </div>
       </header>
 
-      <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {QUICK_ACTIONS.map((a) => (
-          <Link
-            key={a.href}
-            href={a.href}
-            className="group flex flex-col rounded-2xl border border-gray-100 bg-white p-5 shadow-[0_8px_30px_rgba(0,0,0,0.04)] transition hover:-translate-y-0.5 hover:shadow-[0_12px_40px_rgba(0,0,0,0.08)]"
-          >
-            <div className={`mb-4 inline-flex h-10 w-10 items-center justify-center rounded-xl text-lg ring-1 ${a.accent}`}>
-              {a.icon}
+      {error && (
+        <p className="rounded-xl border border-red-100 bg-red-50 p-4 text-sm text-red-700">出错: {error}</p>
+      )}
+
+      {/* KPI 卡 */}
+      <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        {KPI_CONFIG.map((cfg) => (
+          <div key={cfg.key} className="relative overflow-hidden rounded-2xl border border-gray-100 bg-white p-5 shadow-[0_8px_30px_rgba(0,0,0,0.04)]">
+            <div className={`pointer-events-none absolute -right-6 -top-6 h-24 w-24 rounded-full bg-gradient-to-br ${cfg.accent} to-transparent blur-2xl`} />
+            <div className="relative flex items-start justify-between">
+              <div>
+                <p className="text-xs font-medium uppercase tracking-wide text-gray-400">{cfg.label}</p>
+                <p className="mt-2 text-3xl font-extrabold tabular-nums tracking-tight text-gray-900">
+                  {data ? data.kpi[cfg.key] : "—"}
+                </p>
+                <p className="mt-0.5 text-xs text-gray-500">{cfg.sub}</p>
+              </div>
+              <span className="text-2xl leading-none">{cfg.icon}</span>
             </div>
-            <h2 className="text-base font-semibold text-gray-900">{a.title}</h2>
-            <p className="mt-1 flex-1 text-sm text-gray-500">{a.desc}</p>
-            <span className="mt-4 text-sm font-medium text-gray-900 group-hover:underline">{a.cta}</span>
-          </Link>
+          </div>
         ))}
       </section>
 
-      <section className="rounded-2xl border border-dashed border-gray-200 bg-white p-6 text-center">
-        <p className="text-sm text-gray-500">控制台总览、KPI、进行中任务面板等会在 Phase 1.4 加上。</p>
-        <Link href="/app/history" className="mt-2 inline-block text-sm font-medium text-gray-900 underline-offset-4 hover:underline">
-          先看历史研究 →
-        </Link>
-      </section>
+      {/* 进行中任务 + 最近研究 */}
+      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+        {/* 进行中 */}
+        <section className="space-y-3">
+          <div className="flex items-end justify-between">
+            <h2 className="text-sm font-semibold text-gray-700">进行中的任务</h2>
+            {data && data.active_jobs.length > 0 && (
+              <span className="text-xs text-gray-400">{data.active_jobs.length} 个</span>
+            )}
+          </div>
+          {!data && <p className="text-sm text-gray-400">加载中…</p>}
+          {data && data.active_jobs.length === 0 && (
+            <div className="rounded-xl border border-dashed border-gray-200 bg-white p-5 text-center text-sm text-gray-500">
+              暂无进行中的任务
+            </div>
+          )}
+          {data && data.active_jobs.length > 0 && (
+            <ul className="space-y-2">
+              {data.active_jobs.map((j) => (
+                <li key={j.id} className="flex items-start justify-between gap-3 rounded-xl border border-gray-200 bg-white p-3.5">
+                  <span className="flex min-w-0 flex-1 items-start gap-2">
+                    <KindBadge kind={j.kind} />
+                    <span className="min-w-0 truncate text-sm text-gray-800" title={j.label}>{j.label}</span>
+                  </span>
+                  <StatusDot status={j.status} />
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+
+        {/* 最近研究 */}
+        <section className="space-y-3">
+          <div className="flex items-end justify-between">
+            <h2 className="text-sm font-semibold text-gray-700">最近研究</h2>
+            <Link href="/app/history" className="text-xs text-gray-500 hover:text-gray-900">查看全部 →</Link>
+          </div>
+          {!data && <p className="text-sm text-gray-400">加载中…</p>}
+          {data && data.recent.length === 0 && (
+            <div className="rounded-xl border border-dashed border-gray-200 bg-white p-5 text-center text-sm text-gray-500">
+              还没有完成的研究
+            </div>
+          )}
+          {data && data.recent.length > 0 && (
+            <ul className="space-y-2">
+              {data.recent.map((r, i) => {
+                const target = r.kind === "search"
+                  ? `/app/search?q=${encodeURIComponent(r.query_text)}`
+                  : `/app/verify?bio=${encodeURIComponent(r.query_text)}`;
+                return (
+                  <li key={i}>
+                    <Link href={target} className="flex items-start justify-between gap-3 rounded-xl border border-gray-200 bg-white p-3.5 transition hover:border-blue-400">
+                      <span className="flex min-w-0 flex-1 items-start gap-2">
+                        <KindBadge kind={r.kind} />
+                        <span className="min-w-0 truncate text-sm text-gray-800" title={r.query_text}>{r.label}</span>
+                      </span>
+                      <span className="shrink-0 text-xs text-gray-400">{r.summary}</span>
+                    </Link>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </section>
+      </div>
+
+      {/* 空状态 onboarding */}
+      {empty && (
+        <section className="rounded-2xl border border-dashed border-gray-200 bg-white p-6">
+          <h3 className="text-sm font-semibold text-gray-800">开始第一步</h3>
+          <p className="mt-1 text-xs text-gray-500">三个动作选一个,SignalHire 让你直接拿到带证据的候选人。</p>
+          <div className="mt-4 grid gap-3 sm:grid-cols-3">
+            <Link href="/app/search" className="group rounded-xl border border-gray-100 bg-white p-4 transition hover:border-gray-900">
+              <p className="text-base font-semibold text-gray-900">🔍 搜人</p>
+              <p className="mt-1 text-xs text-gray-500">给一段招聘需求, MiroMind 全网搜出 10-15 个候选人。</p>
+            </Link>
+            <Link href="/app/verify" className="group rounded-xl border border-gray-100 bg-white p-4 transition hover:border-gray-900">
+              <p className="text-base font-semibold text-gray-900">✅ 核验</p>
+              <p className="mt-1 text-xs text-gray-500">粘贴候选人自述, 跨源核实每条声称, 揭示红旗。</p>
+            </Link>
+            <Link href="/app/history" className="group rounded-xl border border-gray-100 bg-white p-4 transition hover:border-gray-900">
+              <p className="text-base font-semibold text-gray-900">🕓 历史</p>
+              <p className="mt-1 text-xs text-gray-500">回看以前的研究, 1 秒打开完整 shortlist。</p>
+            </Link>
+          </div>
+        </section>
+      )}
     </div>
   );
 }

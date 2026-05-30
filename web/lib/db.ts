@@ -29,6 +29,24 @@ const KEY = process.env.INSFORGE_API_KEY; // 服务端 access key, 绝不进 NEX
 const client =
   BASE && KEY ? createClient({ baseUrl: BASE, anonKey: KEY, isServerMode: true }) : null;
 
+// PostgREST 没法做 FILTER 聚合, 走 Insforge 自带的 raw SQL admin 端点 (参数化, 安全)。
+// 仅用于聚合/dashboard 类只读查询; 写操作仍走 SDK 以保持一致。
+async function runSQL<T = Record<string, unknown>>(query: string, params: unknown[] = []): Promise<T[] | null> {
+  if (!BASE || !KEY) return null;
+  try {
+    const r = await fetch(`${BASE}/api/database/advance/rawsql`, {
+      method: "POST",
+      headers: { "x-api-key": KEY, "Content-Type": "application/json" },
+      body: JSON.stringify({ query, params }),
+    });
+    if (!r.ok) return null;
+    const j = await r.json();
+    return (j.rows ?? []) as T[];
+  } catch {
+    return null;
+  }
+}
+
 const TABLE = "research_runs";
 const MAX_CACHE_KEY_LENGTH = 240;
 const MAX_FLAT_KEY_LENGTH = 220;
@@ -476,5 +494,66 @@ export async function workerHealth(): Promise<WorkerHealth> {
       stale_jobs: [],
       recent_done: null,
     };
+  }
+}
+
+// ───────── 控制台总览 (Phase 1.4) ─────────
+
+export interface OverviewKpi {
+  searches_this_month: number;
+  verifies_total: number;
+  shortlist_total: number;
+  red_flags_total: number;
+}
+
+export interface ActiveJob {
+  id: string;
+  kind: RunKind;
+  label: string;
+  status: string;
+  updated_at: string | null;
+}
+
+// 一次性聚合 4 个 KPI: 本月搜人 / 总核验 / 总收藏 / 总红旗 (verify 中 overall_trust=low)。
+// 失败一律返 0 (静默降级, dashboard 不能因 DB 抖动整页报错)。
+export async function overviewStats(userId: string): Promise<OverviewKpi> {
+  const zero: OverviewKpi = { searches_this_month: 0, verifies_total: 0, shortlist_total: 0, red_flags_total: 0 };
+  if (!client) return zero;
+  const [runs, shortlist] = await Promise.all([
+    runSQL<{ searches_this_month: string; verifies_total: string; red_flags_total: string }>(
+      `SELECT
+        COUNT(*) FILTER (WHERE kind='search' AND status='done' AND created_at >= date_trunc('month', now())) AS searches_this_month,
+        COUNT(*) FILTER (WHERE kind='verify' AND status='done')                                              AS verifies_total,
+        COUNT(*) FILTER (WHERE kind='verify' AND status='done' AND result->>'overall_trust' = 'low')         AS red_flags_total
+       FROM research_runs WHERE user_id = $1`,
+      [userId],
+    ),
+    runSQL<{ n: string }>(`SELECT COUNT(*) AS n FROM shortlist_items WHERE user_id = $1`, [userId]),
+  ]);
+  const r = runs?.[0];
+  const s = shortlist?.[0];
+  return {
+    searches_this_month: Number(r?.searches_this_month ?? 0),
+    verifies_total: Number(r?.verifies_total ?? 0),
+    shortlist_total: Number(s?.n ?? 0),
+    red_flags_total: Number(r?.red_flags_total ?? 0),
+  };
+}
+
+// 进行中的任务 (queued / running / retrying)。dashboard 实时性参考用。
+export async function activeJobs(userId: string, limit = 10): Promise<ActiveJob[]> {
+  if (!client) return [];
+  try {
+    const { data, error } = await client.database
+      .from(TABLE)
+      .select("id,kind,label,status,updated_at")
+      .eq("user_id", userId)
+      .in("status", ["queued", "running", "retrying"])
+      .order("updated_at", { ascending: false })
+      .limit(limit);
+    if (error || !data) return [];
+    return data as ActiveJob[];
+  } catch {
+    return [];
   }
 }
