@@ -3,13 +3,20 @@
 // /app/settings —— 设置(最小版)
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { currentUser, logout } from "@/lib/auth";
+import { logout } from "@/lib/auth";
 
 export default function SettingsPage() {
   const router = useRouter();
-  const [user, setUser] = useState<{ email: string } | null>(null);
+  const [user, setUser] = useState<{ id: string; email: string } | null>(null);
+  const [copied, setCopied] = useState(false);
 
-  useEffect(() => { currentUser().then(setUser); }, []);
+  useEffect(() => {
+    // 从服务端拿 (含 user.id, 方便 SQL backfill 用)
+    fetch("/api/whoami")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((j) => j?.user && setUser(j.user))
+      .catch(() => {});
+  }, []);
 
   async function handleLogout() {
     await logout();
@@ -29,6 +36,26 @@ export default function SettingsPage() {
           <div className="flex items-center justify-between gap-3">
             <dt className="text-gray-500">邮箱</dt>
             <dd className="font-medium text-gray-900">{user?.email ?? "加载中…"}</dd>
+          </div>
+          <div className="flex items-center justify-between gap-3">
+            <dt className="text-gray-500">User ID</dt>
+            <dd className="flex items-center gap-2">
+              <code className="rounded bg-gray-50 px-2 py-1 font-mono text-xs text-gray-700">
+                {user?.id ?? "加载中…"}
+              </code>
+              {user?.id && (
+                <button
+                  onClick={() => {
+                    navigator.clipboard?.writeText(user.id);
+                    setCopied(true);
+                    setTimeout(() => setCopied(false), 1500);
+                  }}
+                  className="rounded-md border border-gray-200 px-2 py-0.5 text-xs text-gray-600 hover:border-gray-900"
+                >
+                  {copied ? "✓" : "复制"}
+                </button>
+              )}
+            </dd>
           </div>
         </dl>
         <button
