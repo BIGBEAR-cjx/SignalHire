@@ -55,15 +55,20 @@ function compactKey(value: string, maxLength: number): string {
 
 // Build DB-safe fields before touching research_runs. Some Insforge string columns are
 // varchar-sized, so long user briefs must not become oversized cache/flat/query fields.
+//
+// 多租户: cacheKey 加入 userId 短哈希, 避免不同用户搜同样 brief 时 upsert 互相覆盖。
+// 老数据 (NULL user_id 被回填到管理员账号) 保留 legacy cacheKey, 不会被新查询命中, 仅在历史里可见。
 export function buildRunStorageFields(input: {
   kind: RunKind;
   flatKey: string;
   queryText: string;
   label: string;
+  userId?: string | null;
 }) {
   const flatKey = compactKey(input.flatKey, MAX_FLAT_KEY_LENGTH);
+  const userPart = input.userId ? `:${shortHash(input.userId).slice(0, 8)}` : "";
   return {
-    cacheKey: compactKey(`${input.kind}:${input.flatKey}`, MAX_CACHE_KEY_LENGTH),
+    cacheKey: compactKey(`${input.kind}${userPart}:${input.flatKey}`, MAX_CACHE_KEY_LENGTH),
     flatKey,
     queryText: truncateText(input.queryText, MAX_QUERY_TEXT_LENGTH),
     label: truncateText(input.label, MAX_LABEL_LENGTH),
@@ -72,11 +77,12 @@ export function buildRunStorageFields(input: {
 }
 
 // 单列唯一键 (Insforge 不支持复合唯一约束), 用于 upsert 去重。
-const cacheKey = (kind: RunKind, flatKey: string) => buildRunStorageFields({
+const cacheKey = (kind: RunKind, flatKey: string, userId?: string | null) => buildRunStorageFields({
   kind,
   flatKey,
   queryText: "",
   label: "",
+  userId,
 }).cacheKey;
 
 function dateMs(value: string | null | undefined): number | null {
@@ -100,6 +106,7 @@ export interface SaveRunInput {
   summary: string;
   result: unknown;
   stats: unknown;
+  userId: string; // 多租户: 必须知道写给谁
 }
 
 export interface RecentRun {
@@ -193,14 +200,16 @@ function normalizeHealthJob(row: {
 
 // 精确 flat_key 查找 (模糊匹配只留给 cache.ts 的 2 个静态头牌, 避免库变大后误命中)。
 // 返回 {id, result} —— id 用于生成可分享报告链接 /r/[id]。
-export async function findRun(kind: RunKind, flatKey: string): Promise<{ id: string; result: unknown } | null> {
+// 多租户: 按当前用户的 cacheKey 查 (cacheKey 已包含 userId 短哈希)。
+export async function findRun(kind: RunKind, flatKey: string, userId: string): Promise<{ id: string; result: unknown } | null> {
   if (!client) return null;
   try {
     const { data, error } = await client.database
       .from(TABLE)
-      .select("id,result,status")
-      .eq("cache_key", cacheKey(kind, flatKey))
+      .select("id,result,status,user_id")
+      .eq("cache_key", cacheKey(kind, flatKey, userId))
       .eq("status", "done")
+      .eq("user_id", userId)
       .limit(1);
     if (error || !data || data.length === 0) return null;
     const row = data[0] as { id: string; result?: unknown; status?: string };
@@ -212,11 +221,15 @@ export async function findRun(kind: RunKind, flatKey: string): Promise<{ id: str
 }
 
 // 只取 id (静态缓存命中时, 为已 seed 的同 key 行拿分享链接 id)。
-export async function findRunId(kind: RunKind, flatKey: string): Promise<string | null> {
+// 多租户: 也按当前用户过滤; 静态 demo 用户(管理员账号) 名下若已 seed 同 key 则返其 id。
+export async function findRunId(kind: RunKind, flatKey: string, userId: string): Promise<string | null> {
   if (!client) return null;
   try {
     const { data, error } = await client.database
-      .from(TABLE).select("id").eq("cache_key", cacheKey(kind, flatKey)).limit(1);
+      .from(TABLE).select("id")
+      .eq("cache_key", cacheKey(kind, flatKey, userId))
+      .eq("user_id", userId)
+      .limit(1);
     if (error || !data || data.length === 0) return null;
     return (data[0] as { id: string }).id ?? null;
   } catch {
@@ -244,6 +257,7 @@ export async function getRunById(id: string): Promise<{
 }
 
 // upsert: cache_key 唯一, 重复查询只更新不新增行。返回该行 id (供分享链接)。
+// 多租户: row.userId 必填; cacheKey 已包含 userId 短哈希避免跨用户覆盖。
 export async function saveRun(row: SaveRunInput): Promise<string | null> {
   if (!client) return null;
   const storage = buildRunStorageFields(row);
@@ -259,6 +273,7 @@ export async function saveRun(row: SaveRunInput): Promise<string | null> {
         result: row.result,
         stats: row.stats,
         status: "done",
+        user_id: row.userId,
         error: null,
         last_error: null,
         progress: null,
@@ -268,7 +283,7 @@ export async function saveRun(row: SaveRunInput): Promise<string | null> {
       },
       { onConflict: "cache_key" },
     );
-    return await findRunId(row.kind, row.flatKey);
+    return await findRunId(row.kind, row.flatKey, row.userId);
   } catch {
     // 静默: 写库失败不能影响给用户返回结果
     return null;
@@ -276,9 +291,9 @@ export async function saveRun(row: SaveRunInput): Promise<string | null> {
 }
 
 // 入队一个异步任务 (实时查询缓存未命中时): 插 status='queued' 行, 返回 id 供前端轮询。
-// worker (Insforge Compute) 会认领并跑完, 写回 result + status='done'。
+// worker (Insforge Compute) 会认领并跑完, 写回 result + status='done' —— worker 不动 user_id。
 export async function enqueue(input: {
-  kind: RunKind; flatKey: string; queryText: string; label: string;
+  kind: RunKind; flatKey: string; queryText: string; label: string; userId: string;
 }): Promise<string | null> {
   if (!client) return null;
   const storage = buildRunStorageFields(input);
@@ -288,27 +303,31 @@ export async function enqueue(input: {
         cache_key: storage.cacheKey, kind: input.kind, flat_key: storage.flatKey,
         query_text: storage.queryText, label: storage.label,
         summary: "研究中…", result: null, stats: null,
-        status: "queued", error: null, last_error: null, progress: storage.queuedProgress,
+        status: "queued",
+        user_id: input.userId,
+        error: null, last_error: null, progress: storage.queuedProgress,
         attempt_count: 0, max_attempts: DEFAULT_MAX_ATTEMPTS,
         locked_at: null, started_at: null, finished_at: null,
         updated_at: new Date().toISOString(),
       },
       { onConflict: "cache_key" },
     );
-    return await findRunId(input.kind, input.flatKey);
+    return await findRunId(input.kind, input.flatKey, input.userId);
   } catch {
     return null;
   }
 }
 
 // 前端轮询: 按 id 取任务状态/进度/结果。
-export async function getStatus(id: string): Promise<RunStatus | null> {
+// 多租户: 必须传 userId, 不属于该用户的 row 当作不存在 (返 null)。
+export async function getStatus(id: string, userId: string): Promise<RunStatus | null> {
   if (!client) return null;
   try {
     const { data, error } = await client.database
       .from(TABLE)
-      .select("status,progress,result,error,last_error,attempt_count,max_attempts,locked_at,started_at,finished_at,updated_at")
+      .select("status,progress,result,error,last_error,attempt_count,max_attempts,locked_at,started_at,finished_at,updated_at,user_id")
       .eq("id", id)
+      .eq("user_id", userId)
       .limit(1);
     if (error || !data || data.length === 0) return null;
     const r = data[0] as {
@@ -337,32 +356,36 @@ export async function getStatus(id: string): Promise<RunStatus | null> {
 }
 
 // 手动重试失败任务: 只允许 error 行重新入队。返回最新状态供前端继续轮询。
-export async function retryRun(id: string): Promise<RunStatus | null> {
+// 多租户: 不属于该用户的行不允许 retry。
+export async function retryRun(id: string, userId: string): Promise<RunStatus | null> {
   if (!client) return null;
   try {
-    const current = await getStatus(id);
+    const current = await getStatus(id, userId);
     if (!current || current.status !== "error") return current;
     const { data, error } = await client.database
       .from(TABLE)
       .update(buildRetryUpdate())
       .eq("id", id)
+      .eq("user_id", userId)
       .eq("status", "error")
       .select("id");
     if (error || !data || data.length === 0) return null;
-    return await getStatus(id);
+    return await getStatus(id, userId);
   } catch {
     return null;
   }
 }
 
 // 历史面板: 最近的运行 (按更新时间倒序)。只显示已完成的 (status=done)。
-export async function recentRuns(limit = 20): Promise<RecentRun[]> {
+// 多租户: 必须传 userId, 只返该用户的。
+export async function recentRuns(userId: string, limit = 20): Promise<RecentRun[]> {
   if (!client) return [];
   try {
     const { data, error } = await client.database
       .from(TABLE)
       .select("kind,label,summary,query_text,updated_at")
       .eq("status", "done")
+      .eq("user_id", userId)
       .order("updated_at", { ascending: false })
       .limit(limit);
     if (error || !data) return [];
