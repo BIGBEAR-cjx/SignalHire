@@ -75,7 +75,7 @@ export default function Landing({
           <span className="text-[17px] tracking-tight">SignalHire</span>
         </a>
         <div className="hidden items-center gap-7 text-sm text-gray-600 md:flex">
-          <a href="#tool" className="hover:text-gray-900">开始使用</a>
+          <a href="/app" className="hover:text-gray-900">开始使用</a>
           <a href="https://github.com/BIGBEAR-cjx/SignalHire" target="_blank" rel="noreferrer" className="hover:text-gray-900">GitHub</a>
         </div>
         {user ? (
