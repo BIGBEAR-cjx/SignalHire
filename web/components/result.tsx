@@ -7,6 +7,14 @@ declare module "@/lib/talent-profile.mjs" {
 }
 
 import type { TalentCandidate, TalentSearchResult } from "@/lib/talent-profile.mjs";
+import {
+  reportUniqueSources,
+  sourceCountChip,
+  sourceCountLabel,
+  trustHeuristic,
+  trustHeuristicChip,
+  uniqueSourcesOf,
+} from "@/lib/source-quality";
 
 export type Verdict = "verified" | "contradicted" | "unverified";
 export type Evidence = { note: string; url: string };
@@ -66,11 +74,20 @@ export function Tally({ claims }: { claims: Claim[] }) {
 
 export function ClaimBlock({ c }: { c: Claim }) {
   const m = VERDICT[c.verdict] ?? VERDICT.unverified;
+  const sourceCount = uniqueSourcesOf(c);
   return (
     <div className={`rounded-xl border-l-2 bg-gray-50/70 p-3.5 ${m.bar}`}>
       <div className="flex items-start justify-between gap-3">
         <p className="text-sm leading-relaxed text-gray-900">{c.claim}</p>
-        <VerdictBadge v={c.verdict} />
+        <div className="flex shrink-0 flex-col items-end gap-1">
+          <VerdictBadge v={c.verdict} />
+          <span
+            title="覆盖该声称的不同域名数 (越多越可靠)"
+            className={`inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[10px] font-medium ring-1 ${sourceCountChip(sourceCount)}`}
+          >
+            ⛓ {sourceCountLabel(sourceCount)}
+          </span>
+        </div>
       </div>
       {c.evidence?.length > 0 && (
         <ul className="mt-2.5 space-y-1.5">
@@ -363,6 +380,8 @@ function TrustRing({ level }: { level: "high" | "medium" | "low" }) {
 }
 
 export function TrustReportView({ r }: { r: VerifyReport }) {
+  const totalSources = reportUniqueSources(r.claims);
+  const heuristic = trustHeuristic(r);
   return (
     <article className="sh-fade-in-up rounded-2xl border border-gray-100 bg-white p-5 shadow-[0_8px_30px_rgba(0,0,0,0.06)]">
       <div className="flex items-center justify-between gap-3">
@@ -372,6 +391,19 @@ export function TrustReportView({ r }: { r: VerifyReport }) {
         </div>
         <TrustRing level={r.overall_trust} />
       </div>
+
+      {/* 信源汇总 + 启发式信任度 (Phase 2.A.1 透明度增强) */}
+      {r.claims?.length > 0 && (
+        <div className="mt-3 flex flex-wrap items-center gap-2 rounded-xl border border-gray-100 bg-gray-50/70 px-3 py-2 text-xs text-gray-600">
+          <span className="font-medium text-gray-700">报告基于 {totalSources} 个独立信源</span>
+          <span className="text-gray-300">·</span>
+          <span title={heuristic.hint} className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 font-medium ring-1 ${trustHeuristicChip(heuristic.level)}`}>
+            {heuristic.label}
+          </span>
+          <span className="text-gray-400">— {heuristic.hint}</span>
+        </div>
+      )}
+
       <div className="mt-4 space-y-2.5">
         {r.claims?.map((cl, i) => <ClaimBlock key={i} c={cl} />)}
       </div>
@@ -383,6 +415,18 @@ export function TrustReportView({ r }: { r: VerifyReport }) {
           </ul>
         </div>
       )}
+
+      {/* 自我披露 / 解读说明 (Phase 2.A.1) */}
+      <details className="mt-4 rounded-xl border border-gray-100 bg-gray-50/50 p-3 text-xs text-gray-600">
+        <summary className="cursor-pointer font-medium text-gray-700">如何解读这份报告 · 局限性</summary>
+        <div className="mt-2 space-y-1.5 leading-relaxed">
+          <p>· 本报告由 AI (MiroMind) 自动抓取公开网页生成, 不构成对候选人最终判断, 仅作为<strong>第一道筛查</strong>。</p>
+          <p>· "已核实 / 矛盾 / 未核实"是模型在抓取时的判断, 可能存在误判或漏判, 关键决策请人工复核每条声称的原始链接。</p>
+          <p>· "独立信源数"= 该条声称的 evidence 中不同域名数 ; 数越多通常越可靠, 但同一来源转发不算独立。</p>
+          <p>· 信源时效以抓取时刻为准, 公开网页内容可能已经更新, 请在做最终决策前点击原链接核对。</p>
+          <p>· 未发现红旗 ≠ 候选人完全可信; 已发现红旗 ≠ 候选人不可用 (可能是同名 / 信源错误)。</p>
+        </div>
+      </details>
     </article>
   );
 }

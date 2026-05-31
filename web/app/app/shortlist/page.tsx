@@ -5,6 +5,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { CandidateProfileView } from "@/components/result";
+import OutreachModal from "@/components/OutreachModal";
 import type { TalentCandidate } from "@/lib/talent-profile.mjs";
 
 type Status = "new" | "contacted" | "interviewing" | "hired" | "rejected";
@@ -243,6 +244,7 @@ function DetailPanel({
   const [savingStatus, setSavingStatus] = useState(false);
   const [notes, setNotes] = useState(item.notes ?? "");
   const [savedHint, setSavedHint] = useState(false);
+  const [outreachOpen, setOutreachOpen] = useState(false);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // 切换候选人时重置 textarea
@@ -321,6 +323,20 @@ function DetailPanel({
           移出候选池
         </button>
       </div>
+
+      {/* AI 外联 CTA (Phase 2.A.3) */}
+      <button
+        onClick={() => setOutreachOpen(true)}
+        className="w-full rounded-xl bg-gradient-to-r from-emerald-500 to-emerald-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:from-emerald-600 hover:to-emerald-700"
+      >
+        ✉️ AI 起草外联邮件
+      </button>
+      <OutreachModal
+        open={outreachOpen}
+        onClose={() => setOutreachOpen(false)}
+        candidate={candidate}
+        candidateName={asCandidate(candidate).name}
+      />
 
       {/* 备注 */}
       <div>

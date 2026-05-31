@@ -14,6 +14,7 @@ import {
   type Candidate,
   type VerifyReport,
 } from "@/components/result";
+import OutreachModal from "@/components/OutreachModal";
 import type { TalentCandidate, TalentSearchResult } from "@/lib/talent-profile.mjs";
 
 type FeedItem = { id: number; kind: "search" | "fetch"; info: string };
@@ -84,6 +85,7 @@ export default function ResearchTool({
   const [selectedCandidateIndex, setSelectedCandidateIndex] = useState<number | null>(null);
   const [shortlist, setShortlist] = useState<number[]>([]); // 已收藏的 candidate_index 集合
   const [savingIdx, setSavingIdx] = useState<Set<number>>(new Set()); // 正在写 API 的 index (防重复点击)
+  const [outreachOpen, setOutreachOpen] = useState(false); // AI 外联弹窗
   const [stats, setStats] = useState<RunStats | null>(null);
   const [feed, setFeed] = useState<FeedItem[]>([]);
   const [live, setLive] = useState<{ searches: number; fetches: number } | null>(null);
@@ -436,13 +438,21 @@ export default function ResearchTool({
                       />
                     ))}
                   </div>
-                  <div className="lg:sticky lg:top-6 lg:self-start">
+                  <div className="lg:sticky lg:top-6 lg:self-start space-y-3">
                     {selectedCandidateIndex === null ? (
                       <div className="rounded-2xl border border-dashed border-gray-200 bg-white p-5 text-sm text-gray-500">
                         点击候选人的「查看详情」打开证据画像。
                       </div>
                     ) : (
-                      <CandidateProfileView candidate={result.candidates[selectedCandidateIndex]} />
+                      <>
+                        <button
+                          onClick={() => setOutreachOpen(true)}
+                          className="w-full rounded-xl bg-gradient-to-r from-emerald-500 to-emerald-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:from-emerald-600 hover:to-emerald-700"
+                        >
+                          ✉️ AI 起草外联邮件给 {result.candidates[selectedCandidateIndex]?.name?.split(" ")[0]}
+                        </button>
+                        <CandidateProfileView candidate={result.candidates[selectedCandidateIndex]} />
+                      </>
                     )}
                   </div>
                 </div>
@@ -454,6 +464,16 @@ export default function ResearchTool({
             (result.candidates ?? []).map((c: Candidate, i: number) => <CandidateCard key={i} c={c} delay={i * 90} />)
           )}
         </div>
+      )}
+
+      {/* AI 外联弹窗 (针对搜人结果里选中的候选人) */}
+      {isTalentSearchResult(result) && selectedCandidateIndex !== null && (
+        <OutreachModal
+          open={outreachOpen}
+          onClose={() => setOutreachOpen(false)}
+          candidate={result.candidates[selectedCandidateIndex]}
+          candidateName={result.candidates[selectedCandidateIndex]?.name}
+        />
       )}
     </div>
   );
