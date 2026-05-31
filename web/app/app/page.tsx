@@ -77,7 +77,11 @@ export default function Overview() {
 
   useEffect(() => {
     fetch("/api/overview")
-      .then((r) => r.ok ? r.json() : Promise.reject(new Error(`HTTP ${r.status}`)))
+      .then(async (r) => {
+        if (r.ok) return r.json();
+        if (r.status === 401) throw new Error("__SESSION_EXPIRED__");
+        throw new Error(`HTTP ${r.status}`);
+      })
       .then(setData)
       .catch((e) => setError((e as Error).message));
   }, []);
@@ -114,9 +118,23 @@ export default function Overview() {
         </div>
       </header>
 
-      {error && (
+      {error === "__SESSION_EXPIRED__" ? (
+        <div className="rounded-xl border border-amber-100 bg-amber-50 p-4 text-sm text-amber-800">
+          <p>会话已过期, 请重新登录。</p>
+          <button
+            onClick={async () => {
+              const { logout } = await import("@/lib/auth");
+              await logout();
+              location.href = "/";
+            }}
+            className="mt-2 rounded-lg bg-amber-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-amber-700"
+          >
+            退出并重新登录
+          </button>
+        </div>
+      ) : error ? (
         <p className="rounded-xl border border-red-100 bg-red-50 p-4 text-sm text-red-700">出错: {error}</p>
-      )}
+      ) : null}
 
       {/* KPI 卡 */}
       <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
