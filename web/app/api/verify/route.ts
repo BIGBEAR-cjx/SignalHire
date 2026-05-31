@@ -19,7 +19,12 @@ export async function POST(req: Request) {
   if (!user) return Response.json({ error: "请先登录" }, { status: 401 });
 
   let bio = "";
-  try { ({ bio } = await req.json()); } catch {}
+  let project_id: string | null | undefined;
+  try {
+    const body = await req.json();
+    bio = body.bio;
+    project_id = body.project_id ?? undefined;
+  } catch {}
   if (!bio?.trim()) return Response.json({ error: "缺少 bio" }, { status: 400 });
 
   const flatKey = flatten(bio);
@@ -40,6 +45,7 @@ export async function POST(req: Request) {
     queryText: bio,
     label: bio.length > 40 ? bio.slice(0, 40) + "…" : bio,
     userId: user.id,
+    projectId: project_id ?? null,
   });
   if (!jobId) return Response.json({ error: "队列暂不可用 (DB 未配置)，请试试示例查询" }, { status: 503 });
   return Response.json({ queued: true, jobId });

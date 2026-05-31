@@ -19,7 +19,12 @@ export async function POST(req: Request) {
   if (!user) return Response.json({ error: "请先登录" }, { status: 401 });
 
   let query = "";
-  try { ({ query } = await req.json()); } catch {}
+  let project_id: string | null | undefined;
+  try {
+    const body = await req.json();
+    query = body.query;
+    project_id = body.project_id ?? undefined;
+  } catch {}
   if (!query?.trim()) return Response.json({ error: "缺少 query" }, { status: 400 });
 
   const flatKey = flatten(query);
@@ -40,6 +45,7 @@ export async function POST(req: Request) {
     queryText: query,
     label: query.length > 60 ? query.slice(0, 60) + "…" : query,
     userId: user.id,
+    projectId: project_id ?? null,
   });
   if (!jobId) return Response.json({ error: "队列暂不可用 (DB 未配置)，请试试示例查询" }, { status: 503 });
   return Response.json({ queued: true, jobId });

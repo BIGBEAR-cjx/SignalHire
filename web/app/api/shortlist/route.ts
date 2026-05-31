@@ -13,14 +13,23 @@ export async function GET(req: Request) {
   const user = await getUser();
   if (!user) return Response.json({ error: "请先登录" }, { status: 401 });
 
+  const sp = new URL(req.url).searchParams;
+
   // ?run=<source_run_id> → 只返该 run 下已收藏的 index 列表 (用于结果页 UI 高亮)
-  const run = new URL(req.url).searchParams.get("run");
+  const run = sp.get("run");
   if (run) {
     const indices = await listIndicesForRun(user.id, run);
     return Response.json({ indices });
   }
 
-  const items = await listItems(user.id);
+  // ?project=<id> | ?project=none → 按项目过滤
+  const proj = sp.get("project");
+  const filter: import("@/lib/shortlist").ProjectFilter | undefined =
+    proj === "none" ? null :
+    proj && proj !== "all" ? proj :
+    undefined;
+
+  const items = await listItems(user.id, filter);
   return Response.json({ items });
 }
 
@@ -28,7 +37,7 @@ export async function POST(req: Request) {
   const user = await getUser();
   if (!user) return Response.json({ error: "请先登录" }, { status: 401 });
 
-  let body: { source_run_id?: string; candidate_index?: number; candidate?: unknown } = {};
+  let body: { source_run_id?: string; candidate_index?: number; candidate?: unknown; project_id?: string | null } = {};
   try { body = await req.json(); } catch {}
 
   const idx = Number(body.candidate_index);
@@ -40,6 +49,7 @@ export async function POST(req: Request) {
     sourceRunId: body.source_run_id ?? null,
     candidateIndex: idx,
     candidate: body.candidate,
+    projectId: body.project_id === undefined ? undefined : (body.project_id ?? null),
   });
   if (!id) return Response.json({ error: "保存失败" }, { status: 500 });
   return Response.json({ id });

@@ -16,10 +16,10 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
   const { id } = await ctx.params;
   if (!id) return Response.json({ error: "缺少 id" }, { status: 400 });
 
-  let body: { status?: unknown; notes?: unknown } = {};
+  let body: { status?: unknown; notes?: unknown; project_id?: unknown } = {};
   try { body = await req.json(); } catch {}
 
-  const patch: { status?: ShortlistStatus; notes?: string | null } = {};
+  const patch: { status?: ShortlistStatus; notes?: string | null; projectId?: string | null } = {};
   if (body.status !== undefined) {
     if (!isStatus(body.status)) return Response.json({ error: "status 取值非法" }, { status: 400 });
     patch.status = body.status;
@@ -28,7 +28,13 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
     if (body.notes !== null && typeof body.notes !== "string") return Response.json({ error: "notes 必须是字符串" }, { status: 400 });
     patch.notes = body.notes as string | null;
   }
-  if (patch.status === undefined && patch.notes === undefined) return Response.json({ error: "没有可更新的字段" }, { status: 400 });
+  if (body.project_id !== undefined) {
+    if (body.project_id !== null && typeof body.project_id !== "string") return Response.json({ error: "project_id 必须是 uuid 或 null" }, { status: 400 });
+    patch.projectId = body.project_id as string | null;
+  }
+  if (patch.status === undefined && patch.notes === undefined && patch.projectId === undefined) {
+    return Response.json({ error: "没有可更新的字段" }, { status: 400 });
+  }
 
   const ok = await updateItem({ userId: user.id, id, ...patch });
   if (!ok) return Response.json({ error: "更新失败或条目不存在" }, { status: 404 });

@@ -12,7 +12,8 @@ type User = { email: string };
 
 const NAV = [
   { href: "/app", label: "总览", icon: "🏠" },
-  { href: "/app/search", label: "智能搜人", icon: "🔍" },
+  { href: "/app/projects", label: "招聘项目", icon: "📁" },
+  { href: "/app/search", label: "搜人", icon: "🔍" },
   { href: "/app/verify", label: "核验台", icon: "✅" },
   { href: "/app/shortlist", label: "候选池", icon: "📋" },
   { href: "/app/history", label: "历史", icon: "🕓" },

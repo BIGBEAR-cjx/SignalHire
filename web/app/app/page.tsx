@@ -10,6 +10,7 @@ interface Kpi {
   verifies_total: number;
   shortlist_total: number;
   red_flags_total: number;
+  projects_open: number;
 }
 interface ActiveJob {
   id: string;
@@ -25,14 +26,24 @@ interface RecentRun {
   query_text: string;
   updated_at: string;
 }
+interface ActiveProject {
+  id: string;
+  name: string;
+  brief: string | null;
+  candidates_total: number;
+  candidates_active: number;
+  runs_active: number;
+}
 interface OverviewData {
   kpi: Kpi;
   active_jobs: ActiveJob[];
   recent: RecentRun[];
+  active_projects: ActiveProject[];
 }
 
 const KPI_CONFIG: { key: keyof Kpi; label: string; sub: string; accent: string; icon: string }[] = [
-  { key: "searches_this_month", label: "本月搜人",       sub: "次研究",      accent: "from-blue-100/60",     icon: "🔍" },
+  { key: "projects_open",       label: "进行中项目",     sub: "个",          accent: "from-blue-100/60",     icon: "📁" },
+  { key: "searches_this_month", label: "本月搜人",       sub: "次研究",      accent: "from-sky-100/60",      icon: "🔍" },
   { key: "verifies_total",      label: "已核验候选人",   sub: "份报告",      accent: "from-amber-100/60",    icon: "✅" },
   { key: "shortlist_total",     label: "候选池",         sub: "人",          accent: "from-emerald-100/60",  icon: "📋" },
   { key: "red_flags_total",     label: "红旗",           sub: "个 (打脸)",   accent: "from-rose-100/60",     icon: "🚩" },
@@ -90,12 +101,15 @@ export default function Overview() {
           <h1 className="text-2xl font-bold tracking-tight text-gray-900">总览</h1>
           <p className="mt-1 text-sm text-gray-500">你的招聘工作台。从这里开始一次新研究, 或回到进行中/最近完成的任务。</p>
         </div>
-        <div className="flex gap-2">
-          <Link href="/app/search" className="rounded-xl bg-gray-900 px-4 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-gray-800">
-            + 新建搜人
+        <div className="flex flex-wrap gap-2">
+          <Link href="/app/projects" className="rounded-xl bg-gray-900 px-4 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-gray-800">
+            + 新建项目
+          </Link>
+          <Link href="/app/search" className="rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition hover:border-gray-900">
+            快速搜人
           </Link>
           <Link href="/app/verify" className="rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition hover:border-gray-900">
-            + 新建核验
+            快速核验
           </Link>
         </div>
       </header>
@@ -105,7 +119,7 @@ export default function Overview() {
       )}
 
       {/* KPI 卡 */}
-      <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
         {KPI_CONFIG.map((cfg) => (
           <div key={cfg.key} className="relative overflow-hidden rounded-2xl border border-gray-100 bg-white p-5 shadow-[0_8px_30px_rgba(0,0,0,0.04)]">
             <div className={`pointer-events-none absolute -right-6 -top-6 h-24 w-24 rounded-full bg-gradient-to-br ${cfg.accent} to-transparent blur-2xl`} />
@@ -122,6 +136,37 @@ export default function Overview() {
           </div>
         ))}
       </section>
+
+      {/* 进行中招聘项目 */}
+      {data && data.active_projects.length > 0 && (
+        <section className="space-y-3">
+          <div className="flex items-end justify-between">
+            <h2 className="text-sm font-semibold text-gray-700">进行中项目</h2>
+            <Link href="/app/projects" className="text-xs text-gray-500 hover:text-gray-900">查看全部 →</Link>
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            {data.active_projects.map((p) => (
+              <Link
+                key={p.id}
+                href={`/app/projects/${p.id}`}
+                className="group rounded-2xl border border-gray-100 bg-white p-4 shadow-[0_8px_30px_rgba(0,0,0,0.04)] transition hover:-translate-y-0.5 hover:shadow-[0_12px_40px_rgba(0,0,0,0.08)]"
+              >
+                <p className="line-clamp-2 text-sm font-semibold text-gray-900 group-hover:underline">{p.name}</p>
+                {p.brief && <p className="mt-1 line-clamp-1 text-xs text-gray-500">{p.brief}</p>}
+                <div className="mt-3 flex flex-wrap items-center gap-1.5 text-xs text-gray-600">
+                  <span className="rounded-md bg-gray-50 px-1.5 py-0.5 ring-1 ring-gray-100">{p.candidates_total} 候选人</span>
+                  {p.runs_active > 0 && (
+                    <span className="inline-flex items-center gap-1 rounded-md bg-amber-50 px-1.5 py-0.5 text-amber-800 ring-1 ring-amber-100">
+                      <span className="inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-amber-500" />
+                      {p.runs_active} 研究中
+                    </span>
+                  )}
+                </div>
+              </Link>
+            ))}
+          </div>
+        </section>
+      )}
 
       {/* 进行中任务 + 最近研究 */}
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">

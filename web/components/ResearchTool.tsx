@@ -73,10 +73,14 @@ export default function ResearchTool({
   mode,
   initialInput = "",
   autoRun = false,
+  projectId,           // 在某项目上下文里搜/验 → 入队 + 收藏自动归项目
+  projectName,         // 仅显示
 }: {
   mode: "search" | "verify";
   initialInput?: string;
   autoRun?: boolean; // 进页面就自动跑 (用于历史回放 / hero 提交带 query 过来)
+  projectId?: string;
+  projectName?: string;
 }) {
   const [input, setInput] = useState(initialInput);
   const [loading, setLoading] = useState(false);
@@ -160,7 +164,8 @@ export default function ResearchTool({
     setJobStatus(null); setCopied(false);
     try {
       const url = mode === "search" ? "/api/search" : "/api/verify";
-      const body = mode === "search" ? { query: value } : { bio: value };
+      const body: Record<string, unknown> = mode === "search" ? { query: value } : { bio: value };
+      if (projectId) body.project_id = projectId;
       const res = await fetch(url, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -271,7 +276,12 @@ export default function ResearchTool({
         const r = await fetch("/api/shortlist", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ source_run_id: runId, candidate_index: idx, candidate }),
+          body: JSON.stringify({
+            source_run_id: runId,
+            candidate_index: idx,
+            candidate,
+            ...(projectId ? { project_id: projectId } : {}),
+          }),
         });
         if (!r.ok) throw new Error("save failed");
       }
@@ -287,6 +297,19 @@ export default function ResearchTool({
 
   return (
     <div className="space-y-5">
+      {/* 项目上下文面包屑 (在某项目下搜/验时显示) */}
+      {projectId && (
+        <div className="flex items-center gap-2 rounded-xl border border-emerald-100 bg-emerald-50/60 px-3 py-2 text-sm">
+          <span className="text-base">📁</span>
+          <span className="text-emerald-800">
+            在项目 <span className="font-semibold">{projectName ?? "(本项目)"}</span> 下{isSearch ? "搜人" : "核验"}
+            <span className="text-emerald-600/80"> — 结果和收藏会自动归到此项目</span>
+          </span>
+          <span className="flex-1" />
+          <a href={`/app/projects/${projectId}`} className="text-xs text-emerald-700 underline-offset-2 hover:underline">← 回项目</a>
+        </div>
+      )}
+
       {/* 输入区 */}
       <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-[0_8px_30px_rgba(0,0,0,0.06)]">
         <div className="flex items-center justify-between gap-3">

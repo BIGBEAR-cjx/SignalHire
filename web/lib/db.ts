@@ -309,27 +309,28 @@ export async function saveRun(row: SaveRunInput): Promise<string | null> {
 }
 
 // 入队一个异步任务 (实时查询缓存未命中时): 插 status='queued' 行, 返回 id 供前端轮询。
-// worker (Insforge Compute) 会认领并跑完, 写回 result + status='done' —— worker 不动 user_id。
+// worker (Insforge Compute) 会认领并跑完, 写回 result + status='done' —— worker 不动 user_id/project_id。
+// projectId 可选 (在某项目上下文里搜 → 自动归项目, 否则 null)。
 export async function enqueue(input: {
   kind: RunKind; flatKey: string; queryText: string; label: string; userId: string;
+  projectId?: string | null;
 }): Promise<string | null> {
   if (!client) return null;
   const storage = buildRunStorageFields(input);
   try {
-    await client.database.from(TABLE).upsert(
-      {
-        cache_key: storage.cacheKey, kind: input.kind, flat_key: storage.flatKey,
-        query_text: storage.queryText, label: storage.label,
-        summary: "研究中…", result: null, stats: null,
-        status: "queued",
-        user_id: input.userId,
-        error: null, last_error: null, progress: storage.queuedProgress,
-        attempt_count: 0, max_attempts: DEFAULT_MAX_ATTEMPTS,
-        locked_at: null, started_at: null, finished_at: null,
-        updated_at: new Date().toISOString(),
-      },
-      { onConflict: "cache_key" },
-    );
+    const row: Record<string, unknown> = {
+      cache_key: storage.cacheKey, kind: input.kind, flat_key: storage.flatKey,
+      query_text: storage.queryText, label: storage.label,
+      summary: "研究中…", result: null, stats: null,
+      status: "queued",
+      user_id: input.userId,
+      error: null, last_error: null, progress: storage.queuedProgress,
+      attempt_count: 0, max_attempts: DEFAULT_MAX_ATTEMPTS,
+      locked_at: null, started_at: null, finished_at: null,
+      updated_at: new Date().toISOString(),
+    };
+    if (input.projectId !== undefined) row.project_id = input.projectId;
+    await client.database.from(TABLE).upsert(row, { onConflict: "cache_key" });
     return await findRunId(input.kind, input.flatKey, input.userId);
   } catch {
     return null;
@@ -504,6 +505,7 @@ export interface OverviewKpi {
   verifies_total: number;
   shortlist_total: number;
   red_flags_total: number;
+  projects_open: number;  // 进行中招聘项目数
 }
 
 export interface ActiveJob {
@@ -517,9 +519,9 @@ export interface ActiveJob {
 // 一次性聚合 4 个 KPI: 本月搜人 / 总核验 / 总收藏 / 总红旗 (verify 中 overall_trust=low)。
 // 失败一律返 0 (静默降级, dashboard 不能因 DB 抖动整页报错)。
 export async function overviewStats(userId: string): Promise<OverviewKpi> {
-  const zero: OverviewKpi = { searches_this_month: 0, verifies_total: 0, shortlist_total: 0, red_flags_total: 0 };
+  const zero: OverviewKpi = { searches_this_month: 0, verifies_total: 0, shortlist_total: 0, red_flags_total: 0, projects_open: 0 };
   if (!client) return zero;
-  const [runs, shortlist] = await Promise.all([
+  const [runs, shortlist, projects] = await Promise.all([
     runSQL<{ searches_this_month: string; verifies_total: string; red_flags_total: string }>(
       `SELECT
         COUNT(*) FILTER (WHERE kind='search' AND status='done' AND created_at >= date_trunc('month', now())) AS searches_this_month,
@@ -529,14 +531,17 @@ export async function overviewStats(userId: string): Promise<OverviewKpi> {
       [userId],
     ),
     runSQL<{ n: string }>(`SELECT COUNT(*) AS n FROM shortlist_items WHERE user_id = $1`, [userId]),
+    runSQL<{ n: string }>(`SELECT COUNT(*) AS n FROM projects WHERE user_id = $1 AND status='open'`, [userId]),
   ]);
   const r = runs?.[0];
   const s = shortlist?.[0];
+  const p = projects?.[0];
   return {
     searches_this_month: Number(r?.searches_this_month ?? 0),
     verifies_total: Number(r?.verifies_total ?? 0),
     shortlist_total: Number(s?.n ?? 0),
     red_flags_total: Number(r?.red_flags_total ?? 0),
+    projects_open: Number(p?.n ?? 0),
   };
 }
 

@@ -25,6 +25,7 @@ export interface ShortlistItem {
   id: string;
   user_id: string;
   source_run_id: string | null;
+  project_id: string | null;
   candidate: unknown;
   status: ShortlistStatus;
   notes: string | null;
@@ -32,22 +33,32 @@ export interface ShortlistItem {
   updated_at: string;
 }
 
+// 列表过滤器:
+//   undefined 或 "all" → 全部
+//   string (uuid) → 该项目
+//   null → 仅未归项目的(候选池根)
+export type ProjectFilter = string | null | "all";
+
 // 端到端 dedup key: 同一 user 在同一 source_run 里同一 index 视为同一候选人。
 // 单列 UNIQUE, 因为 Insforge 不支持复合 unique 约束。
 function makeDedupKey(userId: string, sourceRunId: string | null, candidateIndex: number): string {
   return `${userId}:${sourceRunId ?? "external"}:${candidateIndex}`;
 }
 
-// 列出当前用户的全部候选池, 最近更新优先。
-export async function listItems(userId: string): Promise<ShortlistItem[]> {
+// 列出当前用户的候选池条目, 可按项目过滤。
+//   filter 默认 undefined = 全部
+//   filter = uuid string → 该项目
+//   filter = null → 仅未归项目的(候选池根)
+export async function listItems(userId: string, filter?: ProjectFilter): Promise<ShortlistItem[]> {
   if (!client) return [];
   try {
-    const { data, error } = await client.database
+    let q = client.database
       .from(TABLE)
-      .select("id,user_id,source_run_id,candidate,status,notes,created_at,updated_at")
-      .eq("user_id", userId)
-      .order("updated_at", { ascending: false })
-      .limit(500);
+      .select("id,user_id,source_run_id,project_id,candidate,status,notes,created_at,updated_at")
+      .eq("user_id", userId);
+    if (filter === null) q = q.is("project_id", null);
+    else if (typeof filter === "string" && filter !== "all") q = q.eq("project_id", filter);
+    const { data, error } = await q.order("updated_at", { ascending: false }).limit(500);
     if (error || !data) return [];
     return data as ShortlistItem[];
   } catch {
@@ -76,26 +87,26 @@ export async function listIndicesForRun(userId: string, sourceRunId: string): Pr
   }
 }
 
-// 收藏: upsert by dedup_key, 返回行 id。已存在则只更新 candidate 快照 + updated_at, status/notes 不动。
+// 收藏: upsert by dedup_key, 返回行 id。已存在则只更新 candidate 快照 + updated_at + project_id, status/notes 不动。
 export async function addItem(input: {
   userId: string;
   sourceRunId: string | null;
   candidateIndex: number;
   candidate: unknown;
+  projectId?: string | null; // 在某项目上下文里收藏 → 自动归项目
 }): Promise<string | null> {
   if (!client) return null;
   const dedup_key = makeDedupKey(input.userId, input.sourceRunId, input.candidateIndex);
   try {
-    await client.database.from(TABLE).upsert(
-      {
-        user_id: input.userId,
-        dedup_key,
-        source_run_id: input.sourceRunId,
-        candidate: input.candidate,
-        updated_at: new Date().toISOString(),
-      },
-      { onConflict: "dedup_key" },
-    );
+    const row: Record<string, unknown> = {
+      user_id: input.userId,
+      dedup_key,
+      source_run_id: input.sourceRunId,
+      candidate: input.candidate,
+      updated_at: new Date().toISOString(),
+    };
+    if (input.projectId !== undefined) row.project_id = input.projectId;
+    await client.database.from(TABLE).upsert(row, { onConflict: "dedup_key" });
     const { data } = await client.database
       .from(TABLE)
       .select("id")
@@ -107,17 +118,20 @@ export async function addItem(input: {
   }
 }
 
-// 改状态/备注。两个字段都可选, 都为 undefined 当 no-op。
+// 改状态/备注/归属项目。可选字段都可单独传, 都为 undefined 当 no-op。
+// project_id 显式传 null 表示移出项目 (回到候选池根)。
 export async function updateItem(input: {
   userId: string;
   id: string;
   status?: ShortlistStatus;
   notes?: string | null;
+  projectId?: string | null;
 }): Promise<boolean> {
   if (!client) return false;
   const patch: Record<string, unknown> = { updated_at: new Date().toISOString() };
   if (input.status !== undefined) patch.status = input.status;
   if (input.notes !== undefined) patch.notes = input.notes;
+  if (input.projectId !== undefined) patch.project_id = input.projectId;
   try {
     const { data, error } = await client.database
       .from(TABLE)
