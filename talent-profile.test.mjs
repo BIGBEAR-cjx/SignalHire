@@ -6,6 +6,9 @@ import {
   isTalentSearchResult,
 } from "./web/lib/talent-profile.mjs";
 import { researchStream } from "./web/lib/miro.ts";
+import {
+  normalizeTalentSearchResult as normalizeWorkerTalentSearchResult,
+} from "./worker/talent-profile.mjs";
 
 test("normalizes talent shortlist shape and clamps scores", () => {
   const result = normalizeTalentSearchResult({
@@ -72,6 +75,55 @@ test("normalizes talent shortlist shape and clamps scores", () => {
   assert.equal(result.candidates[0].claims[1].evidence.length, 0);
   assert.ok(isTalentSearchResult(result));
   assert.ok(AI_DIRECTIONS.includes("AI Infrastructure / LLM Systems"));
+});
+
+test("normalizes search plan and evidence graph", () => {
+  const result = normalizeTalentSearchResult({
+    search_plan: {
+      must_have: ["LLM serving", "  "],
+      nice_to_have: ["Triton"],
+      exclusions: ["pure prompt engineering"],
+      source_strategy: [
+        { source_type: "code", target: "GitHub", reason: "verify engineering" },
+        null,
+        { source_type: "", target: "", reason: "" },
+      ],
+      adjacent_pools: [
+        { pool: "Distributed systems engineers", reason: "transferable infra" },
+        { pool: "", reason: "" },
+      ],
+    },
+    evidence_graph: {
+      summary: "Code evidence is strongest.",
+      source_mix: [
+        { source_type: "code", count: 3 },
+        { source_type: "paper", count: -1 },
+      ],
+      candidates: [
+        {
+          candidate_name: "Ada Lovelace",
+          independent_sources: 5.6,
+          source_types: ["code", "", "blog"],
+          strongest_evidence: ["Merged serving PRs"],
+          weakest_evidence: ["Location from one profile"],
+          cross_validation: "Code and blog agree.",
+          risk_flags: ["No recent public updates"],
+        },
+        null,
+      ],
+    },
+    candidates: [{ name: "Ada Lovelace", match_score: 90 }],
+  });
+
+  assert.deepEqual(result.search_plan.must_have, ["LLM serving"]);
+  assert.equal(result.search_plan.source_strategy.length, 1);
+  assert.equal(result.search_plan.adjacent_pools.length, 1);
+  assert.equal(result.evidence_graph.summary, "Code evidence is strongest.");
+  assert.equal(result.evidence_graph.source_mix[0].count, 3);
+  assert.equal(result.evidence_graph.source_mix[1].count, 0);
+  assert.equal(result.evidence_graph.candidates.length, 1);
+  assert.equal(result.evidence_graph.candidates[0].independent_sources, 6);
+  assert.deepEqual(result.evidence_graph.candidates[0].source_types, ["code", "blog"]);
 });
 
 test("filters search-result URLs from evidence", () => {
@@ -217,4 +269,44 @@ test("normalizes cached v1 talent payload for web streaming output", async () =>
   assert.equal(done.data.candidates[0].match_score, 100);
   assert.equal(done.data.candidates[0].claims[0].evidence.length, 1);
   assert.equal(done.data.candidates[0].claims[0].evidence[0].url, "https://example.com/project");
+});
+
+test("search prompt requests search plan and evidence graph", async () => {
+  const { searchPrompt } = await import("./web/lib/miro.ts");
+  const prompt = searchPrompt("Find AI infra engineers");
+
+  assert.match(prompt, /"search_plan"/);
+  assert.match(prompt, /"evidence_graph"/);
+  assert.match(prompt, /source_strategy/);
+  assert.match(prompt, /independent_sources/);
+  assert.match(prompt, /cross_validation/);
+});
+
+test("worker prompt and normalizer support search plan and evidence graph", async () => {
+  const { searchPrompt } = await import("./worker/lib.mjs");
+  const prompt = searchPrompt("Find AI infra engineers");
+  const result = normalizeWorkerTalentSearchResult({
+    search_plan: {
+      must_have: ["LLM serving"],
+      source_strategy: [{ source_type: "", target: "GitHub", reason: "verify code" }],
+    },
+    evidence_graph: {
+      candidates: [{
+        candidate_name: "Ada Lovelace",
+        independent_sources: 2,
+        source_types: ["code"],
+        cross_validation: "GitHub and blog agree.",
+      }],
+    },
+    candidates: [{ name: "Ada Lovelace", match_score: 90 }],
+  });
+
+  assert.match(prompt, /"search_plan"/);
+  assert.match(prompt, /"evidence_graph"/);
+  assert.match(prompt, /source_strategy/);
+  assert.match(prompt, /independent_sources/);
+  assert.match(prompt, /cross_validation/);
+  assert.deepEqual(result.search_plan.must_have, ["LLM serving"]);
+  assert.equal(result.search_plan.source_strategy[0].source_type, "other");
+  assert.equal(result.evidence_graph.candidates[0].candidate_name, "Ada Lovelace");
 });

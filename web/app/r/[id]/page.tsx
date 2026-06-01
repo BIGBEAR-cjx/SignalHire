@@ -6,6 +6,8 @@ import { getRunById } from "@/lib/db";
 import {
   CandidateCard,
   CandidateProfileView,
+  EvidenceGraphView,
+  SearchPlanView,
   TalentMapView,
   TrustReportView,
   type Claim,
@@ -151,9 +153,13 @@ export default async function ReportPage({ params }: { params: Promise<{ id: str
               {row.kind === "search" ? (
                 talentResult ? (
                   <>
+                    <SearchPlanView result={talentResult} />
                     <TalentMapView result={talentResult} />
                     {talentResult.candidates.map((candidate, index) => (
-                      <CandidateProfileView key={`${candidate.name}-${index}`} candidate={candidate} />
+                      <div key={`${candidate.name}-${index}`} className="space-y-3">
+                        <EvidenceGraphView result={talentResult} candidate={candidate} />
+                        <CandidateProfileView candidate={candidate} />
+                      </div>
                     ))}
                   </>
                 ) : legacyCandidates.length > 0 ? (
