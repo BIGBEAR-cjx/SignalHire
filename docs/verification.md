@@ -130,13 +130,33 @@ npm run verify:retry
 
 `verify:live` 期望 web server 和 worker 已经在运行。它会提交一个稳定的、非缓存的 AI 人才搜索
 brief，然后轮询 `/api/status`，直到任务进入 `done` 或 `error`。任务完成后，它会校验新版
-payload：`search_brief`、`talent_map`、10-15 位 `candidates`、每位候选人的 `match_score`、
-`evidence_audit`，以及可追溯的 `claims`。
+payload：`search_brief`、`search_plan`、`talent_map`、`evidence_graph`、10-15 位
+`candidates`、每位候选人的 `match_score`、`evidence_audit`，以及可追溯的 `claims`。
 
 `verify:live` 保持 human-facing query 稳定且真实。它会发送私有
 `x-signalhire-verify-run-id` header 来绕过 DB cache，便于 smoke tests 每次都跑 live job，同时
 不会把 timestamps 或 random IDs 写进 MiroMind 需要研究的 prompt。它还会用 exponential backoff
 重试短暂的 fetch/TLS/5xx failures。
+
+生产环境的 `/api/search` 需要登录。跑生产 live smoke test 时，需要提供以下任一登录方式：
+
+```bash
+cd web
+APP_BASE_URL=https://signal-hire-eight.vercel.app \
+RESEARCH_VERIFY_EMAIL=<test-user-email> \
+RESEARCH_VERIFY_PASSWORD=<test-user-password> \
+NEXT_PUBLIC_INSFORGE_API_BASE_URL=<insforge-public-base-url> \
+npm run verify:live
+```
+
+或直接提供已登录的 cookie / token：
+
+```bash
+cd web
+APP_BASE_URL=https://signal-hire-eight.vercel.app \
+RESEARCH_VERIFY_COOKIE='sh_token=<access-token>' \
+npm run verify:live
+```
 
 `verify:retry` 会创建一条 synthetic `error` row，调用 `/api/retry`，确认该 row 回到 `queued`，
 然后删除 synthetic row。
