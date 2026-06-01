@@ -2,11 +2,13 @@
 // 同时被 app/page.tsx (客户端工具) 和 app/r/[id]/page.tsx (服务端可分享报告) 复用。
 
 declare module "@/lib/talent-profile.mjs" {
+  export type CandidateComparisonRow = import("@/lib/talent-profile").CandidateComparisonRow;
   export type TalentCandidate = import("@/lib/talent-profile").TalentCandidate;
   export type TalentSearchResult = import("@/lib/talent-profile").TalentSearchResult;
 }
 
-import type { TalentCandidate, TalentSearchResult } from "@/lib/talent-profile.mjs";
+import type { CandidateComparisonRow, TalentCandidate, TalentSearchResult } from "@/lib/talent-profile.mjs";
+import { buildCandidateComparisonRows } from "@/lib/talent-profile.mjs";
 import {
   reportUniqueSources,
   sourceCountChip,
@@ -230,6 +232,79 @@ export function TalentMapView({ result }: { result: TalentSearchResult }) {
             <p className="mt-2 text-sm leading-relaxed text-gray-600">{item.rationale}</p>
           </article>
         ))}
+      </div>
+    </section>
+  );
+}
+
+export function CandidateComparisonView({ result }: { result: TalentSearchResult }) {
+  const rows: CandidateComparisonRow[] = buildCandidateComparisonRows(result);
+  if (rows.length === 0) return null;
+  return (
+    <section className="rounded-2xl border border-gray-100 bg-white p-5 shadow-[0_8px_30px_rgba(0,0,0,0.06)]">
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <h2 className="text-lg font-semibold text-gray-900">候选人对比</h2>
+          <p className="mt-1 text-sm text-gray-500">按匹配度、证据强度、能力拆解和主要风险快速排序审阅。</p>
+        </div>
+        <span className="rounded-full bg-gray-100 px-2.5 py-1 text-xs font-semibold text-gray-600">
+          {rows.length} 人
+        </span>
+      </div>
+      <div className="mt-4 overflow-x-auto">
+        <table className="min-w-[960px] w-full border-separate border-spacing-0 text-left text-sm">
+          <thead>
+            <tr className="text-xs font-semibold uppercase tracking-wide text-gray-400">
+              <th className="border-b border-gray-100 px-3 py-2">候选人</th>
+              <th className="border-b border-gray-100 px-3 py-2">方向</th>
+              <th className="border-b border-gray-100 px-3 py-2 text-right">匹配</th>
+              <th className="border-b border-gray-100 px-3 py-2 text-right">成果</th>
+              <th className="border-b border-gray-100 px-3 py-2 text-right">技能</th>
+              <th className="border-b border-gray-100 px-3 py-2 text-right">经历</th>
+              <th className="border-b border-gray-100 px-3 py-2 text-right">证据</th>
+              <th className="border-b border-gray-100 px-3 py-2">信源</th>
+              <th className="border-b border-gray-100 px-3 py-2">主要信号 / 风险</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((row) => (
+              <tr key={row.name} className="align-top">
+                <td className="border-b border-gray-100 px-3 py-3">
+                  <p className="font-semibold text-gray-900">{row.name}</p>
+                  {row.role && <p className="mt-0.5 text-xs leading-relaxed text-gray-500">{row.role}</p>}
+                </td>
+                <td className="border-b border-gray-100 px-3 py-3">
+                  {row.primary_direction ? (
+                    <span className="rounded-full bg-blue-50 px-2 py-0.5 text-xs font-medium text-blue-700 ring-1 ring-blue-100">
+                      {row.primary_direction}
+                    </span>
+                  ) : (
+                    <span className="text-xs text-gray-400">未识别</span>
+                  )}
+                  {row.secondary_directions && <p className="mt-1 text-xs leading-relaxed text-gray-500">{row.secondary_directions}</p>}
+                </td>
+                <td className="border-b border-gray-100 px-3 py-3 text-right font-semibold text-gray-900">{row.match_score}</td>
+                <td className="border-b border-gray-100 px-3 py-3 text-right text-gray-600">{row.achievement_signals}</td>
+                <td className="border-b border-gray-100 px-3 py-3 text-right text-gray-600">{row.skill_match}</td>
+                <td className="border-b border-gray-100 px-3 py-3 text-right text-gray-600">{row.work_history}</td>
+                <td className="border-b border-gray-100 px-3 py-3 text-right">
+                  <div className="flex flex-col items-end gap-1">
+                    <span className="font-medium text-gray-700">{row.evidence_score}</span>
+                    <QualityPill value={row.evidence_quality} />
+                  </div>
+                </td>
+                <td className="border-b border-gray-100 px-3 py-3">
+                  <p className="text-sm font-semibold text-gray-900">{row.independent_sources}</p>
+                  {row.source_types && <p className="mt-0.5 text-xs leading-relaxed text-gray-500">{row.source_types}</p>}
+                </td>
+                <td className="border-b border-gray-100 px-3 py-3">
+                  {row.top_signal && <p className="text-xs leading-relaxed text-emerald-700">{row.top_signal}</p>}
+                  {row.risk_summary && <p className="mt-1 text-xs leading-relaxed text-amber-700">{row.risk_summary}</p>}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </div>
     </section>
   );

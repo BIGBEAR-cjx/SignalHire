@@ -7,6 +7,7 @@
 import { useEffect, useRef, useState } from "react";
 import {
   CandidateCard,
+  CandidateComparisonView,
   CandidateProfileView,
   EvidenceGraphView,
   SearchPlanView,
@@ -434,6 +435,7 @@ export default function ResearchTool({
             <>
               <SearchPlanView result={result} />
               <TalentMapView result={result} />
+              <CandidateComparisonView result={result} />
               <section className="space-y-3">
                 <div className="flex flex-wrap items-end justify-between gap-3">
                   <div>
