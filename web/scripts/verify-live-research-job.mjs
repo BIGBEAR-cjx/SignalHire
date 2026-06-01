@@ -4,6 +4,7 @@
 
 import { setTimeout as sleep } from "node:timers/promises";
 import { randomUUID } from "node:crypto";
+import { assertTalentPayload, resolveAuthCookie } from "./verify-live-research-job-utils.mjs";
 
 const APP_BASE_URL = process.env.APP_BASE_URL || "http://127.0.0.1:3000";
 const MODE = process.env.RESEARCH_VERIFY_MODE || "search";
@@ -12,6 +13,12 @@ const TIMEOUT_MS = Number(process.env.RESEARCH_VERIFY_TIMEOUT_MS || 20 * 60 * 10
 const BYPASS_SECRET = process.env.VERCEL_AUTOMATION_BYPASS_SECRET;
 const RUN_ID = randomUUID();
 const RETRYABLE_HTTP = new Set([408, 425, 429, 500, 502, 503, 504]);
+const AUTH_COOKIE = await resolveAuthCookie({
+  cookie: process.env.RESEARCH_VERIFY_COOKIE,
+  email: process.env.RESEARCH_VERIFY_EMAIL,
+  password: process.env.RESEARCH_VERIFY_PASSWORD,
+  insforgeBaseUrl: process.env.NEXT_PUBLIC_INSFORGE_API_BASE_URL || process.env.INSFORGE_API_BASE_URL,
+});
 
 const input =
   MODE === "verify"
@@ -29,43 +36,6 @@ const input =
         },
       };
 
-function assertTalentPayload(status) {
-  const result = status?.result;
-  if (!result || typeof result !== "object" || Array.isArray(result)) {
-    throw new Error(`Job reached done without object result: ${JSON.stringify(status)}`);
-  }
-  if (!("search_brief" in result)) {
-    throw new Error(`Job result missing search_brief: ${JSON.stringify(result)}`);
-  }
-  if (!Array.isArray(result.talent_map)) {
-    throw new Error(`Job result missing talent_map array: ${JSON.stringify(result)}`);
-  }
-  if (!Array.isArray(result.candidates)) {
-    throw new Error(`Job result missing candidates array: ${JSON.stringify(result)}`);
-  }
-  if (result.candidates.length < 10 || result.candidates.length > 15) {
-    throw new Error(`Expected 10-15 candidates, got ${result.candidates.length}`);
-  }
-
-  result.candidates.forEach((candidate, index) => {
-    if (!candidate || typeof candidate !== "object" || Array.isArray(candidate)) {
-      throw new Error(`Candidate ${index} must be an object: ${JSON.stringify(candidate)}`);
-    }
-    if (!candidate.name) {
-      throw new Error(`Candidate ${index} missing name: ${JSON.stringify(candidate)}`);
-    }
-    if (!Number.isFinite(Number(candidate.match_score))) {
-      throw new Error(`Candidate ${index} missing finite match_score: ${JSON.stringify(candidate)}`);
-    }
-    if (!("evidence_audit" in candidate)) {
-      throw new Error(`Candidate ${index} missing evidence_audit: ${JSON.stringify(candidate)}`);
-    }
-    if (!Array.isArray(candidate.claims)) {
-      throw new Error(`Candidate ${index} missing claims array: ${JSON.stringify(candidate)}`);
-    }
-  });
-}
-
 function isRetryable(error) {
   const status = Number(error?.status);
   if (RETRYABLE_HTTP.has(status)) return true;
@@ -80,6 +50,7 @@ function backoffMs(attempt) {
 async function jsonFetch(path, init, { attempts = 4 } = {}) {
   const headers = new Headers(init?.headers ?? {});
   if (BYPASS_SECRET) headers.set("x-vercel-protection-bypass", BYPASS_SECRET);
+  if (AUTH_COOKIE) headers.set("Cookie", AUTH_COOKIE);
   headers.set("x-signalhire-verify-run-id", RUN_ID);
 
   for (let attempt = 1; attempt <= attempts; attempt++) {
@@ -110,6 +81,7 @@ async function jsonFetch(path, init, { attempts = 4 } = {}) {
 }
 
 console.log(`Submitting ${MODE} job to ${APP_BASE_URL}${input.path} (run ${RUN_ID})`);
+if (AUTH_COOKIE) console.log("Using authenticated verify session");
 const queued = await jsonFetch(input.path, {
   method: "POST",
   headers: { "Content-Type": "application/json" },
