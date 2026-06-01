@@ -146,6 +146,70 @@ function QualityPill({ value }: { value: string }) {
   );
 }
 
+function PlanList({ title, items, tone }: { title: string; items: string[]; tone: "emerald" | "blue" | "red" }) {
+  const toneClass = {
+    emerald: "bg-emerald-50 text-emerald-700 ring-emerald-100",
+    blue: "bg-blue-50 text-blue-700 ring-blue-100",
+    red: "bg-red-50 text-red-700 ring-red-100",
+  }[tone];
+  return (
+    <div className={`rounded-xl p-4 ring-1 ${toneClass}`}>
+      <p className="text-sm font-semibold">{title}</p>
+      {items.length > 0 ? (
+        <ul className="mt-2 list-disc space-y-1 pl-5 text-sm leading-relaxed">
+          {items.map((item) => <li key={item}>{item}</li>)}
+        </ul>
+      ) : (
+        <p className="mt-2 text-sm opacity-70">未识别</p>
+      )}
+    </div>
+  );
+}
+
+export function SearchPlanView({ result }: { result: TalentSearchResult }) {
+  const plan = result.search_plan;
+  if (!plan) return null;
+  const hasPlan = plan.must_have.length || plan.nice_to_have.length || plan.exclusions.length || plan.source_strategy.length || plan.adjacent_pools.length;
+  if (!hasPlan) return null;
+  return (
+    <section className="rounded-2xl border border-gray-100 bg-white p-5 shadow-[0_8px_30px_rgba(0,0,0,0.06)]">
+      <div>
+        <h2 className="text-lg font-semibold text-gray-900">搜索计划</h2>
+        <p className="mt-1 text-sm text-gray-500">系统如何拆解岗位画像、选择来源并扩展相邻人才池。</p>
+      </div>
+      <div className="mt-4 grid gap-3 md:grid-cols-3">
+        <PlanList title="必须条件" items={plan.must_have} tone="emerald" />
+        <PlanList title="加分条件" items={plan.nice_to_have} tone="blue" />
+        <PlanList title="排除条件" items={plan.exclusions} tone="red" />
+      </div>
+      {plan.source_strategy.length > 0 && (
+        <div className="mt-4 grid gap-3 md:grid-cols-2">
+          {plan.source_strategy.map((source, i) => (
+            <article key={`${source.source_type}-${i}`} className="rounded-xl border border-gray-100 bg-gray-50/70 p-4">
+              <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">{source.source_type}</p>
+              <h3 className="mt-1 text-sm font-semibold text-gray-900">{source.target}</h3>
+              {source.reason && <p className="mt-2 text-sm leading-relaxed text-gray-600">{source.reason}</p>}
+            </article>
+          ))}
+        </div>
+      )}
+      {plan.adjacent_pools.length > 0 && (
+        <div className="mt-4 rounded-xl border border-blue-100 bg-blue-50/60 p-4">
+          <p className="text-sm font-semibold text-blue-900">相邻人才池</p>
+          <ul className="mt-2 space-y-2 text-sm leading-relaxed text-blue-900/80">
+            {plan.adjacent_pools.map((pool, i) => (
+              <li key={`${pool.pool}-${i}`}>
+                <span className="font-medium">{pool.pool}</span>
+                {pool.reason && <span className="text-blue-800/70"> · {pool.reason}</span>}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </section>
+  );
+}
+
 export function TalentMapView({ result }: { result: TalentSearchResult }) {
   return (
     <section className="rounded-2xl border border-gray-100 bg-white p-5 shadow-[0_8px_30px_rgba(0,0,0,0.06)]">
@@ -294,6 +358,54 @@ export function EvidenceAuditView({ audit }: { audit: TalentCandidate["evidence_
   );
 }
 
+function EvidenceList({ title, items, tone }: { title: string; items: string[]; tone: "emerald" | "amber" | "red" }) {
+  const toneClass = {
+    emerald: "text-emerald-700",
+    amber: "text-amber-700",
+    red: "text-red-700",
+  }[tone];
+  return (
+    <div className="mt-3">
+      <p className={`text-xs font-semibold ${toneClass}`}>{title}</p>
+      <ul className="mt-1 list-disc space-y-1 pl-5 text-sm leading-relaxed text-gray-600">
+        {items.map((item) => <li key={item}>{item}</li>)}
+      </ul>
+    </div>
+  );
+}
+
+export function EvidenceGraphView({ result, candidate }: { result: TalentSearchResult; candidate: TalentCandidate }) {
+  const graph = result.evidence_graph;
+  if (!graph) return null;
+  const node = graph.candidates.find((item) => item.candidate_name === candidate.name);
+  if (!node && !graph.summary && graph.source_mix.length === 0) return null;
+  return (
+    <section className="rounded-xl border border-gray-100 bg-gray-50/70 p-4">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h4 className="text-sm font-semibold text-gray-900">证据图</h4>
+        {node && (
+          <span className="rounded-full bg-white px-2 py-0.5 text-xs font-semibold text-gray-600 ring-1 ring-gray-200">
+            {node.independent_sources} 个独立信源
+          </span>
+        )}
+      </div>
+      {node?.source_types.length ? (
+        <div className="mt-2 flex flex-wrap gap-1.5">
+          {node.source_types.map((type) => (
+            <span key={type} className="rounded-full bg-blue-50 px-2 py-0.5 text-xs font-medium text-blue-700 ring-1 ring-blue-100">
+              {type}
+            </span>
+          ))}
+        </div>
+      ) : null}
+      {node?.cross_validation ? <p className="mt-3 text-sm leading-relaxed text-gray-700">{node.cross_validation}</p> : null}
+      {node?.strongest_evidence.length ? <EvidenceList title="最强证据" items={node.strongest_evidence} tone="emerald" /> : null}
+      {node?.weakest_evidence.length ? <EvidenceList title="弱证据" items={node.weakest_evidence} tone="amber" /> : null}
+      {node?.risk_flags.length ? <EvidenceList title="风险" items={node.risk_flags} tone="red" /> : null}
+    </section>
+  );
+}
+
 export function CandidateProfileView({ candidate }: { candidate: TalentCandidate }) {
   return (
     <article className="rounded-2xl border border-gray-100 bg-white p-5 shadow-[0_8px_30px_rgba(0,0,0,0.06)]">
@@ -421,8 +533,8 @@ export function TrustReportView({ r }: { r: VerifyReport }) {
         <summary className="cursor-pointer font-medium text-gray-700">如何解读这份报告 · 局限性</summary>
         <div className="mt-2 space-y-1.5 leading-relaxed">
           <p>· 本报告由 AI (MiroMind) 自动抓取公开网页生成, 不构成对候选人最终判断, 仅作为<strong>第一道筛查</strong>。</p>
-          <p>· "已核实 / 矛盾 / 未核实"是模型在抓取时的判断, 可能存在误判或漏判, 关键决策请人工复核每条声称的原始链接。</p>
-          <p>· "独立信源数"= 该条声称的 evidence 中不同域名数 ; 数越多通常越可靠, 但同一来源转发不算独立。</p>
+          <p>· &quot;已核实 / 矛盾 / 未核实&quot;是模型在抓取时的判断, 可能存在误判或漏判, 关键决策请人工复核每条声称的原始链接。</p>
+          <p>· &quot;独立信源数&quot;= 该条声称的 evidence 中不同域名数 ; 数越多通常越可靠, 但同一来源转发不算独立。</p>
           <p>· 信源时效以抓取时刻为准, 公开网页内容可能已经更新, 请在做最终决策前点击原链接核对。</p>
           <p>· 未发现红旗 ≠ 候选人完全可信; 已发现红旗 ≠ 候选人不可用 (可能是同名 / 信源错误)。</p>
         </div>

@@ -26,6 +26,10 @@ function cleanString(value) {
   return typeof value === "string" ? value.trim() : "";
 }
 
+function cleanStringArray(value, limit = 20) {
+  return Array.isArray(value) ? value.map(cleanString).filter(Boolean).slice(0, limit) : [];
+}
+
 function clampScore(value) {
   const n = Number(value);
   if (!Number.isFinite(n)) return 0;
@@ -81,12 +85,12 @@ function normalizeAudit(audit = {}) {
   audit = isPlainObject(audit) ? audit : {};
   const quality = cleanString(audit.overall_evidence_quality).toLowerCase();
   return {
-    verified_claims: Array.isArray(audit.verified_claims) ? audit.verified_claims.map(cleanString).filter(Boolean) : [],
-    unverified_claims: Array.isArray(audit.unverified_claims) ? audit.unverified_claims.map(cleanString).filter(Boolean) : [],
-    contradicted_claims: Array.isArray(audit.contradicted_claims) ? audit.contradicted_claims.map(cleanString).filter(Boolean) : [],
-    single_source_claims: Array.isArray(audit.single_source_claims) ? audit.single_source_claims.map(cleanString).filter(Boolean) : [],
-    identity_risks: Array.isArray(audit.identity_risks) ? audit.identity_risks.map(cleanString).filter(Boolean) : [],
-    recency_notes: Array.isArray(audit.recency_notes) ? audit.recency_notes.map(cleanString).filter(Boolean) : [],
+    verified_claims: cleanStringArray(audit.verified_claims),
+    unverified_claims: cleanStringArray(audit.unverified_claims),
+    contradicted_claims: cleanStringArray(audit.contradicted_claims),
+    single_source_claims: cleanStringArray(audit.single_source_claims),
+    identity_risks: cleanStringArray(audit.identity_risks),
+    recency_notes: cleanStringArray(audit.recency_notes),
     overall_evidence_quality: EVIDENCE_QUALITY.includes(quality) ? quality : "medium",
   };
 }
@@ -100,17 +104,11 @@ function normalizeCandidate(candidate = {}) {
     location: cleanString(candidate.location) || null,
     current_role: cleanString(candidate.current_role) || null,
     current_company: cleanString(candidate.current_company) || null,
-    ai_directions: Array.isArray(candidate.ai_directions)
-      ? candidate.ai_directions.map(cleanString).filter(Boolean)
-      : [],
+    ai_directions: cleanStringArray(candidate.ai_directions),
     match_score: clampScore(candidate.match_score),
     score_breakdown: normalizeScoreBreakdown(candidate.score_breakdown),
-    strongest_signals: Array.isArray(candidate.strongest_signals)
-      ? candidate.strongest_signals.map(cleanString).filter(Boolean).slice(0, 5)
-      : [],
-    uncertainties: Array.isArray(candidate.uncertainties)
-      ? candidate.uncertainties.map(cleanString).filter(Boolean).slice(0, 5)
-      : [],
+    strongest_signals: cleanStringArray(candidate.strongest_signals).slice(0, 5),
+    uncertainties: cleanStringArray(candidate.uncertainties).slice(0, 5),
     links: normalizeLinks(candidate.links),
     claims,
     evidence_audit: normalizeAudit(candidate.evidence_audit),
@@ -123,13 +121,69 @@ function normalizeBrief(brief = {}) {
   brief = isPlainObject(brief) ? brief : {};
   return {
     original_query: cleanString(brief.original_query),
-    target_directions: Array.isArray(brief.target_directions) ? brief.target_directions.map(cleanString).filter(Boolean) : [],
-    required_skills: Array.isArray(brief.required_skills) ? brief.required_skills.map(cleanString).filter(Boolean) : [],
-    preferred_skills: Array.isArray(brief.preferred_skills) ? brief.preferred_skills.map(cleanString).filter(Boolean) : [],
+    target_directions: cleanStringArray(brief.target_directions),
+    required_skills: cleanStringArray(brief.required_skills),
+    preferred_skills: cleanStringArray(brief.preferred_skills),
     seniority: cleanString(brief.seniority) || null,
     geography: cleanString(brief.geography) || null,
-    evidence_preferences: Array.isArray(brief.evidence_preferences) ? brief.evidence_preferences.map(cleanString).filter(Boolean) : [],
-    exclusions: Array.isArray(brief.exclusions) ? brief.exclusions.map(cleanString).filter(Boolean) : [],
+    evidence_preferences: cleanStringArray(brief.evidence_preferences),
+    exclusions: cleanStringArray(brief.exclusions),
+  };
+}
+
+function normalizeCount(value) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return 0;
+  return Math.max(0, Math.round(n));
+}
+
+function normalizeSearchPlan(plan = {}) {
+  plan = isPlainObject(plan) ? plan : {};
+  return {
+    must_have: cleanStringArray(plan.must_have),
+    nice_to_have: cleanStringArray(plan.nice_to_have),
+    exclusions: cleanStringArray(plan.exclusions),
+    source_strategy: (Array.isArray(plan.source_strategy) ? plan.source_strategy : []).map((item) => {
+      item = isPlainObject(item) ? item : {};
+      return {
+        source_type: cleanString(item.source_type) || "other",
+        target: cleanString(item.target),
+        reason: cleanString(item.reason),
+      };
+    }).filter((item) => item.target || item.reason).slice(0, 12),
+    adjacent_pools: (Array.isArray(plan.adjacent_pools) ? plan.adjacent_pools : []).map((item) => {
+      item = isPlainObject(item) ? item : {};
+      return {
+        pool: cleanString(item.pool),
+        reason: cleanString(item.reason),
+      };
+    }).filter((item) => item.pool || item.reason).slice(0, 8),
+  };
+}
+
+function normalizeEvidenceGraph(graph = {}) {
+  graph = isPlainObject(graph) ? graph : {};
+  return {
+    summary: cleanString(graph.summary),
+    source_mix: (Array.isArray(graph.source_mix) ? graph.source_mix : []).map((item) => {
+      item = isPlainObject(item) ? item : {};
+      return {
+        source_type: cleanString(item.source_type),
+        count: normalizeCount(item.count),
+      };
+    }).filter((item) => item.source_type).slice(0, 12),
+    candidates: (Array.isArray(graph.candidates) ? graph.candidates : []).map((candidate) => {
+      candidate = isPlainObject(candidate) ? candidate : {};
+      return {
+        candidate_name: cleanString(candidate.candidate_name),
+        independent_sources: normalizeCount(candidate.independent_sources),
+        source_types: cleanStringArray(candidate.source_types, 12),
+        strongest_evidence: cleanStringArray(candidate.strongest_evidence, 8),
+        weakest_evidence: cleanStringArray(candidate.weakest_evidence, 8),
+        cross_validation: cleanString(candidate.cross_validation),
+        risk_flags: cleanStringArray(candidate.risk_flags, 8),
+      };
+    }).filter((candidate) => candidate.candidate_name || candidate.source_types.length || candidate.cross_validation).slice(0, 20),
   };
 }
 
@@ -149,6 +203,8 @@ export function normalizeTalentSearchResult(data) {
   const source = isPlainObject(data) ? data : {};
   return {
     search_brief: normalizeBrief(source.search_brief),
+    search_plan: normalizeSearchPlan(source.search_plan),
+    evidence_graph: normalizeEvidenceGraph(source.evidence_graph),
     talent_map: normalizeTalentMap(source.talent_map),
     candidates: (Array.isArray(source.candidates) ? source.candidates : []).map(normalizeCandidate),
   };

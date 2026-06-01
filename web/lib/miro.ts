@@ -243,6 +243,24 @@ Use exactly this shape:
     "evidence_preferences": ["string"],
     "exclusions": ["string"]
   },
+  "search_plan": {
+    "must_have": ["explicit non-negotiable criteria extracted from the brief"],
+    "nice_to_have": ["preferred but not required criteria"],
+    "exclusions": ["profiles or signals to avoid"],
+    "source_strategy": [
+      {
+        "source_type": "paper | code | profile | company | talk | blog | project | community | other",
+        "target": "specific platforms or source families to search",
+        "reason": "why this source family matters for this brief"
+      }
+    ],
+    "adjacent_pools": [
+      {
+        "pool": "adjacent candidate pool worth exploring",
+        "reason": "why this pool may transfer into the role"
+      }
+    ]
+  },
   "talent_map": [
     {
       "direction": "AI Infrastructure / LLM Systems",
@@ -251,6 +269,23 @@ Use exactly this shape:
       "rationale": "string"
     }
   ],
+  "evidence_graph": {
+    "summary": "short summary of evidence coverage, source diversity, and main verification risks",
+    "source_mix": [
+      { "source_type": "paper | code | profile | company | talk | blog | project | community | other", "count": 0 }
+    ],
+    "candidates": [
+      {
+        "candidate_name": "First Last",
+        "independent_sources": 0,
+        "source_types": ["code", "company"],
+        "strongest_evidence": ["specific strongest evidence signal"],
+        "weakest_evidence": ["specific weak or single-source evidence signal"],
+        "cross_validation": "how independent sources agree or disagree on the core fit claims",
+        "risk_flags": ["identity, recency, single-source, or contradiction risks"]
+      }
+    ]
+  },
   "candidates": [
     {
       "name": "First Last",

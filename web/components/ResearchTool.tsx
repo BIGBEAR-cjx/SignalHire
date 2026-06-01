@@ -8,6 +8,8 @@ import { useEffect, useRef, useState } from "react";
 import {
   CandidateCard,
   CandidateProfileView,
+  EvidenceGraphView,
+  SearchPlanView,
   ShortlistCard,
   TalentMapView,
   TrustReportView,
@@ -430,6 +432,7 @@ export default function ResearchTool({
           </div>
           {isTalentSearchResult(result) ? (
             <>
+              <SearchPlanView result={result} />
               <TalentMapView result={result} />
               <section className="space-y-3">
                 <div className="flex flex-wrap items-end justify-between gap-3">
@@ -474,6 +477,7 @@ export default function ResearchTool({
                         >
                           ✉️ AI 起草外联邮件给 {result.candidates[selectedCandidateIndex]?.name?.split(" ")[0]}
                         </button>
+                        <EvidenceGraphView result={result} candidate={result.candidates[selectedCandidateIndex]} />
                         <CandidateProfileView candidate={result.candidates[selectedCandidateIndex]} />
                       </>
                     )}
