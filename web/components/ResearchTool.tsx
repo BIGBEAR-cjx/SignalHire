@@ -6,6 +6,7 @@
 // 核验 → TrustReportView
 import { useEffect, useRef, useState } from "react";
 import {
+  BackfillMergeSummaryView,
   CandidateCard,
   CandidateComparisonView,
   CandidateProfileView,
@@ -21,7 +22,8 @@ import {
   type VerifyReport,
 } from "@/components/result";
 import OutreachModal from "@/components/OutreachModal";
-import type { CoverageBackfillJob, TalentCandidate, TalentSearchResult } from "@/lib/talent-profile.mjs";
+import { buildBackfillMergeSummary } from "@/lib/talent-profile.mjs";
+import type { BackfillMergeSummary, CoverageBackfillJob, TalentCandidate, TalentSearchResult } from "@/lib/talent-profile.mjs";
 
 type FeedItem = { id: number; kind: "search" | "fetch"; info: string };
 type SearchResult = { candidates?: Candidate[] } | TalentSearchResult;
@@ -47,6 +49,7 @@ type StatusResponse = {
   last_error?: string | null;
   status_view?: JobStatusView;
 };
+type BackfillContext = { originalResult: TalentSearchResult; job: CoverageBackfillJob };
 
 const WORKER_DELAY_MS = 2 * 60 * 1000;
 const JOB_TIMEOUT_MS = 15 * 60 * 1000;
@@ -103,6 +106,8 @@ export default function ResearchTool({
   const [jobStatus, setJobStatus] = useState<JobStatusView | null>(null);
   const [currentJobId, setCurrentJobId] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const [backfillContext, setBackfillContext] = useState<BackfillContext | null>(null);
+  const [backfillMergeSummary, setBackfillMergeSummary] = useState<BackfillMergeSummary | null>(null);
   const idRef = useRef(0);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -111,7 +116,7 @@ export default function ResearchTool({
   }
   useEffect(() => stopPolling, []);
 
-  function beginPolling(jobId: string) {
+  function beginPolling(jobId: string, context?: BackfillContext) {
     stopPolling();
     const startedAt = Date.now();
     let pollFailures = 0;
@@ -136,6 +141,13 @@ export default function ResearchTool({
         if (j.status === "done") {
           stopPolling();
           if (!j.result) { setError("研究完成但结果为空，请重新研究"); setLoading(false); return; }
+          const mergeContext = context ?? backfillContext;
+          if (mergeContext && isTalentSearchResult(j.result)) {
+            setBackfillMergeSummary(buildBackfillMergeSummary({
+              originalResult: mergeContext.originalResult,
+              backfillResult: j.result,
+            }));
+          }
           setResult(j.result);
           setStats(p ? { searches: p.searches ?? 0, fetches: p.fetches ?? 0 } : null);
           setRunId(j.runId ?? jobId);
@@ -167,7 +179,7 @@ export default function ResearchTool({
     setLoading(true); setError(""); setResult(null); setStats(null);
     setSelectedCandidateIndex(null); setShortlist([]);
     setFeed([]); setLive(null); setRunId(null); setCurrentJobId(null);
-    setJobStatus(null); setCopied(false);
+    setJobStatus(null); setCopied(false); setBackfillContext(null); setBackfillMergeSummary(null);
     try {
       const url = mode === "search" ? "/api/search" : "/api/verify";
       const body: Record<string, unknown> = mode === "search" ? { query: value } : { bio: value };
@@ -201,6 +213,7 @@ export default function ResearchTool({
               setResult(ev.data);
               setStats(ev.stats ?? null);
               setRunId(ev.runId ?? null);
+              setBackfillMergeSummary(null);
             } else if (ev.type === "error") {
               setError(ev.error || "出错了");
             }
@@ -251,6 +264,9 @@ export default function ResearchTool({
     setLoading(true); setError(""); setStats(null); setFeed([]); setLive(null);
     setJobStatus({ phase: "queued", label: "补搜已进入研究队列", detail: "等待 worker 认领这个证据缺口任务。", canRetry: false });
     setCurrentJobId(null);
+    const context = { originalResult: result, job };
+    setBackfillContext(context);
+    setBackfillMergeSummary(null);
     try {
       const res = await fetch("/api/backfill", {
         method: "POST",
@@ -266,7 +282,7 @@ export default function ResearchTool({
       if (!res.ok) { setError(j.error ?? `HTTP ${res.status}`); setLoading(false); return; }
       if (j.queued && j.jobId) {
         setCurrentJobId(j.jobId);
-        beginPolling(j.jobId);
+        beginPolling(j.jobId, context);
       } else {
         setError(j.error ?? "补搜入队失败"); setLoading(false);
       }
@@ -467,6 +483,7 @@ export default function ResearchTool({
           </div>
           {isTalentSearchResult(result) ? (
             <>
+              {backfillMergeSummary && <BackfillMergeSummaryView summary={backfillMergeSummary} />}
               <SearchPlanView result={result} />
               <SourceExecutionView result={result} />
               <CoverageBackfillView result={result} onBackfillJob={enqueueBackfillJob} backfillDisabled={loading} />

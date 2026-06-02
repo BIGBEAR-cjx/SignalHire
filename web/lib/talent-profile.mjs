@@ -325,6 +325,29 @@ function evidenceSummaryFromClaims(claims) {
   };
 }
 
+function evidenceDetailsFromClaims(claims) {
+  const urls = new Set();
+  const sourceTypes = new Set();
+  for (const claim of Array.isArray(claims) ? claims : []) {
+    for (const evidence of Array.isArray(claim?.evidence) ? claim.evidence : []) {
+      const url = cleanString(evidence?.url);
+      if (url && !isSearchUrl(url)) urls.add(url);
+      const sourceType = cleanString(evidence?.source_type).toLowerCase();
+      if (sourceType) sourceTypes.add(sourceType);
+    }
+  }
+  return { urls, sourceTypes };
+}
+
+function candidateMapByName(candidates) {
+  const map = new Map();
+  for (const candidate of Array.isArray(candidates) ? candidates : []) {
+    const name = cleanString(candidate?.name);
+    if (name) map.set(name.toLowerCase(), candidate);
+  }
+  return map;
+}
+
 function sourceTypeCountsFromClaims(candidates) {
   const counts = new Map();
   for (const candidate of Array.isArray(candidates) ? candidates : []) {
@@ -345,6 +368,13 @@ function sourceTypeCountsFromMix(sourceMix, candidates) {
     if (sourceType) counts.set(sourceType, Math.max(counts.get(sourceType) ?? 0, normalizeCount(item?.count)));
   }
   return counts;
+}
+
+function addCounts(target, source) {
+  for (const [key, count] of source.entries()) {
+    target.set(key, (target.get(key) ?? 0) + count);
+  }
+  return target;
 }
 
 function coverageGroupsFromCounts(counts) {
@@ -587,6 +617,73 @@ export function buildBackfillSearchInput({ job, originalQuery = "" } = {}) {
     "Prioritize concrete public evidence and specific source URLs. Do not cite search-result URLs.",
     "Explain whether the new evidence confirms, weakens, or changes the original candidate fit.",
   ].join("\n");
+}
+
+/**
+ * @param {{ originalResult?: unknown; backfillResult?: unknown }} input
+ */
+export function buildBackfillMergeSummary({ originalResult, backfillResult } = {}) {
+  const original = normalizeTalentSearchResult(originalResult);
+  const backfill = normalizeTalentSearchResult(backfillResult);
+  const originalCandidates = candidateMapByName(original.candidates);
+  const improvedCandidates = [];
+  const newCandidateNames = [];
+
+  for (const candidate of backfill.candidates) {
+    const name = cleanString(candidate.name);
+    if (!name) continue;
+    const originalCandidate = originalCandidates.get(name.toLowerCase());
+    if (!originalCandidate) {
+      newCandidateNames.push(name);
+      continue;
+    }
+
+    const before = evidenceDetailsFromClaims(originalCandidate.claims);
+    const after = evidenceDetailsFromClaims(candidate.claims);
+    const newEvidenceUrls = Array.from(after.urls).filter((url) => !before.urls.has(url)).slice(0, 12);
+    const newSourceTypes = Array.from(after.sourceTypes).filter((type) => !before.sourceTypes.has(type)).slice(0, 12);
+    if (newEvidenceUrls.length === 0 && newSourceTypes.length === 0) continue;
+
+    improvedCandidates.push({
+      candidate_name: name,
+      new_evidence_count: newEvidenceUrls.length,
+      new_source_types: newSourceTypes,
+      new_evidence_urls: newEvidenceUrls,
+      merge_note: newSourceTypes.length
+        ? `新增 ${newSourceTypes.join(", ")} 来源证据。`
+        : "发现新的公开证据链接。",
+    });
+  }
+
+  const beforeCounts = sourceTypeCountsFromMix(original.evidence_graph.source_mix, original.candidates);
+  const backfillCounts = sourceTypeCountsFromMix(backfill.evidence_graph.source_mix, backfill.candidates);
+  const afterCounts = addCounts(new Map(beforeCounts), backfillCounts);
+  const beforeCoverage = coverageGroupsFromCounts(beforeCounts);
+  const afterCoverage = coverageGroupsFromCounts(afterCounts);
+  const coverageGains = afterCoverage
+    .map((afterGroup) => {
+      const beforeGroup = beforeCoverage.find((group) => group.key === afterGroup.key);
+      const beforeCount = beforeGroup?.count ?? 0;
+      return {
+        key: afterGroup.key,
+        label: afterGroup.label,
+        before_count: beforeCount,
+        after_count: afterGroup.count,
+        added_source_types: afterGroup.source_types.filter((type) => !(beforeGroup?.source_types ?? []).includes(type)),
+      };
+    })
+    .filter((group) => group.after_count > group.before_count)
+    .slice(0, 4);
+
+  const newEvidenceCount = improvedCandidates.reduce((total, candidate) => total + candidate.new_evidence_count, 0);
+  return {
+    summary: improvedCandidates.length > 0
+      ? `${improvedCandidates.length} 位候选人发现 ${newEvidenceCount} 条新增证据。`
+      : "未发现可合并到原报告的新增候选人证据。",
+    improved_candidates: improvedCandidates.slice(0, 12),
+    new_candidate_names: Array.from(new Set(newCandidateNames)).slice(0, 12),
+    coverage_gains: coverageGains,
+  };
 }
 
 export function isTalentSearchResult(data) {
