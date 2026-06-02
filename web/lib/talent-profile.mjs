@@ -16,6 +16,7 @@ export const EVIDENCE_COVERAGE_GROUPS = [
   { key: "work_history", label: "工作经历", source_types: ["profile", "company", "community"] },
   { key: "public_voice", label: "公开表达", source_types: ["talk", "blog", "podcast", "interview"] },
 ];
+export const SOURCE_EXECUTION_STATUSES = ["planned", "completed", "partial", "failed"];
 const COVERAGE_GROUP_KEYS = EVIDENCE_COVERAGE_GROUPS.map((group) => group.key);
 const SOURCE_TYPE_TO_COVERAGE_GROUP = new Map(
   EVIDENCE_COVERAGE_GROUPS.flatMap((group) => group.source_types.map((sourceType) => [sourceType, group.key])),
@@ -71,6 +72,10 @@ function normalizeEvidence(evidence) {
       source_type: cleanString(item.source_type) || "other",
     }))
     .filter((item) => item.url && !isSearchUrl(item.url));
+}
+
+function normalizeSourceUrls(value, limit = 12) {
+  return cleanStringArray(value, limit).filter((url) => !isSearchUrl(url));
 }
 
 function normalizeClaim(claim) {
@@ -186,6 +191,36 @@ function normalizeSearchPlan(plan = {}) {
         reason: cleanString(item.reason),
       };
     }).filter((item) => item.pool || item.reason).slice(0, 8),
+  };
+}
+
+function normalizeSourceExecutionJob(job = {}, index = 0) {
+  job = isPlainObject(job) ? job : {};
+  const sourceType = cleanString(job.source_type) || "other";
+  const status = cleanString(job.status).toLowerCase();
+  return {
+    job_id: cleanString(job.job_id) || `source-${index + 1}-${sourceType}`,
+    source_type: sourceType,
+    coverage_group: normalizeCoverageGroup(job.coverage_group, sourceType),
+    query: cleanString(job.query),
+    status: SOURCE_EXECUTION_STATUSES.includes(status) ? status : "planned",
+    urls_found: normalizeCount(job.urls_found),
+    evidence_found: normalizeCount(job.evidence_found),
+    candidate_leads: cleanStringArray(job.candidate_leads, 12),
+    source_urls: normalizeSourceUrls(job.source_urls),
+    error: cleanString(job.error),
+    next_action: cleanString(job.next_action),
+  };
+}
+
+function normalizeSourceExecution(execution = {}) {
+  execution = isPlainObject(execution) ? execution : {};
+  return {
+    summary: cleanString(execution.summary),
+    jobs: (Array.isArray(execution.jobs) ? execution.jobs : [])
+      .map(normalizeSourceExecutionJob)
+      .filter((job) => job.query || job.source_urls.length || job.error || job.next_action)
+      .slice(0, 16),
   };
 }
 
@@ -324,6 +359,7 @@ export function normalizeTalentSearchResult(data) {
   return {
     search_brief: normalizeBrief(source.search_brief),
     search_plan: normalizeSearchPlan(source.search_plan),
+    source_execution: normalizeSourceExecution(source.source_execution),
     evidence_graph: normalizeEvidenceGraph(source.evidence_graph),
     talent_map: normalizeTalentMap(source.talent_map),
     candidates: (Array.isArray(source.candidates) ? source.candidates : []).map(normalizeCandidate),
@@ -384,6 +420,28 @@ export function buildSourceQueryPlan(result) {
       priority: index + 1,
     };
   }).filter((item) => item.query || item.target || item.reason).slice(0, 12);
+}
+
+export function buildSourceExecution(result) {
+  const source = isPlainObject(result) ? result : {};
+  const execution = normalizeSourceExecution(source.source_execution);
+  if (execution.jobs.length > 0) return execution;
+  return {
+    summary: "",
+    jobs: buildSourceQueryPlan(source).map((item) => ({
+      job_id: `source-${item.priority}-${item.source_type}`,
+      source_type: item.source_type,
+      coverage_group: item.coverage_group,
+      query: item.query,
+      status: "planned",
+      urls_found: 0,
+      evidence_found: 0,
+      candidate_leads: [],
+      source_urls: [],
+      error: "",
+      next_action: item.reason || item.target,
+    })),
+  };
 }
 
 export function isTalentSearchResult(data) {
