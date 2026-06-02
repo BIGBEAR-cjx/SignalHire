@@ -3,6 +3,7 @@
 
 declare module "@/lib/talent-profile.mjs" {
   export type CandidateComparisonRow = import("@/lib/talent-profile").CandidateComparisonRow;
+  export type BackfillMergeSummary = import("@/lib/talent-profile").BackfillMergeSummary;
   export type CoverageBackfillJob = import("@/lib/talent-profile").CoverageBackfillJob;
   export type EvidenceCoverageGroup = import("@/lib/talent-profile").EvidenceCoverageGroup;
   export type SourceExecutionJob = import("@/lib/talent-profile").SourceExecutionJob;
@@ -11,7 +12,7 @@ declare module "@/lib/talent-profile.mjs" {
   export type TalentSearchResult = import("@/lib/talent-profile").TalentSearchResult;
 }
 
-import type { CandidateComparisonRow, CoverageBackfillJob, EvidenceCoverageGroup, SourceExecutionJob, SourceQueryPlanItem, TalentCandidate, TalentSearchResult } from "@/lib/talent-profile.mjs";
+import type { BackfillMergeSummary, CandidateComparisonRow, CoverageBackfillJob, EvidenceCoverageGroup, SourceExecutionJob, SourceQueryPlanItem, TalentCandidate, TalentSearchResult } from "@/lib/talent-profile.mjs";
 import { buildCandidateComparisonRows, buildCoverageBackfillPlan, buildEvidenceCoverage, buildSourceExecution, buildSourceQueryPlan } from "@/lib/talent-profile.mjs";
 import {
   reportUniqueSources,
@@ -417,6 +418,80 @@ export function CoverageBackfillView({
           );
         })}
       </div>
+    </section>
+  );
+}
+
+export function BackfillMergeSummaryView({ summary }: { summary: BackfillMergeSummary }) {
+  const hasCandidates = summary.improved_candidates.length > 0;
+  const hasCoverage = summary.coverage_gains.length > 0;
+  if (!hasCandidates && !hasCoverage && summary.new_candidate_names.length === 0) return null;
+  return (
+    <section className="rounded-2xl border border-emerald-100 bg-emerald-50/50 p-5 shadow-[0_8px_30px_rgba(0,0,0,0.06)]">
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <h2 className="text-lg font-semibold text-gray-900">补搜证据增量</h2>
+          <p className="mt-1 text-sm text-emerald-900/70">{summary.summary}</p>
+        </div>
+        <span className="rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-emerald-700 ring-1 ring-emerald-200">
+          可合并
+        </span>
+      </div>
+      {hasCoverage && (
+        <div className="mt-4 grid gap-3 md:grid-cols-2">
+          {summary.coverage_gains.map((gain) => (
+            <article key={gain.key} className="rounded-xl bg-white p-4 ring-1 ring-emerald-100">
+              <div className="flex items-center justify-between gap-2">
+                <h3 className="text-sm font-semibold text-gray-900">{gain.label}</h3>
+                <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-semibold text-emerald-700 ring-1 ring-emerald-200">
+                  {gain.before_count} → {gain.after_count}
+                </span>
+              </div>
+              {gain.added_source_types.length > 0 && (
+                <p className="mt-2 text-xs leading-relaxed text-gray-600">
+                  新增来源：{gain.added_source_types.join(", ")}
+                </p>
+              )}
+            </article>
+          ))}
+        </div>
+      )}
+      {hasCandidates && (
+        <div className="mt-4 space-y-3">
+          {summary.improved_candidates.map((candidate) => (
+            <article key={candidate.candidate_name} className="rounded-xl bg-white p-4 ring-1 ring-emerald-100">
+              <div className="flex flex-wrap items-center gap-2">
+                <h3 className="text-sm font-semibold text-gray-900">{candidate.candidate_name}</h3>
+                <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-semibold text-emerald-700 ring-1 ring-emerald-200">
+                  +{candidate.new_evidence_count} 证据
+                </span>
+                {candidate.new_source_types.map((type) => (
+                  <span key={type} className="rounded-full bg-blue-50 px-2 py-0.5 text-xs font-medium text-blue-700 ring-1 ring-blue-100">
+                    {type}
+                  </span>
+                ))}
+              </div>
+              <p className="mt-2 text-xs leading-relaxed text-gray-600">{candidate.merge_note}</p>
+              {candidate.new_evidence_urls.length > 0 && (
+                <ul className="mt-2 space-y-1 text-xs leading-relaxed text-gray-500">
+                  {candidate.new_evidence_urls.slice(0, 4).map((url) => (
+                    <li key={url} className="truncate">
+                      <a className="hover:text-gray-900 hover:underline" href={url} target="_blank" rel="noreferrer">
+                        {host(url)}
+                      </a>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </article>
+          ))}
+        </div>
+      )}
+      {summary.new_candidate_names.length > 0 && (
+        <p className="mt-4 text-xs leading-relaxed text-gray-600">
+          补搜还发现新候选人：{summary.new_candidate_names.join(", ")}
+        </p>
+      )}
     </section>
   );
 }

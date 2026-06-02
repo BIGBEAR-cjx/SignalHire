@@ -368,6 +368,63 @@ test("builds focused search input for a coverage backfill job", () => {
   assert.match(input, /specific source URLs/);
 });
 
+test("summarizes backfill evidence that can merge into the original report", () => {
+  assert.equal(typeof talentProfile.buildBackfillMergeSummary, "function");
+
+  const originalResult = normalizeTalentSearchResult({
+    evidence_graph: {
+      source_mix: [{ source_type: "paper", count: 1 }],
+      candidates: [
+        { candidate_name: "Ada Lovelace", source_types: ["paper"], independent_sources: 1 },
+      ],
+    },
+    candidates: [
+      {
+        name: "Ada Lovelace",
+        claims: [
+          {
+            claim: "Published LLM systems research",
+            verdict: "verified",
+            evidence: [{ note: "paper", url: "https://arxiv.org/abs/1234.5678", source_type: "paper" }],
+          },
+        ],
+      },
+    ],
+  });
+  const backfillResult = normalizeTalentSearchResult({
+    evidence_graph: {
+      source_mix: [{ source_type: "code", count: 1 }],
+      candidates: [
+        { candidate_name: "Ada Lovelace", source_types: ["code"], independent_sources: 1 },
+      ],
+    },
+    candidates: [
+      {
+        name: "Ada Lovelace",
+        claims: [
+          {
+            claim: "Maintains a public vLLM integration",
+            verdict: "verified",
+            evidence: [{ note: "GitHub repo", url: "https://github.com/example/vllm", source_type: "code" }],
+          },
+        ],
+      },
+    ],
+  });
+
+  const summary = talentProfile.buildBackfillMergeSummary({ originalResult, backfillResult });
+
+  assert.equal(summary.improved_candidates.length, 1);
+  assert.equal(summary.improved_candidates[0].candidate_name, "Ada Lovelace");
+  assert.equal(summary.improved_candidates[0].new_evidence_count, 1);
+  assert.deepEqual(summary.improved_candidates[0].new_source_types, ["code"]);
+  assert.deepEqual(summary.improved_candidates[0].new_evidence_urls, ["https://github.com/example/vllm"]);
+  assert.equal(summary.coverage_gains.find((item) => item.key === "practice")?.before_count, 0);
+  assert.equal(summary.coverage_gains.find((item) => item.key === "practice")?.after_count, 1);
+  assert.match(summary.summary, /1 位候选人/);
+  assert.match(summary.summary, /1 条新增证据/);
+});
+
 test("builds candidate comparison rows from shortlist and evidence graph", () => {
   const result = normalizeTalentSearchResult({
     evidence_graph: {

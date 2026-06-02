@@ -23,6 +23,9 @@ export type TalentSearchResult = { search_brief: TalentSearchBrief; search_plan:
 export type EvidenceCoverageGroup = { key: string; label: string; count: number; source_types: string[]; missing_source_types: string[]; status: "covered" | "missing" };
 export type SourceQueryPlanItem = { source_type: string; coverage_group: string; target: string; query: string; reason: string; priority: number };
 export type CandidateComparisonRow = { name: string; role: string; primary_direction: string; secondary_directions: string; match_score: number; achievement_signals: number; skill_match: number; work_history: number; evidence_score: number; evidence_quality: string; independent_sources: number; source_types: string; coverage_gaps: string; top_signal: string; risk_summary: string };
+export type BackfillMergeCandidate = { candidate_name: string; new_evidence_count: number; new_source_types: string[]; new_evidence_urls: string[]; merge_note: string };
+export type BackfillCoverageGain = { key: string; label: string; before_count: number; after_count: number; added_source_types: string[] };
+export type BackfillMergeSummary = { summary: string; improved_candidates: BackfillMergeCandidate[]; new_candidate_names: string[]; coverage_gains: BackfillCoverageGain[] };
 export const AI_DIRECTIONS: string[];
 export const VERDICTS: Verdict[];
 export const EVIDENCE_QUALITY: EvidenceQuality[];
@@ -33,6 +36,7 @@ export function normalizeTalentSearchResult(data: unknown): TalentSearchResult;
 export function buildCandidateComparisonRows(result: unknown): CandidateComparisonRow[];
 export function buildCoverageBackfillPlan(result: unknown): CoverageBackfillPlan;
 export function buildBackfillSearchInput(input?: { job?: unknown; originalQuery?: string }): string;
+export function buildBackfillMergeSummary(input?: { originalResult?: unknown; backfillResult?: unknown }): BackfillMergeSummary;
 export function buildEvidenceCoverage(result: unknown): EvidenceCoverageGroup[];
 export function buildSourceQueryPlan(result: unknown): SourceQueryPlanItem[];
 export function buildSourceExecution(result: unknown): SourceExecution;
