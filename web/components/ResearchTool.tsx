@@ -13,6 +13,7 @@ import {
   EvidenceGraphView,
   SearchPlanView,
   ShortlistCard,
+  SourceExecutionView,
   TalentMapView,
   TrustReportView,
   type Candidate,
@@ -435,6 +436,7 @@ export default function ResearchTool({
           {isTalentSearchResult(result) ? (
             <>
               <SearchPlanView result={result} />
+              <SourceExecutionView result={result} />
               <EvidenceCoverageView result={result} />
               <TalentMapView result={result} />
               <CandidateComparisonView result={result} />

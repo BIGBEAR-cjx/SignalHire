@@ -4,13 +4,14 @@
 declare module "@/lib/talent-profile.mjs" {
   export type CandidateComparisonRow = import("@/lib/talent-profile").CandidateComparisonRow;
   export type EvidenceCoverageGroup = import("@/lib/talent-profile").EvidenceCoverageGroup;
+  export type SourceExecutionJob = import("@/lib/talent-profile").SourceExecutionJob;
   export type SourceQueryPlanItem = import("@/lib/talent-profile").SourceQueryPlanItem;
   export type TalentCandidate = import("@/lib/talent-profile").TalentCandidate;
   export type TalentSearchResult = import("@/lib/talent-profile").TalentSearchResult;
 }
 
-import type { CandidateComparisonRow, EvidenceCoverageGroup, SourceQueryPlanItem, TalentCandidate, TalentSearchResult } from "@/lib/talent-profile.mjs";
-import { buildCandidateComparisonRows, buildEvidenceCoverage, buildSourceQueryPlan } from "@/lib/talent-profile.mjs";
+import type { CandidateComparisonRow, EvidenceCoverageGroup, SourceExecutionJob, SourceQueryPlanItem, TalentCandidate, TalentSearchResult } from "@/lib/talent-profile.mjs";
+import { buildCandidateComparisonRows, buildEvidenceCoverage, buildSourceExecution, buildSourceQueryPlan } from "@/lib/talent-profile.mjs";
 import {
   reportUniqueSources,
   sourceCountChip,
@@ -255,6 +256,89 @@ function coverageGroupLabel(value: string) {
     work_history: "工作经历",
     public_voice: "公开表达",
   }[value] ?? value;
+}
+
+function sourceExecutionStatusMeta(status: SourceExecutionJob["status"]) {
+  return {
+    planned: { label: "待执行", chip: "bg-gray-50 text-gray-600 ring-gray-200" },
+    completed: { label: "已完成", chip: "bg-emerald-50 text-emerald-700 ring-emerald-200" },
+    partial: { label: "部分完成", chip: "bg-amber-50 text-amber-700 ring-amber-200" },
+    failed: { label: "失败", chip: "bg-red-50 text-red-700 ring-red-200" },
+  }[status] ?? { label: status, chip: "bg-gray-50 text-gray-600 ring-gray-200" };
+}
+
+export function SourceExecutionView({ result }: { result: TalentSearchResult }) {
+  const execution = buildSourceExecution(result);
+  const visibleJobs: SourceExecutionJob[] = execution.jobs.filter((job: SourceExecutionJob) => job.status !== "planned" || job.query || job.next_action);
+  if (visibleJobs.length === 0) return null;
+  const hasReturnedExecution = result.source_execution.jobs.length > 0;
+  const executedCount = visibleJobs.filter((job) => job.status !== "planned").length;
+  const evidenceCount = visibleJobs.reduce((total, job) => total + job.evidence_found, 0);
+  return (
+    <section className="rounded-2xl border border-gray-100 bg-white p-5 shadow-[0_8px_30px_rgba(0,0,0,0.06)]">
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <h2 className="text-lg font-semibold text-gray-900">来源执行记录</h2>
+          <p className="mt-1 text-sm text-gray-500">
+            {hasReturnedExecution ? "记录每类来源任务的实际查询、具体 URL、证据数量和后续缺口。" : "本次结果未返回执行记录，先展示可执行的来源任务计划。"}
+          </p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <span className="rounded-full bg-gray-100 px-2.5 py-1 text-xs font-semibold text-gray-600">
+            {executedCount} / {visibleJobs.length} 已执行
+          </span>
+          <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700 ring-1 ring-emerald-100">
+            {evidenceCount} 条证据
+          </span>
+        </div>
+      </div>
+      {execution.summary && <p className="mt-3 text-sm leading-relaxed text-gray-600">{execution.summary}</p>}
+      <div className="mt-4 grid gap-3 md:grid-cols-2">
+        {visibleJobs.map((job) => {
+          const status = sourceExecutionStatusMeta(job.status);
+          return (
+            <article key={job.job_id} className="rounded-xl border border-gray-100 bg-gray-50/70 p-4">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ring-1 ${status.chip}`}>
+                  {status.label}
+                </span>
+                <span className="rounded-full bg-white px-2 py-0.5 text-xs font-medium text-blue-700 ring-1 ring-blue-100">
+                  {job.source_type}
+                </span>
+                <span className="text-xs text-gray-400">{coverageGroupLabel(job.coverage_group)}</span>
+              </div>
+              <p className="mt-3 break-words font-mono text-xs leading-relaxed text-gray-700">{job.query}</p>
+              <div className="mt-3 flex flex-wrap gap-2 text-xs font-semibold text-gray-600">
+                <span className="rounded-full bg-white px-2 py-0.5 ring-1 ring-gray-200">{job.urls_found} URL</span>
+                <span className="rounded-full bg-white px-2 py-0.5 ring-1 ring-gray-200">{job.evidence_found} 证据</span>
+              </div>
+              {job.candidate_leads.length > 0 && (
+                <p className="mt-2 text-xs leading-relaxed text-gray-500">
+                  线索：{job.candidate_leads.slice(0, 4).join(", ")}
+                </p>
+              )}
+              {job.source_urls.length > 0 && (
+                <ul className="mt-3 space-y-1 text-xs leading-relaxed text-gray-500">
+                  {job.source_urls.slice(0, 3).map((url) => (
+                    <li key={url} className="truncate">
+                      <a className="hover:text-gray-900 hover:underline" href={url} target="_blank" rel="noreferrer">
+                        {host(url)}
+                      </a>
+                    </li>
+                  ))}
+                </ul>
+              )}
+              {(job.error || job.next_action) && (
+                <p className={`mt-3 text-xs leading-relaxed ${job.error ? "text-red-600" : "text-gray-500"}`}>
+                  {job.error || job.next_action}
+                </p>
+              )}
+            </article>
+          );
+        })}
+      </div>
+    </section>
+  );
 }
 
 export function TalentMapView({ result }: { result: TalentSearchResult }) {

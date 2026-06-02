@@ -10,6 +10,7 @@ export const AI_DIRECTIONS = [
 
 export const VERDICTS = ["verified", "contradicted", "unverified"];
 export const EVIDENCE_QUALITY = ["high", "medium", "low"];
+export const SOURCE_EXECUTION_STATUSES = ["planned", "completed", "partial", "failed"];
 
 export function isSearchUrl(url) {
   return (
@@ -45,6 +46,10 @@ function normalizeEvidence(evidence) {
       source_type: cleanString(item.source_type) || "other",
     }))
     .filter((item) => item.url && !isSearchUrl(item.url));
+}
+
+function normalizeSourceUrls(value, limit = 12) {
+  return cleanStringArray(value, limit).filter((url) => !isSearchUrl(url));
 }
 
 function normalizeClaim(claim) {
@@ -163,6 +168,36 @@ function normalizeSearchPlan(plan = {}) {
   };
 }
 
+function normalizeSourceExecutionJob(job = {}, index = 0) {
+  job = isPlainObject(job) ? job : {};
+  const sourceType = cleanString(job.source_type) || "other";
+  const status = cleanString(job.status).toLowerCase();
+  return {
+    job_id: cleanString(job.job_id) || `source-${index + 1}-${sourceType}`,
+    source_type: sourceType,
+    coverage_group: cleanString(job.coverage_group),
+    query: cleanString(job.query),
+    status: SOURCE_EXECUTION_STATUSES.includes(status) ? status : "planned",
+    urls_found: normalizeCount(job.urls_found),
+    evidence_found: normalizeCount(job.evidence_found),
+    candidate_leads: cleanStringArray(job.candidate_leads, 12),
+    source_urls: normalizeSourceUrls(job.source_urls),
+    error: cleanString(job.error),
+    next_action: cleanString(job.next_action),
+  };
+}
+
+function normalizeSourceExecution(execution = {}) {
+  execution = isPlainObject(execution) ? execution : {};
+  return {
+    summary: cleanString(execution.summary),
+    jobs: (Array.isArray(execution.jobs) ? execution.jobs : [])
+      .map(normalizeSourceExecutionJob)
+      .filter((job) => job.query || job.source_urls.length || job.error || job.next_action)
+      .slice(0, 16),
+  };
+}
+
 function normalizeEvidenceGraph(graph = {}) {
   graph = isPlainObject(graph) ? graph : {};
   return {
@@ -206,6 +241,7 @@ export function normalizeTalentSearchResult(data) {
   return {
     search_brief: normalizeBrief(source.search_brief),
     search_plan: normalizeSearchPlan(source.search_plan),
+    source_execution: normalizeSourceExecution(source.source_execution),
     evidence_graph: normalizeEvidenceGraph(source.evidence_graph),
     talent_map: normalizeTalentMap(source.talent_map),
     candidates: (Array.isArray(source.candidates) ? source.candidates : []).map(normalizeCandidate),

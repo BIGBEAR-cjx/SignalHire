@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import {
   AI_DIRECTIONS,
   buildEvidenceCoverage,
+  buildSourceExecution,
   buildSourceQueryPlan,
   buildCandidateComparisonRows,
   normalizeTalentSearchResult,
@@ -197,6 +198,74 @@ test("builds executable source query plan from brief and source strategy", () =>
   assert.match(plan[1].query, /Find LLM inference engineers/);
   assert.match(plan[1].query, /vLLM/);
   assert.match(plan[1].query, /site:arxiv.org/);
+});
+
+test("normalizes source execution and falls back to planned jobs", () => {
+  const result = normalizeTalentSearchResult({
+    search_brief: {
+      original_query: "Find LLM inference engineers",
+      required_skills: ["vLLM"],
+    },
+    search_plan: {
+      source_strategy: [
+        { source_type: "code", target: "GitHub", reason: "verify code", coverage_group: "practice", query: "vLLM site:github.com" },
+      ],
+    },
+    source_execution: {
+      summary: "Code source search completed; paper search still thin.",
+      jobs: [
+        {
+          job_id: "code-1",
+          source_type: "code",
+          coverage_group: "practice",
+          query: "vLLM site:github.com",
+          status: "completed",
+          urls_found: 2.4,
+          evidence_found: 3,
+          candidate_leads: ["Ada Lovelace", ""],
+          source_urls: [
+            "https://github.com/example/vllm-project",
+            "https://www.google.com/search?q=vllm",
+          ],
+          error: "",
+          next_action: "Use GitHub evidence in candidate claims.",
+        },
+        {
+          source_type: "paper",
+          query: "vLLM site:arxiv.org",
+          status: "unknown",
+          urls_found: -1,
+          evidence_found: 0,
+          source_urls: [],
+          error: "No concrete paper source found.",
+        },
+      ],
+    },
+  });
+
+  assert.equal(result.source_execution.summary, "Code source search completed; paper search still thin.");
+  assert.equal(result.source_execution.jobs.length, 2);
+  assert.equal(result.source_execution.jobs[0].status, "completed");
+  assert.equal(result.source_execution.jobs[0].urls_found, 2);
+  assert.equal(result.source_execution.jobs[0].evidence_found, 3);
+  assert.deepEqual(result.source_execution.jobs[0].candidate_leads, ["Ada Lovelace"]);
+  assert.deepEqual(result.source_execution.jobs[0].source_urls, ["https://github.com/example/vllm-project"]);
+  assert.equal(result.source_execution.jobs[1].status, "planned");
+  assert.equal(result.source_execution.jobs[1].coverage_group, "research");
+
+  const fallback = buildSourceExecution(normalizeTalentSearchResult({
+    search_brief: { original_query: "Find AI infra talent", required_skills: ["Triton"] },
+    search_plan: {
+      source_strategy: [
+        { source_type: "paper", target: "arXiv", reason: "verify research" },
+      ],
+    },
+  }));
+
+  assert.equal(fallback.summary, "");
+  assert.equal(fallback.jobs.length, 1);
+  assert.equal(fallback.jobs[0].status, "planned");
+  assert.match(fallback.jobs[0].query, /site:arxiv.org/);
 });
 
 test("builds candidate comparison rows from shortlist and evidence graph", () => {
@@ -432,8 +501,11 @@ test("search prompt requests search plan and evidence graph", async () => {
   const prompt = searchPrompt("Find AI infra engineers");
 
   assert.match(prompt, /"search_plan"/);
+  assert.match(prompt, /"source_execution"/);
   assert.match(prompt, /"evidence_graph"/);
   assert.match(prompt, /coverage_checklist/);
+  assert.match(prompt, /urls_found/);
+  assert.match(prompt, /evidence_found/);
   assert.match(prompt, /coverage_group/);
   assert.match(prompt, /"query"/);
   assert.match(prompt, /research \| practice \| work_history \| public_voice/);
@@ -451,6 +523,18 @@ test("worker prompt and normalizer support search plan and evidence graph", asyn
       must_have: ["LLM serving"],
       source_strategy: [{ source_type: "", target: "GitHub", reason: "verify code", coverage_group: "practice", query: "site:github.com vLLM" }],
     },
+    source_execution: {
+      summary: "GitHub source completed.",
+      jobs: [{
+        source_type: "code",
+        coverage_group: "practice",
+        query: "site:github.com vLLM",
+        status: "completed",
+        urls_found: 1,
+        evidence_found: 1,
+        source_urls: ["https://github.com/example/vllm"],
+      }],
+    },
     evidence_graph: {
       candidates: [{
         candidate_name: "Ada Lovelace",
@@ -463,8 +547,11 @@ test("worker prompt and normalizer support search plan and evidence graph", asyn
   });
 
   assert.match(prompt, /"search_plan"/);
+  assert.match(prompt, /"source_execution"/);
   assert.match(prompt, /"evidence_graph"/);
   assert.match(prompt, /coverage_checklist/);
+  assert.match(prompt, /urls_found/);
+  assert.match(prompt, /evidence_found/);
   assert.match(prompt, /coverage_group/);
   assert.match(prompt, /"query"/);
   assert.match(prompt, /research \| practice \| work_history \| public_voice/);
@@ -476,5 +563,7 @@ test("worker prompt and normalizer support search plan and evidence graph", asyn
   assert.equal(result.search_plan.source_strategy[0].source_type, "other");
   assert.equal(result.search_plan.source_strategy[0].coverage_group, "practice");
   assert.equal(result.search_plan.source_strategy[0].query, "site:github.com vLLM");
+  assert.equal(result.source_execution.jobs[0].status, "completed");
+  assert.equal(result.source_execution.jobs[0].source_urls[0], "https://github.com/example/vllm");
   assert.equal(result.evidence_graph.candidates[0].candidate_name, "Ada Lovelace");
 });

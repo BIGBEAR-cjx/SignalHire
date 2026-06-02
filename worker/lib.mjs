@@ -119,6 +119,7 @@ EVIDENCE RULES:
 
 OUTPUT RULES:
 Respond with only one JSON object and no prose.
+For each search_plan.source_strategy item, include a matching source_execution.jobs item that reports whether that source family was completed, partial, failed, or still planned.
 Use exactly this shape:
 {
   "search_brief": {
@@ -148,6 +149,24 @@ Use exactly this shape:
       {
         "pool": "adjacent candidate pool worth exploring",
         "reason": "why this pool may transfer into the role"
+      }
+    ]
+  },
+  "source_execution": {
+    "summary": "short audit of which source jobs were executed, which were thin, and where follow-up is needed",
+    "jobs": [
+      {
+        "job_id": "stable id such as source-1-code",
+        "source_type": "paper | code | profile | company | talk | blog | project | community | patent | dataset | benchmark | other",
+        "coverage_group": "research | practice | work_history | public_voice",
+        "query": "exact query or source plan actually run for this source family",
+        "status": "completed | partial | failed | planned",
+        "urls_found": 0,
+        "evidence_found": 0,
+        "candidate_leads": ["candidate names first found or supported by this source job"],
+        "source_urls": ["specific source URLs reviewed or used; never search-results URLs"],
+        "error": "empty string unless the source job failed or produced no concrete source",
+        "next_action": "follow-up search or coverage gap to run next"
       }
     ]
   },
