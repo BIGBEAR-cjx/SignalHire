@@ -187,6 +187,31 @@ function normalizeEvidenceGraph(graph = {}) {
   };
 }
 
+function hostFromUrl(url) {
+  try {
+    return new URL(url).hostname.replace(/^www\./, "");
+  } catch {
+    return "";
+  }
+}
+
+function evidenceSummaryFromClaims(claims) {
+  const hosts = new Set();
+  const sourceTypes = new Set();
+  for (const claim of Array.isArray(claims) ? claims : []) {
+    for (const evidence of Array.isArray(claim?.evidence) ? claim.evidence : []) {
+      const host = hostFromUrl(evidence?.url);
+      if (host && !isSearchUrl(evidence.url)) hosts.add(host);
+      const sourceType = cleanString(evidence?.source_type);
+      if (sourceType) sourceTypes.add(sourceType);
+    }
+  }
+  return {
+    independent_sources: hosts.size,
+    source_types: Array.from(sourceTypes).slice(0, 12).join(", "),
+  };
+}
+
 function normalizeTalentMap(map = []) {
   return (Array.isArray(map) ? map : []).map((item) => {
     item = isPlainObject(item) ? item : {};
@@ -218,6 +243,7 @@ export function buildCandidateComparisonRows(result) {
     const graphNode = graphCandidates.find((item) => item?.candidate_name === candidate.name) || {};
     const roleParts = [candidate.current_role, candidate.current_company].map(cleanString).filter(Boolean);
     const directions = cleanStringArray(candidate.ai_directions);
+    const evidenceSummary = evidenceSummaryFromClaims(candidate.claims);
     return {
       name: cleanString(candidate.name) || "Unknown candidate",
       role: roleParts.join(" / "),
@@ -229,8 +255,8 @@ export function buildCandidateComparisonRows(result) {
       work_history: clampScore(candidate.score_breakdown?.work_history),
       evidence_score: clampScore(candidate.score_breakdown?.evidence_quality),
       evidence_quality: cleanString(candidate.evidence_audit?.overall_evidence_quality) || "medium",
-      independent_sources: normalizeCount(graphNode.independent_sources),
-      source_types: cleanStringArray(graphNode.source_types, 12).join(", "),
+      independent_sources: normalizeCount(graphNode.independent_sources) || evidenceSummary.independent_sources,
+      source_types: cleanStringArray(graphNode.source_types, 12).join(", ") || evidenceSummary.source_types,
       top_signal: cleanStringArray(candidate.strongest_signals, 1)[0] || "",
       risk_summary: cleanStringArray(graphNode.risk_flags, 1)[0] || cleanStringArray(candidate.uncertainties, 1)[0] || "",
     };
