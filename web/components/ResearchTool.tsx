@@ -9,6 +9,7 @@ import {
   CandidateCard,
   CandidateComparisonView,
   CandidateProfileView,
+  EvidenceCoverageView,
   EvidenceGraphView,
   SearchPlanView,
   ShortlistCard,
@@ -255,7 +256,7 @@ export default function ResearchTool({
   // 拿到结果 (search) 且有 runId → 加载该用户已收藏的 candidate_index 集合, 回填高亮
   useEffect(() => {
     if (mode !== "search") return;
-    if (!runId) { setShortlist([]); return; }
+    if (!runId) return;
     let cancelled = false;
     fetch(`/api/shortlist?run=${encodeURIComponent(runId)}`)
       .then((r) => r.ok ? r.json() : { indices: [] })
@@ -434,6 +435,7 @@ export default function ResearchTool({
           {isTalentSearchResult(result) ? (
             <>
               <SearchPlanView result={result} />
+              <EvidenceCoverageView result={result} />
               <TalentMapView result={result} />
               <CandidateComparisonView result={result} />
               <section className="space-y-3">

@@ -3,12 +3,13 @@
 
 declare module "@/lib/talent-profile.mjs" {
   export type CandidateComparisonRow = import("@/lib/talent-profile").CandidateComparisonRow;
+  export type EvidenceCoverageGroup = import("@/lib/talent-profile").EvidenceCoverageGroup;
   export type TalentCandidate = import("@/lib/talent-profile").TalentCandidate;
   export type TalentSearchResult = import("@/lib/talent-profile").TalentSearchResult;
 }
 
-import type { CandidateComparisonRow, TalentCandidate, TalentSearchResult } from "@/lib/talent-profile.mjs";
-import { buildCandidateComparisonRows } from "@/lib/talent-profile.mjs";
+import type { CandidateComparisonRow, EvidenceCoverageGroup, TalentCandidate, TalentSearchResult } from "@/lib/talent-profile.mjs";
+import { buildCandidateComparisonRows, buildEvidenceCoverage } from "@/lib/talent-profile.mjs";
 import {
   reportUniqueSources,
   sourceCountChip,
@@ -237,6 +238,42 @@ export function TalentMapView({ result }: { result: TalentSearchResult }) {
   );
 }
 
+export function EvidenceCoverageView({ result }: { result: TalentSearchResult }) {
+  const coverage = buildEvidenceCoverage(result) as EvidenceCoverageGroup[];
+  if (coverage.every((item) => item.count === 0)) return null;
+  const covered = coverage.filter((item) => item.status === "covered").length;
+  return (
+    <section className="rounded-2xl border border-gray-100 bg-white p-5 shadow-[0_8px_30px_rgba(0,0,0,0.06)]">
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <h2 className="text-lg font-semibold text-gray-900">信息源覆盖</h2>
+          <p className="mt-1 text-sm text-gray-500">按研究、实践、工作经历和公开表达检查交叉验证基础。</p>
+        </div>
+        <span className="rounded-full bg-gray-100 px-2.5 py-1 text-xs font-semibold text-gray-600">
+          {covered} / {coverage.length}
+        </span>
+      </div>
+      <div className="mt-4 grid gap-3 md:grid-cols-4">
+        {coverage.map((item) => (
+          <article key={item.key} className={`rounded-xl border p-4 ${item.status === "covered" ? "border-emerald-100 bg-emerald-50/50" : "border-amber-100 bg-amber-50/50"}`}>
+            <div className="flex items-center justify-between gap-2">
+              <h3 className="text-sm font-semibold text-gray-900">{item.label}</h3>
+              <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ring-1 ${item.status === "covered" ? "bg-white text-emerald-700 ring-emerald-200" : "bg-white text-amber-700 ring-amber-200"}`}>
+                {item.count}
+              </span>
+            </div>
+            {item.source_types.length > 0 ? (
+              <p className="mt-2 text-xs leading-relaxed text-gray-600">{item.source_types.join(", ")}</p>
+            ) : (
+              <p className="mt-2 text-xs leading-relaxed text-amber-700">缺 {item.missing_source_types.slice(0, 2).join(", ")}</p>
+            )}
+          </article>
+        ))}
+      </div>
+    </section>
+  );
+}
+
 export function CandidateComparisonView({ result }: { result: unknown }) {
   const rows: CandidateComparisonRow[] = buildCandidateComparisonRows(result);
   if (rows.length === 0) return null;
@@ -300,6 +337,7 @@ export function CandidateComparisonView({ result }: { result: unknown }) {
                 <td className="border-b border-gray-100 px-3 py-3">
                   {row.top_signal && <p className="text-xs leading-relaxed text-emerald-700">{row.top_signal}</p>}
                   {row.risk_summary && <p className="mt-1 text-xs leading-relaxed text-amber-700">{row.risk_summary}</p>}
+                  {row.coverage_gaps && <p className="mt-1 text-xs leading-relaxed text-gray-500">缺口: {row.coverage_gaps}</p>}
                 </td>
               </tr>
             ))}
