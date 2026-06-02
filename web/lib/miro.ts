@@ -234,6 +234,7 @@ EVIDENCE RULES:
 OUTPUT RULES:
 Respond with only one JSON object and no prose.
 For each search_plan.source_strategy item, include a matching source_execution.jobs item that reports whether that source family was completed, partial, failed, or still planned.
+Use coverage_backfill.jobs to turn missing or weak coverage into concrete next-round source tasks.
 Use exactly this shape:
 {
   "search_brief": {
@@ -281,6 +282,22 @@ Use exactly this shape:
         "source_urls": ["specific source URLs reviewed or used; never search-results URLs"],
         "error": "empty string unless the source job failed or produced no concrete source",
         "next_action": "follow-up search or coverage gap to run next"
+      }
+    ]
+  },
+  "coverage_backfill": {
+    "summary": "short summary of the most important source coverage gaps to backfill next",
+    "jobs": [
+      {
+        "gap_id": "stable id such as practice-code",
+        "coverage_group": "research | practice | work_history | public_voice",
+        "missing_source_type": "paper | code | profile | company | talk | blog | project | community | patent | dataset | benchmark | other",
+        "query": "concrete query string for the next backfill search",
+        "reason": "why this gap matters for verification or ranking",
+        "priority": 1,
+        "status": "planned | completed | skipped",
+        "candidate_names": ["candidate names affected by this gap"],
+        "source_types_to_check": ["source families to try for this gap"]
       }
     ]
   },

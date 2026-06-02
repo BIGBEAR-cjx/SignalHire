@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
   AI_DIRECTIONS,
+  buildCoverageBackfillPlan,
   buildEvidenceCoverage,
   buildSourceExecution,
   buildSourceQueryPlan,
@@ -268,6 +269,76 @@ test("normalizes source execution and falls back to planned jobs", () => {
   assert.match(fallback.jobs[0].query, /site:arxiv.org/);
 });
 
+test("builds coverage backfill plan from returned jobs or missing coverage", () => {
+  const returned = normalizeTalentSearchResult({
+    coverage_backfill: {
+      summary: "Practice evidence is missing for two candidates.",
+      jobs: [
+        {
+          gap_id: "practice-code",
+          coverage_group: "practice",
+          missing_source_type: "code",
+          query: "vLLM site:github.com",
+          reason: "No public code evidence yet.",
+          priority: 2.4,
+          status: "ready",
+          candidate_names: ["Ada Lovelace", ""],
+          source_types_to_check: ["code", "huggingface", ""],
+        },
+        {
+          gap_id: "",
+          coverage_group: "unknown",
+          missing_source_type: "",
+          query: "",
+          reason: "",
+        },
+      ],
+    },
+  });
+
+  assert.equal(returned.coverage_backfill.summary, "Practice evidence is missing for two candidates.");
+  assert.equal(returned.coverage_backfill.jobs.length, 1);
+  assert.equal(returned.coverage_backfill.jobs[0].coverage_group, "practice");
+  assert.equal(returned.coverage_backfill.jobs[0].missing_source_type, "code");
+  assert.equal(returned.coverage_backfill.jobs[0].priority, 2);
+  assert.equal(returned.coverage_backfill.jobs[0].status, "planned");
+  assert.deepEqual(returned.coverage_backfill.jobs[0].candidate_names, ["Ada Lovelace"]);
+  assert.deepEqual(returned.coverage_backfill.jobs[0].source_types_to_check, ["code", "huggingface"]);
+
+  const derived = buildCoverageBackfillPlan(normalizeTalentSearchResult({
+    search_brief: {
+      original_query: "Find LLM inference engineers",
+      required_skills: ["vLLM"],
+    },
+    evidence_graph: {
+      source_mix: [{ source_type: "paper", count: 2 }],
+      candidates: [
+        { candidate_name: "Ada Lovelace", source_types: ["paper"], risk_flags: ["No public implementation evidence"] },
+      ],
+    },
+    source_execution: {
+      jobs: [
+        {
+          source_type: "code",
+          coverage_group: "practice",
+          query: "vLLM site:github.com",
+          status: "failed",
+          error: "No concrete GitHub source found.",
+        },
+      ],
+    },
+    candidates: [{ name: "Ada Lovelace" }],
+  }));
+
+  assert.equal(derived.jobs.some((job) => job.coverage_group === "practice"), true);
+  const practiceJob = derived.jobs.find((job) => job.coverage_group === "practice");
+  assert.equal(practiceJob?.status, "planned");
+  assert.match(practiceJob?.query ?? "", /site:github.com/);
+  assert.deepEqual(practiceJob?.candidate_names, ["Ada Lovelace"]);
+  assert.match(practiceJob?.reason ?? "", /缺少实践/);
+  assert.match(derived.summary, /待补/);
+});
+
 test("builds candidate comparison rows from shortlist and evidence graph", () => {
   const result = normalizeTalentSearchResult({
     evidence_graph: {
@@ -502,8 +573,11 @@ test("search prompt requests search plan and evidence graph", async () => {
 
   assert.match(prompt, /"search_plan"/);
   assert.match(prompt, /"source_execution"/);
+  assert.match(prompt, /"coverage_backfill"/);
   assert.match(prompt, /"evidence_graph"/);
   assert.match(prompt, /coverage_checklist/);
+  assert.match(prompt, /missing_source_type/);
+  assert.match(prompt, /source_types_to_check/);
   assert.match(prompt, /urls_found/);
   assert.match(prompt, /evidence_found/);
   assert.match(prompt, /coverage_group/);
@@ -535,6 +609,17 @@ test("worker prompt and normalizer support search plan and evidence graph", asyn
         source_urls: ["https://github.com/example/vllm"],
       }],
     },
+    coverage_backfill: {
+      summary: "Practice coverage complete.",
+      jobs: [{
+        coverage_group: "practice",
+        missing_source_type: "code",
+        query: "site:github.com vLLM",
+        reason: "Double-check implementation evidence.",
+        candidate_names: ["Ada Lovelace"],
+        source_types_to_check: ["code"],
+      }],
+    },
     evidence_graph: {
       candidates: [{
         candidate_name: "Ada Lovelace",
@@ -548,8 +633,11 @@ test("worker prompt and normalizer support search plan and evidence graph", asyn
 
   assert.match(prompt, /"search_plan"/);
   assert.match(prompt, /"source_execution"/);
+  assert.match(prompt, /"coverage_backfill"/);
   assert.match(prompt, /"evidence_graph"/);
   assert.match(prompt, /coverage_checklist/);
+  assert.match(prompt, /missing_source_type/);
+  assert.match(prompt, /source_types_to_check/);
   assert.match(prompt, /urls_found/);
   assert.match(prompt, /evidence_found/);
   assert.match(prompt, /coverage_group/);
@@ -565,5 +653,7 @@ test("worker prompt and normalizer support search plan and evidence graph", asyn
   assert.equal(result.search_plan.source_strategy[0].query, "site:github.com vLLM");
   assert.equal(result.source_execution.jobs[0].status, "completed");
   assert.equal(result.source_execution.jobs[0].source_urls[0], "https://github.com/example/vllm");
+  assert.equal(result.coverage_backfill.jobs[0].coverage_group, "practice");
+  assert.equal(result.coverage_backfill.jobs[0].missing_source_type, "code");
   assert.equal(result.evidence_graph.candidates[0].candidate_name, "Ada Lovelace");
 });

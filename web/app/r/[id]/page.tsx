@@ -7,6 +7,7 @@ import {
   CandidateCard,
   CandidateComparisonView,
   CandidateProfileView,
+  CoverageBackfillView,
   EvidenceCoverageView,
   EvidenceGraphView,
   SearchPlanView,
@@ -158,6 +159,7 @@ export default async function ReportPage({ params }: { params: Promise<{ id: str
                   <>
                     <SearchPlanView result={talentResult} />
                     <SourceExecutionView result={talentResult} />
+                    <CoverageBackfillView result={talentResult} />
                     <EvidenceCoverageView result={talentResult} />
                     <TalentMapView result={talentResult} />
                     <CandidateComparisonView result={talentResult} />
