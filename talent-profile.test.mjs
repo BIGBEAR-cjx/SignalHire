@@ -181,6 +181,34 @@ test("builds candidate comparison rows from shortlist and evidence graph", () =>
   assert.equal(rows[0].risk_summary, "Location is single-source");
 });
 
+test("builds candidate comparison rows from candidate evidence when evidence graph is absent", () => {
+  const result = normalizeTalentSearchResult({
+    candidates: [
+      {
+        name: "Grace Hopper",
+        match_score: 84,
+        claims: [
+          {
+            claim: "Built an evaluation system",
+            verdict: "verified",
+            evidence: [
+              { note: "code", url: "https://github.com/example/eval", source_type: "code" },
+              { note: "blog", url: "https://example.com/eval", source_type: "blog" },
+            ],
+          },
+        ],
+        uncertainties: ["Only one recent project found"],
+      },
+    ],
+  });
+
+  const rows = buildCandidateComparisonRows(result);
+
+  assert.equal(rows[0].independent_sources, 2);
+  assert.equal(rows[0].source_types, "code, blog");
+  assert.equal(rows[0].risk_summary, "Only one recent project found");
+});
+
 test("filters search-result URLs from evidence", () => {
   const result = normalizeTalentSearchResult({
     candidates: [

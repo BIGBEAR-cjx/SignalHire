@@ -237,7 +237,7 @@ export function TalentMapView({ result }: { result: TalentSearchResult }) {
   );
 }
 
-export function CandidateComparisonView({ result }: { result: TalentSearchResult }) {
+export function CandidateComparisonView({ result }: { result: unknown }) {
   const rows: CandidateComparisonRow[] = buildCandidateComparisonRows(result);
   if (rows.length === 0) return null;
   return (

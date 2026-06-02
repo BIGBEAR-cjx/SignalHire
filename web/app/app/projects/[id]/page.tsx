@@ -5,7 +5,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { CandidateProfileView } from "@/components/result";
+import { CandidateComparisonView, CandidateProfileView } from "@/components/result";
 import OutreachModal from "@/components/OutreachModal";
 import type { TalentCandidate } from "@/lib/talent-profile.mjs";
 
@@ -95,16 +95,29 @@ export default function ProjectDetailPage() {
     } catch (e) { setError((e as Error).message); }
   }, [id]);
 
-  const reloadItems = useCallback(async () => {
-    try {
-      const r = await fetch(`/api/shortlist?project=${encodeURIComponent(id)}`);
-      const j = await r.json();
-      if (!r.ok) throw new Error(j.error || "候选人加载失败");
-      setItems((j.items ?? []) as ShortlistItem[]);
-    } catch (e) { setError((e as Error).message); }
+  useEffect(() => {
+    if (!id) return;
+    let cancelled = false;
+    async function load() {
+      try {
+        const [detailRes, itemsRes] = await Promise.all([
+          fetch(`/api/projects/${id}`),
+          fetch(`/api/shortlist?project=${encodeURIComponent(id)}`),
+        ]);
+        const [detailJson, itemsJson] = await Promise.all([detailRes.json(), itemsRes.json()]);
+        if (cancelled) return;
+        if (!detailRes.ok) throw new Error(detailJson.error || "加载失败");
+        if (!itemsRes.ok) throw new Error(itemsJson.error || "候选人加载失败");
+        setDetail(detailJson as ProjectDetail);
+        setItems((itemsJson.items ?? []) as ShortlistItem[]);
+        setError("");
+      } catch (e) {
+        if (!cancelled) setError((e as Error).message);
+      }
+    }
+    void load();
+    return () => { cancelled = true; };
   }, [id]);
-
-  useEffect(() => { if (id) { reloadDetail(); reloadItems(); } }, [id, reloadDetail, reloadItems]);
 
   const filteredItems = useMemo(() => {
     if (!items) return [];
@@ -113,6 +126,9 @@ export default function ProjectDetailPage() {
   }, [items, statusFilter]);
 
   const selectedItem = useMemo(() => filteredItems.find((it) => it.id === selectedItemId) ?? null, [filteredItems, selectedItemId]);
+  const projectComparisonResult = useMemo(() => ({
+    candidates: (items ?? []).map((it) => it.candidate),
+  }), [items]);
 
   async function deleteProject() {
     if (!confirm("删除这个项目?\n关联候选人和历史会回到「候选池(全部)」, 不会丢失。")) return;
@@ -138,7 +154,7 @@ export default function ProjectDetailPage() {
       <Link href="/app/projects" className="inline-flex items-center gap-1 text-sm text-gray-500 hover:text-gray-900">← 回项目列表</Link>
 
       {/* 头部: name + brief 编辑 + 状态 + 删除 */}
-      <ProjectHeader detail={detail} onChanged={reloadDetail} onDelete={deleteProject} />
+      <ProjectHeader key={`${p.id}:${p.name}:${p.brief ?? ""}`} detail={detail} onChanged={reloadDetail} onDelete={deleteProject} />
 
       {/* KPI strip */}
       <section className="grid grid-cols-2 gap-3 sm:grid-cols-5">
@@ -154,6 +170,8 @@ export default function ProjectDetailPage() {
           />
         ))}
       </section>
+
+      <StatusFunnel breakdown={detail.breakdown} total={p.candidates_total} current={statusFilter} onClick={setStatusFilter} />
 
       {/* 动作 */}
       <div className="flex flex-wrap gap-2">
@@ -194,40 +212,43 @@ export default function ProjectDetailPage() {
           </div>
         )}
         {items && items.length > 0 && (
-          <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(360px,0.85fr)]">
-            <ul className="space-y-2">
-              {filteredItems.map((it) => (
-                <CandidateItem key={it.id} item={it} selected={selectedItemId === it.id} onClick={() => setSelectedItemId(it.id)} />
-              ))}
-              {filteredItems.length === 0 && (
-                <li className="rounded-xl border border-dashed border-gray-200 bg-white p-4 text-center text-sm text-gray-500">这个状态下没有候选人。</li>
-              )}
-            </ul>
-            <div className="lg:sticky lg:top-6 lg:self-start">
-              {selectedItem ? (
-                <CandidateDetailPanel
-                  item={selectedItem}
-                  projectId={id}
-                  onChanged={(patch) => {
-                    setItems((prev) => prev?.map((it) => it.id === selectedItem.id ? { ...it, ...patch } : it) ?? prev);
-                    reloadDetail();
-                  }}
-                  onDeleted={() => {
-                    setItems((prev) => prev?.filter((it) => it.id !== selectedItem.id) ?? prev);
-                    setSelectedItemId(null);
-                    reloadDetail();
-                  }}
-                  onUnassigned={() => {
-                    setItems((prev) => prev?.filter((it) => it.id !== selectedItem.id) ?? prev);
-                    setSelectedItemId(null);
-                    reloadDetail();
-                  }}
-                />
-              ) : (
-                <div className="rounded-2xl border border-dashed border-gray-200 bg-white p-5 text-sm text-gray-500">
-                  点左侧候选人查看画像、切状态、写备注。
-                </div>
-              )}
+          <div className="space-y-4">
+            <CandidateComparisonView result={projectComparisonResult} />
+            <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(360px,0.85fr)]">
+              <ul className="space-y-2">
+                {filteredItems.map((it) => (
+                  <CandidateItem key={it.id} item={it} selected={selectedItemId === it.id} onClick={() => setSelectedItemId(it.id)} />
+                ))}
+                {filteredItems.length === 0 && (
+                  <li className="rounded-xl border border-dashed border-gray-200 bg-white p-4 text-center text-sm text-gray-500">这个状态下没有候选人。</li>
+                )}
+              </ul>
+              <div className="lg:sticky lg:top-6 lg:self-start">
+                {selectedItem ? (
+                  <CandidateDetailPanel
+                    key={selectedItem.id}
+                    item={selectedItem}
+                    onChanged={(patch) => {
+                      setItems((prev) => prev?.map((it) => it.id === selectedItem.id ? { ...it, ...patch } : it) ?? prev);
+                      reloadDetail();
+                    }}
+                    onDeleted={() => {
+                      setItems((prev) => prev?.filter((it) => it.id !== selectedItem.id) ?? prev);
+                      setSelectedItemId(null);
+                      reloadDetail();
+                    }}
+                    onUnassigned={() => {
+                      setItems((prev) => prev?.filter((it) => it.id !== selectedItem.id) ?? prev);
+                      setSelectedItemId(null);
+                      reloadDetail();
+                    }}
+                  />
+                ) : (
+                  <div className="rounded-2xl border border-dashed border-gray-200 bg-white p-5 text-sm text-gray-500">
+                    点左侧候选人查看画像、切状态、写备注。
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         )}
@@ -266,6 +287,67 @@ function KindBadge({ kind }: { kind: "search" | "verify" }) {
   return <span className="shrink-0 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800">核验</span>;
 }
 
+function StatusFunnel({
+  breakdown,
+  total,
+  current,
+  onClick,
+}: {
+  breakdown: Record<ShortlistStatus, number>;
+  total: number;
+  current: ShortlistStatus | "all";
+  onClick: (v: ShortlistStatus | "all") => void;
+}) {
+  if (total === 0) return null;
+  return (
+    <section className="rounded-2xl border border-gray-100 bg-white p-5 shadow-[0_8px_30px_rgba(0,0,0,0.04)]">
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <h2 className="text-sm font-semibold text-gray-900">状态漏斗</h2>
+        </div>
+        <button
+          type="button"
+          onClick={() => onClick("all")}
+          className={`rounded-full px-2.5 py-1 text-xs font-medium ${
+            current === "all" ? "bg-gray-900 text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+          }`}
+        >
+          全部 {total}
+        </button>
+      </div>
+      <div className="mt-4 grid gap-2 md:grid-cols-5">
+        {SHORT_STATUS.map((status) => {
+          const count = breakdown[status.value] ?? 0;
+          const pct = total > 0 ? Math.round((count / total) * 100) : 0;
+          const active = current === status.value;
+          return (
+            <button
+              key={status.value}
+              type="button"
+              onClick={() => onClick(status.value)}
+              className={`rounded-xl border p-3 text-left transition ${
+                active ? "border-gray-900 bg-gray-50" : "border-gray-100 bg-white hover:border-gray-300"
+              }`}
+            >
+              <div className="flex items-center justify-between gap-2">
+                <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-gray-700">
+                  <span className={`h-1.5 w-1.5 rounded-full ${status.dot}`} />
+                  {status.label}
+                </span>
+                <span className="text-xs tabular-nums text-gray-400">{pct}%</span>
+              </div>
+              <p className="mt-2 text-2xl font-bold tabular-nums tracking-tight text-gray-900">{count}</p>
+              <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-gray-100">
+                <div className={`h-full rounded-full ${status.dot}`} style={{ width: `${pct}%` }} />
+              </div>
+            </button>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
 function KpiCard({ label, value, sub, accentDot, onClick }: { label: string; value: number; sub: string; accentDot?: string; onClick?: () => void }) {
   const inner = (
     <div className="rounded-2xl border border-gray-100 bg-white p-4 shadow-[0_8px_30px_rgba(0,0,0,0.04)]">
@@ -301,8 +383,6 @@ function ProjectHeader({ detail, onChanged, onDelete }: { detail: ProjectDetail;
   const [editingBrief, setEditingBrief] = useState(false);
   const [name, setName] = useState(p.name);
   const [brief, setBrief] = useState(p.brief ?? "");
-
-  useEffect(() => { setName(p.name); setBrief(p.brief ?? ""); }, [p.name, p.brief]);
 
   async function patch(body: Record<string, unknown>) {
     const r = await fetch(`/api/projects/${p.id}`, {
@@ -423,10 +503,9 @@ function CandidateItem({ item, selected, onClick }: { item: ShortlistItem; selec
 }
 
 function CandidateDetailPanel({
-  item, projectId, onChanged, onDeleted, onUnassigned,
+  item, onChanged, onDeleted, onUnassigned,
 }: {
   item: ShortlistItem;
-  projectId: string;
   onChanged: (patch: Partial<ShortlistItem>) => void;
   onDeleted: () => void;
   onUnassigned: () => void;
@@ -436,8 +515,6 @@ function CandidateDetailPanel({
   const [savedHint, setSavedHint] = useState(false);
   const [outreachOpen, setOutreachOpen] = useState(false);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  useEffect(() => { setNotes(item.notes ?? ""); }, [item.id, item.notes]);
 
   async function patch(body: Record<string, unknown>) {
     const r = await fetch(`/api/shortlist/${item.id}`, {
