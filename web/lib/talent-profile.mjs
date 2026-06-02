@@ -210,6 +210,33 @@ export function normalizeTalentSearchResult(data) {
   };
 }
 
+export function buildCandidateComparisonRows(result) {
+  const source = isPlainObject(result) ? result : {};
+  const graphCandidates = Array.isArray(source.evidence_graph?.candidates) ? source.evidence_graph.candidates : [];
+  return (Array.isArray(source.candidates) ? source.candidates : []).map((candidate) => {
+    candidate = isPlainObject(candidate) ? candidate : {};
+    const graphNode = graphCandidates.find((item) => item?.candidate_name === candidate.name) || {};
+    const roleParts = [candidate.current_role, candidate.current_company].map(cleanString).filter(Boolean);
+    const directions = cleanStringArray(candidate.ai_directions);
+    return {
+      name: cleanString(candidate.name) || "Unknown candidate",
+      role: roleParts.join(" / "),
+      primary_direction: directions[0] || "",
+      secondary_directions: directions.slice(1).join(", "),
+      match_score: clampScore(candidate.match_score),
+      achievement_signals: clampScore(candidate.score_breakdown?.achievement_signals),
+      skill_match: clampScore(candidate.score_breakdown?.skill_match),
+      work_history: clampScore(candidate.score_breakdown?.work_history),
+      evidence_score: clampScore(candidate.score_breakdown?.evidence_quality),
+      evidence_quality: cleanString(candidate.evidence_audit?.overall_evidence_quality) || "medium",
+      independent_sources: normalizeCount(graphNode.independent_sources),
+      source_types: cleanStringArray(graphNode.source_types, 12).join(", "),
+      top_signal: cleanStringArray(candidate.strongest_signals, 1)[0] || "",
+      risk_summary: cleanStringArray(graphNode.risk_flags, 1)[0] || cleanStringArray(candidate.uncertainties, 1)[0] || "",
+    };
+  });
+}
+
 export function isTalentSearchResult(data) {
   return Boolean(
     isPlainObject(data) &&

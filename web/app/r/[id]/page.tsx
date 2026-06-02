@@ -5,6 +5,7 @@ import type { Metadata } from "next";
 import { getRunById } from "@/lib/db";
 import {
   CandidateCard,
+  CandidateComparisonView,
   CandidateProfileView,
   EvidenceGraphView,
   SearchPlanView,
@@ -155,6 +156,7 @@ export default async function ReportPage({ params }: { params: Promise<{ id: str
                   <>
                     <SearchPlanView result={talentResult} />
                     <TalentMapView result={talentResult} />
+                    <CandidateComparisonView result={talentResult} />
                     {talentResult.candidates.map((candidate, index) => (
                       <div key={`${candidate.name}-${index}`} className="space-y-3">
                         <EvidenceGraphView result={talentResult} candidate={candidate} />

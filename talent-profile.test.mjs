@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
   AI_DIRECTIONS,
+  buildCandidateComparisonRows,
   normalizeTalentSearchResult,
   isTalentSearchResult,
 } from "./web/lib/talent-profile.mjs";
@@ -124,6 +125,60 @@ test("normalizes search plan and evidence graph", () => {
   assert.equal(result.evidence_graph.candidates.length, 1);
   assert.equal(result.evidence_graph.candidates[0].independent_sources, 6);
   assert.deepEqual(result.evidence_graph.candidates[0].source_types, ["code", "blog"]);
+});
+
+test("builds candidate comparison rows from shortlist and evidence graph", () => {
+  const result = normalizeTalentSearchResult({
+    evidence_graph: {
+      candidates: [
+        {
+          candidate_name: "Ada Lovelace",
+          independent_sources: 4,
+          source_types: ["code", "blog"],
+          risk_flags: ["Location is single-source"],
+        },
+      ],
+    },
+    candidates: [
+      {
+        name: "Ada Lovelace",
+        current_role: "Staff Engineer",
+        current_company: "Example AI",
+        ai_directions: ["AI Infrastructure / LLM Systems", "ML Platform / MLOps"],
+        match_score: 91,
+        score_breakdown: {
+          achievement_signals: 39,
+          skill_match: 24,
+          work_history: 18,
+          evidence_quality: 13,
+        },
+        strongest_signals: ["Merged LLM serving PRs"],
+        evidence_audit: {
+          overall_evidence_quality: "high",
+          verified_claims: [],
+          unverified_claims: [],
+          contradicted_claims: [],
+          single_source_claims: [],
+          identity_risks: [],
+          recency_notes: [],
+        },
+      },
+    ],
+  });
+
+  const rows = buildCandidateComparisonRows(result);
+
+  assert.equal(rows.length, 1);
+  assert.equal(rows[0].name, "Ada Lovelace");
+  assert.equal(rows[0].role, "Staff Engineer / Example AI");
+  assert.equal(rows[0].primary_direction, "AI Infrastructure / LLM Systems");
+  assert.equal(rows[0].secondary_directions, "ML Platform / MLOps");
+  assert.equal(rows[0].match_score, 91);
+  assert.equal(rows[0].evidence_quality, "high");
+  assert.equal(rows[0].independent_sources, 4);
+  assert.equal(rows[0].source_types, "code, blog");
+  assert.equal(rows[0].top_signal, "Merged LLM serving PRs");
+  assert.equal(rows[0].risk_summary, "Location is single-source");
 });
 
 test("filters search-result URLs from evidence", () => {
