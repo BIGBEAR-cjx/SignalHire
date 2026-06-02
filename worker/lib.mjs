@@ -138,7 +138,9 @@ Use exactly this shape:
     "source_strategy": [
       {
         "source_type": "paper | code | profile | company | talk | blog | project | community | patent | dataset | benchmark | other",
+        "coverage_group": "research | practice | work_history | public_voice",
         "target": "specific platforms or source families to search",
+        "query": "concrete query string or site operator plan to run for this source family",
         "reason": "why this source family matters for this brief"
       }
     ],

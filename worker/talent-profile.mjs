@@ -149,6 +149,8 @@ function normalizeSearchPlan(plan = {}) {
         source_type: cleanString(item.source_type) || "other",
         target: cleanString(item.target),
         reason: cleanString(item.reason),
+        coverage_group: cleanString(item.coverage_group),
+        query: cleanString(item.query),
       };
     }).filter((item) => item.target || item.reason).slice(0, 12),
     adjacent_pools: (Array.isArray(plan.adjacent_pools) ? plan.adjacent_pools : []).map((item) => {

@@ -3,7 +3,7 @@ export type EvidenceQuality = "high" | "medium" | "low";
 export type TalentEvidence = { note: string; url: string; source_type: string };
 export type TalentClaim = { claim: string; verdict: Verdict; evidence: TalentEvidence[] };
 export type TalentSearchBrief = { original_query: string; target_directions: string[]; required_skills: string[]; preferred_skills: string[]; seniority: string | null; geography: string | null; evidence_preferences: string[]; exclusions: string[] };
-export type SearchPlanSourceStrategy = { source_type: string; target: string; reason: string };
+export type SearchPlanSourceStrategy = { source_type: string; target: string; reason: string; coverage_group: string; query: string };
 export type SearchPlanAdjacentPool = { pool: string; reason: string };
 export type TalentSearchPlan = { must_have: string[]; nice_to_have: string[]; exclusions: string[]; source_strategy: SearchPlanSourceStrategy[]; adjacent_pools: SearchPlanAdjacentPool[] };
 export type EvidenceGraphSourceMix = { source_type: string; count: number };
@@ -15,6 +15,7 @@ export type EvidenceAudit = { verified_claims: string[]; unverified_claims: stri
 export type TalentCandidate = { name: string; headline: string; location: string | null; current_role: string | null; current_company: string | null; ai_directions: string[]; match_score: number; score_breakdown: ScoreBreakdown; strongest_signals: string[]; uncertainties: string[]; links: { github: string | null; linkedin: string | null; scholar: string | null; huggingface: string | null; website: string | null; other: string | null }; claims: TalentClaim[]; evidence_audit: EvidenceAudit; outreach_angle: string; summary: string };
 export type TalentSearchResult = { search_brief: TalentSearchBrief; search_plan: TalentSearchPlan; evidence_graph: TalentEvidenceGraph; talent_map: TalentMapItem[]; candidates: TalentCandidate[] };
 export type EvidenceCoverageGroup = { key: string; label: string; count: number; source_types: string[]; missing_source_types: string[]; status: "covered" | "missing" };
+export type SourceQueryPlanItem = { source_type: string; coverage_group: string; target: string; query: string; reason: string; priority: number };
 export type CandidateComparisonRow = { name: string; role: string; primary_direction: string; secondary_directions: string; match_score: number; achievement_signals: number; skill_match: number; work_history: number; evidence_score: number; evidence_quality: string; independent_sources: number; source_types: string; coverage_gaps: string; top_signal: string; risk_summary: string };
 export const AI_DIRECTIONS: string[];
 export const VERDICTS: Verdict[];
@@ -23,5 +24,6 @@ export const EVIDENCE_COVERAGE_GROUPS: { key: string; label: string; source_type
 export function normalizeTalentSearchResult(data: unknown): TalentSearchResult;
 export function buildCandidateComparisonRows(result: unknown): CandidateComparisonRow[];
 export function buildEvidenceCoverage(result: unknown): EvidenceCoverageGroup[];
+export function buildSourceQueryPlan(result: unknown): SourceQueryPlanItem[];
 export function isTalentSearchResult(data: unknown): data is TalentSearchResult;
 export function isSearchUrl(url: unknown): boolean;

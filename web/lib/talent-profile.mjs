@@ -16,6 +16,26 @@ export const EVIDENCE_COVERAGE_GROUPS = [
   { key: "work_history", label: "工作经历", source_types: ["profile", "company", "community"] },
   { key: "public_voice", label: "公开表达", source_types: ["talk", "blog", "podcast", "interview"] },
 ];
+const COVERAGE_GROUP_KEYS = EVIDENCE_COVERAGE_GROUPS.map((group) => group.key);
+const SOURCE_TYPE_TO_COVERAGE_GROUP = new Map(
+  EVIDENCE_COVERAGE_GROUPS.flatMap((group) => group.source_types.map((sourceType) => [sourceType, group.key])),
+);
+const SOURCE_QUERY_OPERATORS = {
+  paper: "site:arxiv.org OR site:openreview.net OR site:semanticscholar.org",
+  patent: "site:patents.google.com",
+  dataset: "site:huggingface.co/datasets OR site:kaggle.com/datasets",
+  benchmark: "site:paperswithcode.com OR benchmark",
+  code: "site:github.com",
+  project: "site:github.io OR project",
+  huggingface: "site:huggingface.co",
+  profile: "site:linkedin.com/in OR site:scholar.google.com",
+  company: "site:*.ai/team OR site:*.com/team",
+  community: "site:news.ycombinator.com OR site:reddit.com",
+  talk: "site:youtube.com OR site:confreaks.tv OR talk",
+  blog: "site:medium.com OR site:substack.com OR blog",
+  podcast: "podcast interview",
+  interview: "interview podcast",
+};
 
 export function isSearchUrl(url) {
   return (
@@ -155,6 +175,8 @@ function normalizeSearchPlan(plan = {}) {
         source_type: cleanString(item.source_type) || "other",
         target: cleanString(item.target),
         reason: cleanString(item.reason),
+        coverage_group: normalizeCoverageGroup(item.coverage_group, item.source_type),
+        query: cleanString(item.query),
       };
     }).filter((item) => item.target || item.reason).slice(0, 12),
     adjacent_pools: (Array.isArray(plan.adjacent_pools) ? plan.adjacent_pools : []).map((item) => {
@@ -165,6 +187,26 @@ function normalizeSearchPlan(plan = {}) {
       };
     }).filter((item) => item.pool || item.reason).slice(0, 8),
   };
+}
+
+function normalizeCoverageGroup(value, sourceType = "") {
+  const group = cleanString(value).toLowerCase();
+  if (COVERAGE_GROUP_KEYS.includes(group)) return group;
+  return SOURCE_TYPE_TO_COVERAGE_GROUP.get(cleanString(sourceType).toLowerCase()) || "practice";
+}
+
+function sourceQueryTerms(brief = {}) {
+  const terms = [
+    cleanString(brief.original_query),
+    ...cleanStringArray(brief.required_skills, 6),
+    ...cleanStringArray(brief.target_directions, 3),
+  ].filter(Boolean);
+  return Array.from(new Set(terms)).join(" ");
+}
+
+function fallbackSourceQuery(sourceType, brief) {
+  const operator = SOURCE_QUERY_OPERATORS[cleanString(sourceType).toLowerCase()] || "";
+  return [sourceQueryTerms(brief), operator].filter(Boolean).join(" ").trim();
 }
 
 function normalizeEvidenceGraph(graph = {}) {
@@ -323,6 +365,25 @@ export function buildEvidenceCoverage(result) {
   const source = isPlainObject(result) ? result : {};
   const counts = sourceTypeCountsFromMix(source.evidence_graph?.source_mix, source.candidates);
   return coverageGroupsFromCounts(counts);
+}
+
+export function buildSourceQueryPlan(result) {
+  const source = isPlainObject(result) ? result : {};
+  const brief = isPlainObject(source.search_brief) ? source.search_brief : {};
+  const strategy = Array.isArray(source.search_plan?.source_strategy) ? source.search_plan.source_strategy : [];
+  return strategy.map((item, index) => {
+    item = isPlainObject(item) ? item : {};
+    const sourceType = cleanString(item.source_type) || "other";
+    const coverageGroup = normalizeCoverageGroup(item.coverage_group, sourceType);
+    return {
+      source_type: sourceType,
+      coverage_group: coverageGroup,
+      target: cleanString(item.target),
+      query: cleanString(item.query) || fallbackSourceQuery(sourceType, brief),
+      reason: cleanString(item.reason),
+      priority: index + 1,
+    };
+  }).filter((item) => item.query || item.target || item.reason).slice(0, 12);
 }
 
 export function isTalentSearchResult(data) {

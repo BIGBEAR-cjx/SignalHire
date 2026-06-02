@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import {
   AI_DIRECTIONS,
   buildEvidenceCoverage,
+  buildSourceQueryPlan,
   buildCandidateComparisonRows,
   normalizeTalentSearchResult,
   isTalentSearchResult,
@@ -160,6 +161,42 @@ test("builds evidence coverage groups from source mix and candidate evidence", (
   assert.equal(coverage.find((item) => item.key === "work_history")?.count, 1);
   assert.equal(coverage.find((item) => item.key === "public_voice")?.count, 1);
   assert.equal(coverage.every((item) => item.status === "covered"), true);
+});
+
+test("builds executable source query plan from brief and source strategy", () => {
+  const result = normalizeTalentSearchResult({
+    search_brief: {
+      original_query: "Find LLM inference engineers",
+      target_directions: ["AI Infrastructure / LLM Systems"],
+      required_skills: ["vLLM", "Triton"],
+    },
+    search_plan: {
+      source_strategy: [
+        {
+          source_type: "code",
+          target: "GitHub repositories",
+          reason: "verify engineering work",
+          coverage_group: "practice",
+          query: "vLLM Triton site:github.com",
+        },
+        {
+          source_type: "paper",
+          target: "arXiv and conference pages",
+          reason: "verify research output",
+        },
+      ],
+    },
+  });
+
+  const plan = buildSourceQueryPlan(result);
+
+  assert.equal(plan.length, 2);
+  assert.equal(plan[0].coverage_group, "practice");
+  assert.equal(plan[0].query, "vLLM Triton site:github.com");
+  assert.equal(plan[0].target, "GitHub repositories");
+  assert.match(plan[1].query, /Find LLM inference engineers/);
+  assert.match(plan[1].query, /vLLM/);
+  assert.match(plan[1].query, /site:arxiv.org/);
 });
 
 test("builds candidate comparison rows from shortlist and evidence graph", () => {
@@ -397,6 +434,8 @@ test("search prompt requests search plan and evidence graph", async () => {
   assert.match(prompt, /"search_plan"/);
   assert.match(prompt, /"evidence_graph"/);
   assert.match(prompt, /coverage_checklist/);
+  assert.match(prompt, /coverage_group/);
+  assert.match(prompt, /"query"/);
   assert.match(prompt, /research \| practice \| work_history \| public_voice/);
   assert.match(prompt, /patent \| dataset \| benchmark/);
   assert.match(prompt, /source_strategy/);
@@ -410,7 +449,7 @@ test("worker prompt and normalizer support search plan and evidence graph", asyn
   const result = normalizeWorkerTalentSearchResult({
     search_plan: {
       must_have: ["LLM serving"],
-      source_strategy: [{ source_type: "", target: "GitHub", reason: "verify code" }],
+      source_strategy: [{ source_type: "", target: "GitHub", reason: "verify code", coverage_group: "practice", query: "site:github.com vLLM" }],
     },
     evidence_graph: {
       candidates: [{
@@ -426,6 +465,8 @@ test("worker prompt and normalizer support search plan and evidence graph", asyn
   assert.match(prompt, /"search_plan"/);
   assert.match(prompt, /"evidence_graph"/);
   assert.match(prompt, /coverage_checklist/);
+  assert.match(prompt, /coverage_group/);
+  assert.match(prompt, /"query"/);
   assert.match(prompt, /research \| practice \| work_history \| public_voice/);
   assert.match(prompt, /patent \| dataset \| benchmark/);
   assert.match(prompt, /source_strategy/);
@@ -433,5 +474,7 @@ test("worker prompt and normalizer support search plan and evidence graph", asyn
   assert.match(prompt, /cross_validation/);
   assert.deepEqual(result.search_plan.must_have, ["LLM serving"]);
   assert.equal(result.search_plan.source_strategy[0].source_type, "other");
+  assert.equal(result.search_plan.source_strategy[0].coverage_group, "practice");
+  assert.equal(result.search_plan.source_strategy[0].query, "site:github.com vLLM");
   assert.equal(result.evidence_graph.candidates[0].candidate_name, "Ada Lovelace");
 });
