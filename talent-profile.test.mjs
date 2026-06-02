@@ -1,5 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import * as talentProfile from "./web/lib/talent-profile.mjs";
 import {
   AI_DIRECTIONS,
   buildCoverageBackfillPlan,
@@ -337,6 +338,34 @@ test("builds coverage backfill plan from returned jobs or missing coverage", () 
   assert.deepEqual(practiceJob?.candidate_names, ["Ada Lovelace"]);
   assert.match(practiceJob?.reason ?? "", /缺少实践/);
   assert.match(derived.summary, /待补/);
+});
+
+test("builds focused search input for a coverage backfill job", () => {
+  assert.equal(typeof talentProfile.buildBackfillSearchInput, "function");
+
+  const input = talentProfile.buildBackfillSearchInput({
+    job: {
+      gap_id: "practice-code",
+      coverage_group: "practice",
+      missing_source_type: "code",
+      query: "vLLM Triton site:github.com",
+      reason: "No public implementation evidence yet.",
+      priority: 1,
+      status: "planned",
+      candidate_names: ["Ada Lovelace", "Grace Hopper"],
+      source_types_to_check: ["code", "huggingface"],
+    },
+    originalQuery: "Find senior LLM inference engineers in North America",
+  });
+
+  assert.match(input, /Coverage backfill search/);
+  assert.match(input, /Find senior LLM inference engineers in North America/);
+  assert.match(input, /practice/);
+  assert.match(input, /code/);
+  assert.match(input, /vLLM Triton site:github.com/);
+  assert.match(input, /Ada Lovelace, Grace Hopper/);
+  assert.match(input, /No public implementation evidence yet/);
+  assert.match(input, /specific source URLs/);
 });
 
 test("builds candidate comparison rows from shortlist and evidence graph", () => {

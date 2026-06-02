@@ -21,7 +21,7 @@ import {
   type VerifyReport,
 } from "@/components/result";
 import OutreachModal from "@/components/OutreachModal";
-import type { TalentCandidate, TalentSearchResult } from "@/lib/talent-profile.mjs";
+import type { CoverageBackfillJob, TalentCandidate, TalentSearchResult } from "@/lib/talent-profile.mjs";
 
 type FeedItem = { id: number; kind: "search" | "fetch"; info: string };
 type SearchResult = { candidates?: Candidate[] } | TalentSearchResult;
@@ -245,6 +245,37 @@ export default function ResearchTool({
     }
   }
 
+  async function enqueueBackfillJob(job: CoverageBackfillJob) {
+    if (loading || !isTalentSearchResult(result)) return;
+    stopPolling();
+    setLoading(true); setError(""); setStats(null); setFeed([]); setLive(null);
+    setJobStatus({ phase: "queued", label: "补搜已进入研究队列", detail: "等待 worker 认领这个证据缺口任务。", canRetry: false });
+    setCurrentJobId(null);
+    try {
+      const res = await fetch("/api/backfill", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          job,
+          original_query: result.search_brief.original_query || input,
+          source_run_id: runId,
+          ...(projectId ? { project_id: projectId } : {}),
+        }),
+      });
+      const j: QueueResponse = await res.json().catch(() => ({}));
+      if (!res.ok) { setError(j.error ?? `HTTP ${res.status}`); setLoading(false); return; }
+      if (j.queued && j.jobId) {
+        setCurrentJobId(j.jobId);
+        beginPolling(j.jobId);
+      } else {
+        setError(j.error ?? "补搜入队失败"); setLoading(false);
+      }
+    } catch (e) {
+      setError((e as Error).message);
+      setLoading(false);
+    }
+  }
+
   // 进页面就自动跑 (hero 跳过来 / 历史回放)
   const ranAuto = useRef(false);
   useEffect(() => {
@@ -438,7 +469,7 @@ export default function ResearchTool({
             <>
               <SearchPlanView result={result} />
               <SourceExecutionView result={result} />
-              <CoverageBackfillView result={result} />
+              <CoverageBackfillView result={result} onBackfillJob={enqueueBackfillJob} backfillDisabled={loading} />
               <EvidenceCoverageView result={result} />
               <TalentMapView result={result} />
               <CandidateComparisonView result={result} />

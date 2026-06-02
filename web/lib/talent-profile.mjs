@@ -562,6 +562,33 @@ export function buildCoverageBackfillPlan(result) {
   };
 }
 
+/**
+ * @param {{ job?: unknown; originalQuery?: string }} input
+ */
+export function buildBackfillSearchInput({ job, originalQuery = "" } = {}) {
+  const backfillJob = normalizeCoverageBackfillJob(job);
+  const candidates = backfillJob.candidate_names.length
+    ? backfillJob.candidate_names.join(", ")
+    : "No specific candidates supplied";
+  const sourceTypes = backfillJob.source_types_to_check.length
+    ? backfillJob.source_types_to_check.join(", ")
+    : backfillJob.missing_source_type || "public sources";
+
+  return [
+    "Coverage backfill search for SignalHire.",
+    `Original search brief: ${cleanString(originalQuery) || "Not provided"}`,
+    `Coverage group: ${backfillJob.coverage_group}`,
+    `Missing source type: ${backfillJob.missing_source_type || "unknown"}`,
+    `Focused query: ${backfillJob.query || fallbackSourceQuery(backfillJob.missing_source_type, { original_query: originalQuery })}`,
+    `Reason: ${backfillJob.reason || "Improve weak evidence coverage and cross-validation."}`,
+    `Affected candidates: ${candidates}`,
+    `Source types to check: ${sourceTypes}`,
+    "Return a fresh AI talent shortlist payload focused on this coverage gap.",
+    "Prioritize concrete public evidence and specific source URLs. Do not cite search-result URLs.",
+    "Explain whether the new evidence confirms, weakens, or changes the original candidate fit.",
+  ].join("\n");
+}
+
 export function isTalentSearchResult(data) {
   return Boolean(
     isPlainObject(data) &&
