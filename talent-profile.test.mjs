@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
   AI_DIRECTIONS,
+  buildEvidenceCoverage,
   buildCandidateComparisonRows,
   normalizeTalentSearchResult,
   isTalentSearchResult,
@@ -127,6 +128,40 @@ test("normalizes search plan and evidence graph", () => {
   assert.deepEqual(result.evidence_graph.candidates[0].source_types, ["code", "blog"]);
 });
 
+test("builds evidence coverage groups from source mix and candidate evidence", () => {
+  const result = normalizeTalentSearchResult({
+    evidence_graph: {
+      source_mix: [
+        { source_type: "paper", count: 2 },
+        { source_type: "code", count: 1 },
+      ],
+    },
+    candidates: [
+      {
+        name: "Ada Lovelace",
+        claims: [
+          {
+            claim: "Works on AI infra",
+            verdict: "verified",
+            evidence: [
+              { note: "company", url: "https://example.ai/team/ada", source_type: "company" },
+              { note: "talk", url: "https://conf.example/talks/ada", source_type: "talk" },
+            ],
+          },
+        ],
+      },
+    ],
+  });
+
+  const coverage = buildEvidenceCoverage(result);
+
+  assert.equal(coverage.find((item) => item.key === "research")?.count, 2);
+  assert.equal(coverage.find((item) => item.key === "practice")?.count, 1);
+  assert.equal(coverage.find((item) => item.key === "work_history")?.count, 1);
+  assert.equal(coverage.find((item) => item.key === "public_voice")?.count, 1);
+  assert.equal(coverage.every((item) => item.status === "covered"), true);
+});
+
 test("builds candidate comparison rows from shortlist and evidence graph", () => {
   const result = normalizeTalentSearchResult({
     evidence_graph: {
@@ -177,6 +212,7 @@ test("builds candidate comparison rows from shortlist and evidence graph", () =>
   assert.equal(rows[0].evidence_quality, "high");
   assert.equal(rows[0].independent_sources, 4);
   assert.equal(rows[0].source_types, "code, blog");
+  assert.equal(rows[0].coverage_gaps, "研究, 工作经历");
   assert.equal(rows[0].top_signal, "Merged LLM serving PRs");
   assert.equal(rows[0].risk_summary, "Location is single-source");
 });
@@ -360,6 +396,9 @@ test("search prompt requests search plan and evidence graph", async () => {
 
   assert.match(prompt, /"search_plan"/);
   assert.match(prompt, /"evidence_graph"/);
+  assert.match(prompt, /coverage_checklist/);
+  assert.match(prompt, /research \| practice \| work_history \| public_voice/);
+  assert.match(prompt, /patent \| dataset \| benchmark/);
   assert.match(prompt, /source_strategy/);
   assert.match(prompt, /independent_sources/);
   assert.match(prompt, /cross_validation/);
@@ -386,6 +425,9 @@ test("worker prompt and normalizer support search plan and evidence graph", asyn
 
   assert.match(prompt, /"search_plan"/);
   assert.match(prompt, /"evidence_graph"/);
+  assert.match(prompt, /coverage_checklist/);
+  assert.match(prompt, /research \| practice \| work_history \| public_voice/);
+  assert.match(prompt, /patent \| dataset \| benchmark/);
   assert.match(prompt, /source_strategy/);
   assert.match(prompt, /independent_sources/);
   assert.match(prompt, /cross_validation/);

@@ -197,12 +197,13 @@ The result must feel like a high-quality hiring shortlist, not raw search result
 
 SEARCH STRATEGY:
 - Prefer public, verifiable achievement signals over resume keywords.
-- Search broadly across papers, arXiv, OpenReview, Semantic Scholar, conference pages, GitHub, Hugging Face, Papers with Code, personal sites, technical blogs, company engineering blogs, project pages, benchmark pages, talks, podcasts, interviews, and public profile pages.
+- Search broadly across papers, arXiv, OpenReview, Semantic Scholar, conference pages, patents, datasets, benchmarks, GitHub, Hugging Face, Papers with Code, personal sites, technical blogs, company engineering blogs, project pages, talks, podcasts, interviews, communities, and public profile pages.
 - Group candidates by AI talent direction.
 - Include primary matches and adjacent transferable candidates when useful.
 - Every candidate must be a single real named person.
 - Never return teams, organizations, unnamed contributors, or collectives.
 - Do not guess private email addresses.
+- Track evidence coverage in four groups: research | practice | work_history | public_voice.
 
 AI DIRECTIONS:
 - AI Infrastructure / LLM Systems
@@ -224,6 +225,7 @@ Use this weighting:
 EVIDENCE RULES:
 - Key claims need specific source URLs.
 - A search-results URL is not evidence.
+- Source types should use: paper | code | profile | company | talk | blog | project | community | patent | dataset | benchmark | other.
 - "verified" means public evidence clearly supports the claim.
 - "contradicted" means public evidence conflicts with the claim.
 - "unverified" means the claim is plausible but not supported by clear public evidence.
@@ -249,7 +251,7 @@ Use exactly this shape:
     "exclusions": ["profiles or signals to avoid"],
     "source_strategy": [
       {
-        "source_type": "paper | code | profile | company | talk | blog | project | community | other",
+        "source_type": "paper | code | profile | company | talk | blog | project | community | patent | dataset | benchmark | other",
         "target": "specific platforms or source families to search",
         "reason": "why this source family matters for this brief"
       }
@@ -271,8 +273,16 @@ Use exactly this shape:
   ],
   "evidence_graph": {
     "summary": "short summary of evidence coverage, source diversity, and main verification risks",
+    "coverage_checklist": [
+      {
+        "group": "research | practice | work_history | public_voice",
+        "covered": true,
+        "missing": ["source families still missing for this group"],
+        "note": "short explanation of the coverage gap or why coverage is sufficient"
+      }
+    ],
     "source_mix": [
-      { "source_type": "paper | code | profile | company | talk | blog | project | community | other", "count": 0 }
+      { "source_type": "paper | code | profile | company | talk | blog | project | community | patent | dataset | benchmark | other", "count": 0 }
     ],
     "candidates": [
       {
@@ -316,7 +326,7 @@ Use exactly this shape:
           "claim": "concrete factual claim",
           "verdict": "verified | contradicted | unverified",
           "evidence": [
-            { "note": "what the source proves", "url": "https://example.com/source-page", "source_type": "paper | code | profile | company | talk | blog | project | other" }
+            { "note": "what the source proves", "url": "https://example.com/source-page", "source_type": "paper | code | profile | company | talk | blog | project | community | patent | dataset | benchmark | other" }
           ]
         }
       ],

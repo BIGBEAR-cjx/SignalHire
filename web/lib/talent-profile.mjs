@@ -10,6 +10,12 @@ export const AI_DIRECTIONS = [
 
 export const VERDICTS = ["verified", "contradicted", "unverified"];
 export const EVIDENCE_QUALITY = ["high", "medium", "low"];
+export const EVIDENCE_COVERAGE_GROUPS = [
+  { key: "research", label: "研究", source_types: ["paper", "patent", "dataset", "benchmark"] },
+  { key: "practice", label: "实践", source_types: ["code", "project", "huggingface"] },
+  { key: "work_history", label: "工作经历", source_types: ["profile", "company", "community"] },
+  { key: "public_voice", label: "公开表达", source_types: ["talk", "blog", "podcast", "interview"] },
+];
 
 export function isSearchUrl(url) {
   return (
@@ -212,6 +218,53 @@ function evidenceSummaryFromClaims(claims) {
   };
 }
 
+function sourceTypeCountsFromClaims(candidates) {
+  const counts = new Map();
+  for (const candidate of Array.isArray(candidates) ? candidates : []) {
+    for (const claim of Array.isArray(candidate?.claims) ? candidate.claims : []) {
+      for (const evidence of Array.isArray(claim?.evidence) ? claim.evidence : []) {
+        const sourceType = cleanString(evidence?.source_type).toLowerCase();
+        if (sourceType) counts.set(sourceType, (counts.get(sourceType) ?? 0) + 1);
+      }
+    }
+  }
+  return counts;
+}
+
+function sourceTypeCountsFromMix(sourceMix, candidates) {
+  const counts = sourceTypeCountsFromClaims(candidates);
+  for (const item of Array.isArray(sourceMix) ? sourceMix : []) {
+    const sourceType = cleanString(item?.source_type).toLowerCase();
+    if (sourceType) counts.set(sourceType, Math.max(counts.get(sourceType) ?? 0, normalizeCount(item?.count)));
+  }
+  return counts;
+}
+
+function coverageGroupsFromCounts(counts) {
+  return EVIDENCE_COVERAGE_GROUPS.map((group) => {
+    const coveredSourceTypes = group.source_types.filter((type) => (counts.get(type) ?? 0) > 0);
+    const count = group.source_types.reduce((total, type) => total + (counts.get(type) ?? 0), 0);
+    return {
+      key: group.key,
+      label: group.label,
+      count,
+      source_types: coveredSourceTypes,
+      missing_source_types: group.source_types.filter((type) => !coveredSourceTypes.includes(type)),
+      status: count > 0 ? "covered" : "missing",
+    };
+  });
+}
+
+function coverageGapLabelsForSourceTypes(sourceTypes) {
+  const counts = new Map();
+  for (const sourceType of cleanStringArray(sourceTypes, 20)) {
+    counts.set(sourceType.toLowerCase(), 1);
+  }
+  return coverageGroupsFromCounts(counts)
+    .filter((group) => group.status === "missing")
+    .map((group) => group.label);
+}
+
 function normalizeTalentMap(map = []) {
   return (Array.isArray(map) ? map : []).map((item) => {
     item = isPlainObject(item) ? item : {};
@@ -244,6 +297,8 @@ export function buildCandidateComparisonRows(result) {
     const roleParts = [candidate.current_role, candidate.current_company].map(cleanString).filter(Boolean);
     const directions = cleanStringArray(candidate.ai_directions);
     const evidenceSummary = evidenceSummaryFromClaims(candidate.claims);
+    const sourceTypes = cleanStringArray(graphNode.source_types, 12);
+    const sourceTypesText = sourceTypes.join(", ") || evidenceSummary.source_types;
     return {
       name: cleanString(candidate.name) || "Unknown candidate",
       role: roleParts.join(" / "),
@@ -256,11 +311,18 @@ export function buildCandidateComparisonRows(result) {
       evidence_score: clampScore(candidate.score_breakdown?.evidence_quality),
       evidence_quality: cleanString(candidate.evidence_audit?.overall_evidence_quality) || "medium",
       independent_sources: normalizeCount(graphNode.independent_sources) || evidenceSummary.independent_sources,
-      source_types: cleanStringArray(graphNode.source_types, 12).join(", ") || evidenceSummary.source_types,
+      source_types: sourceTypesText,
+      coverage_gaps: coverageGapLabelsForSourceTypes(sourceTypesText.split(",")).join(", "),
       top_signal: cleanStringArray(candidate.strongest_signals, 1)[0] || "",
       risk_summary: cleanStringArray(graphNode.risk_flags, 1)[0] || cleanStringArray(candidate.uncertainties, 1)[0] || "",
     };
   });
+}
+
+export function buildEvidenceCoverage(result) {
+  const source = isPlainObject(result) ? result : {};
+  const counts = sourceTypeCountsFromMix(source.evidence_graph?.source_mix, source.candidates);
+  return coverageGroupsFromCounts(counts);
 }
 
 export function isTalentSearchResult(data) {
