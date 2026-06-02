@@ -11,6 +11,7 @@ export const AI_DIRECTIONS = [
 export const VERDICTS = ["verified", "contradicted", "unverified"];
 export const EVIDENCE_QUALITY = ["high", "medium", "low"];
 export const SOURCE_EXECUTION_STATUSES = ["planned", "completed", "partial", "failed"];
+export const COVERAGE_BACKFILL_STATUSES = ["planned", "completed", "skipped"];
 
 export function isSearchUrl(url) {
   return (
@@ -198,6 +199,35 @@ function normalizeSourceExecution(execution = {}) {
   };
 }
 
+function normalizeCoverageBackfillJob(job = {}, index = 0) {
+  job = isPlainObject(job) ? job : {};
+  const status = cleanString(job.status).toLowerCase();
+  const coverageGroup = cleanString(job.coverage_group);
+  const missingSourceType = cleanString(job.missing_source_type);
+  return {
+    gap_id: cleanString(job.gap_id) || `${coverageGroup || "coverage"}-${missingSourceType || index + 1}`,
+    coverage_group: coverageGroup,
+    missing_source_type: missingSourceType,
+    query: cleanString(job.query),
+    reason: cleanString(job.reason),
+    priority: normalizeCount(job.priority) || index + 1,
+    status: COVERAGE_BACKFILL_STATUSES.includes(status) ? status : "planned",
+    candidate_names: cleanStringArray(job.candidate_names, 12),
+    source_types_to_check: cleanStringArray(job.source_types_to_check, 8),
+  };
+}
+
+function normalizeCoverageBackfill(backfill = {}) {
+  backfill = isPlainObject(backfill) ? backfill : {};
+  return {
+    summary: cleanString(backfill.summary),
+    jobs: (Array.isArray(backfill.jobs) ? backfill.jobs : [])
+      .map(normalizeCoverageBackfillJob)
+      .filter((job) => job.coverage_group && (job.missing_source_type || job.query || job.reason))
+      .slice(0, 16),
+  };
+}
+
 function normalizeEvidenceGraph(graph = {}) {
   graph = isPlainObject(graph) ? graph : {};
   return {
@@ -242,6 +272,7 @@ export function normalizeTalentSearchResult(data) {
     search_brief: normalizeBrief(source.search_brief),
     search_plan: normalizeSearchPlan(source.search_plan),
     source_execution: normalizeSourceExecution(source.source_execution),
+    coverage_backfill: normalizeCoverageBackfill(source.coverage_backfill),
     evidence_graph: normalizeEvidenceGraph(source.evidence_graph),
     talent_map: normalizeTalentMap(source.talent_map),
     candidates: (Array.isArray(source.candidates) ? source.candidates : []).map(normalizeCandidate),

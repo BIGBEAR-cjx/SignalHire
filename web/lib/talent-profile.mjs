@@ -17,6 +17,7 @@ export const EVIDENCE_COVERAGE_GROUPS = [
   { key: "public_voice", label: "公开表达", source_types: ["talk", "blog", "podcast", "interview"] },
 ];
 export const SOURCE_EXECUTION_STATUSES = ["planned", "completed", "partial", "failed"];
+export const COVERAGE_BACKFILL_STATUSES = ["planned", "completed", "skipped"];
 const COVERAGE_GROUP_KEYS = EVIDENCE_COVERAGE_GROUPS.map((group) => group.key);
 const SOURCE_TYPE_TO_COVERAGE_GROUP = new Map(
   EVIDENCE_COVERAGE_GROUPS.flatMap((group) => group.source_types.map((sourceType) => [sourceType, group.key])),
@@ -224,6 +225,35 @@ function normalizeSourceExecution(execution = {}) {
   };
 }
 
+function normalizeCoverageBackfillJob(job = {}, index = 0) {
+  job = isPlainObject(job) ? job : {};
+  const missingSourceType = cleanString(job.missing_source_type).toLowerCase();
+  const coverageGroup = normalizeCoverageGroup(job.coverage_group, missingSourceType);
+  const status = cleanString(job.status).toLowerCase();
+  return {
+    gap_id: cleanString(job.gap_id) || `${coverageGroup}-${missingSourceType || index + 1}`,
+    coverage_group: coverageGroup,
+    missing_source_type: missingSourceType,
+    query: cleanString(job.query),
+    reason: cleanString(job.reason),
+    priority: normalizeCount(job.priority) || index + 1,
+    status: COVERAGE_BACKFILL_STATUSES.includes(status) ? status : "planned",
+    candidate_names: cleanStringArray(job.candidate_names, 12),
+    source_types_to_check: cleanStringArray(job.source_types_to_check, 8),
+  };
+}
+
+function normalizeCoverageBackfill(backfill = {}) {
+  backfill = isPlainObject(backfill) ? backfill : {};
+  return {
+    summary: cleanString(backfill.summary),
+    jobs: (Array.isArray(backfill.jobs) ? backfill.jobs : [])
+      .map(normalizeCoverageBackfillJob)
+      .filter((job) => job.coverage_group && (job.missing_source_type || job.query || job.reason))
+      .slice(0, 16),
+  };
+}
+
 function normalizeCoverageGroup(value, sourceType = "") {
   const group = cleanString(value).toLowerCase();
   if (COVERAGE_GROUP_KEYS.includes(group)) return group;
@@ -342,6 +372,34 @@ function coverageGapLabelsForSourceTypes(sourceTypes) {
     .map((group) => group.label);
 }
 
+function coverageGroupByKey(key) {
+  return EVIDENCE_COVERAGE_GROUPS.find((group) => group.key === key) || EVIDENCE_COVERAGE_GROUPS[1];
+}
+
+function candidateNamesForCoverageGroup(result, coverageGroup) {
+  const group = coverageGroupByKey(coverageGroup);
+  const graphCandidates = Array.isArray(result?.evidence_graph?.candidates) ? result.evidence_graph.candidates : [];
+  const names = graphCandidates
+    .filter((candidate) => {
+      const sourceTypes = cleanStringArray(candidate?.source_types, 12).map((type) => type.toLowerCase());
+      return sourceTypes.length === 0 || !sourceTypes.some((type) => group.source_types.includes(type));
+    })
+    .map((candidate) => cleanString(candidate?.candidate_name))
+    .filter(Boolean);
+  if (names.length > 0) return Array.from(new Set(names)).slice(0, 8);
+  return (Array.isArray(result?.candidates) ? result.candidates : [])
+    .map((candidate) => cleanString(candidate?.name))
+    .filter(Boolean)
+    .slice(0, 8);
+}
+
+function backfillReason(group, sourceType, executionJob) {
+  if (executionJob?.status === "failed") return executionJob.error || `前一轮 ${sourceType} 来源任务失败，需要补搜。`;
+  if (executionJob?.status === "partial") return executionJob.next_action || `前一轮 ${sourceType} 来源证据偏薄，需要补搜。`;
+  if (executionJob && executionJob.evidence_found === 0) return executionJob.next_action || `前一轮 ${sourceType} 未找到可用证据，需要补搜。`;
+  return `缺少${group.label}覆盖，需要补搜 ${sourceType} 来源做交叉验证。`;
+}
+
 function normalizeTalentMap(map = []) {
   return (Array.isArray(map) ? map : []).map((item) => {
     item = isPlainObject(item) ? item : {};
@@ -360,6 +418,7 @@ export function normalizeTalentSearchResult(data) {
     search_brief: normalizeBrief(source.search_brief),
     search_plan: normalizeSearchPlan(source.search_plan),
     source_execution: normalizeSourceExecution(source.source_execution),
+    coverage_backfill: normalizeCoverageBackfill(source.coverage_backfill),
     evidence_graph: normalizeEvidenceGraph(source.evidence_graph),
     talent_map: normalizeTalentMap(source.talent_map),
     candidates: (Array.isArray(source.candidates) ? source.candidates : []).map(normalizeCandidate),
@@ -441,6 +500,65 @@ export function buildSourceExecution(result) {
       error: "",
       next_action: item.reason || item.target,
     })),
+  };
+}
+
+export function buildCoverageBackfillPlan(result) {
+  const source = isPlainObject(result) ? result : {};
+  const returned = normalizeCoverageBackfill(source.coverage_backfill);
+  if (returned.jobs.length > 0) return returned;
+
+  const executionJobs = buildSourceExecution(source).jobs;
+  const jobs = [];
+  const seen = new Set();
+
+  const addJob = ({ coverageGroup, sourceType, reason, query, candidateNames, sourceTypesToCheck }) => {
+    const group = coverageGroupByKey(coverageGroup);
+    const normalizedSourceType = cleanString(sourceType).toLowerCase();
+    const key = `${group.key}:${normalizedSourceType}`;
+    if (!normalizedSourceType || seen.has(key)) return;
+    seen.add(key);
+    jobs.push({
+      gap_id: `${group.key}-${normalizedSourceType}`,
+      coverage_group: group.key,
+      missing_source_type: normalizedSourceType,
+      query: cleanString(query) || fallbackSourceQuery(normalizedSourceType, source.search_brief),
+      reason: cleanString(reason) || `缺少${group.label}覆盖，需要补搜 ${normalizedSourceType} 来源做交叉验证。`,
+      priority: jobs.length + 1,
+      status: "planned",
+      candidate_names: cleanStringArray(candidateNames, 12),
+      source_types_to_check: cleanStringArray(sourceTypesToCheck, 8),
+    });
+  };
+
+  for (const group of buildEvidenceCoverage(source)) {
+    if (group.status !== "missing") continue;
+    for (const sourceType of group.missing_source_types.slice(0, 2)) {
+      addJob({
+        coverageGroup: group.key,
+        sourceType,
+        reason: `缺少${group.label}覆盖，需要补搜 ${sourceType} 来源做交叉验证。`,
+        candidateNames: candidateNamesForCoverageGroup(source, group.key),
+        sourceTypesToCheck: group.missing_source_types,
+      });
+    }
+  }
+
+  for (const executionJob of executionJobs) {
+    if (executionJob.status === "completed" && executionJob.evidence_found > 0) continue;
+    addJob({
+      coverageGroup: executionJob.coverage_group,
+      sourceType: executionJob.source_type,
+      reason: backfillReason(coverageGroupByKey(executionJob.coverage_group), executionJob.source_type, executionJob),
+      query: executionJob.query,
+      candidateNames: executionJob.candidate_leads.length ? executionJob.candidate_leads : candidateNamesForCoverageGroup(source, executionJob.coverage_group),
+      sourceTypesToCheck: [executionJob.source_type],
+    });
+  }
+
+  return {
+    summary: jobs.length > 0 ? `${jobs.length} 个覆盖缺口待补搜。` : "",
+    jobs: jobs.slice(0, 16),
   };
 }
 

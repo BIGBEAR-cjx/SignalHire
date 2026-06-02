@@ -3,6 +3,7 @@
 
 declare module "@/lib/talent-profile.mjs" {
   export type CandidateComparisonRow = import("@/lib/talent-profile").CandidateComparisonRow;
+  export type CoverageBackfillJob = import("@/lib/talent-profile").CoverageBackfillJob;
   export type EvidenceCoverageGroup = import("@/lib/talent-profile").EvidenceCoverageGroup;
   export type SourceExecutionJob = import("@/lib/talent-profile").SourceExecutionJob;
   export type SourceQueryPlanItem = import("@/lib/talent-profile").SourceQueryPlanItem;
@@ -10,8 +11,8 @@ declare module "@/lib/talent-profile.mjs" {
   export type TalentSearchResult = import("@/lib/talent-profile").TalentSearchResult;
 }
 
-import type { CandidateComparisonRow, EvidenceCoverageGroup, SourceExecutionJob, SourceQueryPlanItem, TalentCandidate, TalentSearchResult } from "@/lib/talent-profile.mjs";
-import { buildCandidateComparisonRows, buildEvidenceCoverage, buildSourceExecution, buildSourceQueryPlan } from "@/lib/talent-profile.mjs";
+import type { CandidateComparisonRow, CoverageBackfillJob, EvidenceCoverageGroup, SourceExecutionJob, SourceQueryPlanItem, TalentCandidate, TalentSearchResult } from "@/lib/talent-profile.mjs";
+import { buildCandidateComparisonRows, buildCoverageBackfillPlan, buildEvidenceCoverage, buildSourceExecution, buildSourceQueryPlan } from "@/lib/talent-profile.mjs";
 import {
   reportUniqueSources,
   sourceCountChip,
@@ -331,6 +332,67 @@ export function SourceExecutionView({ result }: { result: TalentSearchResult }) 
               {(job.error || job.next_action) && (
                 <p className={`mt-3 text-xs leading-relaxed ${job.error ? "text-red-600" : "text-gray-500"}`}>
                   {job.error || job.next_action}
+                </p>
+              )}
+            </article>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
+function backfillStatusMeta(status: CoverageBackfillJob["status"]) {
+  return {
+    planned: { label: "待补搜", chip: "bg-blue-50 text-blue-700 ring-blue-100" },
+    completed: { label: "已补齐", chip: "bg-emerald-50 text-emerald-700 ring-emerald-200" },
+    skipped: { label: "已跳过", chip: "bg-gray-50 text-gray-600 ring-gray-200" },
+  }[status] ?? { label: status, chip: "bg-gray-50 text-gray-600 ring-gray-200" };
+}
+
+export function CoverageBackfillView({ result }: { result: TalentSearchResult }) {
+  const plan = buildCoverageBackfillPlan(result);
+  const jobs: CoverageBackfillJob[] = plan.jobs.filter((job: CoverageBackfillJob) => job.query || job.reason);
+  if (jobs.length === 0) return null;
+  return (
+    <section className="rounded-2xl border border-gray-100 bg-white p-5 shadow-[0_8px_30px_rgba(0,0,0,0.06)]">
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <h2 className="text-lg font-semibold text-gray-900">缺口补搜计划</h2>
+          <p className="mt-1 text-sm text-gray-500">把缺失或偏弱的信息源覆盖转成下一轮可执行查询。</p>
+        </div>
+        <span className="rounded-full bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-700 ring-1 ring-blue-100">
+          {jobs.length} 个缺口
+        </span>
+      </div>
+      {plan.summary && <p className="mt-3 text-sm leading-relaxed text-gray-600">{plan.summary}</p>}
+      <div className="mt-4 grid gap-3 md:grid-cols-2">
+        {jobs.map((job) => {
+          const status = backfillStatusMeta(job.status);
+          return (
+            <article key={job.gap_id} className="rounded-xl border border-blue-100 bg-blue-50/40 p-4">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="rounded-full bg-gray-900 px-2 py-0.5 text-xs font-semibold text-white">
+                  {job.priority}
+                </span>
+                <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ring-1 ${status.chip}`}>
+                  {status.label}
+                </span>
+                <span className="rounded-full bg-white px-2 py-0.5 text-xs font-medium text-blue-700 ring-1 ring-blue-100">
+                  {job.missing_source_type}
+                </span>
+                <span className="text-xs text-gray-500">{coverageGroupLabel(job.coverage_group)}</span>
+              </div>
+              <p className="mt-3 break-words font-mono text-xs leading-relaxed text-gray-700">{job.query}</p>
+              {job.reason && <p className="mt-2 text-xs leading-relaxed text-gray-600">{job.reason}</p>}
+              {job.candidate_names.length > 0 && (
+                <p className="mt-2 text-xs leading-relaxed text-blue-900/70">
+                  影响候选人：{job.candidate_names.slice(0, 5).join(", ")}
+                </p>
+              )}
+              {job.source_types_to_check.length > 0 && (
+                <p className="mt-1 text-xs leading-relaxed text-gray-500">
+                  优先来源：{job.source_types_to_check.join(", ")}
                 </p>
               )}
             </article>

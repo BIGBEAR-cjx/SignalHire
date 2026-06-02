@@ -9,6 +9,7 @@ import {
   CandidateCard,
   CandidateComparisonView,
   CandidateProfileView,
+  CoverageBackfillView,
   EvidenceCoverageView,
   EvidenceGraphView,
   SearchPlanView,
@@ -437,6 +438,7 @@ export default function ResearchTool({
             <>
               <SearchPlanView result={result} />
               <SourceExecutionView result={result} />
+              <CoverageBackfillView result={result} />
               <EvidenceCoverageView result={result} />
               <TalentMapView result={result} />
               <CandidateComparisonView result={result} />
