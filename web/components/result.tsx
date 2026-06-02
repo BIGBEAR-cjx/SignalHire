@@ -4,12 +4,13 @@
 declare module "@/lib/talent-profile.mjs" {
   export type CandidateComparisonRow = import("@/lib/talent-profile").CandidateComparisonRow;
   export type EvidenceCoverageGroup = import("@/lib/talent-profile").EvidenceCoverageGroup;
+  export type SourceQueryPlanItem = import("@/lib/talent-profile").SourceQueryPlanItem;
   export type TalentCandidate = import("@/lib/talent-profile").TalentCandidate;
   export type TalentSearchResult = import("@/lib/talent-profile").TalentSearchResult;
 }
 
-import type { CandidateComparisonRow, EvidenceCoverageGroup, TalentCandidate, TalentSearchResult } from "@/lib/talent-profile.mjs";
-import { buildCandidateComparisonRows, buildEvidenceCoverage } from "@/lib/talent-profile.mjs";
+import type { CandidateComparisonRow, EvidenceCoverageGroup, SourceQueryPlanItem, TalentCandidate, TalentSearchResult } from "@/lib/talent-profile.mjs";
+import { buildCandidateComparisonRows, buildEvidenceCoverage, buildSourceQueryPlan } from "@/lib/talent-profile.mjs";
 import {
   reportUniqueSources,
   sourceCountChip,
@@ -174,6 +175,7 @@ export function SearchPlanView({ result }: { result: TalentSearchResult }) {
   if (!plan) return null;
   const hasPlan = plan.must_have.length || plan.nice_to_have.length || plan.exclusions.length || plan.source_strategy.length || plan.adjacent_pools.length;
   if (!hasPlan) return null;
+  const queryPlan = buildSourceQueryPlan(result) as SourceQueryPlanItem[];
   return (
     <section className="rounded-2xl border border-gray-100 bg-white p-5 shadow-[0_8px_30px_rgba(0,0,0,0.06)]">
       <div>
@@ -196,6 +198,39 @@ export function SearchPlanView({ result }: { result: TalentSearchResult }) {
           ))}
         </div>
       )}
+      {queryPlan.length > 0 && (
+        <div className="mt-4 rounded-xl border border-gray-100 bg-gray-50/70 p-4">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <p className="text-sm font-semibold text-gray-900">来源查询计划</p>
+            <span className="rounded-full bg-white px-2 py-0.5 text-xs font-semibold text-gray-600 ring-1 ring-gray-200">
+              {queryPlan.length} 条
+            </span>
+          </div>
+          <div className="mt-3 space-y-2">
+            {queryPlan.map((item) => (
+              <article key={`${item.priority}-${item.source_type}`} className="rounded-lg bg-white p-3 ring-1 ring-gray-100">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="rounded-full bg-gray-900 px-2 py-0.5 text-xs font-semibold text-white">
+                    {item.priority}
+                  </span>
+                  <span className="rounded-full bg-blue-50 px-2 py-0.5 text-xs font-medium text-blue-700 ring-1 ring-blue-100">
+                    {item.source_type}
+                  </span>
+                  <span className="text-xs text-gray-400">{coverageGroupLabel(item.coverage_group)}</span>
+                </div>
+                <p className="mt-2 break-words font-mono text-xs leading-relaxed text-gray-700">{item.query}</p>
+                {(item.target || item.reason) && (
+                  <p className="mt-1 text-xs leading-relaxed text-gray-500">
+                    {item.target}
+                    {item.target && item.reason ? " · " : ""}
+                    {item.reason}
+                  </p>
+                )}
+              </article>
+            ))}
+          </div>
+        </div>
+      )}
       {plan.adjacent_pools.length > 0 && (
         <div className="mt-4 rounded-xl border border-blue-100 bg-blue-50/60 p-4">
           <p className="text-sm font-semibold text-blue-900">相邻人才池</p>
@@ -211,6 +246,15 @@ export function SearchPlanView({ result }: { result: TalentSearchResult }) {
       )}
     </section>
   );
+}
+
+function coverageGroupLabel(value: string) {
+  return {
+    research: "研究",
+    practice: "实践",
+    work_history: "工作经历",
+    public_voice: "公开表达",
+  }[value] ?? value;
 }
 
 export function TalentMapView({ result }: { result: TalentSearchResult }) {
