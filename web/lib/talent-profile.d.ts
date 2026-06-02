@@ -32,6 +32,7 @@ export const COVERAGE_BACKFILL_STATUSES: CoverageBackfillStatus[];
 export function normalizeTalentSearchResult(data: unknown): TalentSearchResult;
 export function buildCandidateComparisonRows(result: unknown): CandidateComparisonRow[];
 export function buildCoverageBackfillPlan(result: unknown): CoverageBackfillPlan;
+export function buildBackfillSearchInput(input?: { job?: unknown; originalQuery?: string }): string;
 export function buildEvidenceCoverage(result: unknown): EvidenceCoverageGroup[];
 export function buildSourceQueryPlan(result: unknown): SourceQueryPlanItem[];
 export function buildSourceExecution(result: unknown): SourceExecution;

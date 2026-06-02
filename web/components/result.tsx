@@ -350,7 +350,15 @@ function backfillStatusMeta(status: CoverageBackfillJob["status"]) {
   }[status] ?? { label: status, chip: "bg-gray-50 text-gray-600 ring-gray-200" };
 }
 
-export function CoverageBackfillView({ result }: { result: TalentSearchResult }) {
+export function CoverageBackfillView({
+  result,
+  onBackfillJob,
+  backfillDisabled = false,
+}: {
+  result: TalentSearchResult;
+  onBackfillJob?: (job: CoverageBackfillJob) => void;
+  backfillDisabled?: boolean;
+}) {
   const plan = buildCoverageBackfillPlan(result);
   const jobs: CoverageBackfillJob[] = plan.jobs.filter((job: CoverageBackfillJob) => job.query || job.reason);
   if (jobs.length === 0) return null;
@@ -394,6 +402,16 @@ export function CoverageBackfillView({ result }: { result: TalentSearchResult })
                 <p className="mt-1 text-xs leading-relaxed text-gray-500">
                   优先来源：{job.source_types_to_check.join(", ")}
                 </p>
+              )}
+              {onBackfillJob && (
+                <button
+                  type="button"
+                  onClick={() => onBackfillJob(job)}
+                  disabled={backfillDisabled || job.status !== "planned"}
+                  className="mt-3 rounded-lg bg-gray-900 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {backfillDisabled ? "补搜入队中…" : "补搜这个缺口"}
+                </button>
               )}
             </article>
           );
