@@ -31,6 +31,11 @@ export type BackfillMergeCandidate = { candidate_name: string; new_evidence_coun
 export type BackfillCoverageGain = { key: string; label: string; before_count: number; after_count: number; added_source_types: string[] };
 export type BackfillMergeSummary = { summary: string; improved_candidates: BackfillMergeCandidate[]; new_candidate_names: string[]; coverage_gains: BackfillCoverageGain[] };
 export type BackfillMergedTalentSearchResult = TalentSearchResult & { backfill_merge: { merged_at: string; summary: BackfillMergeSummary } };
+export type SearchFeedbackPrecision = "accurate" | "partial" | "off";
+export type SearchFeedbackSatisfaction = "satisfied" | "mixed" | "unsatisfied";
+export type SearchFeedbackIssue = "too_broad" | "wrong_seniority" | "wrong_direction" | "weak_evidence" | "wrong_location" | "too_few" | "too_many" | "other";
+export type SearchFeedbackFocus = "stricter_match" | "expand_sources" | "stronger_evidence" | "adjacent_pools" | "higher_seniority" | "location_fit";
+export type SearchFeedback = { precision?: SearchFeedbackPrecision | ""; satisfaction?: SearchFeedbackSatisfaction | ""; issue?: SearchFeedbackIssue | ""; focus?: SearchFeedbackFocus | "" };
 export const AI_DIRECTIONS: string[];
 export const VERDICTS: Verdict[];
 export const EVIDENCE_QUALITY: EvidenceQuality[];
@@ -47,6 +52,7 @@ export function buildBackfillMergeSummary(input?: { originalResult?: unknown; ba
 export function mergeBackfillResult(input?: { originalResult?: unknown; backfillResult?: unknown; mergedAt?: string }): BackfillMergedTalentSearchResult;
 export function buildEditableSearchPlanDraft(query: unknown): EditableSearchPlanDraft;
 export function buildSearchInputFromEditablePlan(input?: { draft?: unknown }): string;
+export function buildFeedbackOptimizedSearchInput(input?: { result?: unknown; feedback?: SearchFeedback }): string;
 export function buildEvidenceCoverage(result: unknown): EvidenceCoverageGroup[];
 export function buildSourceQueryPlan(result: unknown): SourceQueryPlanItem[];
 export function buildSourceExecution(result: unknown): SourceExecution;

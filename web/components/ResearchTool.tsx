@@ -23,7 +23,7 @@ import {
   type VerifyReport,
 } from "@/components/result";
 import OutreachModal from "@/components/OutreachModal";
-import { buildBackfillMergeSummary, buildEditableSearchPlanDraft, buildSearchInputFromEditablePlan } from "@/lib/talent-profile.mjs";
+import { buildBackfillMergeSummary, buildEditableSearchPlanDraft, buildFeedbackOptimizedSearchInput, buildSearchInputFromEditablePlan } from "@/lib/talent-profile.mjs";
 import type { BackfillMergeSummary, CoverageBackfillJob, TalentCandidate, TalentSearchResult } from "@/lib/talent-profile.mjs";
 
 type FeedItem = { id: number; kind: "search" | "fetch"; info: string };
@@ -54,9 +54,69 @@ type BackfillContext = { originalResult: TalentSearchResult; originalRunId: stri
 type MergeBackfillResponse = { merged?: boolean; runId?: string; result?: AppResult; mergeSummary?: BackfillMergeSummary; error?: string };
 type EditableSearchPlanDraft = TalentSearchResult;
 type EditableSourceStrategy = TalentSearchResult["search_plan"]["source_strategy"][number];
+type SearchFeedbackState = {
+  precision: "" | "accurate" | "partial" | "off";
+  satisfaction: "" | "satisfied" | "mixed" | "unsatisfied";
+  issue: "" | "too_broad" | "wrong_seniority" | "wrong_direction" | "weak_evidence" | "wrong_location" | "too_few" | "too_many" | "other";
+  focus: "" | "stricter_match" | "expand_sources" | "stronger_evidence" | "adjacent_pools" | "higher_seniority" | "location_fit";
+};
+type SearchFeedbackField = keyof SearchFeedbackState;
+type SearchFeedbackOption = { value: SearchFeedbackState[SearchFeedbackField]; label: string };
+type SearchFeedbackGroup = { key: SearchFeedbackField; label: string; options: SearchFeedbackOption[] };
 
 const WORKER_DELAY_MS = 2 * 60 * 1000;
 const JOB_TIMEOUT_MS = 15 * 60 * 1000;
+const EMPTY_SEARCH_FEEDBACK: SearchFeedbackState = {
+  precision: "",
+  satisfaction: "",
+  issue: "",
+  focus: "",
+};
+const SEARCH_FEEDBACK_GROUPS: SearchFeedbackGroup[] = [
+  {
+    key: "precision",
+    label: "候选人是否精准？",
+    options: [
+      { value: "accurate", label: "精准" },
+      { value: "partial", label: "部分精准" },
+      { value: "off", label: "不精准" },
+    ],
+  },
+  {
+    key: "satisfaction",
+    label: "推荐人选是否满意？",
+    options: [
+      { value: "satisfied", label: "满意" },
+      { value: "mixed", label: "一般" },
+      { value: "unsatisfied", label: "不满意" },
+    ],
+  },
+  {
+    key: "issue",
+    label: "主要问题",
+    options: [
+      { value: "too_broad", label: "太泛" },
+      { value: "wrong_seniority", label: "资历不对" },
+      { value: "wrong_direction", label: "方向不对" },
+      { value: "weak_evidence", label: "证据不足" },
+      { value: "wrong_location", label: "地域不对" },
+      { value: "too_few", label: "太少" },
+      { value: "too_many", label: "太多" },
+    ],
+  },
+  {
+    key: "focus",
+    label: "下一轮优化方向",
+    options: [
+      { value: "stricter_match", label: "更严格" },
+      { value: "expand_sources", label: "扩来源" },
+      { value: "stronger_evidence", label: "强证据" },
+      { value: "adjacent_pools", label: "换人才池" },
+      { value: "higher_seniority", label: "更资深" },
+      { value: "location_fit", label: "调地域" },
+    ],
+  },
+];
 
 function isVerifyReport(result: AppResult): result is VerifyReport {
   return "claims" in result;
@@ -115,6 +175,7 @@ export default function ResearchTool({
   const [mergingBackfill, setMergingBackfill] = useState(false);
   const [mergedOriginalRunId, setMergedOriginalRunId] = useState<string | null>(null);
   const [editablePlan, setEditablePlan] = useState<EditableSearchPlanDraft | null>(null);
+  const [searchFeedback, setSearchFeedback] = useState<SearchFeedbackState>(EMPTY_SEARCH_FEEDBACK);
   const idRef = useRef(0);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -188,6 +249,7 @@ export default function ResearchTool({
     setFeed([]); setLive(null); setRunId(null); setCurrentJobId(null);
     setJobStatus(null); setCopied(false); setBackfillContext(null); setBackfillMergeSummary(null);
     setMergingBackfill(false); setMergedOriginalRunId(null);
+    setSearchFeedback(EMPTY_SEARCH_FEEDBACK);
     if (!options.preserveInput) setEditablePlan(null);
     try {
       const url = mode === "search" ? "/api/search" : "/api/verify";
@@ -283,6 +345,18 @@ export default function ResearchTool({
   function runEditablePlan() {
     if (!editablePlan) return;
     run(buildSearchInputFromEditablePlan({ draft: editablePlan }), { preserveInput: true });
+  }
+
+  function updateSearchFeedback(key: SearchFeedbackField, value: SearchFeedbackState[SearchFeedbackField]) {
+    setSearchFeedback((current) => ({
+      ...current,
+      [key]: current[key] === value ? "" : value,
+    }));
+  }
+
+  function runFeedbackOptimizedSearch() {
+    if (!isTalentSearchResult(result)) return;
+    run(buildFeedbackOptimizedSearchInput({ result, feedback: searchFeedback }), { preserveInput: true });
   }
 
   async function retryCurrentJob() {
@@ -425,6 +499,7 @@ export default function ResearchTool({
   }
 
   const isSearch = mode === "search";
+  const hasCoreSearchFeedback = Boolean(searchFeedback.precision && searchFeedback.satisfaction);
 
   return (
     <div className="space-y-5">
@@ -663,6 +738,53 @@ export default function ResearchTool({
               <EvidenceCoverageView result={result} />
               <TalentMapView result={result} />
               <CandidateComparisonView result={result} />
+              <section className="rounded-2xl border border-gray-100 bg-white p-5 shadow-[0_8px_30px_rgba(0,0,0,0.06)]">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <h2 className="text-lg font-semibold text-gray-900">这轮结果怎么样？</h2>
+                    <p className="mt-1 text-sm text-gray-500">
+                      用选择题反馈本轮 shortlist，下一轮会按你的反馈调整搜索和交叉验证重点。
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={runFeedbackOptimizedSearch}
+                    disabled={loading || !hasCoreSearchFeedback}
+                    className="rounded-xl bg-gray-900 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    按反馈优化下一轮
+                  </button>
+                </div>
+                <div className="mt-4 grid gap-4 md:grid-cols-2">
+                  {SEARCH_FEEDBACK_GROUPS.map((group) => (
+                    <div key={group.key}>
+                      <p className="text-xs font-semibold text-gray-500">{group.label}</p>
+                      <div className="mt-2 flex flex-wrap gap-2">
+                        {group.options.map((option) => {
+                          const selected = searchFeedback[group.key] === option.value;
+                          return (
+                            <button
+                              key={option.value}
+                              type="button"
+                              onClick={() => updateSearchFeedback(group.key, option.value)}
+                              className={`rounded-full border px-3 py-1.5 text-sm font-medium transition ${
+                                selected
+                                  ? "border-gray-900 bg-gray-900 text-white"
+                                  : "border-gray-200 bg-gray-50 text-gray-700 hover:border-gray-900 hover:bg-white"
+                              }`}
+                            >
+                              {option.label}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                {!hasCoreSearchFeedback && (
+                  <p className="mt-4 text-xs text-gray-400">先选择精准度和满意度后即可重跑；主要问题和优化方向可选。</p>
+                )}
+              </section>
               <section className="space-y-3">
                 <div className="flex flex-wrap items-end justify-between gap-3">
                   <div>

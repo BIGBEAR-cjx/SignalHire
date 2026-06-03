@@ -829,6 +829,88 @@ export function buildSearchInputFromEditablePlan({ draft } = {}) {
   ].join("\n");
 }
 
+const SEARCH_FEEDBACK_LABELS = {
+  precision: {
+    accurate: "精准",
+    partial: "部分精准",
+    off: "不精准",
+  },
+  satisfaction: {
+    satisfied: "满意",
+    mixed: "一般",
+    unsatisfied: "不满意",
+  },
+  issue: {
+    too_broad: "候选人太泛",
+    wrong_seniority: "资历不对",
+    wrong_direction: "方向不对",
+    weak_evidence: "证据不足",
+    wrong_location: "地域不对",
+    too_few: "候选人太少",
+    too_many: "候选人太多",
+    other: "其他",
+  },
+  focus: {
+    stricter_match: "更严格匹配",
+    expand_sources: "扩大信息源",
+    stronger_evidence: "补强证据",
+    adjacent_pools: "换相邻人才池",
+    higher_seniority: "提高资历门槛",
+    location_fit: "调整地域匹配",
+  },
+};
+
+function feedbackLabel(group, value, fallback) {
+  const key = cleanString(value);
+  return SEARCH_FEEDBACK_LABELS[group]?.[key] || fallback;
+}
+
+function candidateFeedbackSummary(candidate) {
+  const role = [candidate.current_role, candidate.current_company].filter(Boolean).join(" / ") || candidate.headline || "role unknown";
+  const directions = candidate.ai_directions.length ? candidate.ai_directions.join(", ") : "direction unknown";
+  const signal = candidate.strongest_signals[0] || candidate.summary || "no strong signal captured";
+  const uncertainty = candidate.uncertainties[0] || "no major uncertainty captured";
+  return `- ${candidate.name}: score ${candidate.match_score}; ${role}; ${directions}; signal: ${signal}; risk: ${uncertainty}`;
+}
+
+/**
+ * @param {{ result?: unknown; feedback?: { precision?: string; satisfaction?: string; issue?: string; focus?: string } }} input
+ */
+export function buildFeedbackOptimizedSearchInput({ result, feedback = {} } = {}) {
+  const normalized = normalizeTalentSearchResult(result);
+  const brief = normalized.search_brief;
+  const plan = normalized.search_plan;
+  const feedbackSummary = [
+    `Precision: ${feedbackLabel("precision", feedback.precision, "未选择")}`,
+    `Satisfaction: ${feedbackLabel("satisfaction", feedback.satisfaction, "未选择")}`,
+    `Main issue: ${feedbackLabel("issue", feedback.issue, "未选择")}`,
+    `Next-round focus: ${feedbackLabel("focus", feedback.focus, "未选择")}`,
+  ];
+  const previousCandidates = normalized.candidates.length
+    ? normalized.candidates.slice(0, 12).map(candidateFeedbackSummary)
+    : ["- No previous candidate summary available."];
+
+  return [
+    "Feedback-optimized SignalHire search.",
+    `Original search brief: ${brief.original_query || "Not provided"}`,
+    `Required skills: ${brief.required_skills.join("; ") || plan.must_have.join("; ") || "not specified"}`,
+    `Preferred skills: ${brief.preferred_skills.join("; ") || plan.nice_to_have.join("; ") || "not specified"}`,
+    `Seniority: ${brief.seniority || "not specified"}`,
+    `Geography: ${brief.geography || "not specified"}`,
+    `Exclusions: ${brief.exclusions.join("; ") || plan.exclusions.join("; ") || "not specified"}`,
+    "User feedback from reviewed shortlist:",
+    ...feedbackSummary,
+    "Previous shortlist to learn from:",
+    ...previousCandidates,
+    "Optimization instructions:",
+    "- Treat the feedback as ranking and sourcing guidance for the same underlying search intent.",
+    "- Do not simply rerank the same shortlist; search for improved or replacement candidates where feedback indicates weak fit.",
+    "- Preserve genuinely strong matches, but raise the bar on the selected issue and next-round focus.",
+    "- Expand and cross-validate public evidence across research, practice, work history, and public voice sources.",
+    "Return the normal SignalHire talent shortlist payload with search_plan, source_execution, coverage_backfill, evidence_graph, talent_map, and candidates.",
+  ].join("\n");
+}
+
 export function buildSourceExecution(result) {
   const source = isPlainObject(result) ? result : {};
   const execution = normalizeSourceExecution(source.source_execution);
