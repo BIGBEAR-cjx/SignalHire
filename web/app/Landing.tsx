@@ -1,53 +1,56 @@
 "use client";
 
-// Landing.tsx —— 首页落地区 (浅色 SaaS 风, 仿 Deflexai)。
-// hero 直接给搜索输入框, 缩短转化路径; 环绕 logo = 交叉验证的公开数据来源。
+// Landing.tsx —— 公开首页。
+// hero 直接给搜索输入框, 缩短转化路径; 首屏展示产品真实产出形态。
 import { useState } from "react";
-import type { IconType } from "react-icons";
-import {
-  SiGithub, SiWikipedia, SiStackoverflow, SiX, SiMedium,
-  SiGooglescholar, SiArxiv, SiCrunchbase, SiOrcid,
-} from "react-icons/si";
-import { FaLinkedin } from "react-icons/fa6";
+import { LogoMark, SecondaryAction } from "@/components/ui/signal-ui";
 
-type Src = { Icon: IconType; color: string; label: string };
-
-// 环绕气泡用的数据来源 (品牌色)
-const ORBIT: (Src & { top: string; left: string; size: number })[] = [
-  { Icon: SiGithub, color: "#181717", label: "GitHub", top: "20%", left: "29%", size: 56 },
-  { Icon: FaLinkedin, color: "#0A66C2", label: "LinkedIn", top: "37%", left: "13%", size: 60 },
-  { Icon: SiWikipedia, color: "#2B2B2B", label: "Wikipedia", top: "56%", left: "6%", size: 52 },
-  { Icon: SiStackoverflow, color: "#F58025", label: "Stack Overflow", top: "73%", left: "15%", size: 54 },
-  { Icon: SiGooglescholar, color: "#4285F4", label: "Google Scholar", top: "86%", left: "30%", size: 50 },
-  { Icon: SiX, color: "#0F0F0F", label: "X", top: "20%", left: "69%", size: 56 },
-  { Icon: SiCrunchbase, color: "#0288D1", label: "Crunchbase", top: "37%", left: "85%", size: 60 },
-  { Icon: SiArxiv, color: "#B31B1B", label: "arXiv", top: "56%", left: "92%", size: 52 },
-  { Icon: SiOrcid, color: "#A6CE39", label: "ORCID", top: "73%", left: "83%", size: 54 },
-  { Icon: SiMedium, color: "#0F0F0F", label: "Medium", top: "86%", left: "68%", size: 50 },
-];
-
-// 品牌雷达标 (透明底, 深色描边 + 青柠中心点) —— 浅色导航/正文用。
-function LogoMark({ className = "" }: { className?: string }) {
+function ProductPreview() {
+  const candidates = [
+    { name: "Ava Chen", role: "LLM Systems Lead", score: 94, evidence: "8 信源" },
+    { name: "Mateo Rossi", role: "Inference Runtime Engineer", score: 89, evidence: "6 信源" },
+    { name: "Nora Singh", role: "AI Infra Researcher", score: 86, evidence: "7 信源" },
+  ];
   return (
-    <svg viewBox="0 0 512 512" className={className} aria-hidden="true">
-      <g stroke="#111111" strokeWidth={22} fill="none" strokeLinecap="round">
-        <circle cx="256" cy="256" r="130" />
-        <circle cx="256" cy="256" r="70" />
-        <path d="M186 256a70 70 0 1 0 70-70" />
-      </g>
-      <circle cx="256" cy="256" r="16" fill="#9EFF4F" />
-    </svg>
-  );
-}
-
-function Bubble({ Icon, color, label, size }: Src & { size: number }) {
-  return (
-    <div
-      title={label}
-      className="absolute flex -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-2xl bg-white shadow-[0_8px_30px_rgba(0,0,0,0.08)] ring-1 ring-gray-100"
-      style={{ width: size, height: size }}
-    >
-      <Icon size={size * 0.5} color={color} />
+    <div className="mx-auto mt-10 grid max-w-5xl gap-4 lg:grid-cols-[1.05fr_0.95fr]">
+      <div className="sh-surface p-5 text-left">
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-neutral-500">Shortlist preview</p>
+            <h2 className="mt-2 text-2xl font-semibold text-[var(--sh-ink)]">AI Infra 候选人</h2>
+          </div>
+          <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700 ring-1 ring-emerald-100">证据强</span>
+        </div>
+        <div className="mt-5 space-y-3">
+          {candidates.map((candidate) => (
+            <div key={candidate.name} className="rounded-2xl bg-white/80 p-4 ring-1 ring-black/5">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="text-sm font-semibold text-[var(--sh-ink)]">{candidate.name}</p>
+                  <p className="mt-1 text-xs text-[var(--sh-muted)]">{candidate.role}</p>
+                </div>
+                <span className="rounded-full bg-neutral-950 px-2.5 py-1 text-xs font-semibold text-white">{candidate.score}</span>
+              </div>
+              <p className="mt-3 text-xs text-[var(--sh-muted)]">{candidate.evidence} · GitHub / arXiv / 公司页面交叉验证</p>
+            </div>
+          ))}
+        </div>
+      </div>
+      <div className="sh-surface p-5 text-left">
+        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-neutral-500">Evidence audit</p>
+        <h2 className="mt-2 text-2xl font-semibold text-[var(--sh-ink)]">每条声称都能回到来源</h2>
+        <div className="mt-5 space-y-3">
+          {["维护 vLLM 推理项目", "发表过系统方向论文", "曾在生产环境负责模型服务"].map((claim, index) => (
+            <div key={claim} className="rounded-2xl bg-white/80 p-4 ring-1 ring-black/5">
+              <div className="flex items-start justify-between gap-3">
+                <p className="text-sm text-[var(--sh-ink)]">{claim}</p>
+                <span className="rounded-full bg-blue-50 px-2 py-0.5 text-xs font-semibold text-blue-700 ring-1 ring-blue-100">{index === 1 ? "待核实" : "已验证"}</span>
+              </div>
+              <p className="mt-2 text-xs text-[var(--sh-muted)]">来源 {index + 3} 个 · 可点击查看原始页面</p>
+            </div>
+          ))}
+        </div>
+      </div>
     </div>
   );
 }
@@ -69,7 +72,7 @@ export default function Landing({
   return (
     <div className="relative overflow-hidden">
       {/* 顶部浮动导航 */}
-      <nav className="sticky top-3 z-30 mx-auto mt-3 flex max-w-5xl items-center justify-between rounded-2xl border border-gray-100 bg-white/80 px-5 py-3 shadow-[0_8px_30px_rgba(0,0,0,0.06)] backdrop-blur">
+      <nav className="sticky top-3 z-30 mx-auto mt-3 flex max-w-5xl items-center justify-between rounded-full border border-black/5 bg-white/72 px-5 py-3 shadow-[0_12px_40px_rgba(0,0,0,0.06)] backdrop-blur-2xl">
         <a href="#top" className="flex items-center gap-2 font-semibold text-gray-900">
           <LogoMark className="h-8 w-8" />
           <span className="text-[17px] tracking-tight">SignalHire</span>
@@ -83,7 +86,7 @@ export default function Landing({
             <span className="hidden max-w-[160px] truncate text-gray-500 sm:inline" title={user.email}>{user.email}</span>
             <button
               onClick={onLogout}
-              className="rounded-xl border border-gray-200 px-3 py-2 font-medium text-gray-700 hover:border-gray-900"
+              className="rounded-full border border-black/10 px-3 py-2 font-medium text-[var(--sh-muted)] hover:border-black/20 hover:text-[var(--sh-ink)]"
             >
               退出
             </button>
@@ -91,7 +94,7 @@ export default function Landing({
         ) : (
           <button
             onClick={onLoginClick}
-            className="rounded-xl bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-800"
+            className="rounded-full bg-neutral-950 px-4 py-2 text-sm font-medium text-white hover:bg-neutral-800"
           >
             登录
           </button>
@@ -99,38 +102,15 @@ export default function Landing({
       </nav>
 
       {/* Hero */}
-      <section id="top" className="relative mx-auto min-h-[760px] max-w-6xl px-4 pt-16 pb-10 text-center">
-        {/* 同心环 (桌面端) */}
-        <div className="pointer-events-none absolute left-1/2 top-1/2 hidden -translate-x-1/2 -translate-y-1/2 lg:block">
-          {[560, 820, 1080, 1340].map((d) => (
-            <div
-              key={d}
-              style={{ width: d, height: d }}
-              className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full border border-gray-200/60"
-            />
-          ))}
-        </div>
-
-        {/* 环绕的数据来源 logo (桌面端) */}
-        <div className="pointer-events-none absolute inset-0 hidden lg:block">
-          {ORBIT.map((s, i) => (
-            <div
-              key={s.label}
-              style={{ top: s.top, left: s.left, animationDelay: `${(i % 5) * 0.5}s` }}
-              className="sh-float absolute"
-            >
-              <Bubble {...s} />
-            </div>
-          ))}
-        </div>
-
+      <section id="top" className="relative mx-auto min-h-[calc(100vh-72px)] max-w-6xl px-4 pb-10 pt-20 text-center">
         {/* 中央内容 */}
-        <div className="sh-fade-in-up relative z-10 mx-auto max-w-2xl">
-          <h1 className="text-5xl font-extrabold leading-[1.1] tracking-tight text-gray-900 sm:text-6xl">
-            AI 找人，<br />每句声称都查证
+        <div className="sh-fade-in-up relative z-10 mx-auto max-w-3xl">
+          <p className="text-sm font-semibold text-[var(--sh-muted)]">For AI hiring teams</p>
+          <h1 className="mt-4 text-5xl font-semibold leading-[1.04] text-[var(--sh-ink)] sm:text-7xl">
+            Find AI talent by evidence.
           </h1>
-          <p className="mx-auto mt-5 max-w-xl text-lg text-gray-600">
-            MiroMind 全网深度搜索候选人，并对每条声称做跨源交叉验证——亮出可点击的证据，而不是又一份没核实的简历。
+          <p className="mx-auto mt-5 max-w-2xl text-lg leading-8 text-[var(--sh-muted)]">
+            为 HR 和猎头生成全球 AI 人才 shortlist、交叉验证证据和候选人风险摘要。
           </p>
 
           {/* 直接搜索输入框 (缩短转化路径; 多行大框, 完整看到长输入) */}
@@ -138,8 +118,7 @@ export default function Landing({
             className="relative mx-auto mt-9 max-w-2xl text-left"
             onSubmit={(e) => { e.preventDefault(); const v = q.trim(); if (v) onSearch(v); }}
           >
-            <div className="absolute -inset-3 -z-10 rounded-full bg-gradient-to-tr from-blue-200/30 via-emerald-100/30 to-transparent blur-2xl" />
-            <div className="rounded-2xl border border-gray-200 bg-white p-2.5 shadow-[0_12px_40px_rgba(0,0,0,0.08)]">
+            <div className="sh-surface p-2.5">
               <textarea
                 value={q}
                 onChange={(e) => setQ(e.target.value)}
@@ -153,23 +132,21 @@ export default function Landing({
                 rows={6}
                 placeholder="描述你要找的人，例如：给 Tokio 贡献过代码、常驻欧洲的资深 Rust 工程师。也可以直接粘贴一段岗位要求或候选人简介。"
                 aria-label="搜索候选人"
-                className="block max-h-[40vh] min-h-[150px] w-full resize-y overflow-y-auto rounded-xl bg-transparent px-3 py-2.5 text-[15px] leading-relaxed text-gray-900 outline-none placeholder:text-gray-400"
+                className="block max-h-[40vh] min-h-[150px] w-full resize-y overflow-y-auto rounded-[18px] bg-white/70 px-3 py-2.5 text-[15px] leading-relaxed text-[var(--sh-ink)] outline-none placeholder:text-[var(--sh-faint)]"
               />
               <div className="mt-1 flex items-center justify-between gap-2 px-1">
-                <span className="text-xs text-gray-400">{q.length} 字 · ⌘/Ctrl + Enter 搜索</span>
-                <button type="submit" className="shrink-0 rounded-xl bg-gray-900 px-6 py-2.5 font-medium text-white hover:bg-gray-800">
+                <span className="text-xs text-[var(--sh-faint)]">{q.length} 字 · ⌘/Ctrl + Enter 搜索</span>
+                <button type="submit" className="sh-primary-action shrink-0 px-6">
                   搜索
                 </button>
               </div>
             </div>
           </form>
-          <button
-            onClick={onDemo}
-            className="mt-4 text-sm text-gray-500 underline-offset-4 transition hover:text-gray-900 hover:underline"
-          >
-            或查看候选人核验示例 →
-          </button>
+          <div className="mt-4 flex justify-center">
+            <SecondaryAction onClick={onDemo}>查看候选人核验示例</SecondaryAction>
+          </div>
         </div>
+        <ProductPreview />
       </section>
 
       <HowItWorks />
