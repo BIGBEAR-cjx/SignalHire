@@ -7,6 +7,7 @@ export const RUN_STATUSES = {
   RETRYING: "retrying",
   DONE: "done",
   ERROR: "error",
+  CANCELED: "canceled",
 };
 
 function iso(now = new Date()) {
@@ -61,6 +62,18 @@ export function buildRunFailureUpdate({
     last_error: msg,
     error: final ? msg : null,
     locked_at: null,
+    updated_at: iso(now),
+  };
+}
+
+export function buildCancelUpdate(now = new Date()) {
+  const msg = "用户已停止搜索";
+  return {
+    status: RUN_STATUSES.CANCELED,
+    error: msg,
+    last_error: msg,
+    locked_at: null,
+    finished_at: iso(now),
     updated_at: iso(now),
   };
 }

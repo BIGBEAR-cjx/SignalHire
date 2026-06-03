@@ -461,7 +461,7 @@ function ProjectHeader({ detail, onChanged, onDelete }: { detail: ProjectDetail;
           />
         ) : (
           <p className={`whitespace-pre-line text-sm ${p.brief ? "text-gray-700" : "text-gray-400 italic"}`}>
-            {p.brief || "暂无 brief — 加上之后, 在本项目下搜人会自动用它"}
+            {p.brief || "暂无 brief — 加上之后, 在本项目下搜人会预填它"}
           </p>
         )}
       </div>

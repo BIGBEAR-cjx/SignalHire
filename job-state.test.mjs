@@ -4,6 +4,7 @@ import assert from "node:assert/strict";
 import {
   DEFAULT_MAX_ATTEMPTS,
   STALE_AFTER_MS,
+  buildCancelUpdate,
   buildRetryUpdate,
   buildRunFailureUpdate,
   buildRunStartUpdate,
@@ -99,6 +100,17 @@ test("manual retry resets an errored job to queued", () => {
   });
 });
 
+test("canceling a run records a stopped terminal status", () => {
+  assert.deepEqual(buildCancelUpdate(now), {
+    status: "canceled",
+    error: "用户已停止搜索",
+    last_error: "用户已停止搜索",
+    locked_at: null,
+    finished_at: now.toISOString(),
+    updated_at: now.toISOString(),
+  });
+});
+
 test("describes user-visible status for polling UI", () => {
   assert.deepEqual(describeJobStatus({ status: "queued" }), {
     phase: "queued",
@@ -133,6 +145,15 @@ test("describes user-visible status for polling UI", () => {
       label: "研究失败",
       detail: "模型输出不是干净 JSON",
       canRetry: true,
+    },
+  );
+  assert.deepEqual(
+    describeJobStatus({ status: "canceled" }),
+    {
+      phase: "canceled",
+      label: "搜索已停止",
+      detail: "你已停止本次搜索。可以调整条件后重新搜索。",
+      canRetry: false,
     },
   );
 });
