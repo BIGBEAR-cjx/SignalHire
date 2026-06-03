@@ -4,6 +4,18 @@
 // 4 KPI + 进行中任务 + 最近研究; 顶部 + 新建。
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import type { IconType } from "react-icons";
+import { FiAlertTriangle, FiBriefcase, FiCheckCircle, FiClipboard } from "react-icons/fi";
+import {
+  EmptyState,
+  FiPlus,
+  FiSearch,
+  MetricCard,
+  PageIntro,
+  PrimaryAction,
+  SecondaryAction,
+  Surface,
+} from "@/components/ui/signal-ui";
 
 interface Kpi {
   searches_this_month: number;
@@ -41,12 +53,12 @@ interface OverviewData {
   active_projects: ActiveProject[];
 }
 
-const KPI_CONFIG: { key: keyof Kpi; label: string; sub: string; accent: string; icon: string }[] = [
-  { key: "projects_open",       label: "进行中项目",     sub: "个",          accent: "from-blue-100/60",     icon: "📁" },
-  { key: "searches_this_month", label: "本月搜人",       sub: "次研究",      accent: "from-sky-100/60",      icon: "🔍" },
-  { key: "verifies_total",      label: "已核验候选人",   sub: "份报告",      accent: "from-amber-100/60",    icon: "✅" },
-  { key: "shortlist_total",     label: "候选池",         sub: "人",          accent: "from-emerald-100/60",  icon: "📋" },
-  { key: "red_flags_total",     label: "红旗",           sub: "个 (打脸)",   accent: "from-rose-100/60",     icon: "🚩" },
+const KPI_CONFIG: { key: keyof Kpi; label: string; sub: string; tone: "neutral" | "blue" | "green" | "amber"; Icon: IconType }[] = [
+  { key: "projects_open", label: "进行中项目", sub: "个", tone: "blue", Icon: FiBriefcase },
+  { key: "searches_this_month", label: "本月搜人", sub: "次研究", tone: "neutral", Icon: FiSearch },
+  { key: "verifies_total", label: "已核验候选人", sub: "份报告", tone: "amber", Icon: FiCheckCircle },
+  { key: "shortlist_total", label: "候选池", sub: "人", tone: "green", Icon: FiClipboard },
+  { key: "red_flags_total", label: "红旗", sub: "个", tone: "amber", Icon: FiAlertTriangle },
 ];
 
 function KindBadge({ kind }: { kind: "search" | "verify" }) {
@@ -99,24 +111,17 @@ export default function Overview() {
 
   return (
     <div className="space-y-8">
-      {/* 顶部 hero */}
-      <header className="flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight text-gray-900">总览</h1>
-          <p className="mt-1 text-sm text-gray-500">你的招聘工作台。从这里开始一次新研究, 或回到进行中/最近完成的任务。</p>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <Link href="/app/projects" className="rounded-xl bg-gray-900 px-4 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-gray-800">
-            + 新建项目
-          </Link>
-          <Link href="/app/search" className="rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition hover:border-gray-900">
-            快速搜人
-          </Link>
-          <Link href="/app/verify" className="rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition hover:border-gray-900">
-            快速核验
-          </Link>
-        </div>
-      </header>
+      <PageIntro
+        eyebrow="SignalHire 工作台"
+        title="今天先推进最重要的人才搜索。"
+        description="从正在进行的项目、候选人审阅和最新研究结果继续，不需要重新组织线索。"
+        actions={
+          <>
+            <PrimaryAction href="/app/search"><FiSearch className="h-4 w-4" aria-hidden="true" /> 智能搜人</PrimaryAction>
+            <SecondaryAction href="/app/projects"><FiPlus className="h-4 w-4" aria-hidden="true" /> 新建项目</SecondaryAction>
+          </>
+        }
+      />
 
       {error === "__SESSION_EXPIRED__" ? (
         <div className="rounded-xl border border-amber-100 bg-amber-50 p-4 text-sm text-amber-800">
@@ -137,44 +142,42 @@ export default function Overview() {
       ) : null}
 
       {/* KPI 卡 */}
-      <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+      <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
         {KPI_CONFIG.map((cfg) => (
-          <div key={cfg.key} className="relative overflow-hidden rounded-2xl border border-gray-100 bg-white p-5 shadow-[0_8px_30px_rgba(0,0,0,0.04)]">
-            <div className={`pointer-events-none absolute -right-6 -top-6 h-24 w-24 rounded-full bg-gradient-to-br ${cfg.accent} to-transparent blur-2xl`} />
-            <div className="relative flex items-start justify-between">
-              <div>
-                <p className="text-xs font-medium uppercase tracking-wide text-gray-400">{cfg.label}</p>
-                <p className="mt-2 text-3xl font-extrabold tabular-nums tracking-tight text-gray-900">
-                  {data ? data.kpi[cfg.key] : "—"}
-                </p>
-                <p className="mt-0.5 text-xs text-gray-500">{cfg.sub}</p>
-              </div>
-              <span className="text-2xl leading-none">{cfg.icon}</span>
-            </div>
-          </div>
+          <MetricCard
+            key={cfg.key}
+            label={cfg.label}
+            value={data ? data.kpi[cfg.key] : "—"}
+            sub={cfg.sub}
+            Icon={cfg.Icon}
+            tone={cfg.tone}
+          />
         ))}
       </section>
 
       {/* 进行中招聘项目 */}
       {data && data.active_projects.length > 0 && (
-        <section className="space-y-3">
-          <div className="flex items-end justify-between">
-            <h2 className="text-sm font-semibold text-gray-700">进行中项目</h2>
-            <Link href="/app/projects" className="text-xs text-gray-500 hover:text-gray-900">查看全部 →</Link>
+        <Surface className="p-5">
+          <div className="flex items-end justify-between gap-3">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-neutral-500">继续项目</p>
+              <h2 className="mt-1 text-xl font-semibold text-[var(--sh-ink)]">进行中招聘项目</h2>
+            </div>
+            <Link href="/app/projects" className="text-sm font-medium text-blue-600 hover:text-blue-700">查看全部</Link>
           </div>
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             {data.active_projects.map((p) => (
               <Link
                 key={p.id}
                 href={`/app/projects/${p.id}`}
-                className="group rounded-2xl border border-gray-100 bg-white p-4 shadow-[0_8px_30px_rgba(0,0,0,0.04)] transition hover:-translate-y-0.5 hover:shadow-[0_12px_40px_rgba(0,0,0,0.08)]"
+                className="group rounded-2xl bg-white/80 p-4 ring-1 ring-black/5 transition hover:-translate-y-0.5 hover:bg-white"
               >
-                <p className="line-clamp-2 text-sm font-semibold text-gray-900 group-hover:underline">{p.name}</p>
-                {p.brief && <p className="mt-1 line-clamp-1 text-xs text-gray-500">{p.brief}</p>}
-                <div className="mt-3 flex flex-wrap items-center gap-1.5 text-xs text-gray-600">
-                  <span className="rounded-md bg-gray-50 px-1.5 py-0.5 ring-1 ring-gray-100">{p.candidates_total} 候选人</span>
+                <p className="line-clamp-2 text-sm font-semibold text-[var(--sh-ink)]">{p.name}</p>
+                {p.brief && <p className="mt-2 line-clamp-2 text-xs leading-5 text-[var(--sh-muted)]">{p.brief}</p>}
+                <div className="mt-4 flex flex-wrap items-center gap-1.5 text-xs text-[var(--sh-muted)]">
+                  <span className="rounded-full bg-neutral-100 px-2 py-0.5">{p.candidates_total} 候选人</span>
                   {p.runs_active > 0 && (
-                    <span className="inline-flex items-center gap-1 rounded-md bg-amber-50 px-1.5 py-0.5 text-amber-800 ring-1 ring-amber-100">
+                    <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-amber-800">
                       <span className="inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-amber-500" />
                       {p.runs_active} 研究中
                     </span>
@@ -183,95 +186,88 @@ export default function Overview() {
               </Link>
             ))}
           </div>
-        </section>
+        </Surface>
       )}
 
       {/* 进行中任务 + 最近研究 */}
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
         {/* 进行中 */}
-        <section className="space-y-3">
+        <Surface className="p-5">
           <div className="flex items-end justify-between">
-            <h2 className="text-sm font-semibold text-gray-700">进行中的任务</h2>
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-neutral-500">Live work</p>
+              <h2 className="mt-1 text-xl font-semibold text-[var(--sh-ink)]">进行中的任务</h2>
+            </div>
             {data && data.active_jobs.length > 0 && (
-              <span className="text-xs text-gray-400">{data.active_jobs.length} 个</span>
+              <span className="rounded-full bg-white/80 px-2.5 py-1 text-xs text-[var(--sh-muted)] ring-1 ring-black/5">{data.active_jobs.length} 个</span>
             )}
           </div>
-          {!data && <p className="text-sm text-gray-400">加载中…</p>}
+          {!data && <p className="mt-5 text-sm text-[var(--sh-faint)]">加载中…</p>}
           {data && data.active_jobs.length === 0 && (
-            <div className="rounded-xl border border-dashed border-gray-200 bg-white p-5 text-center text-sm text-gray-500">
+            <div className="mt-5 rounded-2xl border border-dashed border-black/10 bg-white/60 p-5 text-center text-sm text-[var(--sh-muted)]">
               暂无进行中的任务
             </div>
           )}
           {data && data.active_jobs.length > 0 && (
-            <ul className="space-y-2">
+            <ul className="mt-5 space-y-2">
               {data.active_jobs.map((j) => (
-                <li key={j.id} className="flex items-start justify-between gap-3 rounded-xl border border-gray-200 bg-white p-3.5">
+                <li key={j.id} className="flex items-start justify-between gap-3 rounded-2xl bg-white/80 p-3.5 ring-1 ring-black/5">
                   <span className="flex min-w-0 flex-1 items-start gap-2">
                     <KindBadge kind={j.kind} />
-                    <span className="min-w-0 truncate text-sm text-gray-800" title={j.label}>{j.label}</span>
+                    <span className="min-w-0 truncate text-sm text-[var(--sh-ink)]" title={j.label}>{j.label}</span>
                   </span>
                   <StatusDot status={j.status} />
                 </li>
               ))}
             </ul>
           )}
-        </section>
+        </Surface>
 
         {/* 最近研究 */}
-        <section className="space-y-3">
+        <Surface className="p-5">
           <div className="flex items-end justify-between">
-            <h2 className="text-sm font-semibold text-gray-700">最近研究</h2>
-            <Link href="/app/history" className="text-xs text-gray-500 hover:text-gray-900">查看全部 →</Link>
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-neutral-500">Recent signals</p>
+              <h2 className="mt-1 text-xl font-semibold text-[var(--sh-ink)]">最近研究</h2>
+            </div>
+            <Link href="/app/history" className="text-sm font-medium text-blue-600 hover:text-blue-700">查看全部</Link>
           </div>
-          {!data && <p className="text-sm text-gray-400">加载中…</p>}
+          {!data && <p className="mt-5 text-sm text-[var(--sh-faint)]">加载中…</p>}
           {data && data.recent.length === 0 && (
-            <div className="rounded-xl border border-dashed border-gray-200 bg-white p-5 text-center text-sm text-gray-500">
+            <div className="mt-5 rounded-2xl border border-dashed border-black/10 bg-white/60 p-5 text-center text-sm text-[var(--sh-muted)]">
               还没有完成的研究
             </div>
           )}
           {data && data.recent.length > 0 && (
-            <ul className="space-y-2">
+            <ul className="mt-5 space-y-2">
               {data.recent.map((r, i) => {
                 const target = r.kind === "search"
                   ? `/app/search?q=${encodeURIComponent(r.query_text)}`
                   : `/app/verify?bio=${encodeURIComponent(r.query_text)}`;
                 return (
                   <li key={i}>
-                    <Link href={target} className="flex items-start justify-between gap-3 rounded-xl border border-gray-200 bg-white p-3.5 transition hover:border-blue-400">
+                    <Link href={target} className="flex items-start justify-between gap-3 rounded-2xl bg-white/80 p-3.5 ring-1 ring-black/5 transition hover:bg-white">
                       <span className="flex min-w-0 flex-1 items-start gap-2">
                         <KindBadge kind={r.kind} />
-                        <span className="min-w-0 truncate text-sm text-gray-800" title={r.query_text}>{r.label}</span>
+                        <span className="min-w-0 truncate text-sm text-[var(--sh-ink)]" title={r.query_text}>{r.label}</span>
                       </span>
-                      <span className="shrink-0 text-xs text-gray-400">{r.summary}</span>
+                      <span className="shrink-0 text-xs text-[var(--sh-faint)]">{r.summary}</span>
                     </Link>
                   </li>
                 );
               })}
             </ul>
           )}
-        </section>
+        </Surface>
       </div>
 
       {/* 空状态 onboarding */}
       {empty && (
-        <section className="rounded-2xl border border-dashed border-gray-200 bg-white p-6">
-          <h3 className="text-sm font-semibold text-gray-800">开始第一步</h3>
-          <p className="mt-1 text-xs text-gray-500">三个动作选一个,SignalHire 让你直接拿到带证据的候选人。</p>
-          <div className="mt-4 grid gap-3 sm:grid-cols-3">
-            <Link href="/app/search" className="group rounded-xl border border-gray-100 bg-white p-4 transition hover:border-gray-900">
-              <p className="text-base font-semibold text-gray-900">🔍 搜人</p>
-              <p className="mt-1 text-xs text-gray-500">给一段招聘需求, MiroMind 全网搜出 10-15 个候选人。</p>
-            </Link>
-            <Link href="/app/verify" className="group rounded-xl border border-gray-100 bg-white p-4 transition hover:border-gray-900">
-              <p className="text-base font-semibold text-gray-900">✅ 核验</p>
-              <p className="mt-1 text-xs text-gray-500">粘贴候选人自述, 跨源核实每条声称, 揭示红旗。</p>
-            </Link>
-            <Link href="/app/history" className="group rounded-xl border border-gray-100 bg-white p-4 transition hover:border-gray-900">
-              <p className="text-base font-semibold text-gray-900">🕓 历史</p>
-              <p className="mt-1 text-xs text-gray-500">回看以前的研究, 1 秒打开完整 shortlist。</p>
-            </Link>
-          </div>
-        </section>
+        <EmptyState
+          title="开始第一轮 AI 人才搜索"
+          description="创建项目或直接描述人才画像，SignalHire 会生成 shortlist、证据摘要和下一轮优化建议。"
+          action={<PrimaryAction href="/app/search">开始搜人</PrimaryAction>}
+        />
       )}
     </div>
   );
