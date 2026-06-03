@@ -1,6 +1,7 @@
 // lib/auth.ts —— 客户端认证封装 (Insforge Auth)。
 // 认证端点无需 key, 仅需 baseUrl (公开)。拿到 accessToken 后 POST 给 /api/auth/session 写 httpOnly cookie。
 import { createClient } from "@insforge/sdk";
+import { syncSessionCookieFromTokenManager } from "@/lib/auth-session-sync.mjs";
 
 const BASE = process.env.NEXT_PUBLIC_INSFORGE_API_BASE_URL;
 const client = createClient({ baseUrl: BASE });
@@ -69,7 +70,7 @@ export async function currentUser(): Promise<{ email: string } | null> {
     // 同步 cookie: SDK 内部刚刚可能用 refresh_token 续了 accessToken,
     // 而 /api/auth/session 写的 sh_token cookie 还是旧的 JWT (已过期 → API 401)。
     // 这里把当前(可能新)accessToken 重写回 cookie, 保证服务端鉴权能用。
-    syncSessionCookie();
+    await syncSessionCookie();
     return { email: data.user.email };
   } catch {
     return null;
@@ -78,18 +79,6 @@ export async function currentUser(): Promise<{ email: string } | null> {
 
 // 从 SDK 拿当前 accessToken 并同步到 httpOnly cookie。
 // 失败完全静默 (cookie 同步是优化, 不是必需)。
-function syncSessionCookie() {
-  try {
-    // tokenManager 是 SDK 内部对象 (private API), 类型上没暴露; 类型断言一次拿出来。
-    const tm = (client.auth as unknown as { tokenManager?: { getAccessToken?: () => string | null } }).tokenManager;
-    const token = tm?.getAccessToken?.();
-    if (!token) return;
-    fetch("/api/auth/session", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ accessToken: token }),
-    }).catch(() => {});
-  } catch {
-    // 静默
-  }
+async function syncSessionCookie() {
+  await syncSessionCookieFromTokenManager(client);
 }
