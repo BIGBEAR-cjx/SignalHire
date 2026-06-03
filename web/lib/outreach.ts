@@ -7,6 +7,7 @@
 // 模型 openai/gpt-4o-mini 足够快+足够好写定制开场。
 //
 // 输出严格 JSON {subject, body} 方便前端直接 mailto: 拼接。
+import { buildOutreachEvidenceBrief, type OutreachEvidenceBrief } from "./outreach-draft.mjs";
 
 const BASE = process.env.INSFORGE_API_BASE_URL;
 const KEY = process.env.INSFORGE_API_KEY;
@@ -51,6 +52,7 @@ export interface OutreachInput {
 export interface OutreachDraft {
   subject: string;
   body: string;
+  evidence_brief?: OutreachEvidenceBrief;
 }
 
 // 把候选人画像压成给模型看的摘要 (省 token + 强调最有用的部分)
@@ -133,5 +135,5 @@ export async function generateOutreach(input: OutreachInput): Promise<OutreachDr
   const subject = String(parsed.subject ?? "").trim();
   const body = String(parsed.body ?? "").trim();
   if (!subject || !body) throw new Error("AI 输出缺 subject 或 body");
-  return { subject, body };
+  return { subject, body, evidence_brief: buildOutreachEvidenceBrief(input.candidate) };
 }

@@ -4,6 +4,11 @@
 // 4 tone 切换 + 可编辑 subject/body + 📋 复制 + 📧 用邮件 App 发送 (mailto:) + 🔄 重新生成。
 // 候选人详情面板/收藏夹/搜人结果都挂同一个 Modal。
 import { useEffect, useRef, useState } from "react";
+import {
+  buildEvidenceDrivenOutreachDraft,
+  buildOutreachEvidenceBrief,
+  type OutreachEvidenceBrief,
+} from "@/lib/outreach-draft.mjs";
 
 type Tone = "friendly" | "professional" | "short" | "detailed";
 
@@ -22,23 +27,23 @@ export interface OutreachModalProps {
   candidate: unknown;        // 任意候选人形状, /api/outreach 不挑
   candidateName?: string;    // 仅用于显示
   candidateEmail?: string;   // 有邮箱直接进 mailto: To
+  roleBrief?: string;        // 可选: 当前岗位画像, 让邮件更贴需求
 }
 
-export default function OutreachModal({ open, onClose, candidate, candidateName, candidateEmail }: OutreachModalProps) {
+export default function OutreachModal({ open, onClose, candidate, candidateName, candidateEmail, roleBrief }: OutreachModalProps) {
   const [tone, setTone] = useState<Tone>("professional");
-  const [sender, setSender] = useState("");
+  const [sender, setSender] = useState(() => {
+    if (typeof window === "undefined") return "";
+    return window.localStorage.getItem(SENDER_KEY) || "";
+  });
   const [subject, setSubject] = useState("");
   const [body, setBody] = useState("");
+  const [evidenceBrief, setEvidenceBrief] = useState<OutreachEvidenceBrief | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [copied, setCopied] = useState(false);
+  const [evidenceCopied, setEvidenceCopied] = useState(false);
   const generatedFor = useRef<{ tone: Tone; candidate: unknown } | null>(null);
-
-  // 读用户在 localStorage 缓存的名字 (避免每次重输)
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    setSender(window.localStorage.getItem(SENDER_KEY) || "");
-  }, []);
 
   // Esc 关闭
   useEffect(() => {
@@ -59,6 +64,13 @@ export default function OutreachModal({ open, onClose, candidate, candidateName,
 
   async function generateDraft(t: Tone) {
     setLoading(true); setError("");
+    const localDraft = buildEvidenceDrivenOutreachDraft({
+      candidate,
+      tone: t,
+      senderName: sender.trim() || undefined,
+      roleBrief,
+    });
+    setEvidenceBrief(localDraft.evidence_brief);
     try {
       const r = await fetch("/api/outreach", {
         method: "POST",
@@ -66,16 +78,22 @@ export default function OutreachModal({ open, onClose, candidate, candidateName,
         body: JSON.stringify({
           candidate,
           tone: t,
+          role_brief: roleBrief,
           sender_name: sender.trim() || undefined,
         }),
       });
       const j = await r.json();
       if (!r.ok) throw new Error(j.error || `HTTP ${r.status}`);
-      setSubject(j.subject || "");
-      setBody(j.body || "");
+      setSubject(j.subject || localDraft.subject);
+      setBody(j.body || localDraft.body);
+      setEvidenceBrief(j.evidence_brief || localDraft.evidence_brief);
       generatedFor.current = { tone: t, candidate };
     } catch (e) {
-      setError((e as Error).message);
+      setSubject(localDraft.subject);
+      setBody(localDraft.body);
+      setEvidenceBrief(localDraft.evidence_brief);
+      setError(`AI 生成失败，已使用本地证据草稿：${(e as Error).message}`);
+      generatedFor.current = { tone: t, candidate };
     } finally {
       setLoading(false);
     }
@@ -91,6 +109,19 @@ export default function OutreachModal({ open, onClose, candidate, candidateName,
     navigator.clipboard?.writeText(text);
     setCopied(true);
     setTimeout(() => setCopied(false), 1500);
+  }
+
+  function copyEvidence() {
+    const brief = evidenceBrief || buildOutreachEvidenceBrief(candidate);
+    const text = [
+      brief.contact_angle ? `联系角度: ${brief.contact_angle}` : "",
+      brief.proof_points.length ? `证据点:\n- ${brief.proof_points.join("\n- ")}` : "",
+      brief.evidence_links.length ? `来源:\n- ${brief.evidence_links.join("\n- ")}` : "",
+      brief.risk_note ? `注意: ${brief.risk_note}` : "",
+    ].filter(Boolean).join("\n\n");
+    navigator.clipboard?.writeText(text);
+    setEvidenceCopied(true);
+    setTimeout(() => setEvidenceCopied(false), 1500);
   }
 
   function openMailto() {
@@ -161,8 +192,8 @@ export default function OutreachModal({ open, onClose, candidate, candidateName,
               MiroMind 起草中…
             </div>
           )}
-          {!loading && error && <p className="text-sm text-red-600">出错: {error}</p>}
-          {!loading && !error && (
+          {!loading && error && <p className="mb-3 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-700 ring-1 ring-amber-100">{error}</p>}
+          {!loading && (
             <div className="space-y-3">
               <div>
                 <label className="mb-1 block text-xs font-medium text-gray-600">主题</label>
@@ -184,6 +215,44 @@ export default function OutreachModal({ open, onClose, candidate, candidateName,
             </div>
           )}
         </div>
+
+        {evidenceBrief && (
+          <section className="mb-3 rounded-xl border border-blue-100 bg-blue-50/60 p-3">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <p className="text-xs font-semibold text-blue-900">本次外联依据</p>
+              <button
+                type="button"
+                onClick={copyEvidence}
+                className="rounded-lg bg-white px-2 py-1 text-xs font-medium text-blue-700 ring-1 ring-blue-100 hover:ring-blue-300"
+              >
+                {evidenceCopied ? "已复制依据" : "复制依据"}
+              </button>
+            </div>
+            {evidenceBrief.contact_angle && (
+              <p className="mt-2 text-sm leading-relaxed text-blue-900">{evidenceBrief.contact_angle}</p>
+            )}
+            {evidenceBrief.proof_points.length > 0 && (
+              <ul className="mt-2 list-disc space-y-1 pl-5 text-xs leading-relaxed text-blue-900/80">
+                {evidenceBrief.proof_points.slice(0, 4).map((point) => <li key={point}>{point}</li>)}
+              </ul>
+            )}
+            <div className="mt-2 flex flex-wrap gap-1.5">
+              {evidenceBrief.public_profiles.map((profile) => (
+                <span key={profile} className="rounded-full bg-white px-2 py-0.5 text-xs font-medium text-blue-700 ring-1 ring-blue-100">
+                  {profile}
+                </span>
+              ))}
+              {evidenceBrief.evidence_links.length > 0 && (
+                <span className="rounded-full bg-white px-2 py-0.5 text-xs font-medium text-gray-600 ring-1 ring-gray-200">
+                  {evidenceBrief.evidence_links.length} 个证据链接
+                </span>
+              )}
+            </div>
+            {evidenceBrief.risk_note && (
+              <p className="mt-2 text-xs leading-relaxed text-amber-700">注意: {evidenceBrief.risk_note}</p>
+            )}
+          </section>
+        )}
 
         {/* 操作栏 */}
         <div className="flex flex-wrap items-center justify-end gap-2">

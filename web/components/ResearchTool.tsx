@@ -729,6 +729,7 @@ export default function ResearchTool({
           onClose={() => setOutreachOpen(false)}
           candidate={result.candidates[selectedCandidateIndex]}
           candidateName={result.candidates[selectedCandidateIndex]?.name}
+          roleBrief={result.search_brief.original_query}
         />
       )}
     </div>
