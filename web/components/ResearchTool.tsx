@@ -36,7 +36,7 @@ type ResearchErrorEvent = { type: "error"; error?: string };
 type ResearchEvent = ResearchStepEvent | ResearchDoneEvent | ResearchErrorEvent;
 type QueueResponse = { queued?: boolean; jobId?: string; error?: string };
 type JobStatusView = {
-  phase: "queued" | "running" | "retrying" | "done" | "error";
+  phase: "queued" | "running" | "retrying" | "done" | "error" | "canceled";
   label: string;
   detail: string;
   canRetry: boolean;
@@ -178,17 +178,20 @@ export default function ResearchTool({
   const [searchFeedback, setSearchFeedback] = useState<SearchFeedbackState>(EMPTY_SEARCH_FEEDBACK);
   const idRef = useRef(0);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const abortRef = useRef<AbortController | null>(null);
+  const runTokenRef = useRef(0);
 
   function stopPolling() {
     if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null; }
   }
   useEffect(() => stopPolling, []);
 
-  function beginPolling(jobId: string, context?: BackfillContext) {
+  function beginPolling(jobId: string, context?: BackfillContext, token = runTokenRef.current) {
     stopPolling();
     const startedAt = Date.now();
     let pollFailures = 0;
     pollRef.current = setInterval(async () => {
+      if (token !== runTokenRef.current) return;
       const elapsedMs = Date.now() - startedAt;
       if (elapsedMs > JOB_TIMEOUT_MS) {
         stopPolling();
@@ -199,6 +202,7 @@ export default function ResearchTool({
       try {
         const r = await fetch(`/api/status?id=${jobId}`);
         const j: StatusResponse = await r.json();
+        if (token !== runTokenRef.current) return;
         pollFailures = 0;
         if (j.status_view) setJobStatus(userFacingStatus(j.status_view, elapsedMs));
         const p = j.progress;
@@ -219,6 +223,10 @@ export default function ResearchTool({
           setResult(j.result);
           setStats(p ? { searches: p.searches ?? 0, fetches: p.fetches ?? 0 } : null);
           setRunId(j.runId ?? jobId);
+          setLoading(false);
+        } else if (j.status === "canceled") {
+          stopPolling();
+          if (j.status_view) setJobStatus(j.status_view);
           setLoading(false);
         } else if (j.status === "error") {
           stopPolling();
@@ -242,6 +250,11 @@ export default function ResearchTool({
   async function run(override?: string, options: { preserveInput?: boolean } = {}) {
     const value = (override ?? input).trim();
     if (!value) return;
+    const token = runTokenRef.current + 1;
+    runTokenRef.current = token;
+    abortRef.current?.abort();
+    const controller = new AbortController();
+    abortRef.current = controller;
     if (override !== undefined && !options.preserveInput) setInput(value);
     stopPolling();
     setLoading(true); setError(""); setResult(null); setStats(null);
@@ -259,7 +272,9 @@ export default function ResearchTool({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
+        signal: controller.signal,
       });
+      if (token !== runTokenRef.current) return;
       const ct = res.headers.get("content-type") || "";
 
       if (ct.includes("ndjson") && res.body) {
@@ -268,6 +283,7 @@ export default function ResearchTool({
         let buf = "";
         for (;;) {
           const { done, value: chunk } = await reader.read();
+          if (token !== runTokenRef.current) return;
           if (done) break;
           buf += dec.decode(chunk, { stream: true });
           let nl: number;
@@ -291,21 +307,25 @@ export default function ResearchTool({
             }
           }
         }
-        setLoading(false);
+        if (token === runTokenRef.current) setLoading(false);
       } else {
         const j: QueueResponse = await res.json().catch(() => ({}));
+        if (token !== runTokenRef.current) return;
         if (!res.ok) { setError(j.error ?? `HTTP ${res.status}`); setLoading(false); return; }
         if (j.queued && j.jobId) {
           setCurrentJobId(j.jobId);
           setJobStatus({ phase: "queued", label: "已进入研究队列", detail: "等待 worker 认领任务。", canRetry: false });
-          beginPolling(j.jobId);
+          beginPolling(j.jobId, undefined, token);
         } else {
           setError(j.error ?? "出错了"); setLoading(false);
         }
       }
     } catch (e) {
+      if ((e as Error).name === "AbortError" || token !== runTokenRef.current) return;
       setError((e as Error).message);
       setLoading(false);
+    } finally {
+      if (token === runTokenRef.current) abortRef.current = null;
     }
   }
 
@@ -357,6 +377,30 @@ export default function ResearchTool({
   function runFeedbackOptimizedSearch() {
     if (!isTalentSearchResult(result)) return;
     run(buildFeedbackOptimizedSearchInput({ result, feedback: searchFeedback }), { preserveInput: true });
+  }
+
+  function stopCurrentRun() {
+    const jobId = currentJobId;
+    runTokenRef.current += 1;
+    abortRef.current?.abort();
+    abortRef.current = null;
+    stopPolling();
+    setLoading(false);
+    setError("");
+    setJobStatus({
+      phase: "canceled",
+      label: "搜索已停止",
+      detail: "你已停止本次搜索。可以调整条件后重新搜索。",
+      canRetry: false,
+    });
+    setCurrentJobId(null);
+    if (jobId) {
+      fetch("/api/cancel", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: jobId }),
+      }).catch(() => {});
+    }
   }
 
   async function retryCurrentJob() {
@@ -651,12 +695,21 @@ export default function ResearchTool({
       {/* 进度区 */}
       {loading && (
         <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-[0_8px_30px_rgba(0,0,0,0.06)]">
-          <div className="flex items-center gap-2 text-sm font-medium text-gray-800">
-            <span className="inline-block h-2 w-2 animate-pulse rounded-full bg-emerald-500" />
-            {jobStatus?.label ?? "MiroMind 正在全网搜索 + 交叉核对…"}
-            {live && (
-              <span className="text-gray-500">（搜索 {live.searches} 次 · 抓取 {live.fetches} 次）</span>
-            )}
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-2 text-sm font-medium text-gray-800">
+              <span className="inline-block h-2 w-2 animate-pulse rounded-full bg-emerald-500" />
+              {jobStatus?.label ?? "MiroMind 正在全网搜索 + 交叉核对…"}
+              {live && (
+                <span className="text-gray-500">（搜索 {live.searches} 次 · 抓取 {live.fetches} 次）</span>
+              )}
+            </div>
+            <button
+              type="button"
+              onClick={stopCurrentRun}
+              className="rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 transition hover:border-gray-900"
+            >
+              停止搜索
+            </button>
           </div>
           {jobStatus?.detail && (
             <p className="mt-2 text-xs text-gray-500">{jobStatus.detail}</p>
@@ -675,6 +728,12 @@ export default function ResearchTool({
               ))}
             </ul>
           )}
+        </div>
+      )}
+
+      {!loading && jobStatus?.phase === "canceled" && (
+        <div className="rounded-xl border border-amber-100 bg-amber-50 p-4 text-sm text-amber-800">
+          <p>{jobStatus.detail}</p>
         </div>
       )}
 

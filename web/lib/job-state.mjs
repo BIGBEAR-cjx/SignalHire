@@ -7,6 +7,7 @@ export const RUN_STATUSES = {
   RETRYING: "retrying",
   DONE: "done",
   ERROR: "error",
+  CANCELED: "canceled",
 };
 
 function iso(now = new Date()) {
@@ -84,6 +85,18 @@ export function buildRetryUpdate(now = new Date()) {
   };
 }
 
+export function buildCancelUpdate(now = new Date()) {
+  const msg = "用户已停止搜索";
+  return {
+    status: RUN_STATUSES.CANCELED,
+    error: msg,
+    last_error: msg,
+    locked_at: null,
+    finished_at: iso(now),
+    updated_at: iso(now),
+  };
+}
+
 export function buildStaleRecoveryUpdate(row, now = new Date()) {
   const nextAttempt = attemptCount(row);
   return {
@@ -144,6 +157,14 @@ export function describeJobStatus(row) {
       label: "研究失败",
       detail: String(row?.error || row?.last_error || "研究多次失败，请重新研究。"),
       canRetry: true,
+    };
+  }
+  if (status === RUN_STATUSES.CANCELED) {
+    return {
+      phase: "canceled",
+      label: "搜索已停止",
+      detail: "你已停止本次搜索。可以调整条件后重新搜索。",
+      canRetry: false,
     };
   }
   return {

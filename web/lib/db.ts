@@ -15,6 +15,7 @@ import {
   DEFAULT_MAX_ATTEMPTS,
   RUN_STATUSES,
   STALE_AFTER_MS,
+  buildCancelUpdate,
   buildRetryUpdate,
   describeJobStatus,
   isStaleRunningJob,
@@ -149,7 +150,7 @@ export interface RunStatus {
   finished_at: string | null;
   updated_at: string | null;
   status_view: {
-    phase: "queued" | "running" | "retrying" | "done" | "error";
+    phase: "queued" | "running" | "retrying" | "done" | "error" | "canceled";
     label: string;
     detail: string;
     canRetry: boolean;
@@ -462,6 +463,28 @@ export async function retryRun(id: string, userId: string): Promise<RunStatus | 
       .eq("id", id)
       .eq("user_id", userId)
       .eq("status", "error")
+      .select("id");
+    if (error || !data || data.length === 0) return null;
+    return await getStatus(id, userId);
+  } catch {
+    return null;
+  }
+}
+
+// 用户停止任务: queued/running/retrying 都标记为 canceled。worker 后续写库带 status=running 条件, 不会覆盖已取消行。
+// 多租户: 不属于该用户的行不允许 cancel。
+export async function cancelRun(id: string, userId: string): Promise<RunStatus | null> {
+  if (!client) return null;
+  try {
+    const current = await getStatus(id, userId);
+    if (!current) return null;
+    if (!["queued", "running", "retrying"].includes(current.status)) return current;
+    const { data, error } = await client.database
+      .from(TABLE)
+      .update(buildCancelUpdate())
+      .eq("id", id)
+      .eq("user_id", userId)
+      .in("status", ["queued", "running", "retrying"])
       .select("id");
     if (error || !data || data.length === 0) return null;
     return await getStatus(id, userId);

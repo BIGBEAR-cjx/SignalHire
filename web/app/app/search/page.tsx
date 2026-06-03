@@ -5,12 +5,13 @@
 import { useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
 import ResearchTool from "@/components/ResearchTool";
+import { shouldAutoRunInitialSearch } from "@/lib/search-page-state.mjs";
 
 function SearchInner() {
   const sp = useSearchParams();
   const initialQ = sp.get("q") || "";
   const projectId = sp.get("project") || undefined;
-  const autoRun = Boolean(initialQ);
+  const autoRun = shouldAutoRunInitialSearch({ initialInput: initialQ, projectId });
   const [projectName, setProjectName] = useState<string | undefined>();
 
   // 在项目上下文时拉项目名 (面包屑显示)

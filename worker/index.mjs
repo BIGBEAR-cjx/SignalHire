@@ -114,7 +114,7 @@ async function runJob(job) {
       lastWrite = now;
       // 节流写进度, 失败忽略 (不影响主研究)
       db.from(TABLE).update({ progress: { searches, fetches, recent }, updated_at: new Date().toISOString() })
-        .eq("id", job.id).then(() => {}, () => {});
+        .eq("id", job.id).eq("status", "running").then(() => {}, () => {});
     }
   };
 
@@ -147,7 +147,7 @@ async function runJob(job) {
     let saved = false;
     for (let i = 0; i < 4 && !saved; i++) {
       try {
-        const { data: upd, error: e } = await db.from(TABLE).update(doneRow).eq("id", job.id).select("id");
+        const { data: upd, error: e } = await db.from(TABLE).update(doneRow).eq("id", job.id).eq("status", "running").select("id");
         if (!e && upd && upd.length > 0) { saved = true; break; }
         console.error(`[${new Date().toISOString()}] ${job.id} 结果写库重试 ${i + 1}: ${e?.message || "0 行受影响"}`);
       } catch (er) {
@@ -166,7 +166,7 @@ async function runJob(job) {
     });
     for (let i = 0; i < 3; i++) {
       try {
-        const { data: upd } = await db.from(TABLE).update(failureRow).eq("id", job.id).select("id");
+        const { data: upd } = await db.from(TABLE).update(failureRow).eq("id", job.id).eq("status", "running").select("id");
         if (upd && upd.length > 0) break;
       } catch {}
       await sleep(1500);

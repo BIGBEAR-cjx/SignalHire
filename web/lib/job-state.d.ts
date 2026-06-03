@@ -6,9 +6,10 @@ export const RUN_STATUSES: {
   RETRYING: "retrying";
   DONE: "done";
   ERROR: "error";
+  CANCELED: "canceled";
 };
 
-export type JobStatus = "queued" | "running" | "retrying" | "done" | "error";
+export type JobStatus = "queued" | "running" | "retrying" | "done" | "error" | "canceled";
 export type JobStatusView = {
   phase: JobStatus;
   label: string;
@@ -28,6 +29,7 @@ export function buildRunFailureUpdate(input: {
   now?: Date;
 }): Record<string, unknown>;
 export function buildRetryUpdate(now?: Date): Record<string, unknown>;
+export function buildCancelUpdate(now?: Date): Record<string, unknown>;
 export function buildStaleRecoveryUpdate(row: unknown, now?: Date): Record<string, unknown>;
 export function buildQueueRetryUpdate(row: unknown, now?: Date): Record<string, unknown>;
 export function describeJobStatus(row: unknown): JobStatusView;
