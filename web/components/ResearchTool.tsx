@@ -22,7 +22,7 @@ import {
   type VerifyReport,
 } from "@/components/result";
 import OutreachModal from "@/components/OutreachModal";
-import { buildBackfillMergeSummary } from "@/lib/talent-profile.mjs";
+import { buildBackfillMergeSummary, buildEditableSearchPlanDraft, buildSearchInputFromEditablePlan } from "@/lib/talent-profile.mjs";
 import type { BackfillMergeSummary, CoverageBackfillJob, TalentCandidate, TalentSearchResult } from "@/lib/talent-profile.mjs";
 
 type FeedItem = { id: number; kind: "search" | "fetch"; info: string };
@@ -51,6 +51,8 @@ type StatusResponse = {
 };
 type BackfillContext = { originalResult: TalentSearchResult; originalRunId: string | null; job: CoverageBackfillJob };
 type MergeBackfillResponse = { merged?: boolean; runId?: string; result?: AppResult; mergeSummary?: BackfillMergeSummary; error?: string };
+type EditableSearchPlanDraft = TalentSearchResult;
+type EditableSourceStrategy = TalentSearchResult["search_plan"]["source_strategy"][number];
 
 const WORKER_DELAY_MS = 2 * 60 * 1000;
 const JOB_TIMEOUT_MS = 15 * 60 * 1000;
@@ -111,6 +113,7 @@ export default function ResearchTool({
   const [backfillMergeSummary, setBackfillMergeSummary] = useState<BackfillMergeSummary | null>(null);
   const [mergingBackfill, setMergingBackfill] = useState(false);
   const [mergedOriginalRunId, setMergedOriginalRunId] = useState<string | null>(null);
+  const [editablePlan, setEditablePlan] = useState<EditableSearchPlanDraft | null>(null);
   const idRef = useRef(0);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -174,16 +177,17 @@ export default function ResearchTool({
     }, 2000);
   }
 
-  async function run(override?: string) {
+  async function run(override?: string, options: { preserveInput?: boolean } = {}) {
     const value = (override ?? input).trim();
     if (!value) return;
-    if (override !== undefined) setInput(value);
+    if (override !== undefined && !options.preserveInput) setInput(value);
     stopPolling();
     setLoading(true); setError(""); setResult(null); setStats(null);
     setSelectedCandidateIndex(null); setShortlist([]);
     setFeed([]); setLive(null); setRunId(null); setCurrentJobId(null);
     setJobStatus(null); setCopied(false); setBackfillContext(null); setBackfillMergeSummary(null);
     setMergingBackfill(false); setMergedOriginalRunId(null);
+    if (!options.preserveInput) setEditablePlan(null);
     try {
       const url = mode === "search" ? "/api/search" : "/api/verify";
       const body: Record<string, unknown> = mode === "search" ? { query: value } : { bio: value };
@@ -240,6 +244,44 @@ export default function ResearchTool({
       setError((e as Error).message);
       setLoading(false);
     }
+  }
+
+  function splitPlanText(value: string) {
+    return value.split("\n").map((item) => item.trim()).filter(Boolean);
+  }
+
+  function joinPlanText(items: string[]) {
+    return items.join("\n");
+  }
+
+  function createEditablePlan() {
+    if (!input.trim()) return;
+    setEditablePlan(buildEditableSearchPlanDraft(input));
+  }
+
+  function updateEditablePlanList(key: "must_have" | "nice_to_have" | "exclusions", value: string) {
+    setEditablePlan((draft) => draft ? {
+      ...draft,
+      search_plan: {
+        ...draft.search_plan,
+        [key]: splitPlanText(value),
+      },
+    } : draft);
+  }
+
+  function updateEditableSource(index: number, patch: Partial<EditableSourceStrategy>) {
+    setEditablePlan((draft) => draft ? {
+      ...draft,
+      search_plan: {
+        ...draft.search_plan,
+        source_strategy: draft.search_plan.source_strategy.map((source, i) => i === index ? { ...source, ...patch } : source),
+      },
+    } : draft);
+  }
+
+  function runEditablePlan() {
+    if (!editablePlan) return;
+    run(buildSearchInputFromEditablePlan({ draft: editablePlan }), { preserveInput: true });
   }
 
   async function retryCurrentJob() {
@@ -440,7 +482,94 @@ export default function ResearchTool({
               ? isSearch ? "正在搜索全球 AI 候选人…" : "正在跨源核验…"
               : isSearch ? "生成 AI 人才 shortlist" : "核验候选人"}
           </button>
+          {isSearch && (
+            <button
+              type="button"
+              onClick={createEditablePlan}
+              disabled={loading || !input.trim()}
+              className="mt-3 w-full rounded-xl border border-gray-200 bg-white px-5 py-3 font-medium text-gray-700 transition hover:border-gray-900 disabled:opacity-50 sm:ml-3 sm:mt-4 sm:w-auto"
+            >
+              生成搜索计划
+            </button>
+          )}
         </div>
+
+        {isSearch && editablePlan && (
+          <div className="mt-5 border-t border-gray-100 pt-5">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <h3 className="text-sm font-semibold text-gray-900">搜索计划</h3>
+              <button
+                type="button"
+                onClick={runEditablePlan}
+                disabled={loading}
+                className="rounded-lg bg-gray-900 px-3 py-2 text-xs font-semibold text-white transition hover:bg-gray-800 disabled:opacity-50"
+              >
+                按计划搜索
+              </button>
+            </div>
+            <div className="mt-4 grid gap-4 md:grid-cols-3">
+              <label className="block">
+                <span className="text-xs font-semibold text-emerald-700">必须条件</span>
+                <textarea
+                  value={joinPlanText(editablePlan.search_plan.must_have)}
+                  onChange={(e) => updateEditablePlanList("must_have", e.target.value)}
+                  rows={4}
+                  className="mt-1 w-full rounded-lg border border-emerald-100 bg-emerald-50/40 px-3 py-2 text-sm text-gray-900 outline-none transition focus:border-emerald-500 focus:bg-white"
+                />
+              </label>
+              <label className="block">
+                <span className="text-xs font-semibold text-blue-700">加分条件</span>
+                <textarea
+                  value={joinPlanText(editablePlan.search_plan.nice_to_have)}
+                  onChange={(e) => updateEditablePlanList("nice_to_have", e.target.value)}
+                  rows={4}
+                  className="mt-1 w-full rounded-lg border border-blue-100 bg-blue-50/40 px-3 py-2 text-sm text-gray-900 outline-none transition focus:border-blue-500 focus:bg-white"
+                />
+              </label>
+              <label className="block">
+                <span className="text-xs font-semibold text-red-700">排除条件</span>
+                <textarea
+                  value={joinPlanText(editablePlan.search_plan.exclusions)}
+                  onChange={(e) => updateEditablePlanList("exclusions", e.target.value)}
+                  rows={4}
+                  className="mt-1 w-full rounded-lg border border-red-100 bg-red-50/40 px-3 py-2 text-sm text-gray-900 outline-none transition focus:border-red-500 focus:bg-white"
+                />
+              </label>
+            </div>
+            <div className="mt-4 space-y-3">
+              {editablePlan.search_plan.source_strategy.map((source, index) => (
+                <div key={`${source.coverage_group}-${source.source_type}-${index}`} className="grid gap-2 border-t border-gray-100 pt-3 md:grid-cols-[140px_minmax(0,1fr)]">
+                  <div>
+                    <p className="text-xs font-semibold text-gray-900">{source.coverage_group}</p>
+                    <input
+                      value={source.source_type}
+                      onChange={(e) => updateEditableSource(index, { source_type: e.target.value })}
+                      className="mt-1 w-full rounded-lg border border-gray-200 px-2 py-1.5 text-xs text-gray-700 outline-none focus:border-gray-900"
+                    />
+                  </div>
+                  <div className="grid gap-2 md:grid-cols-2">
+                    <input
+                      value={source.target}
+                      onChange={(e) => updateEditableSource(index, { target: e.target.value })}
+                      className="rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-700 outline-none focus:border-gray-900"
+                    />
+                    <input
+                      value={source.reason}
+                      onChange={(e) => updateEditableSource(index, { reason: e.target.value })}
+                      className="rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-700 outline-none focus:border-gray-900"
+                    />
+                    <textarea
+                      value={source.query}
+                      onChange={(e) => updateEditableSource(index, { query: e.target.value })}
+                      rows={2}
+                      className="rounded-lg border border-gray-200 px-3 py-2 font-mono text-xs text-gray-700 outline-none focus:border-gray-900 md:col-span-2"
+                    />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* 进度区 */}

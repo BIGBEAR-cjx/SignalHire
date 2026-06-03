@@ -202,6 +202,32 @@ test("builds executable source query plan from brief and source strategy", () =>
   assert.match(plan[1].query, /site:arxiv.org/);
 });
 
+test("builds editable search plan draft and compiles it into search input", () => {
+  assert.equal(typeof talentProfile.buildEditableSearchPlanDraft, "function");
+  assert.equal(typeof talentProfile.buildSearchInputFromEditablePlan, "function");
+
+  const draft = talentProfile.buildEditableSearchPlanDraft("Find senior LLM inference engineers with vLLM, Triton, remote US/EU, exclude prompt-only profiles");
+
+  assert.equal(draft.search_brief.original_query, "Find senior LLM inference engineers with vLLM, Triton, remote US/EU, exclude prompt-only profiles");
+  assert.ok(draft.search_plan.must_have.some((item) => /LLM inference/i.test(item)));
+  assert.ok(draft.search_plan.exclusions.some((item) => /prompt-only/i.test(item)));
+  assert.equal(draft.search_plan.source_strategy.length, 4);
+  assert.equal(draft.search_plan.source_strategy[0].source_type, "code");
+  assert.equal(draft.search_plan.source_strategy[0].coverage_group, "practice");
+  assert.match(draft.search_plan.source_strategy[0].query, /site:github.com/);
+
+  draft.search_plan.must_have.push("Production TensorRT-LLM work");
+  draft.search_plan.exclusions.push("Pure academic profiles without code");
+  draft.search_plan.source_strategy[0].query = "vLLM TensorRT-LLM site:github.com";
+
+  const input = talentProfile.buildSearchInputFromEditablePlan({ draft });
+  assert.match(input, /Editable Search Plan/);
+  assert.match(input, /Production TensorRT-LLM work/);
+  assert.match(input, /Pure academic profiles without code/);
+  assert.match(input, /vLLM TensorRT-LLM site:github.com/);
+  assert.match(input, /Return the normal SignalHire talent shortlist payload/);
+});
+
 test("normalizes source execution and falls back to planned jobs", () => {
   const result = normalizeTalentSearchResult({
     search_brief: {
