@@ -20,6 +20,7 @@ export type ScoreBreakdown = { achievement_signals: number; skill_match: number;
 export type EvidenceAudit = { verified_claims: string[]; unverified_claims: string[]; contradicted_claims: string[]; single_source_claims: string[]; identity_risks: string[]; recency_notes: string[]; overall_evidence_quality: EvidenceQuality };
 export type TalentCandidate = { name: string; headline: string; location: string | null; current_role: string | null; current_company: string | null; ai_directions: string[]; match_score: number; score_breakdown: ScoreBreakdown; strongest_signals: string[]; uncertainties: string[]; links: { github: string | null; linkedin: string | null; scholar: string | null; huggingface: string | null; website: string | null; other: string | null }; claims: TalentClaim[]; evidence_audit: EvidenceAudit; outreach_angle: string; summary: string };
 export type TalentSearchResult = { search_brief: TalentSearchBrief; search_plan: TalentSearchPlan; source_execution: SourceExecution; coverage_backfill: CoverageBackfillPlan; evidence_graph: TalentEvidenceGraph; talent_map: TalentMapItem[]; candidates: TalentCandidate[] };
+export type EditableSearchPlanDraft = TalentSearchResult;
 export type EvidenceCoverageGroup = { key: string; label: string; count: number; source_types: string[]; missing_source_types: string[]; status: "covered" | "missing" };
 export type SourceQueryPlanItem = { source_type: string; coverage_group: string; target: string; query: string; reason: string; priority: number };
 export type CandidateComparisonRow = { name: string; role: string; primary_direction: string; secondary_directions: string; match_score: number; achievement_signals: number; skill_match: number; work_history: number; evidence_score: number; evidence_quality: string; independent_sources: number; source_types: string; coverage_gaps: string; top_signal: string; risk_summary: string };
@@ -39,6 +40,8 @@ export function buildCoverageBackfillPlan(result: unknown): CoverageBackfillPlan
 export function buildBackfillSearchInput(input?: { job?: unknown; originalQuery?: string }): string;
 export function buildBackfillMergeSummary(input?: { originalResult?: unknown; backfillResult?: unknown }): BackfillMergeSummary;
 export function mergeBackfillResult(input?: { originalResult?: unknown; backfillResult?: unknown; mergedAt?: string }): BackfillMergedTalentSearchResult;
+export function buildEditableSearchPlanDraft(query: unknown): EditableSearchPlanDraft;
+export function buildSearchInputFromEditablePlan(input?: { draft?: unknown }): string;
 export function buildEvidenceCoverage(result: unknown): EvidenceCoverageGroup[];
 export function buildSourceQueryPlan(result: unknown): SourceQueryPlanItem[];
 export function buildSourceExecution(result: unknown): SourceExecution;

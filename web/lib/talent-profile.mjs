@@ -274,6 +274,58 @@ function fallbackSourceQuery(sourceType, brief) {
   return [sourceQueryTerms(brief), operator].filter(Boolean).join(" ").trim();
 }
 
+function inferredMustHave(query) {
+  const clean = cleanString(query);
+  const items = [];
+  if (/llm|large language model|inference|serving/i.test(clean)) items.push("LLM inference / serving experience");
+  if (/vllm/i.test(clean)) items.push("vLLM experience");
+  if (/triton/i.test(clean)) items.push("Triton or GPU serving experience");
+  if (/senior|staff|principal|lead/i.test(clean)) items.push("Senior-level engineering ownership");
+  return items.length ? uniqueStrings(items, 8) : [clean || "AI talent fit"];
+}
+
+function inferredExclusions(query) {
+  const clean = cleanString(query);
+  const items = [];
+  if (/prompt[- ]?only|pure prompt|prompt engineering/i.test(clean)) items.push("prompt-only profiles");
+  if (/exclude|not|avoid/i.test(clean)) items.push("profiles that only match keywords without public evidence");
+  return uniqueStrings(items, 8);
+}
+
+function defaultEditableSourceStrategy(query) {
+  const brief = { original_query: query, required_skills: inferredMustHave(query) };
+  return [
+    {
+      source_type: "code",
+      coverage_group: "practice",
+      target: "GitHub, Hugging Face, Papers with Code",
+      query: fallbackSourceQuery("code", brief),
+      reason: "verify implementation and engineering practice",
+    },
+    {
+      source_type: "paper",
+      coverage_group: "research",
+      target: "arXiv, OpenReview, Semantic Scholar",
+      query: fallbackSourceQuery("paper", brief),
+      reason: "verify research depth and publications",
+    },
+    {
+      source_type: "company",
+      coverage_group: "work_history",
+      target: "company team pages, public profiles, speaker bios",
+      query: fallbackSourceQuery("company", brief),
+      reason: "verify role, seniority, and work history",
+    },
+    {
+      source_type: "blog",
+      coverage_group: "public_voice",
+      target: "technical blogs, talks, podcasts, interviews",
+      query: fallbackSourceQuery("blog", brief),
+      reason: "verify public technical judgment and influence",
+    },
+  ];
+}
+
 function normalizeEvidenceGraph(graph = {}) {
   graph = isPlainObject(graph) ? graph : {};
   return {
@@ -603,6 +655,48 @@ export function buildSourceQueryPlan(result) {
       priority: index + 1,
     };
   }).filter((item) => item.query || item.target || item.reason).slice(0, 12);
+}
+
+export function buildEditableSearchPlanDraft(query) {
+  const originalQuery = cleanString(query);
+  return normalizeTalentSearchResult({
+    search_brief: {
+      original_query: originalQuery,
+      required_skills: inferredMustHave(originalQuery),
+      exclusions: inferredExclusions(originalQuery),
+    },
+    search_plan: {
+      must_have: inferredMustHave(originalQuery),
+      nice_to_have: [],
+      exclusions: inferredExclusions(originalQuery),
+      source_strategy: defaultEditableSourceStrategy(originalQuery),
+      adjacent_pools: [
+        {
+          pool: "adjacent AI infrastructure and applied AI builders",
+          reason: "surface transferable public evidence beyond exact keyword matches",
+        },
+      ],
+    },
+  });
+}
+
+/**
+ * @param {{ draft?: unknown }} input
+ */
+export function buildSearchInputFromEditablePlan({ draft } = {}) {
+  const normalized = normalizeTalentSearchResult(draft);
+  const plan = normalized.search_plan;
+  const sources = buildSourceQueryPlan(normalized);
+  return [
+    "Editable Search Plan for SignalHire.",
+    `Original search brief: ${normalized.search_brief.original_query}`,
+    `Must-have: ${plan.must_have.join("; ") || "not specified"}`,
+    `Nice-to-have: ${plan.nice_to_have.join("; ") || "not specified"}`,
+    `Exclude: ${plan.exclusions.join("; ") || "not specified"}`,
+    "Source plan:",
+    ...sources.map((source) => `- ${source.coverage_group}/${source.source_type}: ${source.query} (${source.reason || source.target})`),
+    "Return the normal SignalHire talent shortlist payload with search_plan, source_execution, coverage_backfill, evidence_graph, talent_map, and candidates.",
+  ].join("\n");
 }
 
 export function buildSourceExecution(result) {
