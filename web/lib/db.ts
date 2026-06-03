@@ -19,6 +19,7 @@ import {
   describeJobStatus,
   isStaleRunningJob,
 } from "./job-state.mjs";
+import { mergeBackfillResult } from "./talent-profile.mjs";
 
 const BASE = process.env.INSFORGE_API_BASE_URL;
 const KEY = process.env.INSFORGE_API_KEY; // 服务端 access key, 绝不进 NEXT_PUBLIC
@@ -187,6 +188,13 @@ export interface WorkerHealth {
     finished_at: string | null;
     updated_at: string | null;
   } | null;
+}
+
+export interface MergeBackfillRunsResult {
+  runId: string;
+  result: unknown;
+  mergeSummary: unknown;
+  updated_at: string | null;
 }
 
 function normalizeHealthJob(row: {
@@ -369,6 +377,73 @@ export async function getStatus(id: string, userId: string): Promise<RunStatus |
       updated_at: r.updated_at ?? null,
     };
     return { ...normalized, status_view: describeJobStatus(normalized) as RunStatus["status_view"] };
+  } catch {
+    return null;
+  }
+}
+
+async function getDoneSearchRunForUser(id: string, userId: string): Promise<{
+  id: string;
+  summary: string | null;
+  result: unknown;
+} | null> {
+  if (!client) return null;
+  const { data, error } = await client.database
+    .from(TABLE)
+    .select("id,summary,result")
+    .eq("id", id)
+    .eq("user_id", userId)
+    .eq("kind", "search")
+    .eq("status", "done")
+    .limit(1);
+  if (error || !data || data.length === 0) return null;
+  const row = data[0] as { id: string; summary?: string | null; result?: unknown };
+  if (!row.result) return null;
+  return { id: row.id, summary: row.summary ?? null, result: row.result };
+}
+
+// 把一个已完成的补搜 search run 合并回原始 search run。
+// 多租户: 两条 run 都必须属于当前 userId；失败时返回 null，由 API 暴露成 404/503。
+export async function mergeBackfillRuns(input: {
+  originalRunId: string;
+  backfillRunId: string;
+  userId: string;
+}): Promise<MergeBackfillRunsResult | null> {
+  if (!client) return null;
+  try {
+    const [original, backfill] = await Promise.all([
+      getDoneSearchRunForUser(input.originalRunId, input.userId),
+      getDoneSearchRunForUser(input.backfillRunId, input.userId),
+    ]);
+    if (!original || !backfill) return null;
+
+    const merged = mergeBackfillResult({
+      originalResult: original.result,
+      backfillResult: backfill.result,
+    });
+    const mergeSummary = merged.backfill_merge.summary;
+    const updatedAt = new Date().toISOString();
+    const { data, error } = await client.database
+      .from(TABLE)
+      .update({
+        result: merged,
+        summary: original.summary || mergeSummary.summary,
+        updated_at: updatedAt,
+      })
+      .eq("id", input.originalRunId)
+      .eq("user_id", input.userId)
+      .eq("kind", "search")
+      .eq("status", "done")
+      .select("id,result,updated_at")
+      .limit(1);
+    if (error || !data || data.length === 0) return null;
+    const row = data[0] as { id: string; result?: unknown; updated_at?: string | null };
+    return {
+      runId: row.id,
+      result: row.result ?? merged,
+      mergeSummary,
+      updated_at: row.updated_at ?? updatedAt,
+    };
   } catch {
     return null;
   }

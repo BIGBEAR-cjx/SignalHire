@@ -49,7 +49,8 @@ type StatusResponse = {
   last_error?: string | null;
   status_view?: JobStatusView;
 };
-type BackfillContext = { originalResult: TalentSearchResult; job: CoverageBackfillJob };
+type BackfillContext = { originalResult: TalentSearchResult; originalRunId: string | null; job: CoverageBackfillJob };
+type MergeBackfillResponse = { merged?: boolean; runId?: string; result?: AppResult; mergeSummary?: BackfillMergeSummary; error?: string };
 
 const WORKER_DELAY_MS = 2 * 60 * 1000;
 const JOB_TIMEOUT_MS = 15 * 60 * 1000;
@@ -108,6 +109,8 @@ export default function ResearchTool({
   const [copied, setCopied] = useState(false);
   const [backfillContext, setBackfillContext] = useState<BackfillContext | null>(null);
   const [backfillMergeSummary, setBackfillMergeSummary] = useState<BackfillMergeSummary | null>(null);
+  const [mergingBackfill, setMergingBackfill] = useState(false);
+  const [mergedOriginalRunId, setMergedOriginalRunId] = useState<string | null>(null);
   const idRef = useRef(0);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -180,6 +183,7 @@ export default function ResearchTool({
     setSelectedCandidateIndex(null); setShortlist([]);
     setFeed([]); setLive(null); setRunId(null); setCurrentJobId(null);
     setJobStatus(null); setCopied(false); setBackfillContext(null); setBackfillMergeSummary(null);
+    setMergingBackfill(false); setMergedOriginalRunId(null);
     try {
       const url = mode === "search" ? "/api/search" : "/api/verify";
       const body: Record<string, unknown> = mode === "search" ? { query: value } : { bio: value };
@@ -214,6 +218,7 @@ export default function ResearchTool({
               setStats(ev.stats ?? null);
               setRunId(ev.runId ?? null);
               setBackfillMergeSummary(null);
+              setMergedOriginalRunId(null);
             } else if (ev.type === "error") {
               setError(ev.error || "出错了");
             }
@@ -264,9 +269,10 @@ export default function ResearchTool({
     setLoading(true); setError(""); setStats(null); setFeed([]); setLive(null);
     setJobStatus({ phase: "queued", label: "补搜已进入研究队列", detail: "等待 worker 认领这个证据缺口任务。", canRetry: false });
     setCurrentJobId(null);
-    const context = { originalResult: result, job };
+    const context = { originalResult: result, originalRunId: runId, job };
     setBackfillContext(context);
     setBackfillMergeSummary(null);
+    setMergedOriginalRunId(null);
     try {
       const res = await fetch("/api/backfill", {
         method: "POST",
@@ -289,6 +295,35 @@ export default function ResearchTool({
     } catch (e) {
       setError((e as Error).message);
       setLoading(false);
+    }
+  }
+
+  async function mergeBackfillIntoOriginal() {
+    if (!backfillContext?.originalRunId || !runId || mergingBackfill) return;
+    setMergingBackfill(true); setError("");
+    try {
+      const res = await fetch("/api/backfill/merge", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          original_run_id: backfillContext.originalRunId,
+          backfill_run_id: runId,
+        }),
+      });
+      const j: MergeBackfillResponse = await res.json().catch(() => ({}));
+      if (!res.ok || !j.merged || !j.result || !j.runId) {
+        setError(j.error ?? `HTTP ${res.status}`);
+        return;
+      }
+      setResult(j.result);
+      setRunId(j.runId);
+      setBackfillMergeSummary(j.mergeSummary ?? backfillMergeSummary);
+      setMergedOriginalRunId(j.runId);
+      setBackfillContext(null);
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setMergingBackfill(false);
     }
   }
 
@@ -483,7 +518,14 @@ export default function ResearchTool({
           </div>
           {isTalentSearchResult(result) ? (
             <>
-              {backfillMergeSummary && <BackfillMergeSummaryView summary={backfillMergeSummary} />}
+              {backfillMergeSummary && (
+                <BackfillMergeSummaryView
+                  summary={backfillMergeSummary}
+                  onMerge={backfillContext?.originalRunId && runId ? mergeBackfillIntoOriginal : undefined}
+                  mergeDisabled={mergingBackfill}
+                  merged={Boolean(mergedOriginalRunId)}
+                />
+              )}
               <SearchPlanView result={result} />
               <SourceExecutionView result={result} />
               <CoverageBackfillView result={result} onBackfillJob={enqueueBackfillJob} backfillDisabled={loading} />
