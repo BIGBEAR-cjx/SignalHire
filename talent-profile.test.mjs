@@ -228,6 +228,84 @@ test("builds editable search plan draft and compiles it into search input", () =
   assert.match(input, /Return the normal SignalHire talent shortlist payload/);
 });
 
+test("builds candidate evidence audit summary from claims and evidence graph", () => {
+  assert.equal(typeof talentProfile.buildCandidateEvidenceAudit, "function");
+
+  const result = normalizeTalentSearchResult({
+    evidence_graph: {
+      candidates: [
+        {
+          candidate_name: "Ada Lovelace",
+          independent_sources: 4,
+          source_types: ["code", "blog"],
+          strongest_evidence: ["Public vLLM integration and technical write-up agree."],
+          weakest_evidence: ["Location appears on one profile only."],
+          cross_validation: "GitHub, blog, and company sources support the core LLM systems fit.",
+          risk_flags: ["Current location is single-source."],
+        },
+      ],
+    },
+    candidates: [
+      {
+        name: "Ada Lovelace",
+        uncertainties: ["Recent availability is unknown."],
+        claims: [
+          {
+            claim: "Maintains a public vLLM integration",
+            verdict: "verified",
+            evidence: [
+              { note: "GitHub repo", url: "https://github.com/example/vllm", source_type: "code" },
+              { note: "Technical post", url: "https://example.com/vllm", source_type: "blog" },
+            ],
+          },
+          {
+            claim: "Is currently based in Berlin",
+            verdict: "verified",
+            evidence: [
+              { note: "Profile", url: "https://profile.example/ada", source_type: "profile" },
+            ],
+          },
+          {
+            claim: "Led TensorRT-LLM work at Example AI",
+            verdict: "unverified",
+            evidence: [],
+          },
+          {
+            claim: "Currently works at OldCo",
+            verdict: "contradicted",
+            evidence: [
+              { note: "Company page lists a different employer", url: "https://company.example/team/ada", source_type: "company" },
+            ],
+          },
+        ],
+        evidence_audit: {
+          identity_risks: ["Same-name profile exists on GitHub."],
+          recency_notes: ["Most concrete activity is from 2025."],
+          overall_evidence_quality: "high",
+        },
+      },
+    ],
+  });
+
+  const summary = talentProfile.buildCandidateEvidenceAudit({
+    result,
+    candidate: result.candidates[0],
+  });
+
+  assert.equal(summary.candidate_name, "Ada Lovelace");
+  assert.equal(summary.overall_evidence_quality, "high");
+  assert.equal(summary.verified_count, 2);
+  assert.equal(summary.unverified_count, 1);
+  assert.equal(summary.contradicted_count, 1);
+  assert.equal(summary.independent_sources, 4);
+  assert.deepEqual(summary.source_types, ["code", "blog", "profile", "company"]);
+  assert.deepEqual(summary.single_source_claims, ["Is currently based in Berlin", "Currently works at OldCo"]);
+  assert.deepEqual(summary.identity_risks, ["Same-name profile exists on GitHub."]);
+  assert.deepEqual(summary.recency_notes, ["Most concrete activity is from 2025."]);
+  assert.equal(summary.cross_validation, "GitHub, blog, and company sources support the core LLM systems fit.");
+  assert.deepEqual(summary.risk_flags, ["Current location is single-source.", "Recent availability is unknown."]);
+});
+
 test("normalizes source execution and falls back to planned jobs", () => {
   const result = normalizeTalentSearchResult({
     search_brief: {

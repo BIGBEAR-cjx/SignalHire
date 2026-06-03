@@ -166,7 +166,7 @@ export default async function ReportPage({ params }: { params: Promise<{ id: str
                     {talentResult.candidates.map((candidate, index) => (
                       <div key={`${candidate.name}-${index}`} className="space-y-3">
                         <EvidenceGraphView result={talentResult} candidate={candidate} />
-                        <CandidateProfileView candidate={candidate} />
+                        <CandidateProfileView candidate={candidate} result={talentResult} />
                       </div>
                     ))}
                   </>

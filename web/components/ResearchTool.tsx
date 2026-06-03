@@ -705,7 +705,7 @@ export default function ResearchTool({
                           ✉️ AI 起草外联邮件给 {result.candidates[selectedCandidateIndex]?.name?.split(" ")[0]}
                         </button>
                         <EvidenceGraphView result={result} candidate={result.candidates[selectedCandidateIndex]} />
-                        <CandidateProfileView candidate={result.candidates[selectedCandidateIndex]} />
+                        <CandidateProfileView candidate={result.candidates[selectedCandidateIndex]} result={result} />
                       </>
                     )}
                   </div>

@@ -391,6 +391,15 @@ function evidenceDetailsFromClaims(claims) {
   return { urls, sourceTypes };
 }
 
+function evidenceHostsFromClaim(claim) {
+  const hosts = new Set();
+  for (const evidence of Array.isArray(claim?.evidence) ? claim.evidence : []) {
+    const host = hostFromUrl(evidence?.url);
+    if (host && !isSearchUrl(evidence.url)) hosts.add(host);
+  }
+  return hosts;
+}
+
 function candidateMapByName(candidates) {
   const map = new Map();
   for (const candidate of Array.isArray(candidates) ? candidates : []) {
@@ -630,6 +639,60 @@ export function buildCandidateComparisonRows(result) {
       risk_summary: cleanStringArray(graphNode.risk_flags, 1)[0] || cleanStringArray(candidate.uncertainties, 1)[0] || "",
     };
   });
+}
+
+/**
+ * @param {{ result?: unknown; candidate?: unknown }} input
+ */
+export function buildCandidateEvidenceAudit({ result, candidate } = {}) {
+  const normalizedResult = normalizeTalentSearchResult(result);
+  const suppliedCandidate = normalizeTalentSearchResult({ candidates: [candidate] }).candidates[0];
+  const suppliedName = cleanString(suppliedCandidate?.name);
+  const resultCandidate = normalizedResult.candidates.find((item) => item.name.toLowerCase() === suppliedName.toLowerCase());
+  const selected = resultCandidate || suppliedCandidate;
+  const candidateName = cleanString(selected?.name);
+  const graphNode = normalizedResult.evidence_graph.candidates.find((item) => item.candidate_name.toLowerCase() === candidateName.toLowerCase()) || {};
+  const claims = Array.isArray(selected?.claims) ? selected.claims : [];
+  const audit = selected?.evidence_audit || normalizeAudit();
+  const evidenceDetails = evidenceDetailsFromClaims(claims);
+  const sourceTypes = uniqueStrings([
+    ...cleanStringArray(graphNode.source_types, 12),
+    ...Array.from(evidenceDetails.sourceTypes),
+  ], 12);
+  const independentSources = Math.max(
+    normalizeCount(graphNode.independent_sources),
+    new Set(Array.from(evidenceDetails.urls).map(hostFromUrl).filter(Boolean)).size,
+  );
+  const claimsByVerdict = (verdict) => claims
+    .filter((claim) => claim.verdict === verdict)
+    .map((claim) => cleanString(claim.claim))
+    .filter(Boolean);
+  const singleSourceClaims = claims
+    .filter((claim) => cleanString(claim.claim) && Array.isArray(claim.evidence) && claim.evidence.length > 0 && evidenceHostsFromClaim(claim).size <= 1)
+    .map((claim) => cleanString(claim.claim));
+
+  return {
+    candidate_name: candidateName,
+    overall_evidence_quality: audit.overall_evidence_quality,
+    independent_sources: independentSources,
+    source_types: sourceTypes,
+    verified_count: claims.filter((claim) => claim.verdict === "verified").length,
+    unverified_count: claims.filter((claim) => claim.verdict === "unverified").length,
+    contradicted_count: claims.filter((claim) => claim.verdict === "contradicted").length,
+    verified_claims: audit.verified_claims.length ? audit.verified_claims : claimsByVerdict("verified"),
+    unverified_claims: audit.unverified_claims.length ? audit.unverified_claims : claimsByVerdict("unverified"),
+    contradicted_claims: audit.contradicted_claims.length ? audit.contradicted_claims : claimsByVerdict("contradicted"),
+    single_source_claims: audit.single_source_claims.length ? audit.single_source_claims : uniqueStrings(singleSourceClaims, 8),
+    identity_risks: audit.identity_risks,
+    recency_notes: audit.recency_notes,
+    cross_validation: cleanString(graphNode.cross_validation) || (independentSources > 1 ? `${independentSources} 个独立信源支持部分候选人声称。` : ""),
+    strongest_evidence: cleanStringArray(graphNode.strongest_evidence, 8),
+    weakest_evidence: cleanStringArray(graphNode.weakest_evidence, 8),
+    risk_flags: uniqueStrings([
+      ...cleanStringArray(graphNode.risk_flags, 8),
+      ...cleanStringArray(selected?.uncertainties, 8),
+    ], 8),
+  };
 }
 
 export function buildEvidenceCoverage(result) {

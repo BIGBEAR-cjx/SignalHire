@@ -5,6 +5,7 @@ declare module "@/lib/talent-profile.mjs" {
   export type CandidateComparisonRow = import("@/lib/talent-profile").CandidateComparisonRow;
   export type BackfillMergeSummary = import("@/lib/talent-profile").BackfillMergeSummary;
   export type CoverageBackfillJob = import("@/lib/talent-profile").CoverageBackfillJob;
+  export type CandidateEvidenceAuditSummary = import("@/lib/talent-profile").CandidateEvidenceAuditSummary;
   export type EvidenceCoverageGroup = import("@/lib/talent-profile").EvidenceCoverageGroup;
   export type SourceExecutionJob = import("@/lib/talent-profile").SourceExecutionJob;
   export type SourceQueryPlanItem = import("@/lib/talent-profile").SourceQueryPlanItem;
@@ -12,8 +13,8 @@ declare module "@/lib/talent-profile.mjs" {
   export type TalentSearchResult = import("@/lib/talent-profile").TalentSearchResult;
 }
 
-import type { BackfillMergeSummary, CandidateComparisonRow, CoverageBackfillJob, EvidenceCoverageGroup, SourceExecutionJob, SourceQueryPlanItem, TalentCandidate, TalentSearchResult } from "@/lib/talent-profile.mjs";
-import { buildCandidateComparisonRows, buildCoverageBackfillPlan, buildEvidenceCoverage, buildSourceExecution, buildSourceQueryPlan } from "@/lib/talent-profile.mjs";
+import type { BackfillMergeSummary, CandidateComparisonRow, CandidateEvidenceAuditSummary, CoverageBackfillJob, EvidenceCoverageGroup, SourceExecutionJob, SourceQueryPlanItem, TalentCandidate, TalentSearchResult } from "@/lib/talent-profile.mjs";
+import { buildCandidateComparisonRows, buildCandidateEvidenceAudit, buildCoverageBackfillPlan, buildEvidenceCoverage, buildSourceExecution, buildSourceQueryPlan } from "@/lib/talent-profile.mjs";
 import {
   reportUniqueSources,
   sourceCountChip,
@@ -738,7 +739,40 @@ export function ShortlistCard({
   );
 }
 
-export function EvidenceAuditView({ audit }: { audit: TalentCandidate["evidence_audit"] }) {
+function AuditStat({ label, value, tone }: { label: string; value: number; tone: "emerald" | "amber" | "red" | "gray" }) {
+  const toneClass = {
+    emerald: "bg-emerald-50 text-emerald-700 ring-emerald-100",
+    amber: "bg-amber-50 text-amber-700 ring-amber-100",
+    red: "bg-red-50 text-red-700 ring-red-100",
+    gray: "bg-gray-50 text-gray-700 ring-gray-100",
+  }[tone];
+  return (
+    <div className={`rounded-xl p-3 ring-1 ${toneClass}`}>
+      <p className="text-xl font-semibold leading-none">{value}</p>
+      <p className="mt-1 text-xs font-medium">{label}</p>
+    </div>
+  );
+}
+
+function AuditItemList({ label, items, chip }: { label: string; items: string[]; chip: string }) {
+  return (
+    <div>
+      <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-semibold ring-1 ${chip}`}>
+        {label}
+      </span>
+      {items.length > 0 ? (
+        <ul className="mt-1.5 list-disc space-y-1 pl-5 text-sm leading-relaxed text-gray-600">
+          {items.map((item) => <li key={item}>{item}</li>)}
+        </ul>
+      ) : (
+        <p className="mt-1.5 text-sm text-gray-400">无</p>
+      )}
+    </div>
+  );
+}
+
+export function EvidenceAuditView({ candidate, result }: { candidate: TalentCandidate; result?: TalentSearchResult }) {
+  const audit: CandidateEvidenceAuditSummary = buildCandidateEvidenceAudit({ result, candidate });
   const rows = [
     { label: "已验证", items: audit.verified_claims, chip: "bg-emerald-50 text-emerald-700 ring-emerald-200" },
     { label: "未验证", items: audit.unverified_claims, chip: "bg-amber-50 text-amber-700 ring-amber-200" },
@@ -752,23 +786,46 @@ export function EvidenceAuditView({ audit }: { audit: TalentCandidate["evidence_
     <section className="rounded-xl border border-gray-100 bg-gray-50/70 p-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h4 className="text-sm font-semibold text-gray-900">证据审计</h4>
-        <QualityPill value={audit.overall_evidence_quality} />
-      </div>
-      <div className="mt-3 space-y-3">
-        {rows.map((row) => (
-          <div key={row.label}>
-            <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-semibold ring-1 ${row.chip}`}>
-              {row.label}
+        <div className="flex flex-wrap items-center gap-2">
+          {audit.independent_sources > 0 && (
+            <span className="rounded-full bg-white px-2 py-0.5 text-xs font-semibold text-gray-600 ring-1 ring-gray-200">
+              {audit.independent_sources} 个独立信源
             </span>
-            {row.items.length > 0 ? (
-              <ul className="mt-1.5 list-disc space-y-1 pl-5 text-sm leading-relaxed text-gray-600">
-                {row.items.map((item) => <li key={item}>{item}</li>)}
-              </ul>
-            ) : (
-              <p className="mt-1.5 text-sm text-gray-400">无</p>
-            )}
-          </div>
-        ))}
+          )}
+          <QualityPill value={audit.overall_evidence_quality} />
+        </div>
+      </div>
+      <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
+        <AuditStat label="已验证" value={audit.verified_count} tone="emerald" />
+        <AuditStat label="未验证" value={audit.unverified_count} tone="amber" />
+        <AuditStat label="矛盾" value={audit.contradicted_count} tone="red" />
+        <AuditStat label="单源声称" value={audit.single_source_claims.length} tone="gray" />
+      </div>
+      {audit.source_types.length > 0 && (
+        <div className="mt-3 flex flex-wrap gap-1.5">
+          {audit.source_types.map((type) => (
+            <span key={type} className="rounded-full bg-white px-2 py-0.5 text-xs font-medium text-blue-700 ring-1 ring-blue-100">
+              {type}
+            </span>
+          ))}
+        </div>
+      )}
+      {audit.cross_validation && (
+        <p className="mt-3 rounded-xl bg-white px-3 py-2 text-sm leading-relaxed text-gray-700 ring-1 ring-gray-100">
+          {audit.cross_validation}
+        </p>
+      )}
+      <div className="mt-3 space-y-3">
+        {rows.map((row) => <AuditItemList key={row.label} {...row} />)}
+        {audit.strongest_evidence.length > 0 && (
+          <AuditItemList label="最强证据" items={audit.strongest_evidence} chip="bg-emerald-50 text-emerald-700 ring-emerald-200" />
+        )}
+        {audit.weakest_evidence.length > 0 && (
+          <AuditItemList label="弱证据" items={audit.weakest_evidence} chip="bg-amber-50 text-amber-700 ring-amber-200" />
+        )}
+        {audit.risk_flags.length > 0 && (
+          <AuditItemList label="风险提示" items={audit.risk_flags} chip="bg-red-50 text-red-700 ring-red-200" />
+        )}
       </div>
     </section>
   );
@@ -822,7 +879,7 @@ export function EvidenceGraphView({ result, candidate }: { result: TalentSearchR
   );
 }
 
-export function CandidateProfileView({ candidate }: { candidate: TalentCandidate }) {
+export function CandidateProfileView({ candidate, result }: { candidate: TalentCandidate; result?: TalentSearchResult }) {
   return (
     <article className="rounded-2xl border border-gray-100 bg-white p-5 shadow-[0_8px_30px_rgba(0,0,0,0.06)]">
       <div className="flex items-start gap-3">
@@ -846,7 +903,7 @@ export function CandidateProfileView({ candidate }: { candidate: TalentCandidate
       )}
 
       <div className="mt-4">
-        <EvidenceAuditView audit={candidate.evidence_audit} />
+        <EvidenceAuditView candidate={candidate} result={result} />
       </div>
 
       {candidate.claims.length > 0 && (
