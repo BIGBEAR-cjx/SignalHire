@@ -11,6 +11,7 @@ import {
   EvidenceCoverageView,
   EvidenceGraphView,
   SearchPlanView,
+  ShortlistDeliveryReportView,
   SourceExecutionView,
   TalentMapView,
   TrustReportView,
@@ -158,6 +159,7 @@ export default async function ReportPage({ params }: { params: Promise<{ id: str
                 talentResult ? (
                   <>
                     <SearchPlanView result={talentResult} />
+                    <ShortlistDeliveryReportView result={talentResult} />
                     <SourceExecutionView result={talentResult} />
                     <CoverageBackfillView result={talentResult} />
                     <EvidenceCoverageView result={talentResult} />

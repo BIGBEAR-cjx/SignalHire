@@ -306,6 +306,104 @@ test("builds candidate evidence audit summary from claims and evidence graph", (
   assert.deepEqual(summary.risk_flags, ["Current location is single-source.", "Recent availability is unknown."]);
 });
 
+test("builds shortlist delivery report for hiring manager handoff", () => {
+  assert.equal(typeof talentProfile.buildShortlistDeliveryReport, "function");
+
+  const result = normalizeTalentSearchResult({
+    search_brief: {
+      original_query: "Find senior LLM inference engineers in North America",
+      target_directions: ["AI Infrastructure / LLM Systems"],
+      required_skills: ["vLLM", "Triton"],
+      geography: "North America",
+    },
+    evidence_graph: {
+      source_mix: [
+        { source_type: "code", count: 3 },
+        { source_type: "company", count: 1 },
+      ],
+      candidates: [
+        {
+          candidate_name: "Ada Lovelace",
+          independent_sources: 4,
+          source_types: ["code", "blog", "company"],
+          risk_flags: ["Location is single-source."],
+        },
+        {
+          candidate_name: "Grace Hopper",
+          independent_sources: 1,
+          source_types: ["profile"],
+          risk_flags: ["Implementation evidence is thin."],
+        },
+      ],
+    },
+    candidates: [
+      {
+        name: "Ada Lovelace",
+        current_role: "Staff Engineer",
+        current_company: "Example AI",
+        ai_directions: ["AI Infrastructure / LLM Systems"],
+        match_score: 92,
+        strongest_signals: ["Merged public vLLM serving PRs"],
+        uncertainties: ["Location needs confirmation"],
+        evidence_audit: { overall_evidence_quality: "high" },
+        claims: [
+          {
+            claim: "Maintains public vLLM serving work",
+            verdict: "verified",
+            evidence: [
+              { note: "GitHub", url: "https://github.com/example/vllm", source_type: "code" },
+              { note: "Blog", url: "https://example.com/vllm", source_type: "blog" },
+            ],
+          },
+        ],
+      },
+      {
+        name: "Grace Hopper",
+        current_role: "Engineer",
+        current_company: "InfraCo",
+        ai_directions: ["ML Platform / MLOps"],
+        match_score: 81,
+        strongest_signals: ["Built internal inference tooling"],
+        uncertainties: ["No public code found"],
+        evidence_audit: { overall_evidence_quality: "medium" },
+        claims: [
+          {
+            claim: "Works on inference tooling",
+            verdict: "verified",
+            evidence: [{ note: "Profile", url: "https://profile.example/grace", source_type: "profile" }],
+          },
+        ],
+      },
+      {
+        name: "Alan Turing",
+        match_score: 62,
+        uncertainties: ["Mostly research-only signal"],
+        evidence_audit: { overall_evidence_quality: "low" },
+      },
+    ],
+  });
+
+  const report = talentProfile.buildShortlistDeliveryReport(result);
+
+  assert.equal(report.brief_summary, "Find senior LLM inference engineers in North America");
+  assert.equal(report.candidate_count, 3);
+  assert.equal(report.strong_recommendation_count, 2);
+  assert.equal(report.average_match_score, 78);
+  assert.equal(report.high_evidence_count, 1);
+  assert.equal(report.covered_group_count, 3);
+  assert.equal(report.coverage_group_count, 4);
+  assert.equal(report.recommended_candidates.length, 2);
+  assert.equal(report.recommended_candidates[0].name, "Ada Lovelace");
+  assert.equal(report.recommended_candidates[0].role, "Staff Engineer / Example AI");
+  assert.equal(report.recommended_candidates[0].recommendation_reason, "Merged public vLLM serving PRs");
+  assert.equal(report.recommended_candidates[0].evidence_quality, "high");
+  assert.equal(report.recommended_candidates[0].independent_sources, 4);
+  assert.equal(report.recommended_candidates[0].primary_risk, "Location is single-source.");
+  assert.ok(report.report_risks.some((risk) => /1 个信息源覆盖缺口/.test(risk)));
+  assert.ok(report.report_risks.some((risk) => /Alan Turing/.test(risk)));
+  assert.deepEqual(report.next_steps.slice(0, 2), ["优先审阅 2 位强推荐候选人的证据详情。", "对 1 个信息源覆盖缺口执行补搜。"]);
+});
+
 test("normalizes source execution and falls back to planned jobs", () => {
   const result = normalizeTalentSearchResult({
     search_brief: {
