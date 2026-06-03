@@ -228,6 +228,61 @@ test("builds editable search plan draft and compiles it into search input", () =
   assert.match(input, /Return the normal SignalHire talent shortlist payload/);
 });
 
+test("builds feedback-optimized search input for the next round", () => {
+  assert.equal(typeof talentProfile.buildFeedbackOptimizedSearchInput, "function");
+
+  const result = normalizeTalentSearchResult({
+    search_brief: {
+      original_query: "Find senior LLM inference engineers in North America",
+      required_skills: ["vLLM", "Triton"],
+      geography: "North America",
+    },
+    candidates: [
+      {
+        name: "Ada Lovelace",
+        current_role: "Staff Engineer",
+        current_company: "Example AI",
+        ai_directions: ["AI Infrastructure / LLM Systems"],
+        match_score: 92,
+        strongest_signals: ["Merged public vLLM serving PRs"],
+        uncertainties: ["Location needs confirmation"],
+        evidence_audit: { overall_evidence_quality: "high" },
+      },
+      {
+        name: "Grace Hopper",
+        current_role: "Engineer",
+        current_company: "InfraCo",
+        ai_directions: ["ML Platform / MLOps"],
+        match_score: 74,
+        strongest_signals: ["Built internal inference tooling"],
+        uncertainties: ["No public code found"],
+        evidence_audit: { overall_evidence_quality: "medium" },
+      },
+    ],
+  });
+
+  const input = talentProfile.buildFeedbackOptimizedSearchInput({
+    result,
+    feedback: {
+      precision: "partial",
+      satisfaction: "mixed",
+      issue: "wrong_seniority",
+      focus: "stricter_match",
+    },
+  });
+
+  assert.match(input, /Feedback-optimized SignalHire search/);
+  assert.match(input, /Find senior LLM inference engineers in North America/);
+  assert.match(input, /部分精准/);
+  assert.match(input, /一般/);
+  assert.match(input, /资历不对/);
+  assert.match(input, /更严格匹配/);
+  assert.match(input, /Ada Lovelace/);
+  assert.match(input, /Grace Hopper/);
+  assert.match(input, /Do not simply rerank the same shortlist/);
+  assert.match(input, /Return the normal SignalHire talent shortlist payload/);
+});
+
 test("builds candidate evidence audit summary from claims and evidence graph", () => {
   assert.equal(typeof talentProfile.buildCandidateEvidenceAudit, "function");
 
