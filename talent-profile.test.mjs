@@ -991,8 +991,9 @@ test("normalizes cached v1 talent payload for web streaming output", async () =>
 });
 
 test("search prompt requests search plan and evidence graph", async () => {
-  const { searchPrompt } = await import("./web/lib/miro.ts");
+  const { searchPrompt, verifyPrompt } = await import("./web/lib/miro.ts");
   const prompt = searchPrompt("Find AI infra engineers");
+  const verify = verifyPrompt("Ada says she built a vLLM project.");
 
   assert.match(prompt, /"search_plan"/);
   assert.match(prompt, /"source_execution"/);
@@ -1010,11 +1011,20 @@ test("search prompt requests search plan and evidence graph", async () => {
   assert.match(prompt, /source_strategy/);
   assert.match(prompt, /independent_sources/);
   assert.match(prompt, /cross_validation/);
+  assert.match(prompt, /OUTPUT LANGUAGE/);
+  assert.match(prompt, /Platform language: Chinese \(Simplified\)/);
+  assert.match(prompt, /user-facing text fields/);
+  assert.match(prompt, /Do not paste raw source passages/);
+  assert.match(verify, /OUTPUT LANGUAGE/);
+  assert.match(verify, /Platform language: Chinese \(Simplified\)/);
+  assert.match(verify, /claim/);
+  assert.match(verify, /red_flags/);
 });
 
 test("worker prompt and normalizer support search plan and evidence graph", async () => {
-  const { searchPrompt } = await import("./worker/lib.mjs");
+  const { searchPrompt, verifyPrompt } = await import("./worker/lib.mjs");
   const prompt = searchPrompt("Find AI infra engineers");
+  const verify = verifyPrompt("Ada says she built a vLLM project.");
   const result = normalizeWorkerTalentSearchResult({
     search_plan: {
       must_have: ["LLM serving"],
@@ -1070,6 +1080,14 @@ test("worker prompt and normalizer support search plan and evidence graph", asyn
   assert.match(prompt, /source_strategy/);
   assert.match(prompt, /independent_sources/);
   assert.match(prompt, /cross_validation/);
+  assert.match(prompt, /OUTPUT LANGUAGE/);
+  assert.match(prompt, /Platform language: Chinese \(Simplified\)/);
+  assert.match(prompt, /user-facing text fields/);
+  assert.match(prompt, /Do not paste raw source passages/);
+  assert.match(verify, /OUTPUT LANGUAGE/);
+  assert.match(verify, /Platform language: Chinese \(Simplified\)/);
+  assert.match(verify, /claim/);
+  assert.match(verify, /red_flags/);
   assert.deepEqual(result.search_plan.must_have, ["LLM serving"]);
   assert.equal(result.search_plan.source_strategy[0].source_type, "other");
   assert.equal(result.search_plan.source_strategy[0].coverage_group, "practice");

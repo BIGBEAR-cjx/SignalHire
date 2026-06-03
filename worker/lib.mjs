@@ -73,7 +73,17 @@ export function normalizeResult(data) {
 }
 
 // ===== prompt (与 web/lib/miro.ts 同款) =====
-export const searchPrompt = (query) => `You are SignalHire, an AI talent sourcing and evidence-audit agent for HR teams and headhunters.
+export const DEFAULT_PLATFORM_LANGUAGE = "Chinese (Simplified)";
+
+function outputLanguageRules(platformLanguage = DEFAULT_PLATFORM_LANGUAGE) {
+  return `OUTPUT LANGUAGE:
+- Platform language: ${platformLanguage}.
+- Write all user-facing text fields in the platform language, including summary, rationale, reason, next_action, strongest_signals, uncertainties, claim, evidence.note, evidence_audit, cross_validation, risk_flags, outreach_angle, and red_flags.
+- Keep JSON keys, enum values, URLs, person names, company names, code/package/model names, benchmark names, and source titles unchanged when appropriate.
+- Do not paste raw source passages as the answer. Summarize or translate source evidence into the platform language.`;
+}
+
+export const searchPrompt = (query, platformLanguage = DEFAULT_PLATFORM_LANGUAGE) => `You are SignalHire, an AI talent sourcing and evidence-audit agent for HR teams and headhunters.
 
 TASK:
 Search globally for 10 to 15 real AI talent candidates for this hiring brief:
@@ -116,6 +126,8 @@ EVIDENCE RULES:
 - "contradicted" means public evidence conflicts with the claim.
 - "unverified" means the claim is plausible but not supported by clear public evidence.
 - If a claim has no concrete evidence URL, use "unverified".
+
+${outputLanguageRules(platformLanguage)}
 
 OUTPUT RULES:
 Respond with only one JSON object and no prose.
@@ -269,7 +281,7 @@ Use exactly this shape:
   ]
 }`;
 
-export const verifyPrompt = (bio) => `You are a candidate fact-checking agent. Below is a candidate's SELF-DESCRIBED profile.
+export const verifyPrompt = (bio, platformLanguage = DEFAULT_PLATFORM_LANGUAGE) => `You are a candidate fact-checking agent. Below is a candidate's SELF-DESCRIBED profile.
 Extract each distinct factual claim and CROSS-VERIFY it against MULTIPLE independent
 public web sources. Be skeptical — resumes commonly overstate.
 
@@ -283,6 +295,8 @@ Scrutinize creator/founder/lead, seniority, tenure, and credential (degree) clai
 VERDICT & EVIDENCE RULES (critical):
 - "verdict" MUST be EXACTLY one of: "verified", "contradicted", "unverified". Never any other value. If unsure, use "unverified".
 - Every evidence "url" MUST be a SPECIFIC source page that contains the fact. NEVER cite a search-results URL (nothing with google.com/search, bing.com/search, or a "?q=" query). If no concrete page exists, mark the claim "unverified".
+
+${outputLanguageRules(platformLanguage)}
 
 OUTPUT RULES (critical): respond with ONLY one JSON object, no prose, exactly this shape:
 {
