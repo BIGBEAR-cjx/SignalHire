@@ -425,6 +425,86 @@ test("summarizes backfill evidence that can merge into the original report", () 
   assert.match(summary.summary, /1 条新增证据/);
 });
 
+test("merges backfill evidence into the original talent report", () => {
+  assert.equal(typeof talentProfile.mergeBackfillResult, "function");
+
+  const originalResult = normalizeTalentSearchResult({
+    search_brief: { original_query: "Find LLM infra engineers" },
+    evidence_graph: {
+      source_mix: [{ source_type: "paper", count: 1 }],
+      candidates: [
+        { candidate_name: "Ada Lovelace", source_types: ["paper"], independent_sources: 1 },
+      ],
+    },
+    coverage_backfill: {
+      jobs: [
+        {
+          gap_id: "practice-code",
+          coverage_group: "practice",
+          missing_source_type: "code",
+          query: "vLLM site:github.com",
+          reason: "No code evidence yet.",
+        },
+      ],
+    },
+    candidates: [
+      {
+        name: "Ada Lovelace",
+        claims: [
+          {
+            claim: "Published LLM systems research",
+            verdict: "verified",
+            evidence: [{ note: "paper", url: "https://arxiv.org/abs/1234.5678", source_type: "paper" }],
+          },
+        ],
+      },
+    ],
+  });
+  const backfillResult = normalizeTalentSearchResult({
+    evidence_graph: {
+      source_mix: [{ source_type: "code", count: 1 }],
+      candidates: [
+        {
+          candidate_name: "Ada Lovelace",
+          source_types: ["code"],
+          independent_sources: 1,
+          strongest_evidence: ["Public vLLM integration"],
+        },
+      ],
+    },
+    candidates: [
+      {
+        name: "Ada Lovelace",
+        claims: [
+          {
+            claim: "Maintains a public vLLM integration",
+            verdict: "verified",
+            evidence: [{ note: "GitHub repo", url: "https://github.com/example/vllm", source_type: "code" }],
+          },
+        ],
+      },
+    ],
+  });
+
+  const merged = talentProfile.mergeBackfillResult({ originalResult, backfillResult, mergedAt: "2026-06-03T00:00:00.000Z" });
+  const candidate = merged.candidates.find((item) => item.name === "Ada Lovelace");
+  assert.equal(candidate?.claims.length, 2);
+  assert.equal(candidate?.claims[1].claim, "Maintains a public vLLM integration");
+  assert.equal(merged.evidence_graph.source_mix.find((item) => item.source_type === "code")?.count, 1);
+  assert.deepEqual(
+    merged.evidence_graph.candidates.find((item) => item.candidate_name === "Ada Lovelace")?.source_types,
+    ["paper", "code"],
+  );
+  assert.equal(merged.coverage_backfill.jobs.find((job) => job.gap_id === "practice-code")?.status, "completed");
+  assert.equal(merged.backfill_merge.merged_at, "2026-06-03T00:00:00.000Z");
+
+  const mergedAgain = talentProfile.mergeBackfillResult({ originalResult: merged, backfillResult, mergedAt: "2026-06-03T00:01:00.000Z" });
+  const urls = mergedAgain.candidates
+    .find((item) => item.name === "Ada Lovelace")
+    ?.claims.flatMap((claim) => claim.evidence.map((evidence) => evidence.url));
+  assert.equal(urls?.filter((url) => url === "https://github.com/example/vllm").length, 1);
+});
+
 test("builds candidate comparison rows from shortlist and evidence graph", () => {
   const result = normalizeTalentSearchResult({
     evidence_graph: {

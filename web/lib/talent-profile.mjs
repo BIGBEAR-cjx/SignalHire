@@ -377,6 +377,100 @@ function addCounts(target, source) {
   return target;
 }
 
+function uniqueStrings(values, limit = 20) {
+  return Array.from(new Set(cleanStringArray(values, limit * 2))).slice(0, limit);
+}
+
+function evidenceUrlSet(claims) {
+  const urls = new Set();
+  for (const claim of Array.isArray(claims) ? claims : []) {
+    for (const evidence of Array.isArray(claim?.evidence) ? claim.evidence : []) {
+      const url = cleanString(evidence?.url);
+      if (url) urls.add(url);
+    }
+  }
+  return urls;
+}
+
+function claimKey(claim) {
+  const text = cleanString(claim?.claim).toLowerCase();
+  const urls = (Array.isArray(claim?.evidence) ? claim.evidence : [])
+    .map((evidence) => cleanString(evidence?.url))
+    .filter(Boolean)
+    .sort()
+    .join("|");
+  return `${text}:${urls}`;
+}
+
+function mergeClaims(originalClaims, backfillClaims) {
+  const merged = Array.isArray(originalClaims) ? [...originalClaims] : [];
+  const seenKeys = new Set(merged.map(claimKey));
+  const seenUrls = evidenceUrlSet(merged);
+  for (const claim of Array.isArray(backfillClaims) ? backfillClaims : []) {
+    const key = claimKey(claim);
+    const urls = Array.isArray(claim?.evidence) ? claim.evidence.map((evidence) => cleanString(evidence?.url)).filter(Boolean) : [];
+    if (seenKeys.has(key) || (urls.length > 0 && urls.every((url) => seenUrls.has(url)))) continue;
+    merged.push(claim);
+    seenKeys.add(key);
+    for (const url of urls) seenUrls.add(url);
+  }
+  return merged;
+}
+
+function mergeSourceMix(originalMix, backfillMix) {
+  const counts = new Map();
+  for (const item of Array.isArray(originalMix) ? originalMix : []) {
+    const sourceType = cleanString(item?.source_type).toLowerCase();
+    if (sourceType) counts.set(sourceType, Math.max(counts.get(sourceType) ?? 0, normalizeCount(item?.count)));
+  }
+  for (const item of Array.isArray(backfillMix) ? backfillMix : []) {
+    const sourceType = cleanString(item?.source_type).toLowerCase();
+    if (sourceType) counts.set(sourceType, (counts.get(sourceType) ?? 0) + normalizeCount(item?.count));
+  }
+  return Array.from(counts.entries()).map(([source_type, count]) => ({ source_type, count })).slice(0, 12);
+}
+
+function mergeEvidenceGraphCandidates(originalCandidates, backfillCandidates) {
+  const byName = new Map();
+  for (const candidate of Array.isArray(originalCandidates) ? originalCandidates : []) {
+    const name = cleanString(candidate?.candidate_name);
+    if (name) byName.set(name.toLowerCase(), { ...candidate });
+  }
+  for (const candidate of Array.isArray(backfillCandidates) ? backfillCandidates : []) {
+    const name = cleanString(candidate?.candidate_name);
+    if (!name) continue;
+    const key = name.toLowerCase();
+    const existing = byName.get(key);
+    if (!existing) {
+      byName.set(key, { ...candidate });
+      continue;
+    }
+    byName.set(key, {
+      ...existing,
+      independent_sources: normalizeCount(existing.independent_sources) + normalizeCount(candidate.independent_sources),
+      source_types: uniqueStrings([...(existing.source_types ?? []), ...(candidate.source_types ?? [])], 12),
+      strongest_evidence: uniqueStrings([...(existing.strongest_evidence ?? []), ...(candidate.strongest_evidence ?? [])], 8),
+      weakest_evidence: uniqueStrings([...(existing.weakest_evidence ?? []), ...(candidate.weakest_evidence ?? [])], 8),
+      risk_flags: uniqueStrings([...(existing.risk_flags ?? []), ...(candidate.risk_flags ?? [])], 8),
+      cross_validation: cleanString(candidate.cross_validation) || cleanString(existing.cross_validation),
+    });
+  }
+  return Array.from(byName.values()).slice(0, 20);
+}
+
+function markCompletedBackfillJobs(jobs, summary) {
+  const gainedPairs = new Set(
+    (Array.isArray(summary?.coverage_gains) ? summary.coverage_gains : []).flatMap((gain) => {
+      const coverageGroup = cleanString(gain?.key);
+      return cleanStringArray(gain?.added_source_types, 12).map((sourceType) => `${coverageGroup}:${sourceType}`);
+    }),
+  );
+  return (Array.isArray(jobs) ? jobs : []).map((job) => {
+    const key = `${cleanString(job.coverage_group)}:${cleanString(job.missing_source_type)}`;
+    return gainedPairs.has(key) ? { ...job, status: "completed" } : job;
+  });
+}
+
 function coverageGroupsFromCounts(counts) {
   return EVIDENCE_COVERAGE_GROUPS.map((group) => {
     const coveredSourceTypes = group.source_types.filter((type) => (counts.get(type) ?? 0) > 0);
@@ -683,6 +777,53 @@ export function buildBackfillMergeSummary({ originalResult, backfillResult } = {
     improved_candidates: improvedCandidates.slice(0, 12),
     new_candidate_names: Array.from(new Set(newCandidateNames)).slice(0, 12),
     coverage_gains: coverageGains,
+  };
+}
+
+/**
+ * @param {{ originalResult?: unknown; backfillResult?: unknown; mergedAt?: string }} input
+ */
+export function mergeBackfillResult({ originalResult, backfillResult, mergedAt = new Date().toISOString() } = {}) {
+  const original = normalizeTalentSearchResult(originalResult);
+  const backfill = normalizeTalentSearchResult(backfillResult);
+  const summary = buildBackfillMergeSummary({ originalResult: original, backfillResult: backfill });
+  const backfillCandidates = candidateMapByName(backfill.candidates);
+  const existingNames = new Set(original.candidates.map((candidate) => candidate.name.toLowerCase()));
+
+  const candidates = original.candidates.map((candidate) => {
+    const backfillCandidate = backfillCandidates.get(candidate.name.toLowerCase());
+    if (!backfillCandidate) return candidate;
+    return {
+      ...candidate,
+      claims: mergeClaims(candidate.claims, backfillCandidate.claims),
+      strongest_signals: uniqueStrings([...candidate.strongest_signals, ...backfillCandidate.strongest_signals], 5),
+      uncertainties: uniqueStrings([...candidate.uncertainties, ...backfillCandidate.uncertainties], 5),
+    };
+  });
+  for (const candidate of backfill.candidates) {
+    if (!existingNames.has(candidate.name.toLowerCase())) candidates.push(candidate);
+  }
+
+  return {
+    ...original,
+    candidates: candidates.slice(0, 24),
+    source_execution: {
+      summary: original.source_execution.summary,
+      jobs: original.source_execution.jobs,
+    },
+    coverage_backfill: {
+      summary: original.coverage_backfill.summary || summary.summary,
+      jobs: markCompletedBackfillJobs(original.coverage_backfill.jobs, summary),
+    },
+    evidence_graph: {
+      summary: summary.summary || original.evidence_graph.summary,
+      source_mix: mergeSourceMix(original.evidence_graph.source_mix, backfill.evidence_graph.source_mix),
+      candidates: mergeEvidenceGraphCandidates(original.evidence_graph.candidates, backfill.evidence_graph.candidates),
+    },
+    backfill_merge: {
+      merged_at: mergedAt,
+      summary,
+    },
   };
 }
 

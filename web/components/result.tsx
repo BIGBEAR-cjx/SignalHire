@@ -422,7 +422,17 @@ export function CoverageBackfillView({
   );
 }
 
-export function BackfillMergeSummaryView({ summary }: { summary: BackfillMergeSummary }) {
+export function BackfillMergeSummaryView({
+  summary,
+  onMerge,
+  mergeDisabled = false,
+  merged = false,
+}: {
+  summary: BackfillMergeSummary;
+  onMerge?: () => void;
+  mergeDisabled?: boolean;
+  merged?: boolean;
+}) {
   const hasCandidates = summary.improved_candidates.length > 0;
   const hasCoverage = summary.coverage_gains.length > 0;
   if (!hasCandidates && !hasCoverage && summary.new_candidate_names.length === 0) return null;
@@ -434,7 +444,7 @@ export function BackfillMergeSummaryView({ summary }: { summary: BackfillMergeSu
           <p className="mt-1 text-sm text-emerald-900/70">{summary.summary}</p>
         </div>
         <span className="rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-emerald-700 ring-1 ring-emerald-200">
-          可合并
+          {merged ? "已合并" : "可合并"}
         </span>
       </div>
       {hasCoverage && (
@@ -491,6 +501,16 @@ export function BackfillMergeSummaryView({ summary }: { summary: BackfillMergeSu
         <p className="mt-4 text-xs leading-relaxed text-gray-600">
           补搜还发现新候选人：{summary.new_candidate_names.join(", ")}
         </p>
+      )}
+      {onMerge && (
+        <button
+          type="button"
+          onClick={onMerge}
+          disabled={mergeDisabled || merged}
+          className="mt-4 rounded-lg bg-gray-900 px-3 py-2 text-xs font-semibold text-white transition hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          {merged ? "已合并回原报告" : mergeDisabled ? "正在合并…" : "合并回原报告"}
+        </button>
       )}
     </section>
   );

@@ -26,6 +26,7 @@ export type CandidateComparisonRow = { name: string; role: string; primary_direc
 export type BackfillMergeCandidate = { candidate_name: string; new_evidence_count: number; new_source_types: string[]; new_evidence_urls: string[]; merge_note: string };
 export type BackfillCoverageGain = { key: string; label: string; before_count: number; after_count: number; added_source_types: string[] };
 export type BackfillMergeSummary = { summary: string; improved_candidates: BackfillMergeCandidate[]; new_candidate_names: string[]; coverage_gains: BackfillCoverageGain[] };
+export type BackfillMergedTalentSearchResult = TalentSearchResult & { backfill_merge: { merged_at: string; summary: BackfillMergeSummary } };
 export const AI_DIRECTIONS: string[];
 export const VERDICTS: Verdict[];
 export const EVIDENCE_QUALITY: EvidenceQuality[];
@@ -37,6 +38,7 @@ export function buildCandidateComparisonRows(result: unknown): CandidateComparis
 export function buildCoverageBackfillPlan(result: unknown): CoverageBackfillPlan;
 export function buildBackfillSearchInput(input?: { job?: unknown; originalQuery?: string }): string;
 export function buildBackfillMergeSummary(input?: { originalResult?: unknown; backfillResult?: unknown }): BackfillMergeSummary;
+export function mergeBackfillResult(input?: { originalResult?: unknown; backfillResult?: unknown; mergedAt?: string }): BackfillMergedTalentSearchResult;
 export function buildEvidenceCoverage(result: unknown): EvidenceCoverageGroup[];
 export function buildSourceQueryPlan(result: unknown): SourceQueryPlanItem[];
 export function buildSourceExecution(result: unknown): SourceExecution;
