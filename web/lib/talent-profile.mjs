@@ -695,6 +695,73 @@ export function buildCandidateEvidenceAudit({ result, candidate } = {}) {
   };
 }
 
+function candidateRole(candidate) {
+  return [candidate?.current_role, candidate?.current_company].map(cleanString).filter(Boolean).join(" / ");
+}
+
+export function buildShortlistDeliveryReport(result) {
+  const normalized = normalizeTalentSearchResult(result);
+  const coverage = buildEvidenceCoverage(normalized);
+  const coveredGroups = coverage.filter((group) => group.status === "covered");
+  const candidateAudits = normalized.candidates.map((candidate) => buildCandidateEvidenceAudit({ result: normalized, candidate }));
+  const strongCandidates = normalized.candidates.filter((candidate) => candidate.match_score >= 80);
+  const weakEvidenceCandidates = normalized.candidates.filter((candidate) => candidate.evidence_audit.overall_evidence_quality === "low");
+  const missingCoverageCount = Math.max(0, coverage.length - coveredGroups.length);
+  const averageMatchScore = normalized.candidates.length
+    ? Math.round(normalized.candidates.reduce((total, candidate) => total + candidate.match_score, 0) / normalized.candidates.length)
+    : 0;
+  const recommendedCandidates = normalized.candidates
+    .filter((candidate) => candidate.match_score >= 75)
+    .sort((a, b) => b.match_score - a.match_score)
+    .slice(0, 5)
+    .map((candidate) => {
+      const audit = candidateAudits.find((item) => item.candidate_name === candidate.name) || buildCandidateEvidenceAudit({ candidate });
+      return {
+        name: candidate.name,
+        role: candidateRole(candidate),
+        match_score: candidate.match_score,
+        evidence_quality: candidate.evidence_audit.overall_evidence_quality,
+        independent_sources: audit.independent_sources,
+        recommendation_reason: cleanStringArray(candidate.strongest_signals, 1)[0] || candidate.summary || candidate.headline,
+        primary_risk: cleanStringArray(audit.risk_flags, 1)[0] || cleanStringArray(candidate.uncertainties, 1)[0] || "",
+      };
+    });
+  const risks = [];
+  if (missingCoverageCount > 0) risks.push(`${missingCoverageCount} 个信息源覆盖缺口需要补搜。`);
+  if (weakEvidenceCandidates.length > 0) {
+    risks.push(`证据偏弱候选人：${weakEvidenceCandidates.map((candidate) => candidate.name).slice(0, 4).join(", ")}。`);
+  }
+  const singleSourceCandidates = candidateAudits.filter((audit) => audit.single_source_claims.length > 0).map((audit) => audit.candidate_name).filter(Boolean);
+  if (singleSourceCandidates.length > 0) {
+    risks.push(`单源声称需复核：${singleSourceCandidates.slice(0, 4).join(", ")}。`);
+  }
+  const nextSteps = [];
+  if (strongCandidates.length > 0) nextSteps.push(`优先审阅 ${strongCandidates.length} 位强推荐候选人的证据详情。`);
+  if (missingCoverageCount > 0) nextSteps.push(`对 ${missingCoverageCount} 个信息源覆盖缺口执行补搜。`);
+  nextSteps.push("将候选人详情分享给 hiring manager 做人工复核。");
+
+  return {
+    brief_summary: normalized.search_brief.original_query || normalized.search_plan.must_have.join("; ") || "AI talent shortlist",
+    candidate_count: normalized.candidates.length,
+    strong_recommendation_count: strongCandidates.length,
+    average_match_score: averageMatchScore,
+    high_evidence_count: normalized.candidates.filter((candidate) => candidate.evidence_audit.overall_evidence_quality === "high").length,
+    covered_group_count: coveredGroups.length,
+    coverage_group_count: coverage.length,
+    coverage_summary: coverage.map((group) => ({
+      key: group.key,
+      label: group.label,
+      status: group.status,
+      count: group.count,
+      source_types: group.source_types,
+      missing_source_types: group.missing_source_types,
+    })),
+    recommended_candidates: recommendedCandidates,
+    report_risks: risks,
+    next_steps: nextSteps,
+  };
+}
+
 export function buildEvidenceCoverage(result) {
   const source = isPlainObject(result) ? result : {};
   const counts = sourceTypeCountsFromMix(source.evidence_graph?.source_mix, source.candidates);

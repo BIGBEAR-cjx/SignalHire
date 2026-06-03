@@ -7,14 +7,15 @@ declare module "@/lib/talent-profile.mjs" {
   export type CoverageBackfillJob = import("@/lib/talent-profile").CoverageBackfillJob;
   export type CandidateEvidenceAuditSummary = import("@/lib/talent-profile").CandidateEvidenceAuditSummary;
   export type EvidenceCoverageGroup = import("@/lib/talent-profile").EvidenceCoverageGroup;
+  export type ShortlistDeliveryReport = import("@/lib/talent-profile").ShortlistDeliveryReport;
   export type SourceExecutionJob = import("@/lib/talent-profile").SourceExecutionJob;
   export type SourceQueryPlanItem = import("@/lib/talent-profile").SourceQueryPlanItem;
   export type TalentCandidate = import("@/lib/talent-profile").TalentCandidate;
   export type TalentSearchResult = import("@/lib/talent-profile").TalentSearchResult;
 }
 
-import type { BackfillMergeSummary, CandidateComparisonRow, CandidateEvidenceAuditSummary, CoverageBackfillJob, EvidenceCoverageGroup, SourceExecutionJob, SourceQueryPlanItem, TalentCandidate, TalentSearchResult } from "@/lib/talent-profile.mjs";
-import { buildCandidateComparisonRows, buildCandidateEvidenceAudit, buildCoverageBackfillPlan, buildEvidenceCoverage, buildSourceExecution, buildSourceQueryPlan } from "@/lib/talent-profile.mjs";
+import type { BackfillMergeSummary, CandidateComparisonRow, CandidateEvidenceAuditSummary, CoverageBackfillJob, EvidenceCoverageGroup, ShortlistDeliveryReport, SourceExecutionJob, SourceQueryPlanItem, TalentCandidate, TalentSearchResult } from "@/lib/talent-profile.mjs";
+import { buildCandidateComparisonRows, buildCandidateEvidenceAudit, buildCoverageBackfillPlan, buildEvidenceCoverage, buildShortlistDeliveryReport, buildSourceExecution, buildSourceQueryPlan } from "@/lib/talent-profile.mjs";
 import {
   reportUniqueSources,
   sourceCountChip,
@@ -151,6 +152,92 @@ function QualityPill({ value }: { value: string }) {
     <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-semibold ring-1 ${QUALITY[value] ?? QUALITY.medium}`}>
       {label}
     </span>
+  );
+}
+
+function ReportMetric({ label, value, sublabel }: { label: string; value: string | number; sublabel?: string }) {
+  return (
+    <div className="rounded-xl bg-gray-50/80 p-4 ring-1 ring-gray-100">
+      <p className="text-2xl font-semibold leading-none text-gray-900">{value}</p>
+      <p className="mt-1 text-xs font-semibold text-gray-500">{label}</p>
+      {sublabel && <p className="mt-1 text-xs leading-relaxed text-gray-400">{sublabel}</p>}
+    </div>
+  );
+}
+
+export function ShortlistDeliveryReportView({ result }: { result: TalentSearchResult }) {
+  const report: ShortlistDeliveryReport = buildShortlistDeliveryReport(result);
+  if (report.candidate_count === 0) return null;
+  return (
+    <section className="rounded-2xl border border-gray-100 bg-white p-5 shadow-[0_8px_30px_rgba(0,0,0,0.06)]">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h2 className="text-lg font-semibold text-gray-900">交付报告摘要</h2>
+          <p className="mt-1 text-sm leading-relaxed text-gray-600">{report.brief_summary}</p>
+        </div>
+        <span className="rounded-full bg-gray-900 px-2.5 py-1 text-xs font-semibold text-white">
+          Hiring shortlist
+        </span>
+      </div>
+      <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <ReportMetric label="候选人" value={report.candidate_count} sublabel={`${report.strong_recommendation_count} 位强推荐`} />
+        <ReportMetric label="平均匹配分" value={report.average_match_score} />
+        <ReportMetric label="证据强候选人" value={report.high_evidence_count} />
+        <ReportMetric label="信息源覆盖" value={`${report.covered_group_count}/${report.coverage_group_count}`} />
+      </div>
+      {report.recommended_candidates.length > 0 && (
+        <div className="mt-4">
+          <p className="text-sm font-semibold text-gray-900">优先审阅候选人</p>
+          <div className="mt-2 grid gap-3 md:grid-cols-2">
+            {report.recommended_candidates.map((candidate) => (
+              <article key={candidate.name} className="rounded-xl border border-gray-100 bg-gray-50/70 p-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <h3 className="text-sm font-semibold text-gray-900">{candidate.name}</h3>
+                    {candidate.role && <p className="mt-0.5 text-xs leading-relaxed text-gray-500">{candidate.role}</p>}
+                  </div>
+                  <span className="rounded-full bg-white px-2 py-0.5 text-xs font-semibold text-gray-700 ring-1 ring-gray-200">
+                    {candidate.match_score}
+                  </span>
+                </div>
+                {candidate.recommendation_reason && (
+                  <p className="mt-2 text-sm leading-relaxed text-gray-700">{candidate.recommendation_reason}</p>
+                )}
+                <div className="mt-2 flex flex-wrap gap-1.5">
+                  <QualityPill value={candidate.evidence_quality} />
+                  {candidate.independent_sources > 0 && (
+                    <span className="rounded-full bg-white px-2 py-0.5 text-xs font-medium text-gray-600 ring-1 ring-gray-200">
+                      {candidate.independent_sources} 信源
+                    </span>
+                  )}
+                </div>
+                {candidate.primary_risk && <p className="mt-2 text-xs leading-relaxed text-amber-700">{candidate.primary_risk}</p>}
+              </article>
+            ))}
+          </div>
+        </div>
+      )}
+      {(report.report_risks.length > 0 || report.next_steps.length > 0) && (
+        <div className="mt-4 grid gap-3 md:grid-cols-2">
+          {report.report_risks.length > 0 && (
+            <div className="rounded-xl border border-amber-100 bg-amber-50/50 p-4">
+              <p className="text-sm font-semibold text-amber-900">交付风险</p>
+              <ul className="mt-2 list-disc space-y-1 pl-5 text-sm leading-relaxed text-amber-800">
+                {report.report_risks.map((risk) => <li key={risk}>{risk}</li>)}
+              </ul>
+            </div>
+          )}
+          {report.next_steps.length > 0 && (
+            <div className="rounded-xl border border-blue-100 bg-blue-50/50 p-4">
+              <p className="text-sm font-semibold text-blue-900">建议下一步</p>
+              <ul className="mt-2 list-disc space-y-1 pl-5 text-sm leading-relaxed text-blue-900/80">
+                {report.next_steps.map((step) => <li key={step}>{step}</li>)}
+              </ul>
+            </div>
+          )}
+        </div>
+      )}
+    </section>
   );
 }
 

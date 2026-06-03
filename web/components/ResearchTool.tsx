@@ -14,6 +14,7 @@ import {
   EvidenceCoverageView,
   EvidenceGraphView,
   SearchPlanView,
+  ShortlistDeliveryReportView,
   ShortlistCard,
   SourceExecutionView,
   TalentMapView,
@@ -656,6 +657,7 @@ export default function ResearchTool({
                 />
               )}
               <SearchPlanView result={result} />
+              <ShortlistDeliveryReportView result={result} />
               <SourceExecutionView result={result} />
               <CoverageBackfillView result={result} onBackfillJob={enqueueBackfillJob} backfillDisabled={loading} />
               <EvidenceCoverageView result={result} />
