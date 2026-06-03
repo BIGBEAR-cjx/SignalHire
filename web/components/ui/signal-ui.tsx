@@ -92,15 +92,17 @@ export function PrimaryAction({
   onClick,
   children,
   className = "",
+  disabled = false,
 }: {
   href?: string;
   onClick?: () => void;
   children: React.ReactNode;
   className?: string;
+  disabled?: boolean;
 }) {
-  const cls = `sh-primary-action ${className}`;
-  if (href) return <Link href={href} className={cls}>{children}</Link>;
-  return <button type="button" onClick={onClick} className={cls}>{children}</button>;
+  const cls = `sh-primary-action ${disabled ? "pointer-events-none opacity-50" : ""} ${className}`;
+  if (href) return <Link href={href} className={cls} aria-disabled={disabled}>{children}</Link>;
+  return <button type="button" onClick={onClick} disabled={disabled} className={cls}>{children}</button>;
 }
 
 export function SecondaryAction({
@@ -108,15 +110,17 @@ export function SecondaryAction({
   onClick,
   children,
   className = "",
+  disabled = false,
 }: {
   href?: string;
   onClick?: () => void;
   children: React.ReactNode;
   className?: string;
+  disabled?: boolean;
 }) {
-  const cls = `sh-secondary-action ${className}`;
-  if (href) return <Link href={href} className={cls}>{children}</Link>;
-  return <button type="button" onClick={onClick} className={cls}>{children}</button>;
+  const cls = `sh-secondary-action ${disabled ? "pointer-events-none opacity-50" : ""} ${className}`;
+  if (href) return <Link href={href} className={cls} aria-disabled={disabled}>{children}</Link>;
+  return <button type="button" onClick={onClick} disabled={disabled} className={cls}>{children}</button>;
 }
 
 export function Pill({
