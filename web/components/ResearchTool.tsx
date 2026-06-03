@@ -25,6 +25,7 @@ import {
 import OutreachModal from "@/components/OutreachModal";
 import { buildBackfillMergeSummary, buildEditableSearchPlanDraft, buildFeedbackOptimizedSearchInput, buildSearchInputFromEditablePlan } from "@/lib/talent-profile.mjs";
 import type { BackfillMergeSummary, CoverageBackfillJob, TalentCandidate, TalentSearchResult } from "@/lib/talent-profile.mjs";
+import { buildResearchProgressView } from "@/lib/research-progress.mjs";
 
 type FeedItem = { id: number; kind: "search" | "fetch"; info: string };
 type SearchResult = { candidates?: Candidate[] } | TalentSearchResult;
@@ -544,6 +545,7 @@ export default function ResearchTool({
 
   const isSearch = mode === "search";
   const hasCoreSearchFeedback = Boolean(searchFeedback.precision && searchFeedback.satisfaction);
+  const progressView = buildResearchProgressView({ feed, live });
 
   return (
     <div className="space-y-5">
@@ -696,12 +698,12 @@ export default function ResearchTool({
       {loading && (
         <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-[0_8px_30px_rgba(0,0,0,0.06)]">
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <div className="flex items-center gap-2 text-sm font-medium text-gray-800">
-              <span className="inline-block h-2 w-2 animate-pulse rounded-full bg-emerald-500" />
-              {jobStatus?.label ?? "MiroMind 正在全网搜索 + 交叉核对…"}
-              {live && (
-                <span className="text-gray-500">（搜索 {live.searches} 次 · 抓取 {live.fetches} 次）</span>
-              )}
+            <div>
+              <div className="flex items-center gap-2 text-sm font-semibold text-gray-900">
+                <span className="inline-block h-2 w-2 animate-pulse rounded-full bg-emerald-500" />
+                实时研究轨迹
+              </div>
+              <p className="mt-1 text-xs text-gray-500">{jobStatus?.label ?? "MiroMind 正在全网搜索 + 交叉核对…"}</p>
             </div>
             <button
               type="button"
@@ -714,19 +716,30 @@ export default function ResearchTool({
           {jobStatus?.detail && (
             <p className="mt-2 text-xs text-gray-500">{jobStatus.detail}</p>
           )}
-          {feed.length === 0 ? (
-            <p className="mt-2 text-xs text-gray-500">深度研究通常需要几分钟，进度会实时显示、完成后自动出结果。</p>
+          <div className="mt-4 grid gap-3 md:grid-cols-[minmax(0,1fr)_180px]">
+            <div className="rounded-xl border border-emerald-100 bg-emerald-50/60 p-4">
+              <p className="text-xs font-semibold text-emerald-700">{progressView.active?.label}</p>
+              <p className="mt-2 break-all font-mono text-sm text-gray-900">{progressView.active?.detail}</p>
+            </div>
+            <div className="rounded-xl border border-gray-100 bg-gray-50 p-4">
+              <p className="text-xs font-semibold text-gray-500">当前进度</p>
+              <p className="mt-2 text-sm font-semibold text-gray-900">{progressView.statsText}</p>
+            </div>
+          </div>
+          {progressView.timeline.length === 0 ? (
+            <p className="mt-3 text-xs text-gray-500">第一批搜索关键词出现后，会在这里实时展开。</p>
           ) : (
-            <ul className="mt-3 max-h-64 space-y-1 overflow-auto font-mono text-xs">
-              {feed.slice().reverse().map((s) => (
-                <li key={s.id} className="flex gap-2 text-gray-600">
-                  <span>{s.kind === "search" ? "🔍" : "📄"}</span>
-                  <span className="truncate" title={s.info}>
-                    {s.info || (s.kind === "search" ? "(搜索中)" : "(抓取中)")}
-                  </span>
+            <ol className="mt-4 max-h-80 space-y-3 overflow-auto">
+              {progressView.timeline.map((item) => (
+                <li key={`${item.id}-${item.kind}`} className="rounded-xl border border-gray-100 bg-gray-50 px-3 py-2">
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-xs font-semibold text-gray-600">{item.label}</span>
+                    <span className="text-[11px] text-gray-400">#{item.id + 1}</span>
+                  </div>
+                  <p className="mt-1 break-all font-mono text-xs leading-relaxed text-gray-700">{item.detail}</p>
                 </li>
               ))}
-            </ul>
+            </ol>
           )}
         </div>
       )}
