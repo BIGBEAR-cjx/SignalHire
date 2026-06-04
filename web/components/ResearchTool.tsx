@@ -6,6 +6,7 @@
 // 核验 → TrustReportView
 import { useEffect, useRef, useState } from "react";
 import { FiMail, FiRefreshCw } from "react-icons/fi";
+import { useI18n } from "@/components/LanguageProvider";
 import {
   BackfillMergeSummaryView,
   CandidateCard,
@@ -76,8 +77,8 @@ type SearchFeedbackState = {
   focus: "" | "stricter_match" | "expand_sources" | "stronger_evidence" | "adjacent_pools" | "higher_seniority" | "location_fit";
 };
 type SearchFeedbackField = keyof SearchFeedbackState;
-type SearchFeedbackOption = { value: SearchFeedbackState[SearchFeedbackField]; label: string };
-type SearchFeedbackGroup = { key: SearchFeedbackField; label: string; options: SearchFeedbackOption[] };
+type SearchFeedbackOption = { value: SearchFeedbackState[SearchFeedbackField]; labelKey: string };
+type SearchFeedbackGroup = { key: SearchFeedbackField; labelKey: string; options: SearchFeedbackOption[] };
 
 const WORKER_DELAY_MS = 2 * 60 * 1000;
 const JOB_TIMEOUT_MS = 15 * 60 * 1000;
@@ -90,45 +91,45 @@ const EMPTY_SEARCH_FEEDBACK: SearchFeedbackState = {
 const SEARCH_FEEDBACK_GROUPS: SearchFeedbackGroup[] = [
   {
     key: "precision",
-    label: "候选人是否精准？",
+    labelKey: "feedback.precision",
     options: [
-      { value: "accurate", label: "精准" },
-      { value: "partial", label: "部分精准" },
-      { value: "off", label: "不精准" },
+      { value: "accurate", labelKey: "feedback.precision.accurate" },
+      { value: "partial", labelKey: "feedback.precision.partial" },
+      { value: "off", labelKey: "feedback.precision.off" },
     ],
   },
   {
     key: "satisfaction",
-    label: "推荐人选是否满意？",
+    labelKey: "feedback.satisfaction",
     options: [
-      { value: "satisfied", label: "满意" },
-      { value: "mixed", label: "一般" },
-      { value: "unsatisfied", label: "不满意" },
+      { value: "satisfied", labelKey: "feedback.satisfaction.satisfied" },
+      { value: "mixed", labelKey: "feedback.satisfaction.mixed" },
+      { value: "unsatisfied", labelKey: "feedback.satisfaction.unsatisfied" },
     ],
   },
   {
     key: "issue",
-    label: "主要问题",
+    labelKey: "feedback.issue",
     options: [
-      { value: "too_broad", label: "太泛" },
-      { value: "wrong_seniority", label: "资历不对" },
-      { value: "wrong_direction", label: "方向不对" },
-      { value: "weak_evidence", label: "证据不足" },
-      { value: "wrong_location", label: "地域不对" },
-      { value: "too_few", label: "太少" },
-      { value: "too_many", label: "太多" },
+      { value: "too_broad", labelKey: "feedback.issue.too_broad" },
+      { value: "wrong_seniority", labelKey: "feedback.issue.wrong_seniority" },
+      { value: "wrong_direction", labelKey: "feedback.issue.wrong_direction" },
+      { value: "weak_evidence", labelKey: "feedback.issue.weak_evidence" },
+      { value: "wrong_location", labelKey: "feedback.issue.wrong_location" },
+      { value: "too_few", labelKey: "feedback.issue.too_few" },
+      { value: "too_many", labelKey: "feedback.issue.too_many" },
     ],
   },
   {
     key: "focus",
-    label: "下一轮优化方向",
+    labelKey: "feedback.focus",
     options: [
-      { value: "stricter_match", label: "更严格" },
-      { value: "expand_sources", label: "扩来源" },
-      { value: "stronger_evidence", label: "强证据" },
-      { value: "adjacent_pools", label: "换人才池" },
-      { value: "higher_seniority", label: "更资深" },
-      { value: "location_fit", label: "调地域" },
+      { value: "stricter_match", labelKey: "feedback.focus.stricter_match" },
+      { value: "expand_sources", labelKey: "feedback.focus.expand_sources" },
+      { value: "stronger_evidence", labelKey: "feedback.focus.stronger_evidence" },
+      { value: "adjacent_pools", labelKey: "feedback.focus.adjacent_pools" },
+      { value: "higher_seniority", labelKey: "feedback.focus.higher_seniority" },
+      { value: "location_fit", labelKey: "feedback.focus.location_fit" },
     ],
   },
 ];
@@ -170,6 +171,7 @@ export default function ResearchTool({
   projectId?: string;
   projectName?: string;
 }) {
+  const { locale, t } = useI18n();
   const [input, setInput] = useState(initialInput);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -281,7 +283,7 @@ export default function ResearchTool({
     if (!options.preserveInput) setEditablePlan(null);
     try {
       const url = mode === "search" ? "/api/search" : "/api/verify";
-      const body: Record<string, unknown> = mode === "search" ? { query: value } : { bio: value };
+      const body: Record<string, unknown> = mode === "search" ? { query: value, locale } : { bio: value, locale };
       if (projectId) body.project_id = projectId;
       const res = await fetch(url, {
         method: "POST",
@@ -589,7 +591,7 @@ export default function ResearchTool({
                   value={joinPlanText(editablePlan.search_plan.must_have)}
                   onChange={(e) => updateEditablePlanList("must_have", e.target.value)}
                   rows={4}
-                  className="mt-1 w-full rounded-lg border border-emerald-100 bg-emerald-50/40 px-3 py-2 text-sm text-gray-900 outline-none transition focus:border-emerald-500 focus:bg-white"
+                  className="mt-1 w-full rounded-lg border border-emerald-100 bg-emerald-50/40 px-3 py-2 text-sm text-emerald-950 outline-none transition focus:border-emerald-500 focus:bg-white"
                 />
               </label>
               <label className="block">
@@ -598,7 +600,7 @@ export default function ResearchTool({
                   value={joinPlanText(editablePlan.search_plan.nice_to_have)}
                   onChange={(e) => updateEditablePlanList("nice_to_have", e.target.value)}
                   rows={4}
-                  className="mt-1 w-full rounded-lg border border-blue-100 bg-blue-50/40 px-3 py-2 text-sm text-gray-900 outline-none transition focus:border-blue-500 focus:bg-white"
+                  className="mt-1 w-full rounded-lg border border-blue-100 bg-blue-50/40 px-3 py-2 text-sm text-blue-950 outline-none transition focus:border-blue-500 focus:bg-white"
                 />
               </label>
               <label className="block">
@@ -607,7 +609,7 @@ export default function ResearchTool({
                   value={joinPlanText(editablePlan.search_plan.exclusions)}
                   onChange={(e) => updateEditablePlanList("exclusions", e.target.value)}
                   rows={4}
-                  className="mt-1 w-full rounded-lg border border-red-100 bg-red-50/40 px-3 py-2 text-sm text-gray-900 outline-none transition focus:border-red-500 focus:bg-white"
+                  className="mt-1 w-full rounded-lg border border-red-100 bg-red-50/40 px-3 py-2 text-sm text-red-950 outline-none transition focus:border-red-500 focus:bg-white"
                 />
               </label>
             </div>
@@ -677,7 +679,7 @@ export default function ResearchTool({
       {result && (
         <ResearchResultShell>
           <ResearchShareBar
-            statsText={stats ? `本次研究: 网页搜索 ${stats.searches} 次 · 抓取 ${stats.fetches} 次` : undefined}
+            statsText={stats ? t("research.stats", { searches: stats.searches, fetches: stats.fetches }) : undefined}
             cached={Boolean(stats?.cached)}
             copied={copied}
             onCopy={runId ? () => {
@@ -706,10 +708,10 @@ export default function ResearchTool({
               <Surface className="p-5 md:p-6">
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div>
-                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-neutral-500">反馈闭环</p>
-                    <h2 className="mt-1 text-xl font-semibold text-[var(--sh-ink)]">这轮结果怎么样？</h2>
+                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-neutral-500">{t("feedback.eyebrow")}</p>
+                    <h2 className="mt-1 text-xl font-semibold text-[var(--sh-ink)]">{t("feedback.title")}</h2>
                     <p className="mt-1 text-sm leading-6 text-[var(--sh-muted)]">
-                      用选择题反馈本轮候选名单，下一轮会按你的反馈调整搜索和交叉验证重点。
+                      {t("feedback.desc")}
                     </p>
                   </div>
                   <PrimaryAction
@@ -718,13 +720,13 @@ export default function ResearchTool({
                     className="px-4"
                   >
                     <FiRefreshCw className="h-4 w-4" aria-hidden="true" />
-                    按反馈优化下一轮
+                    {t("feedback.run")}
                   </PrimaryAction>
                 </div>
                 <div className="mt-4 grid gap-4 md:grid-cols-2">
                   {SEARCH_FEEDBACK_GROUPS.map((group) => (
                     <div key={group.key}>
-                      <p className="text-xs font-semibold text-[var(--sh-muted)]">{group.label}</p>
+                      <p className="text-xs font-semibold text-[var(--sh-muted)]">{t(group.labelKey)}</p>
                       <div className="mt-2 flex flex-wrap gap-2">
                         {group.options.map((option) => {
                           const selected = searchFeedback[group.key] === option.value;
@@ -739,7 +741,7 @@ export default function ResearchTool({
                                   : "border-black/10 bg-white/72 text-[var(--sh-muted)] hover:border-black/20 hover:bg-white"
                               }`}
                             >
-                              {option.label}
+                              {t(option.labelKey)}
                             </button>
                           );
                         })}
@@ -748,15 +750,15 @@ export default function ResearchTool({
                   ))}
                 </div>
                 {!hasCoreSearchFeedback && (
-                  <p className="mt-4 text-xs text-[var(--sh-faint)]">先选择精准度和满意度后即可重跑；主要问题和优化方向可选。</p>
+                  <p className="mt-4 text-xs text-[var(--sh-faint)]">{t("feedback.hint")}</p>
                 )}
               </Surface>
               <section className="space-y-3">
                 <div className="flex flex-wrap items-end justify-between gap-3">
                   <div>
-                    <h2 className="text-lg font-semibold text-gray-900">候选名单</h2>
+                    <h2 className="text-lg font-semibold text-gray-900">{t("result.shortlistTitle")}</h2>
                     <p className="mt-1 text-sm text-gray-500">
-                      已选 {shortlist.length} / {result.candidates.length} 人
+                      {t("result.selectedCount", { selected: shortlist.length, total: result.candidates.length })}
                     </p>
                   </div>
                   {result.search_brief.target_directions.length > 0 && (
@@ -784,7 +786,7 @@ export default function ResearchTool({
                   <div className="lg:sticky lg:top-6 lg:self-start space-y-3">
                     {selectedCandidateIndex === null ? (
                       <div className="rounded-3xl border border-dashed border-black/10 bg-white/80 p-5 text-sm text-[var(--sh-muted)]">
-                        点击候选人的「查看详情」打开证据画像。
+                        {t("result.openHint")}
                       </div>
                     ) : (
                       <>
@@ -793,7 +795,7 @@ export default function ResearchTool({
                           className="inline-flex w-full items-center justify-center gap-2 rounded-full bg-[var(--sh-ink)] px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-black"
                         >
                           <FiMail className="h-4 w-4" aria-hidden="true" />
-                          AI 起草外联邮件给 {result.candidates[selectedCandidateIndex]?.name?.split(" ")[0]}
+                          {t("result.outreachTo", { name: result.candidates[selectedCandidateIndex]?.name?.split(" ")[0] ?? "" })}
                         </button>
                         <EvidenceGraphView result={result} candidate={result.candidates[selectedCandidateIndex]} />
                         <CandidateProfileView candidate={result.candidates[selectedCandidateIndex]} result={result} />

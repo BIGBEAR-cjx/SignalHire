@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import type { IconType } from "react-icons";
 import { FiAlertTriangle, FiBriefcase, FiCheckCircle, FiClipboard } from "react-icons/fi";
+import { useI18n } from "@/components/LanguageProvider";
 import {
   EmptyState,
   FiPlus,
@@ -54,28 +55,30 @@ interface OverviewData {
   active_projects: ActiveProject[];
 }
 
-const KPI_CONFIG: { key: keyof Kpi; label: string; sub: string; tone: "neutral" | "blue" | "green" | "amber"; Icon: IconType }[] = [
-  { key: "projects_open", label: "进行中项目", sub: "个", tone: "blue", Icon: FiBriefcase },
-  { key: "searches_this_month", label: "本月搜人", sub: "次研究", tone: "neutral", Icon: FiSearch },
-  { key: "verifies_total", label: "已核验候选人", sub: "份报告", tone: "amber", Icon: FiCheckCircle },
-  { key: "shortlist_total", label: "候选池", sub: "人", tone: "green", Icon: FiClipboard },
-  { key: "red_flags_total", label: "红旗", sub: "个", tone: "amber", Icon: FiAlertTriangle },
+const KPI_CONFIG: { key: keyof Kpi; labelKey: string; subKey: string; tone: "neutral" | "blue" | "green" | "amber"; Icon: IconType }[] = [
+  { key: "projects_open", labelKey: "overview.projectsOpen", subKey: "overview.unitProjects", tone: "blue", Icon: FiBriefcase },
+  { key: "searches_this_month", labelKey: "overview.searchesMonth", subKey: "overview.unitResearch", tone: "neutral", Icon: FiSearch },
+  { key: "verifies_total", labelKey: "overview.verifiesTotal", subKey: "overview.unitReports", tone: "amber", Icon: FiCheckCircle },
+  { key: "shortlist_total", labelKey: "overview.shortlistTotal", subKey: "overview.unitPeople", tone: "green", Icon: FiClipboard },
+  { key: "red_flags_total", labelKey: "overview.redFlags", subKey: "overview.unitFlags", tone: "amber", Icon: FiAlertTriangle },
 ];
 
 function KindBadge({ kind }: { kind: "search" | "verify" }) {
-  if (kind === "search") return <span className="shrink-0 rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-800">搜人</span>;
-  return <span className="shrink-0 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800">核验</span>;
+  const { t } = useI18n();
+  if (kind === "search") return <span className="shrink-0 rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-800">{t("kind.search")}</span>;
+  return <span className="shrink-0 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800">{t("kind.verify")}</span>;
 }
 
 function StatusDot({ status }: { status: string }) {
+  const { t } = useI18n();
   const color =
     status === "running" ? "bg-blue-500" :
     status === "retrying" ? "bg-amber-500" :
     "bg-gray-400";
   const label =
-    status === "running" ? "运行中" :
-    status === "retrying" ? "重试中" :
-    "排队中";
+    status === "running" ? t("status.running") :
+    status === "retrying" ? t("status.retrying") :
+    t("status.queued");
   return (
     <span className="inline-flex items-center gap-1.5 text-xs text-gray-500">
       <span className={`h-1.5 w-1.5 animate-pulse rounded-full ${color}`} />
@@ -85,6 +88,7 @@ function StatusDot({ status }: { status: string }) {
 }
 
 export default function Overview() {
+  const { t } = useI18n();
   const [data, setData] = useState<OverviewData | null>(null);
   const [error, setError] = useState("");
 
@@ -113,20 +117,20 @@ export default function Overview() {
   return (
     <div className="space-y-8">
       <PageIntro
-        eyebrow="SignalHire 工作台"
-        title="今天先推进最重要的人才搜索。"
-        description="从正在进行的项目、候选人审阅和最新研究结果继续，不需要重新组织线索。"
+        eyebrow={t("overview.eyebrow")}
+        title={t("overview.title")}
+        description={t("overview.desc")}
         actions={
           <>
-            <PrimaryAction href="/app/search"><FiSearch className="h-4 w-4" aria-hidden="true" /> 智能搜人</PrimaryAction>
-            <SecondaryAction href="/app/projects"><FiPlus className="h-4 w-4" aria-hidden="true" /> 新建项目</SecondaryAction>
+            <PrimaryAction href="/app/search"><FiSearch className="h-4 w-4" aria-hidden="true" /> {t("nav.search")}</PrimaryAction>
+            <SecondaryAction href="/app/projects"><FiPlus className="h-4 w-4" aria-hidden="true" /> {t("overview.newProject")}</SecondaryAction>
           </>
         }
       />
 
       {error === "__SESSION_EXPIRED__" ? (
         <div className="rounded-xl border border-amber-100 bg-amber-50 p-4 text-sm text-amber-800">
-          <p>会话已过期, 请重新登录。</p>
+          <p>{t("overview.sessionExpired")}</p>
           <button
             onClick={async () => {
               const { logout } = await import("@/lib/auth");
@@ -135,11 +139,11 @@ export default function Overview() {
             }}
             className="mt-2 rounded-lg bg-amber-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-amber-700"
           >
-            退出并重新登录
+            {t("common.retryLogin")}
           </button>
         </div>
       ) : error ? (
-        <p className="rounded-xl border border-red-100 bg-red-50 p-4 text-sm text-red-700">出错: {error}</p>
+        <p className="rounded-xl border border-red-100 bg-red-50 p-4 text-sm text-red-700">{t("common.errorPrefix")}: {error}</p>
       ) : null}
 
       {/* KPI 卡 */}
@@ -147,9 +151,9 @@ export default function Overview() {
         {KPI_CONFIG.map((cfg) => (
           <MetricCard
             key={cfg.key}
-            label={cfg.label}
+            label={t(cfg.labelKey)}
             value={data ? data.kpi[cfg.key] : "—"}
-            sub={cfg.sub}
+            sub={t(cfg.subKey)}
             Icon={cfg.Icon}
             tone={cfg.tone}
           />
@@ -161,10 +165,10 @@ export default function Overview() {
         <Surface className="p-5">
           <div className="flex items-end justify-between gap-3">
             <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-neutral-500">继续项目</p>
-              <h2 className="mt-1 text-xl font-semibold text-[var(--sh-ink)]">进行中招聘项目</h2>
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-neutral-500">{t("overview.continueProjects")}</p>
+              <h2 className="mt-1 text-xl font-semibold text-[var(--sh-ink)]">{t("overview.activeProjects")}</h2>
             </div>
-            <Link href="/app/projects" className="text-sm font-medium text-blue-600 hover:text-blue-700">查看全部</Link>
+            <Link href="/app/projects" className="text-sm font-medium text-blue-600 hover:text-blue-700">{t("overview.viewAll")}</Link>
           </div>
           <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             {data.active_projects.map((p) => (
@@ -176,11 +180,11 @@ export default function Overview() {
                 <p className="line-clamp-2 text-sm font-semibold text-[var(--sh-ink)]">{p.name}</p>
                 {p.brief && <p className="mt-2 line-clamp-2 text-xs leading-5 text-[var(--sh-muted)]">{p.brief}</p>}
                 <div className="mt-4 flex flex-wrap items-center gap-1.5 text-xs text-[var(--sh-muted)]">
-                  <span className="rounded-full bg-neutral-100 px-2 py-0.5">{p.candidates_total} 候选人</span>
+                  <span className="rounded-full bg-neutral-100 px-2 py-0.5">{p.candidates_total} {t("overview.candidates")}</span>
                   {p.runs_active > 0 && (
                     <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-amber-800">
                       <span className="inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-amber-500" />
-                      {p.runs_active} 研究中
+                      {p.runs_active} {t("overview.researching")}
                     </span>
                   )}
                 </div>
@@ -196,17 +200,17 @@ export default function Overview() {
         <Surface className="p-5">
           <div className="flex items-end justify-between">
             <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-neutral-500">进行中</p>
-              <h2 className="mt-1 text-xl font-semibold text-[var(--sh-ink)]">进行中的任务</h2>
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-neutral-500">{t("overview.active")}</p>
+              <h2 className="mt-1 text-xl font-semibold text-[var(--sh-ink)]">{t("overview.activeTasks")}</h2>
             </div>
             {data && data.active_jobs.length > 0 && (
-              <span className="rounded-full bg-white/80 px-2.5 py-1 text-xs text-[var(--sh-muted)] ring-1 ring-black/5">{data.active_jobs.length} 个</span>
+              <span className="rounded-full bg-white/80 px-2.5 py-1 text-xs text-[var(--sh-muted)] ring-1 ring-black/5">{data.active_jobs.length} {t("overview.unitProjects")}</span>
             )}
           </div>
-          {!data && <LoadingState title="正在同步任务" description="正在读取进行中的搜索和核验任务。" className="mt-5" />}
+          {!data && <LoadingState title={t("overview.syncTasks")} description={t("overview.syncTasksDesc")} className="mt-5" />}
           {data && data.active_jobs.length === 0 && (
             <div className="mt-5 rounded-2xl border border-dashed border-black/10 bg-white/60 p-5 text-center text-sm text-[var(--sh-muted)]">
-              暂无进行中的任务
+              {t("overview.noActiveTasks")}
             </div>
           )}
           {data && data.active_jobs.length > 0 && (
@@ -228,15 +232,15 @@ export default function Overview() {
         <Surface className="p-5">
           <div className="flex items-end justify-between">
             <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-neutral-500">最近信号</p>
-              <h2 className="mt-1 text-xl font-semibold text-[var(--sh-ink)]">最近研究</h2>
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-neutral-500">{t("overview.recentSignal")}</p>
+              <h2 className="mt-1 text-xl font-semibold text-[var(--sh-ink)]">{t("overview.recentResearch")}</h2>
             </div>
-            <Link href="/app/history" className="text-sm font-medium text-blue-600 hover:text-blue-700">查看全部</Link>
+            <Link href="/app/history" className="text-sm font-medium text-blue-600 hover:text-blue-700">{t("overview.viewAll")}</Link>
           </div>
-          {!data && <LoadingState title="正在加载最近研究" description="正在整理已经完成的候选名单和核验报告。" className="mt-5" />}
+          {!data && <LoadingState title={t("overview.loadRecent")} description={t("overview.loadRecentDesc")} className="mt-5" />}
           {data && data.recent.length === 0 && (
             <div className="mt-5 rounded-2xl border border-dashed border-black/10 bg-white/60 p-5 text-center text-sm text-[var(--sh-muted)]">
-              还没有完成的研究
+              {t("overview.noRecent")}
             </div>
           )}
           {data && data.recent.length > 0 && (

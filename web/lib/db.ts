@@ -84,6 +84,7 @@ export function buildRunStorageFields(input: {
   queryText: string;
   label: string;
   userId?: string | null;
+  platformLanguage?: string | null;
 }) {
   const flatKey = compactKey(input.flatKey, MAX_FLAT_KEY_LENGTH);
   const userPart = input.userId ? `:${shortHash(input.userId).slice(0, 8)}` : "";
@@ -92,7 +93,7 @@ export function buildRunStorageFields(input: {
     flatKey,
     queryText: truncateText(input.queryText, MAX_QUERY_TEXT_LENGTH),
     label: truncateText(input.label, MAX_LABEL_LENGTH),
-    queuedProgress: { original_query: input.queryText },
+    queuedProgress: { original_query: input.queryText, platform_language: input.platformLanguage ?? null },
   };
 }
 
@@ -323,6 +324,7 @@ export async function saveRun(row: SaveRunInput): Promise<string | null> {
 export async function enqueue(input: {
   kind: RunKind; flatKey: string; queryText: string; label: string; userId: string;
   projectId?: string | null;
+  platformLanguage?: string | null;
 }): Promise<string | null> {
   if (!client) return null;
   const storage = buildRunStorageFields(input);

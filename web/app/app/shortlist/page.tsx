@@ -5,6 +5,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { FiMail, FiPlus, FiTrash2 } from "react-icons/fi";
+import { useI18n } from "@/components/LanguageProvider";
 import { CandidateProfileView } from "@/components/result";
 import OutreachModal from "@/components/OutreachModal";
 import {
@@ -20,12 +21,12 @@ import {
 import type { TalentCandidate } from "@/lib/talent-profile.mjs";
 
 type Status = "new" | "contacted" | "interviewing" | "hired" | "rejected";
-const STATUSES: { value: Status; label: string; chipCls: string; dotCls: string }[] = [
-  { value: "new",          label: "待联系",   chipCls: "bg-gray-100 text-gray-700 ring-gray-200",        dotCls: "bg-gray-400" },
-  { value: "contacted",    label: "已联系",   chipCls: "bg-blue-50 text-blue-700 ring-blue-200",         dotCls: "bg-blue-500" },
-  { value: "interviewing", label: "面试中",   chipCls: "bg-amber-50 text-amber-800 ring-amber-200",      dotCls: "bg-amber-500" },
-  { value: "hired",        label: "已 hire", chipCls: "bg-emerald-50 text-emerald-700 ring-emerald-200", dotCls: "bg-emerald-500" },
-  { value: "rejected",     label: "已拒",     chipCls: "bg-rose-50 text-rose-700 ring-rose-200",         dotCls: "bg-rose-400" },
+const STATUSES: { value: Status; labelKey: string; chipCls: string; dotCls: string }[] = [
+  { value: "new",          labelKey: "shortlist.status.new",          chipCls: "bg-gray-100 text-gray-700 ring-gray-200",        dotCls: "bg-gray-400" },
+  { value: "contacted",    labelKey: "shortlist.status.contacted",    chipCls: "bg-blue-50 text-blue-700 ring-blue-200",         dotCls: "bg-blue-500" },
+  { value: "interviewing", labelKey: "shortlist.status.interviewing", chipCls: "bg-amber-50 text-amber-800 ring-amber-200",      dotCls: "bg-amber-500" },
+  { value: "hired",        labelKey: "shortlist.status.hired",        chipCls: "bg-emerald-50 text-emerald-700 ring-emerald-200", dotCls: "bg-emerald-500" },
+  { value: "rejected",     labelKey: "shortlist.status.rejected",     chipCls: "bg-rose-50 text-rose-700 ring-rose-200",         dotCls: "bg-rose-400" },
 ];
 
 interface Item {
@@ -59,11 +60,13 @@ function isTalentShape(x: unknown): x is TalentCandidate {
 }
 
 function StatusChip({ status }: { status: Status }) {
+  const { t } = useI18n();
   const meta = STATUSES.find((s) => s.value === status) ?? STATUSES[0];
-  return <StatusBadge label={meta.label} dotClassName={meta.dotCls} className={meta.chipCls} />;
+  return <StatusBadge label={t(meta.labelKey)} dotClassName={meta.dotCls} className={meta.chipCls} />;
 }
 
 export default function ShortlistPage() {
+  const { t } = useI18n();
   const [items, setItems] = useState<Item[] | null>(null);
   const [error, setError] = useState("");
   const [filter, setFilter] = useState<Status | "all">("all");
@@ -101,38 +104,38 @@ export default function ShortlistPage() {
   return (
     <div className="space-y-6">
       <PageIntro
-        eyebrow="候选池"
-        title="集中审阅、推进和复盘候选人。"
-        description="把跨项目收藏的人选放到一个工作区里，按状态筛选、补备注、打开证据画像，并直接起草外联。"
+        eyebrow={t("shortlist.eyebrow")}
+        title={t("shortlist.title")}
+        description={t("shortlist.desc")}
         actions={(
           <PrimaryAction href="/app/search">
             <FiPlus className="h-4 w-4" aria-hidden="true" />
-            新建搜人
+            {t("shortlist.newSearch")}
           </PrimaryAction>
         )}
       />
 
-      {error && <p className="rounded-xl border border-red-100 bg-red-50 p-4 text-sm text-red-700">出错: {error}</p>}
+      {error && <p className="rounded-xl border border-red-100 bg-red-50 p-4 text-sm text-red-700">{t("common.errorPrefix")}: {error}</p>}
 
       <SegmentedControl
         value={filter}
         onChange={setFilter}
         items={[
-          { value: "all", label: "全部", count: counts.all },
-          ...STATUSES.map((s) => ({ value: s.value, label: s.label, count: counts[s.value] ?? 0 })),
+          { value: "all", label: t("common.all"), count: counts.all },
+          ...STATUSES.map((s) => ({ value: s.value, label: t(s.labelKey), count: counts[s.value] ?? 0 })),
         ]}
       />
 
       {items === null && !error && (
-        <LoadingState title="正在加载候选池" description="正在同步候选人状态、备注和证据画像。" />
+        <LoadingState title={t("shortlist.load")} description={t("shortlist.loadDesc")} />
       )}
 
       {/* 空状态 */}
       {items && items.length === 0 && (
         <EmptyState
-          title="候选池还是空的"
-          description="先做一次搜人，再把合适候选人加入候选池；之后可以在这里统一审阅和推进状态。"
-          action={<PrimaryAction href="/app/search"><FiPlus className="h-4 w-4" aria-hidden="true" />智能搜人</PrimaryAction>}
+          title={t("shortlist.emptyTitle")}
+          description={t("shortlist.emptyDesc")}
+          action={<PrimaryAction href="/app/search"><FiPlus className="h-4 w-4" aria-hidden="true" />{t("nav.search")}</PrimaryAction>}
         />
       )}
 
@@ -150,7 +153,7 @@ export default function ShortlistPage() {
               />
             ))}
             {filtered.length === 0 && (
-              <li><EmptyState title="这个状态下没有候选人" description="切换筛选条件，或继续把合适的人选加入候选池。" /></li>
+              <li><EmptyState title={t("shortlist.noFiltered")} description={t("shortlist.noFilteredDesc")} /></li>
             )}
           </ul>
 
@@ -170,7 +173,7 @@ export default function ShortlistPage() {
               />
             ) : (
               <div className="rounded-3xl border border-dashed border-black/10 bg-white/80 p-6 text-sm text-[var(--sh-muted)]">
-                点左侧卡片查看候选人画像、改状态、写备注。
+                {t("shortlist.selectHint")}
               </div>
             )}
           </div>
@@ -181,6 +184,7 @@ export default function ShortlistPage() {
 }
 
 function ItemCard({ item, selected, onClick }: { item: Item; selected: boolean; onClick: () => void }) {
+  const { t } = useI18n();
   const c = asCandidate(item.candidate);
   const subtitle = [c.current_role, c.current_company].filter(Boolean).join(" · ") || c.headline || "";
   return (
@@ -193,7 +197,7 @@ function ItemCard({ item, selected, onClick }: { item: Item; selected: boolean; 
       >
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
-            <p className="truncate text-sm font-semibold text-gray-900">{c.name || "(无名)"}</p>
+            <p className="truncate text-sm font-semibold text-gray-900">{c.name || t("shortlist.unknownName")}</p>
             {subtitle && <p className="mt-0.5 truncate text-xs text-gray-500">{subtitle}</p>}
           </div>
           <div className="flex shrink-0 items-center gap-2">
@@ -213,7 +217,7 @@ function ItemCard({ item, selected, onClick }: { item: Item; selected: boolean; 
           </div>
         )}
         {item.notes && (
-          <p className="line-clamp-2 text-xs text-gray-600">备注：{item.notes}</p>
+          <p className="line-clamp-2 text-xs text-gray-600">{t("shortlist.notesPrefix", { notes: item.notes })}</p>
         )}
       </button>
     </li>
@@ -229,6 +233,7 @@ function DetailPanel({
   onChanged: (patch: Partial<Item>) => void;
   onDeleted: () => void;
 }) {
+  const { t, locale } = useI18n();
   const [savingStatus, setSavingStatus] = useState(false);
   const [notes, setNotes] = useState(item.notes ?? "");
   const [savedHint, setSavedHint] = useState(false);
@@ -241,7 +246,7 @@ function DetailPanel({
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
     });
-    if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || "更新失败");
+    if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || t("common.errorPrefix"));
   }
 
   async function setStatus(next: Status) {
@@ -277,7 +282,7 @@ function DetailPanel({
   }
 
   async function handleDelete() {
-    if (!confirm("把这个候选人移出候选池?")) return;
+    if (!confirm(t("shortlist.removeConfirm"))) return;
     const r = await fetch(`/api/shortlist/${item.id}`, { method: "DELETE" });
     if (r.ok) onDeleted();
   }
@@ -300,11 +305,11 @@ function DetailPanel({
                 : "bg-white text-gray-600 ring-1 ring-gray-200 hover:ring-gray-900"
             }`}
           >
-            {s.label}
+            {t(s.labelKey)}
           </button>
         ))}
         <span className="flex-1" />
-        <IconButton label="移出候选池" onClick={handleDelete} Icon={FiTrash2} tone="danger" />
+        <IconButton label={t("shortlist.remove")} onClick={handleDelete} Icon={FiTrash2} tone="danger" />
       </div>
 
       <button
@@ -312,7 +317,7 @@ function DetailPanel({
         className="inline-flex w-full items-center justify-center gap-2 rounded-full bg-[var(--sh-ink)] px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-black"
       >
         <FiMail className="h-4 w-4" aria-hidden="true" />
-        AI 起草外联邮件
+        {t("shortlist.outreach")}
       </button>
       <OutreachModal
         open={outreachOpen}
@@ -324,24 +329,24 @@ function DetailPanel({
       {/* 备注 */}
       <div>
         <div className="mb-1 flex items-center justify-between">
-          <label className="text-xs font-medium text-gray-600">备注</label>
-          <span className="text-[11px] text-gray-400">{savedHint ? "已保存" : "自动保存"}</span>
+          <label className="text-xs font-medium text-gray-600">{t("shortlist.notes")}</label>
+          <span className="text-[11px] text-gray-400">{savedHint ? t("shortlist.saved") : t("shortlist.autosave")}</span>
         </div>
         <textarea
           value={notes}
           onChange={(e) => onNotesChange(e.target.value)}
           rows={3}
-          placeholder="第一次约见印象 / 你想问的问题 / 候选人对项目的反应…"
+          placeholder={t("shortlist.notesPlaceholder")}
           className="block w-full resize-y rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-900 outline-none transition placeholder:text-gray-400 focus:border-gray-900 focus:bg-white"
         />
       </div>
 
       {/* 来源 + 时间 */}
       <div className="flex items-center justify-between text-xs text-gray-500">
-        <span>添加于 {new Date(item.created_at).toLocaleString("zh-CN")}</span>
+        <span>{t("shortlist.addedAt", { date: new Date(item.created_at).toLocaleString(locale === "en" ? "en-US" : "zh-CN") })}</span>
         {item.source_run_id && (
           <Link href={`/app/history`} className="text-gray-600 underline-offset-2 hover:text-gray-900 hover:underline">
-            来源:历史
+            {t("shortlist.sourceHistory")}
           </Link>
         )}
       </div>
@@ -359,10 +364,11 @@ function DetailPanel({
 }
 
 function LegacyCandidateView({ candidate }: { candidate: unknown }) {
+  const { t } = useI18n();
   const c = asCandidate(candidate);
   return (
     <div className="space-y-3 text-sm">
-      <h2 className="text-lg font-semibold text-gray-900">{c.name || "(无名)"}</h2>
+      <h2 className="text-lg font-semibold text-gray-900">{c.name || t("shortlist.unknownName")}</h2>
       {c.headline && <p className="text-gray-600">{c.headline}</p>}
       {c.summary && <p className="whitespace-pre-line text-gray-700">{c.summary}</p>}
       {c.links && Object.entries(c.links).some(([, v]) => v) && (

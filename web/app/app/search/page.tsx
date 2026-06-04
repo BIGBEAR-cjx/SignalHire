@@ -5,11 +5,13 @@
 import { useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
 import { FiSearch } from "react-icons/fi";
+import { useI18n } from "@/components/LanguageProvider";
 import ResearchTool from "@/components/ResearchTool";
 import { LoadingState, PageIntro } from "@/components/ui/signal-ui";
 import { shouldAutoRunInitialSearch } from "@/lib/search-page-state.mjs";
 
 function SearchInner() {
+  const { t } = useI18n();
   const sp = useSearchParams();
   const initialQ = sp.get("q") || "";
   const projectId = sp.get("project") || undefined;
@@ -27,10 +29,10 @@ function SearchInner() {
   return (
     <div className="space-y-6">
       <PageIntro
-        eyebrow={projectName ? "项目内搜人" : "智能搜人"}
-        title="把人才画像变成可审阅候选名单。"
-        description={projectName ? `当前项目：${projectName}。先调整搜索条件，再手动启动深度研究。` : "描述 AI 人才画像，SignalHire 会拆解搜索策略、实时检索来源，并输出带证据的候选人列表。"}
-        actions={<span className="inline-flex items-center gap-2 rounded-full bg-white/80 px-3 py-1.5 text-xs font-semibold text-[var(--sh-muted)] ring-1 ring-black/10"><FiSearch className="h-3.5 w-3.5" aria-hidden="true" /> 搜索工作台</span>}
+        eyebrow={projectName ? t("search.projectEyebrow") : t("search.eyebrow")}
+        title={t("search.title")}
+        description={projectName ? t("search.projectDesc", { name: projectName }) : t("search.desc")}
+        actions={<span className="inline-flex items-center gap-2 rounded-full bg-white/80 px-3 py-1.5 text-xs font-semibold text-[var(--sh-muted)] ring-1 ring-black/10"><FiSearch className="h-3.5 w-3.5" aria-hidden="true" /> {t("search.badge")}</span>}
       />
       <ResearchTool mode="search" initialInput={initialQ} autoRun={autoRun} projectId={projectId} projectName={projectName} />
     </div>
@@ -38,8 +40,9 @@ function SearchInner() {
 }
 
 export default function SearchPage() {
+  const { t } = useI18n();
   return (
-    <Suspense fallback={<LoadingState title="正在打开搜索工作台" description="正在读取 URL 中的搜索条件和项目上下文。" />}>
+    <Suspense fallback={<LoadingState title={t("search.loading")} description={t("search.loadingDesc")} />}>
       <SearchInner />
     </Suspense>
   );

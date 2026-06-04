@@ -103,7 +103,8 @@ function summarize(kind, data) {
 async function runJob(job) {
   console.log(`[${new Date().toISOString()}] 认领任务 ${job.id} (${job.kind})`);
   const queryText = typeof job.progress?.original_query === "string" ? job.progress.original_query : job.query_text;
-  const prompt = job.kind === "search" ? searchPrompt(queryText) : verifyPrompt(queryText);
+  const platformLanguage = typeof job.progress?.platform_language === "string" ? job.progress.platform_language : undefined;
+  const prompt = job.kind === "search" ? searchPrompt(queryText, platformLanguage) : verifyPrompt(queryText, platformLanguage);
 
   const recent = [];
   let lastWrite = 0;

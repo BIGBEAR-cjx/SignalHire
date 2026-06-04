@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { FiFolder, FiPlus } from "react-icons/fi";
+import { useI18n } from "@/components/LanguageProvider";
 import {
   EmptyState,
   IconButton,
@@ -33,13 +34,14 @@ interface ProjectKpi {
   runs_active: number;
 }
 
-const STATUS_META: Record<Status, { label: string; chip: string; dot: string }> = {
-  open:   { label: "进行中", chip: "bg-emerald-50 text-emerald-700 ring-emerald-200", dot: "bg-emerald-500" },
-  paused: { label: "暂停",   chip: "bg-amber-50 text-amber-800 ring-amber-200",       dot: "bg-amber-500" },
-  closed: { label: "已关闭", chip: "bg-gray-100 text-gray-600 ring-gray-200",         dot: "bg-gray-400" },
+const STATUS_META: Record<Status, { labelKey: string; chip: string; dot: string }> = {
+  open:   { labelKey: "common.open", chip: "bg-emerald-50 text-emerald-700 ring-emerald-200", dot: "bg-emerald-500" },
+  paused: { labelKey: "common.paused", chip: "bg-amber-50 text-amber-800 ring-amber-200",       dot: "bg-amber-500" },
+  closed: { labelKey: "common.closed", chip: "bg-gray-100 text-gray-600 ring-gray-200",         dot: "bg-gray-400" },
 };
 
 export default function ProjectsPage() {
+  const { t } = useI18n();
   const router = useRouter();
   const [projects, setProjects] = useState<ProjectKpi[] | null>(null);
   const [error, setError] = useState("");
@@ -75,49 +77,49 @@ export default function ProjectsPage() {
   return (
     <div className="space-y-6">
       <PageIntro
-        eyebrow="招聘项目"
-        title="把每个职位变成独立的人才研究空间。"
-        description="管理岗位画像、候选人状态、历史研究和下一轮搜索，让 HR 与猎头围绕同一个上下文推进。"
+        eyebrow={t("projects.eyebrow")}
+        title={t("projects.title")}
+        description={t("projects.desc")}
         actions={(
           <PrimaryAction onClick={() => setDialogOpen(true)}>
             <FiPlus className="h-4 w-4" aria-hidden="true" />
-            新建项目
+            {t("projects.new")}
           </PrimaryAction>
         )}
       />
 
-      {error && <p className="rounded-xl border border-red-100 bg-red-50 p-4 text-sm text-red-700">出错: {error}</p>}
+      {error && <p className="rounded-xl border border-red-100 bg-red-50 p-4 text-sm text-red-700">{t("common.errorPrefix")}: {error}</p>}
 
       <SegmentedControl
         value={filter}
         onChange={setFilter}
         items={[
-          { value: "all", label: "全部", count: counts.all },
-          { value: "open", label: "进行中", count: counts.open },
-          { value: "paused", label: "暂停", count: counts.paused },
-          { value: "closed", label: "已关闭", count: counts.closed },
+          { value: "all", label: t("common.all"), count: counts.all },
+          { value: "open", label: t("common.open"), count: counts.open },
+          { value: "paused", label: t("common.paused"), count: counts.paused },
+          { value: "closed", label: t("common.closed"), count: counts.closed },
         ]}
       />
 
       {projects === null && !error && (
-        <LoadingState title="正在加载招聘项目" description="正在读取项目、候选人数量和研究状态。" />
+        <LoadingState title={t("projects.load")} description={t("projects.loadDesc")} />
       )}
 
       {projects && projects.length === 0 && (
         <EmptyState
-          title="还没有招聘项目"
-          description="创建第一个项目，放入岗位画像；之后的搜人、收藏和核验都会自动归档到这个空间。"
+          title={t("projects.emptyTitle")}
+          description={t("projects.emptyDesc")}
           action={(
             <PrimaryAction onClick={() => setDialogOpen(true)}>
               <FiPlus className="h-4 w-4" aria-hidden="true" />
-              新建第一个项目
+              {t("projects.first")}
             </PrimaryAction>
           )}
         />
       )}
 
       {projects && projects.length > 0 && filtered.length === 0 && (
-        <EmptyState title="这个状态下没有项目" description="切换筛选条件，或创建一个新的招聘项目。" />
+        <EmptyState title={t("projects.noFiltered")} description={t("projects.noFilteredDesc")} />
       )}
       {filtered.length > 0 && (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -133,20 +135,20 @@ export default function ProjectsPage() {
               </div>
               <h2 className="mt-5 line-clamp-2 text-xl font-semibold tracking-tight text-[var(--sh-ink)]">{p.name}</h2>
               {p.brief && <p className="mt-2 line-clamp-3 text-sm leading-6 text-[var(--sh-muted)]">{p.brief}</p>}
-              {!p.brief && <p className="mt-2 text-sm italic text-[var(--sh-faint)]">暂无 brief</p>}
+              {!p.brief && <p className="mt-2 text-sm italic text-[var(--sh-faint)]">{t("projects.noBrief")}</p>}
               <div className="mt-auto flex flex-wrap items-center gap-2 pt-5 text-xs">
                 <span className="rounded-full bg-neutral-100 px-2.5 py-1 font-semibold text-neutral-700 ring-1 ring-black/5">
-                  {p.candidates_total} 位候选人
+                  {p.candidates_total} {t("projects.people")}
                 </span>
                 {p.candidates_active > 0 && p.candidates_active !== p.candidates_total && (
                   <span className="rounded-full bg-blue-50 px-2.5 py-1 font-semibold text-blue-700 ring-1 ring-blue-100">
-                    {p.candidates_active} 进行中
+                    {p.candidates_active} {t("projects.activePeople")}
                   </span>
                 )}
                 {p.runs_active > 0 && (
                   <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2.5 py-1 font-semibold text-amber-800 ring-1 ring-amber-100">
                     <span className="inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-amber-500" />
-                    {p.runs_active} 研究进行
+                    {p.runs_active} {t("projects.runsActive")}
                   </span>
                 )}
               </div>
@@ -168,8 +170,9 @@ export default function ProjectsPage() {
 }
 
 function StatusChip({ status }: { status: Status }) {
+  const { t } = useI18n();
   const m = STATUS_META[status];
-  return <StatusBadge label={m.label} dotClassName={m.dot} className={m.chip} />;
+  return <StatusBadge label={t(m.labelKey)} dotClassName={m.dot} className={m.chip} />;
 }
 
 function NewProjectDialog({
@@ -177,6 +180,7 @@ function NewProjectDialog({
 }: {
   open: boolean; onClose: () => void; onCreated: (project: { id: string }) => void;
 }) {
+  const { t } = useI18n();
   const [name, setName] = useState("");
   const [brief, setBrief] = useState("");
   const [creating, setCreating] = useState(false);
@@ -204,7 +208,7 @@ function NewProjectDialog({
   if (!open) return null;
 
   async function submit() {
-    if (!name.trim()) { setError("项目名称必填"); return; }
+    if (!name.trim()) { setError(t("projects.nameRequired")); return; }
     setCreating(true); setError("");
     try {
       const r = await fetch("/api/projects", {
@@ -213,7 +217,7 @@ function NewProjectDialog({
         body: JSON.stringify({ name: name.trim(), brief: brief.trim() || null }),
       });
       const j = await r.json();
-      if (!r.ok) throw new Error(j.error || "创建失败");
+      if (!r.ok) throw new Error(j.error || t("common.create"));
       reset();
       onCreated(j.project);
     } catch (e) {
@@ -229,32 +233,32 @@ function NewProjectDialog({
         className="sh-fade-in-up relative w-full max-w-lg p-6 shadow-[0_24px_80px_rgba(0,0,0,0.2)]"
       >
         <div onClick={(e) => e.stopPropagation()}>
-        <IconButton label="关闭" onClick={closeDialog} className="absolute right-4 top-4" />
+        <IconButton label={t("common.cancel")} onClick={closeDialog} className="absolute right-4 top-4" />
         <div className="pr-10">
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-neutral-500">新建项目</p>
-          <h2 className="mt-2 text-2xl font-semibold text-[var(--sh-ink)]">新建招聘项目</h2>
-          <p className="mt-2 text-sm leading-6 text-[var(--sh-muted)]">名称必填，brief 之后可改。建议直接粘贴 JD 或候选人画像。</p>
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-neutral-500">{t("projects.dialogEyebrow")}</p>
+          <h2 className="mt-2 text-2xl font-semibold text-[var(--sh-ink)]">{t("projects.dialogTitle")}</h2>
+          <p className="mt-2 text-sm leading-6 text-[var(--sh-muted)]">{t("projects.dialogDesc")}</p>
         </div>
 
         <div className="mt-4 space-y-3">
           <div>
-            <label className="mb-1 block text-xs font-medium text-gray-600">项目名称</label>
+            <label className="mb-1 block text-xs font-medium text-gray-600">{t("projects.name")}</label>
             <input
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="例如:Senior LLM Infra Engineer"
+              placeholder={t("projects.namePlaceholder")}
               autoFocus
               maxLength={120}
               className="block w-full rounded-2xl border border-black/10 bg-white/72 px-4 py-3 text-sm text-[var(--sh-ink)] outline-none focus:border-black/20 focus:bg-white"
             />
           </div>
           <div>
-            <label className="mb-1 block text-xs font-medium text-gray-600">招聘需求 / brief (可选)</label>
+            <label className="mb-1 block text-xs font-medium text-gray-600">{t("projects.brief")}</label>
             <textarea
               value={brief}
               onChange={(e) => setBrief(e.target.value)}
               rows={5}
-              placeholder="粘贴 JD, 或一句话描述要找什么样的人。"
+              placeholder={t("projects.briefPlaceholder")}
               className="block w-full resize-y rounded-2xl border border-black/10 bg-white/72 px-4 py-3 text-sm text-[var(--sh-ink)] outline-none placeholder:text-[var(--sh-faint)] focus:border-black/20 focus:bg-white"
             />
           </div>
@@ -262,9 +266,9 @@ function NewProjectDialog({
         </div>
 
         <div className="mt-5 flex justify-end gap-2">
-          <button onClick={closeDialog} className="sh-secondary-action min-h-10 px-4 py-2 text-sm">取消</button>
+          <button onClick={closeDialog} className="sh-secondary-action min-h-10 px-4 py-2 text-sm">{t("common.cancel")}</button>
           <button onClick={submit} disabled={creating} className="sh-primary-action min-h-10 px-4 py-2 text-sm disabled:opacity-50">
-            {creating ? "创建中…" : "创建"}
+            {creating ? t("common.creating") : t("common.create")}
           </button>
         </div>
       </div>

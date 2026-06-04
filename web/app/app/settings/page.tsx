@@ -4,10 +4,12 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { FiCheckCircle, FiCopy, FiLogOut } from "react-icons/fi";
+import { useI18n } from "@/components/LanguageProvider";
 import { logout } from "@/lib/auth";
 import { PageIntro, SecondaryAction, Surface } from "@/components/ui/signal-ui";
 
 export default function SettingsPage() {
+  const { t } = useI18n();
   const router = useRouter();
   const [user, setUser] = useState<{ id: string; email: string } | null>(null);
   const [copied, setCopied] = useState(false);
@@ -28,23 +30,23 @@ export default function SettingsPage() {
   return (
     <div className="space-y-6">
       <PageIntro
-        eyebrow="设置"
-        title="账户和偏好。"
-        description="管理登录账户、复制用户标识，并为后续团队协作与通知偏好预留空间。"
+        eyebrow={t("settings.eyebrow")}
+        title={t("settings.title")}
+        description={t("settings.desc")}
       />
 
       <Surface className="p-5 md:p-6">
-        <h2 className="text-xl font-semibold text-[var(--sh-ink)]">账户</h2>
+        <h2 className="text-xl font-semibold text-[var(--sh-ink)]">{t("settings.account")}</h2>
         <dl className="mt-3 space-y-3 text-sm">
           <div className="flex items-center justify-between gap-3">
-            <dt className="text-gray-500">邮箱</dt>
-            <dd className="font-medium text-gray-900">{user?.email ?? "加载中…"}</dd>
+            <dt className="text-gray-500">{t("settings.email")}</dt>
+            <dd className="font-medium text-gray-900">{user?.email ?? t("settings.loading")}</dd>
           </div>
           <div className="flex items-center justify-between gap-3">
-            <dt className="text-gray-500">用户 ID</dt>
+            <dt className="text-gray-500">{t("settings.userId")}</dt>
             <dd className="flex items-center gap-2">
               <code className="rounded bg-gray-50 px-2 py-1 font-mono text-xs text-gray-700">
-                {user?.id ?? "加载中…"}
+                {user?.id ?? t("settings.loading")}
               </code>
               {user?.id && (
                 <button
@@ -56,7 +58,7 @@ export default function SettingsPage() {
                   className="inline-flex items-center gap-1 rounded-full border border-black/10 bg-white px-2.5 py-1 text-xs font-semibold text-[var(--sh-muted)] hover:border-black/20"
                 >
                   {copied ? <FiCheckCircle className="h-3.5 w-3.5" aria-hidden="true" /> : <FiCopy className="h-3.5 w-3.5" aria-hidden="true" />}
-                  {copied ? "已复制" : "复制"}
+                  {copied ? t("common.copied") : t("common.copy")}
                 </button>
               )}
             </dd>
@@ -64,15 +66,15 @@ export default function SettingsPage() {
         </dl>
         <SecondaryAction onClick={handleLogout} className="mt-5">
           <FiLogOut className="h-4 w-4" aria-hidden="true" />
-          退出登录
+          {t("settings.logout")}
         </SecondaryAction>
       </Surface>
 
       <Surface className="p-5 md:p-6">
-        <h2 className="text-xl font-semibold text-[var(--sh-ink)]">即将上线</h2>
+        <h2 className="text-xl font-semibold text-[var(--sh-ink)]">{t("settings.coming")}</h2>
         <ul className="mt-4 grid gap-2 text-sm text-[var(--sh-muted)] sm:grid-cols-2">
-          {["修改密码", "邮件通知偏好", "团队 / 协作", "计费 / 用量", "API 密钥"].map((item) => (
-            <li key={item} className="rounded-2xl bg-white/70 px-3 py-2 ring-1 ring-black/5">{item}</li>
+          {["settings.password", "settings.emailPrefs", "settings.team", "settings.billing", "settings.apiKeys"].map((item) => (
+            <li key={item} className="rounded-2xl bg-white/70 px-3 py-2 ring-1 ring-black/5">{t(item)}</li>
           ))}
         </ul>
       </Surface>

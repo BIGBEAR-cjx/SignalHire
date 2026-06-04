@@ -1,6 +1,7 @@
 import { researchStream } from "@/lib/miro";
 import { findCachedVerify, flatten } from "@/lib/cache";
 import { findRun, findRunId, enqueue } from "@/lib/db";
+import { normalizeLocale } from "@/lib/i18n.mjs";
 import { getUser } from "@/lib/session";
 
 export const runtime = "nodejs";
@@ -20,18 +21,21 @@ export async function POST(req: Request) {
 
   let bio = "";
   let project_id: string | null | undefined;
+  let locale = "zh";
   try {
     const body = await req.json();
     bio = body.bio;
     project_id = body.project_id ?? undefined;
+    locale = normalizeLocale(body.locale);
   } catch {}
   if (!bio?.trim()) return Response.json({ error: "缺少 bio" }, { status: 400 });
 
-  const flatKey = flatten(bio);
+  const platformLanguage = locale === "en" ? "English" : "Chinese (Simplified)";
+  const flatKey = flatten(locale === "zh" ? bio : `${bio} ${locale}`);
   const dbFlatKey = smokeFlatKey(req, flatKey);
 
   // ① 静态缓存 (demo 头牌); 同 key 若该用户已 seed 进 DB 则带上分享 id
-  const staticHit = dbFlatKey === flatKey ? findCachedVerify(bio) : null;
+  const staticHit = locale === "zh" && dbFlatKey === flatKey ? findCachedVerify(bio) : null;
   if (staticHit) return researchStream({ cached: staticHit, runId: await findRunId("verify", flatKey, user.id) });
 
   // ② DB 缓存 (该用户之前的核查)
@@ -46,6 +50,7 @@ export async function POST(req: Request) {
     label: bio.length > 40 ? bio.slice(0, 40) + "…" : bio,
     userId: user.id,
     projectId: project_id ?? null,
+    platformLanguage,
   });
   if (!jobId) return Response.json({ error: "队列暂不可用 (DB 未配置)，请试试示例查询" }, { status: 503 });
   return Response.json({ queued: true, jobId });
