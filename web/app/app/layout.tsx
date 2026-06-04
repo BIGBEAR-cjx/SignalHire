@@ -86,6 +86,14 @@ function MobileTopBar({ user, onLogout }: { user: User; onLogout: () => void }) 
       </Link>
       <div className="flex min-w-0 items-center gap-3">
         <span className="hidden max-w-[160px] truncate text-xs text-[var(--sh-muted)] sm:inline" title={user.email}>{user.email}</span>
+        <Link
+          href={SETTINGS_NAV.href}
+          aria-label={SETTINGS_NAV.label}
+          title={SETTINGS_NAV.label}
+          className="inline-flex h-9 w-9 items-center justify-center rounded-full text-[var(--sh-muted)] transition hover:bg-white hover:text-[var(--sh-ink)]"
+        >
+          <SETTINGS_NAV.Icon className="h-[18px] w-[18px]" aria-hidden="true" />
+        </Link>
         <button onClick={onLogout} className="text-sm font-medium text-[var(--sh-muted)] hover:text-[var(--sh-ink)]">退出</button>
       </div>
     </div>
@@ -96,7 +104,7 @@ function MobileTopBar({ user, onLogout }: { user: User; onLogout: () => void }) 
 function MobileBottomNav({ currentPath }: { currentPath: string }) {
   return (
     <nav className="fixed bottom-0 left-0 right-0 z-20 flex border-t border-black/5 bg-white/90 backdrop-blur-2xl md:hidden">
-      {APP_NAV.slice(0, 5).map((item) => {
+      {APP_NAV.map((item) => {
         const active = isActivePath(currentPath, item.href);
         return (
           <Link
