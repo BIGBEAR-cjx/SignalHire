@@ -198,7 +198,7 @@ export function ShortlistDeliveryReportView({ result }: { result: TalentSearchRe
           <p className="mt-1 text-sm leading-relaxed text-gray-600">{report.brief_summary}</p>
         </div>
         <span className="rounded-full bg-gray-900 px-2.5 py-1 text-xs font-semibold text-white">
-          Hiring shortlist
+          招聘候选名单
         </span>
       </div>
       <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
@@ -392,7 +392,7 @@ export function SourceExecutionView({ result }: { result: TalentSearchResult }) 
         <div>
           <h2 className="text-lg font-semibold text-gray-900">来源执行记录</h2>
           <p className="mt-1 text-sm text-gray-500">
-            {hasReturnedExecution ? "记录每类来源任务的实际查询、具体 URL、证据数量和后续缺口。" : "本次结果未返回执行记录，先展示可执行的来源任务计划。"}
+            {hasReturnedExecution ? "记录每类来源任务的实际查询、具体链接、证据数量和后续缺口。" : "本次结果未返回执行记录，先展示可执行的来源任务计划。"}
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -421,7 +421,7 @@ export function SourceExecutionView({ result }: { result: TalentSearchResult }) 
               </div>
               <p className="mt-3 break-words font-mono text-xs leading-relaxed text-gray-700">{job.query}</p>
               <div className="mt-3 flex flex-wrap gap-2 text-xs font-semibold text-gray-600">
-                <span className="rounded-full bg-white px-2 py-0.5 ring-1 ring-gray-200">{job.urls_found} URL</span>
+                <span className="rounded-full bg-white px-2 py-0.5 ring-1 ring-gray-200">{job.urls_found} 链接</span>
                 <span className="rounded-full bg-white px-2 py-0.5 ring-1 ring-gray-200">{job.evidence_found} 证据</span>
               </div>
               {job.candidate_leads.length > 0 && (
@@ -841,7 +841,7 @@ export function ShortlistCard({
               : "bg-emerald-50 text-emerald-700 ring-emerald-200 hover:bg-emerald-100"
           }`}
         >
-          {selected ? "移出 shortlist" : "加入 shortlist"}
+          {selected ? "移出候选池" : "加入候选池"}
         </button>
       </div>
     </article>

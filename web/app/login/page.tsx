@@ -40,7 +40,7 @@ export default function LoginPage() {
               回到你的 AI 人才搜索工作台。
             </h1>
             <p className="mt-5 max-w-xl text-lg leading-8 text-[var(--sh-muted)]">
-              继续管理招聘项目、候选池和多源证据核验，让 shortlist 从搜索到交付保持同一套可信链路。
+              继续管理招聘项目、候选池和多源证据核验，让候选名单从搜索到交付保持同一套可信链路。
             </p>
           </div>
         </section>

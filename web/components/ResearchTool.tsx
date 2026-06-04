@@ -709,7 +709,7 @@ export default function ResearchTool({
                     <p className="text-xs font-semibold uppercase tracking-[0.18em] text-neutral-500">反馈闭环</p>
                     <h2 className="mt-1 text-xl font-semibold text-[var(--sh-ink)]">这轮结果怎么样？</h2>
                     <p className="mt-1 text-sm leading-6 text-[var(--sh-muted)]">
-                      用选择题反馈本轮 shortlist，下一轮会按你的反馈调整搜索和交叉验证重点。
+                      用选择题反馈本轮候选名单，下一轮会按你的反馈调整搜索和交叉验证重点。
                     </p>
                   </div>
                   <PrimaryAction

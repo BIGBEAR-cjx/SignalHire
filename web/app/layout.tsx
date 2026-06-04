@@ -8,7 +8,7 @@ import "./globals.css";
 export const metadata: Metadata = {
   title: "SignalHire — Find signals. Not resumes.",
   description:
-    "面向公司 HR 和猎头的全球 AI 人才搜索平台，生成候选人 shortlist、人才地图和可审计的交叉验证证据。",
+    "面向公司 HR 和猎头的全球 AI 人才搜索平台，生成候选名单、人才地图和可审计的交叉验证证据。",
 };
 
 export default function RootLayout({

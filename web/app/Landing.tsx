@@ -62,7 +62,7 @@ function ProductHeroVisual() {
               <div className="rounded-3xl bg-white/86 p-4 ring-1 ring-black/5">
                 <FiUsers className="h-5 w-5 text-[var(--sh-blue)]" aria-hidden="true" />
                 <p className="mt-4 text-3xl font-semibold tracking-tight text-[var(--sh-ink)]">13</p>
-                <p className="text-xs text-[var(--sh-muted)]">候选人 shortlist</p>
+                <p className="text-xs text-[var(--sh-muted)]">候选名单</p>
               </div>
               <div className="rounded-3xl bg-white/86 p-4 ring-1 ring-black/5">
                 <FiShield className="h-5 w-5 text-emerald-600" aria-hidden="true" />
@@ -160,7 +160,7 @@ export default function Landing({
             AI 人才搜索，从证据开始。
           </h1>
           <p className="mx-auto mt-5 max-w-2xl text-lg leading-8 text-[var(--sh-muted)]">
-            为 HR 和猎头生成全球 AI 人才 shortlist、交叉验证证据和候选人风险摘要。
+            为 HR 和猎头生成全球 AI 人才候选名单、交叉验证证据和候选人风险摘要。
           </p>
 
           {/* 直接搜索输入框 (缩短转化路径; 多行大框, 完整看到长输入) */}
@@ -224,7 +224,7 @@ function HowItWorks() {
     {
       n: "3",
       title: "拿到带证据的报告",
-      desc: "shortlist + 跨源画像 + 红旗高亮, 每条声称都可以点开看到原始来源。再也不是「听他自己说」。",
+      desc: "候选名单 + 跨源画像 + 红旗高亮，每条声称都可以点开看到原始来源。再也不是「听他自己说」。",
     },
   ];
   return (
@@ -304,8 +304,8 @@ function SampleReports() {
       id: "11e6f828-aaa7-43cd-aaad-88200b532e80",
       kind: "search",
       title: "13 位 AI / LLM Infra 候选人",
-      desc: "一句话 brief，SignalHire 全网研究，候选人按匹配度排序输出 shortlist。",
-      tag: "搜人 · shortlist",
+      desc: "一句话画像，SignalHire 全网研究，候选人按匹配度排序输出候选名单。",
+      tag: "搜人 · 候选名单",
     },
     {
       id: "7db220df-f1ff-4258-b715-9a14f4505507",
@@ -327,7 +327,7 @@ function SampleReports() {
       <div className="mb-12 text-center">
         <p className="text-xs font-semibold uppercase tracking-wider text-gray-400">示例报告</p>
         <h2 className="mt-2 text-3xl font-bold tracking-tight text-gray-900 sm:text-4xl">点开看真实输出</h2>
-        <p className="mx-auto mt-4 max-w-xl text-base text-gray-600">三份真实产出。无需登录, 直接看 SignalHire 给你的核实级 shortlist 和打脸报告。</p>
+        <p className="mx-auto mt-4 max-w-xl text-base text-gray-600">三份真实产出。无需登录，直接看 SignalHire 给你的核实级候选名单和证据报告。</p>
       </div>
       <div className="grid gap-5 md:grid-cols-3">
         {samples.map((s) => (

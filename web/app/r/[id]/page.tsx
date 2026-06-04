@@ -69,7 +69,7 @@ function normalizeLegacyCandidates(result: unknown): Candidate[] {
   return result.candidates.filter(isRecord).map((candidate) => {
     const links = isRecord(candidate.links) ? candidate.links : {};
     return {
-      name: cleanString(candidate.name) || "Unknown candidate",
+      name: cleanString(candidate.name) || "未知候选人",
       headline: cleanString(candidate.headline),
       links: {
         github: cleanString(links.github) || null,
@@ -92,7 +92,7 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
     title: `${row.label} — 核实报告 · SignalHire`,
     description: row.summary || (
       row.kind === "search"
-        ? "SignalHire 生成的 AI 人才 shortlist 与公开证据报告。"
+        ? "SignalHire 生成的 AI 人才候选名单与公开证据报告。"
         : "SignalHire 生成的候选人证据审计报告。"
     ),
   };
@@ -114,9 +114,9 @@ export default async function ReportPage({ params }: { params: Promise<{ id: str
         button: "开始审计候选人",
       }
     : {
-        title: "想为你的 AI 岗位生成这样的 shortlist？",
+        title: "想为你的 AI 岗位生成这样的候选名单？",
         body: "SignalHire 从公开来源搜索全球 AI 人才，并把论文、开源、实践和工作经历证据整理成可交付报告。",
-        button: "生成 AI 人才 shortlist",
+        button: "生成 AI 人才候选名单",
       };
 
   return (

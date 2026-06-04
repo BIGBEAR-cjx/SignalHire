@@ -30,7 +30,7 @@ export default function HistoryPage() {
       <PageIntro
         eyebrow="研究历史"
         title="重新打开每一次人才研究。"
-        description="回看已完成的 shortlist 和核验报告，或用同一画像快速开始下一轮搜索。"
+        description="回看已完成的候选名单和核验报告，或用同一画像快速开始下一轮搜索。"
       />
 
       {error && (

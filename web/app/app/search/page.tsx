@@ -28,7 +28,7 @@ function SearchInner() {
     <div className="space-y-6">
       <PageIntro
         eyebrow={projectName ? "项目内搜人" : "智能搜人"}
-        title="把人才画像变成可审阅 shortlist。"
+        title="把人才画像变成可审阅候选名单。"
         description={projectName ? `当前项目：${projectName}。先调整搜索条件，再手动启动深度研究。` : "描述 AI 人才画像，SignalHire 会拆解搜索策略、实时检索来源，并输出带证据的候选人列表。"}
         actions={<span className="inline-flex items-center gap-2 rounded-full bg-white/80 px-3 py-1.5 text-xs font-semibold text-[var(--sh-muted)] ring-1 ring-black/10"><FiSearch className="h-3.5 w-3.5" aria-hidden="true" /> 搜索工作台</span>}
       />

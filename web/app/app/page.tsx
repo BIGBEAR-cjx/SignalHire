@@ -233,7 +233,7 @@ export default function Overview() {
             </div>
             <Link href="/app/history" className="text-sm font-medium text-blue-600 hover:text-blue-700">查看全部</Link>
           </div>
-          {!data && <LoadingState title="正在加载最近研究" description="正在整理已经完成的 shortlist 和核验报告。" className="mt-5" />}
+          {!data && <LoadingState title="正在加载最近研究" description="正在整理已经完成的候选名单和核验报告。" className="mt-5" />}
           {data && data.recent.length === 0 && (
             <div className="mt-5 rounded-2xl border border-dashed border-black/10 bg-white/60 p-5 text-center text-sm text-[var(--sh-muted)]">
               还没有完成的研究
@@ -266,7 +266,7 @@ export default function Overview() {
       {empty && (
         <EmptyState
           title="开始第一轮 AI 人才搜索"
-          description="创建项目或直接描述人才画像，SignalHire 会生成 shortlist、证据摘要和下一轮优化建议。"
+          description="创建项目或直接描述人才画像，SignalHire 会生成候选名单、证据摘要和下一轮优化建议。"
           action={<PrimaryAction href="/app/search">开始搜人</PrimaryAction>}
         />
       )}
