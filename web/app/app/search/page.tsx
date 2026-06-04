@@ -6,7 +6,7 @@ import { useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
 import { FiSearch } from "react-icons/fi";
 import ResearchTool from "@/components/ResearchTool";
-import { PageIntro } from "@/components/ui/signal-ui";
+import { LoadingState, PageIntro } from "@/components/ui/signal-ui";
 import { shouldAutoRunInitialSearch } from "@/lib/search-page-state.mjs";
 
 function SearchInner() {
@@ -39,7 +39,7 @@ function SearchInner() {
 
 export default function SearchPage() {
   return (
-    <Suspense fallback={<div className="text-sm text-gray-400">加载中…</div>}>
+    <Suspense fallback={<LoadingState title="正在打开搜索工作台" description="正在读取 URL 中的搜索条件和项目上下文。" />}>
       <SearchInner />
     </Suspense>
   );

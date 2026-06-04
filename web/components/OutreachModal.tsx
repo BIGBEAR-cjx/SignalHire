@@ -153,7 +153,7 @@ export default function OutreachModal({ open, onClose, candidate, candidateName,
         <IconButton label="关闭" onClick={onClose} Icon={FiX} className="absolute right-4 top-4" />
 
         <header className="mb-4">
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-neutral-500">Evidence outreach</p>
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-neutral-500">证据外联</p>
           <h2 className="mt-2 text-2xl font-semibold text-[var(--sh-ink)]">起草外联邮件</h2>
           {candidateName && <p className="mt-2 text-sm text-[var(--sh-muted)]">写给 {candidateName}</p>}
         </header>

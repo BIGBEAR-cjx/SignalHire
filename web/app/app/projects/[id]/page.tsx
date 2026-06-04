@@ -11,6 +11,7 @@ import OutreachModal from "@/components/OutreachModal";
 import {
   EmptyState,
   IconButton,
+  LoadingState,
   PrimaryAction,
   SecondaryAction,
   SegmentedControl,
@@ -154,7 +155,11 @@ export default function ProjectDetailPage() {
           <FiArrowLeft className="h-3.5 w-3.5" aria-hidden="true" />
           回项目列表
         </SecondaryAction>
-        {error ? <p className="rounded-xl border border-red-100 bg-red-50 p-4 text-sm text-red-700">{error}</p> : <p className="text-sm text-gray-400">加载中…</p>}
+        {error ? (
+          <p className="rounded-xl border border-red-100 bg-red-50 p-4 text-sm text-red-700">{error}</p>
+        ) : (
+          <LoadingState title="正在加载项目" description="正在读取项目画像、候选人和历史研究。" />
+        )}
       </div>
     );
   }
@@ -223,7 +228,9 @@ export default function ProjectDetailPage() {
           )}
         </div>
 
-        {items === null && <p className="text-sm text-gray-400">加载中…</p>}
+        {items === null && (
+          <LoadingState title="正在加载候选人" description="正在同步本项目下的候选人状态和证据画像。" />
+        )}
         {items && items.length === 0 && (
           <EmptyState title="本项目还没有候选人" description="先在本项目下启动一次搜人，候选人会自动回到这个项目空间。" />
         )}
@@ -274,7 +281,7 @@ export default function ProjectDetailPage() {
       {detail.runs.length > 0 && (
         <section className="space-y-2">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-neutral-500">Research history</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-neutral-500">研究历史</p>
             <h2 className="mt-1 text-xl font-semibold text-[var(--sh-ink)]">本项目历史研究 ({detail.runs.length})</h2>
           </div>
           <ul className="space-y-2">
@@ -322,7 +329,7 @@ function StatusFunnel({
     <Surface className="p-5">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-neutral-500">Candidate pipeline</p>
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-neutral-500">候选人漏斗</p>
           <h2 className="mt-1 text-xl font-semibold text-[var(--sh-ink)]">状态漏斗</h2>
         </div>
         <button
@@ -415,7 +422,7 @@ function ProjectHeader({ detail, onChanged, onDelete }: { detail: ProjectDetail;
     <Surface className="space-y-5 p-5 md:p-7">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-neutral-500">Project workspace</p>
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-neutral-500">项目工作台</p>
           {editingName ? (
             <input
               value={name}

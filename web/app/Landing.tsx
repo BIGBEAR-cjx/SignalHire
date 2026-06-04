@@ -23,7 +23,7 @@ function ProductHeroVisual() {
             <span className="h-2.5 w-2.5 rounded-full bg-emerald-300" />
           </div>
           <div className="hidden rounded-full bg-neutral-100 px-4 py-1.5 text-xs font-medium text-[var(--sh-muted)] sm:block">
-            SignalHire Research Workspace
+            SignalHire 研究工作台
           </div>
           <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700 ring-1 ring-emerald-100">证据链完成</span>
         </div>
@@ -34,7 +34,7 @@ function ProductHeroVisual() {
                 <FiSearch className="h-5 w-5" aria-hidden="true" />
               </span>
               <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--sh-faint)]">Talent brief</p>
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--sh-faint)]">人才画像</p>
                 <h2 className="text-xl font-semibold text-[var(--sh-ink)]">欧洲 AI Infra 负责人</h2>
               </div>
             </div>
@@ -94,7 +94,7 @@ function ProductHeroVisual() {
               ))}
             </div>
             <div className="mt-4 rounded-3xl bg-neutral-950 p-5 text-white">
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-white/50">Evidence summary</p>
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-white/50">证据摘要</p>
               <p className="mt-3 text-lg font-semibold">每位候选人的论文、开源、工作经历和公开影响力都被转译成中文结论。</p>
               <p className="mt-2 text-sm leading-6 text-white/62">招聘团队不用逐页读英文资料，也能看到来源、置信度和下一步追问建议。</p>
             </div>

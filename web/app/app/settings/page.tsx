@@ -28,7 +28,7 @@ export default function SettingsPage() {
   return (
     <div className="space-y-6">
       <PageIntro
-        eyebrow="Settings"
+        eyebrow="设置"
         title="账户和偏好。"
         description="管理登录账户、复制用户标识，并为后续团队协作与通知偏好预留空间。"
       />
@@ -41,7 +41,7 @@ export default function SettingsPage() {
             <dd className="font-medium text-gray-900">{user?.email ?? "加载中…"}</dd>
           </div>
           <div className="flex items-center justify-between gap-3">
-            <dt className="text-gray-500">User ID</dt>
+            <dt className="text-gray-500">用户 ID</dt>
             <dd className="flex items-center gap-2">
               <code className="rounded bg-gray-50 px-2 py-1 font-mono text-xs text-gray-700">
                 {user?.id ?? "加载中…"}
@@ -71,7 +71,7 @@ export default function SettingsPage() {
       <Surface className="p-5 md:p-6">
         <h2 className="text-xl font-semibold text-[var(--sh-ink)]">即将上线</h2>
         <ul className="mt-4 grid gap-2 text-sm text-[var(--sh-muted)] sm:grid-cols-2">
-          {["修改密码", "邮件通知偏好", "团队 / 协作", "计费 / 用量", "API Keys"].map((item) => (
+          {["修改密码", "邮件通知偏好", "团队 / 协作", "计费 / 用量", "API 密钥"].map((item) => (
             <li key={item} className="rounded-2xl bg-white/70 px-3 py-2 ring-1 ring-black/5">{item}</li>
           ))}
         </ul>

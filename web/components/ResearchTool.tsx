@@ -706,7 +706,7 @@ export default function ResearchTool({
               <Surface className="p-5 md:p-6">
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div>
-                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-neutral-500">Feedback loop</p>
+                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-neutral-500">反馈闭环</p>
                     <h2 className="mt-1 text-xl font-semibold text-[var(--sh-ink)]">这轮结果怎么样？</h2>
                     <p className="mt-1 text-sm leading-6 text-[var(--sh-muted)]">
                       用选择题反馈本轮 shortlist，下一轮会按你的反馈调整搜索和交叉验证重点。
@@ -754,7 +754,7 @@ export default function ResearchTool({
               <section className="space-y-3">
                 <div className="flex flex-wrap items-end justify-between gap-3">
                   <div>
-                    <h2 className="text-lg font-semibold text-gray-900">Shortlist</h2>
+                    <h2 className="text-lg font-semibold text-gray-900">候选名单</h2>
                     <p className="mt-1 text-sm text-gray-500">
                       已选 {shortlist.length} / {result.candidates.length} 人
                     </p>
@@ -783,7 +783,7 @@ export default function ResearchTool({
                   </div>
                   <div className="lg:sticky lg:top-6 lg:self-start space-y-3">
                     {selectedCandidateIndex === null ? (
-                      <div className="rounded-2xl border border-dashed border-gray-200 bg-white p-5 text-sm text-gray-500">
+                      <div className="rounded-3xl border border-dashed border-black/10 bg-white/80 p-5 text-sm text-[var(--sh-muted)]">
                         点击候选人的「查看详情」打开证据画像。
                       </div>
                     ) : (

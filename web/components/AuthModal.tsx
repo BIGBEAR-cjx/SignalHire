@@ -98,7 +98,7 @@ export default function AuthModal({
 
         {stage === "verify" ? (
           <form onSubmit={submitVerify} className="space-y-3">
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-neutral-500">Email verification</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-neutral-500">邮箱验证</p>
             <h2 className="text-2xl font-semibold text-[var(--sh-ink)]">验证邮箱</h2>
             <p className="text-sm leading-6 text-[var(--sh-muted)]">
               验证码已发送到 <span className="font-semibold text-[var(--sh-ink)]">{email}</span>，请输入。
@@ -127,7 +127,7 @@ export default function AuthModal({
         ) : (
           <>
             <div className="mb-5">
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-neutral-500">Account</p>
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-neutral-500">账户</p>
               <h2 className="mt-2 text-2xl font-semibold text-[var(--sh-ink)]">{tab === "login" ? "登录控制台" : "创建 SignalHire 账号"}</h2>
               <div className="mt-4">
                 <SegmentedControl

@@ -6,7 +6,7 @@ import { useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
 import { FiCheckCircle } from "react-icons/fi";
 import ResearchTool from "@/components/ResearchTool";
-import { PageIntro } from "@/components/ui/signal-ui";
+import { LoadingState, PageIntro } from "@/components/ui/signal-ui";
 import { HERO_BIO } from "@/lib/cache";
 
 function VerifyInner() {
@@ -39,7 +39,7 @@ function VerifyInner() {
 
 export default function VerifyPage() {
   return (
-    <Suspense fallback={<div className="text-sm text-gray-400">加载中…</div>}>
+    <Suspense fallback={<LoadingState title="正在打开核验台" description="正在读取候选人材料和项目上下文。" />}>
       <VerifyInner />
     </Suspense>
   );

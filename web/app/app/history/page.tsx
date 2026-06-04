@@ -4,7 +4,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { FiCheckCircle, FiSearch } from "react-icons/fi";
-import { EmptyState, PageIntro, PrimaryAction, SecondaryAction, StatusBadge } from "@/components/ui/signal-ui";
+import { EmptyState, LoadingState, PageIntro, PrimaryAction, SecondaryAction, StatusBadge } from "@/components/ui/signal-ui";
 
 type HistoryItem = {
   kind: "search" | "verify";
@@ -28,7 +28,7 @@ export default function HistoryPage() {
   return (
     <div className="space-y-6">
       <PageIntro
-        eyebrow="Research history"
+        eyebrow="研究历史"
         title="重新打开每一次人才研究。"
         description="回看已完成的 shortlist 和核验报告，或用同一画像快速开始下一轮搜索。"
       />
@@ -38,7 +38,7 @@ export default function HistoryPage() {
       )}
 
       {items === null && !error && (
-        <p className="text-sm text-gray-400">加载中…</p>
+        <LoadingState title="正在加载研究历史" description="正在读取已完成的搜人和核验记录。" />
       )}
 
       {items && items.length === 0 && (

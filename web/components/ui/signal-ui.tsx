@@ -212,6 +212,31 @@ export function EmptyState({
   );
 }
 
+export function LoadingState({
+  title = "正在加载",
+  description = "正在同步最新数据。",
+  className = "",
+}: {
+  title?: string;
+  description?: string;
+  className?: string;
+}) {
+  return (
+    <Surface className={`p-5 ${className}`}>
+      <div className="flex items-center gap-4">
+        <span className="relative inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-white ring-1 ring-black/10">
+          <span className="absolute h-8 w-8 animate-ping rounded-full bg-[var(--sh-blue)]/12" />
+          <span className="h-2.5 w-2.5 rounded-full bg-[var(--sh-blue)]" />
+        </span>
+        <div>
+          <p className="text-sm font-semibold text-[var(--sh-ink)]">{title}</p>
+          <p className="mt-1 text-sm text-[var(--sh-muted)]">{description}</p>
+        </div>
+      </div>
+    </Surface>
+  );
+}
+
 export function StatusBadge({
   label,
   dotClassName = "bg-neutral-400",

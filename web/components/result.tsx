@@ -1006,7 +1006,7 @@ export function CandidateProfileView({ candidate, result }: { candidate: TalentC
 
       {candidate.outreach_angle && (
         <div className="mt-4 rounded-xl border border-blue-100 bg-blue-50/70 p-4">
-          <p className="text-sm font-semibold text-blue-700">Outreach angle</p>
+          <p className="text-sm font-semibold text-blue-700">外联角度</p>
           <p className="mt-1 text-sm leading-relaxed text-blue-900">{candidate.outreach_angle}</p>
         </div>
       )}

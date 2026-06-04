@@ -10,6 +10,7 @@ import {
   EmptyState,
   FiPlus,
   FiSearch,
+  LoadingState,
   MetricCard,
   PageIntro,
   PrimaryAction,
@@ -195,14 +196,14 @@ export default function Overview() {
         <Surface className="p-5">
           <div className="flex items-end justify-between">
             <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-neutral-500">Live work</p>
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-neutral-500">进行中</p>
               <h2 className="mt-1 text-xl font-semibold text-[var(--sh-ink)]">进行中的任务</h2>
             </div>
             {data && data.active_jobs.length > 0 && (
               <span className="rounded-full bg-white/80 px-2.5 py-1 text-xs text-[var(--sh-muted)] ring-1 ring-black/5">{data.active_jobs.length} 个</span>
             )}
           </div>
-          {!data && <p className="mt-5 text-sm text-[var(--sh-faint)]">加载中…</p>}
+          {!data && <LoadingState title="正在同步任务" description="正在读取进行中的搜索和核验任务。" className="mt-5" />}
           {data && data.active_jobs.length === 0 && (
             <div className="mt-5 rounded-2xl border border-dashed border-black/10 bg-white/60 p-5 text-center text-sm text-[var(--sh-muted)]">
               暂无进行中的任务
@@ -227,12 +228,12 @@ export default function Overview() {
         <Surface className="p-5">
           <div className="flex items-end justify-between">
             <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-neutral-500">Recent signals</p>
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-neutral-500">最近信号</p>
               <h2 className="mt-1 text-xl font-semibold text-[var(--sh-ink)]">最近研究</h2>
             </div>
             <Link href="/app/history" className="text-sm font-medium text-blue-600 hover:text-blue-700">查看全部</Link>
           </div>
-          {!data && <p className="mt-5 text-sm text-[var(--sh-faint)]">加载中…</p>}
+          {!data && <LoadingState title="正在加载最近研究" description="正在整理已经完成的 shortlist 和核验报告。" className="mt-5" />}
           {data && data.recent.length === 0 && (
             <div className="mt-5 rounded-2xl border border-dashed border-black/10 bg-white/60 p-5 text-center text-sm text-[var(--sh-muted)]">
               还没有完成的研究

@@ -50,7 +50,7 @@ export default function RegisterPage() {
             SignalHire
           </Link>
           <div className="max-w-2xl">
-            <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[var(--sh-faint)]">Build Your Talent Graph</p>
+            <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[var(--sh-faint)]">建立人才图谱</p>
             <h1 className="mt-3 text-5xl font-semibold leading-[1.02] tracking-tight text-[var(--sh-ink)] md:text-6xl">
               为 AI 招聘建立可信搜索入口。
             </h1>

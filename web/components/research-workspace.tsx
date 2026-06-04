@@ -72,7 +72,7 @@ export function ResearchInputStage({
             </p>
           </div>
           <span className={`rounded-full px-3 py-1 text-xs font-semibold ring-1 ${isSearch ? "bg-blue-50 text-blue-700 ring-blue-100" : "bg-amber-50 text-amber-800 ring-amber-100"}`}>
-            {isSearch ? "Shortlist + 证据" : "可信度报告"}
+            {isSearch ? "候选名单 + 证据" : "可信度报告"}
           </span>
         </div>
         <textarea
@@ -117,7 +117,7 @@ export function EditableSearchPlanPanel({
     <Surface className="p-5 md:p-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-neutral-500">Search plan</p>
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-neutral-500">搜索计划</p>
           <h3 className="mt-1 text-xl font-semibold text-[var(--sh-ink)]">先调整搜索策略，再启动研究。</h3>
         </div>
         <PrimaryAction onClick={onRunPlan} disabled={loading}>

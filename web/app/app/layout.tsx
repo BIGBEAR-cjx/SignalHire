@@ -10,6 +10,7 @@ import { currentUser, logout } from "@/lib/auth";
 import {
   APP_NAV,
   FiLogOut,
+  LoadingState,
   LogoMark,
   SETTINGS_NAV,
 } from "@/components/ui/signal-ui";
@@ -132,8 +133,12 @@ export default function ConsoleLayout({ children }: { children: React.ReactNode 
   // 初始加载
   if (user === undefined) {
     return (
-      <div className="flex h-screen items-center justify-center text-sm text-gray-400">
-        加载中…
+      <div className="flex h-screen items-center justify-center bg-[var(--sh-canvas)] px-4">
+        <LoadingState
+          title="正在进入工作台"
+          description="正在确认登录状态和加载你的招聘上下文。"
+          className="w-full max-w-md"
+        />
       </div>
     );
   }
@@ -142,8 +147,12 @@ export default function ConsoleLayout({ children }: { children: React.ReactNode 
   if (user === null) {
     return (
       <>
-        <div className="flex h-screen flex-col items-center justify-center px-4 text-center">
-          <p className="text-sm text-gray-500">请先登录使用 SignalHire 控制台</p>
+        <div className="flex h-screen flex-col items-center justify-center bg-[var(--sh-canvas)] px-4 text-center">
+          <div className="sh-surface w-full max-w-md p-7">
+            <LogoMark className="mx-auto h-10 w-10" />
+            <p className="mt-4 text-lg font-semibold text-[var(--sh-ink)]">登录后继续使用工作台</p>
+            <p className="mt-2 text-sm leading-6 text-[var(--sh-muted)]">SignalHire 会保护你的项目、候选池和研究历史。</p>
+          </div>
         </div>
         <AuthModal
           open={true}

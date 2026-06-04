@@ -35,7 +35,7 @@ export default function LoginPage() {
             SignalHire
           </Link>
           <div className="max-w-2xl">
-            <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[var(--sh-faint)]">AI Talent Intelligence</p>
+            <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[var(--sh-faint)]">AI 人才情报</p>
             <h1 className="mt-3 text-5xl font-semibold leading-[1.02] tracking-tight text-[var(--sh-ink)] md:text-6xl">
               回到你的 AI 人才搜索工作台。
             </h1>

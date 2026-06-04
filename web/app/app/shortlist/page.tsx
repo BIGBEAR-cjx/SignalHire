@@ -10,6 +10,7 @@ import OutreachModal from "@/components/OutreachModal";
 import {
   EmptyState,
   IconButton,
+  LoadingState,
   PageIntro,
   PrimaryAction,
   SegmentedControl,
@@ -100,7 +101,7 @@ export default function ShortlistPage() {
   return (
     <div className="space-y-6">
       <PageIntro
-        eyebrow="Candidate pool"
+        eyebrow="候选池"
         title="集中审阅、推进和复盘候选人。"
         description="把跨项目收藏的人选放到一个工作区里，按状态筛选、补备注、打开证据画像，并直接起草外联。"
         actions={(
@@ -122,8 +123,9 @@ export default function ShortlistPage() {
         ]}
       />
 
-      {/* 加载中 */}
-      {items === null && !error && <p className="text-sm text-gray-400">加载中…</p>}
+      {items === null && !error && (
+        <LoadingState title="正在加载候选池" description="正在同步候选人状态、备注和证据画像。" />
+      )}
 
       {/* 空状态 */}
       {items && items.length === 0 && (
@@ -148,9 +150,7 @@ export default function ShortlistPage() {
               />
             ))}
             {filtered.length === 0 && (
-              <li className="rounded-xl border border-dashed border-gray-200 bg-white p-6 text-center text-sm text-gray-500">
-                这个状态下没有候选人。
-              </li>
+              <li><EmptyState title="这个状态下没有候选人" description="切换筛选条件，或继续把合适的人选加入候选池。" /></li>
             )}
           </ul>
 

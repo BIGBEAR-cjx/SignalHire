@@ -9,6 +9,7 @@ import {
   EmptyState,
   IconButton,
   IconTile,
+  LoadingState,
   PageIntro,
   PrimaryAction,
   SegmentedControl,
@@ -74,7 +75,7 @@ export default function ProjectsPage() {
   return (
     <div className="space-y-6">
       <PageIntro
-        eyebrow="Recruiting projects"
+        eyebrow="招聘项目"
         title="把每个职位变成独立的人才研究空间。"
         description="管理岗位画像、候选人状态、历史研究和下一轮搜索，让 HR 与猎头围绕同一个上下文推进。"
         actions={(
@@ -98,7 +99,9 @@ export default function ProjectsPage() {
         ]}
       />
 
-      {projects === null && !error && <p className="text-sm text-gray-400">加载中…</p>}
+      {projects === null && !error && (
+        <LoadingState title="正在加载招聘项目" description="正在读取项目、候选人数量和研究状态。" />
+      )}
 
       {projects && projects.length === 0 && (
         <EmptyState
@@ -228,7 +231,7 @@ function NewProjectDialog({
         <div onClick={(e) => e.stopPropagation()}>
         <IconButton label="关闭" onClick={closeDialog} className="absolute right-4 top-4" />
         <div className="pr-10">
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-neutral-500">New project</p>
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-neutral-500">新建项目</p>
           <h2 className="mt-2 text-2xl font-semibold text-[var(--sh-ink)]">新建招聘项目</h2>
           <p className="mt-2 text-sm leading-6 text-[var(--sh-muted)]">名称必填，brief 之后可改。建议直接粘贴 JD 或候选人画像。</p>
         </div>
