@@ -2,6 +2,7 @@
 // 把一条 research_runs 渲染成"带证据的核实报告", 可直接发给客户/投资人。
 import Link from "next/link";
 import type { Metadata } from "next";
+import { FiArrowRight } from "react-icons/fi";
 import { getRunById } from "@/lib/db";
 import {
   CandidateCard,
@@ -110,12 +111,12 @@ export default async function ReportPage({ params }: { params: Promise<{ id: str
     ? {
         title: "想审计你自己的候选人证据？",
         body: "SignalHire 从公开来源交叉验证候选人声称，标出已验证、未验证和矛盾点。",
-        button: "开始审计候选人 →",
+        button: "开始审计候选人",
       }
     : {
         title: "想为你的 AI 岗位生成这样的 shortlist？",
         body: "SignalHire 从公开来源搜索全球 AI 人才，并把论文、开源、实践和工作经历证据整理成可交付报告。",
-        button: "生成 AI 人才 shortlist →",
+        button: "生成 AI 人才 shortlist",
       };
 
   return (
@@ -131,11 +132,12 @@ export default async function ReportPage({ params }: { params: Promise<{ id: str
 
       <main className="mx-auto max-w-3xl px-4 pb-20">
         {!row ? (
-          <div className="mt-10 rounded-2xl border border-gray-100 bg-white p-8 text-center shadow-[0_8px_30px_rgba(0,0,0,0.06)]">
+          <div className="mt-10 rounded-[28px] border border-black/10 bg-white/86 p-8 text-center shadow-[0_18px_52px_rgba(15,23,42,0.06)] backdrop-blur-xl">
             <p className="text-lg font-semibold text-gray-900">报告不存在或链接已失效</p>
             <p className="mt-1 text-sm text-gray-500">这条核实记录找不到了。</p>
-            <Link href="/" className="mt-5 inline-block rounded-xl bg-gray-900 px-5 py-2.5 text-sm font-medium text-white hover:bg-gray-800">
-              去 SignalHire 验证候选人 →
+            <Link href="/" className="mt-5 inline-flex items-center justify-center gap-2 rounded-full bg-gray-950 px-5 py-2.5 text-sm font-semibold text-white shadow-[0_16px_32px_rgba(15,23,42,0.18)] transition hover:-translate-y-0.5 hover:bg-gray-800">
+              去 SignalHire 验证候选人
+              <FiArrowRight aria-hidden="true" />
             </Link>
           </div>
         ) : (
@@ -185,18 +187,19 @@ export default async function ReportPage({ params }: { params: Promise<{ id: str
             </div>
 
             {/* CTA */}
-            <div className="mt-10 rounded-2xl border border-gray-100 bg-gradient-to-tr from-gray-50 to-white p-6 text-center shadow-[0_8px_30px_rgba(0,0,0,0.06)]">
+            <div className="mt-10 rounded-[28px] border border-black/10 bg-white/86 p-6 text-center shadow-[0_18px_52px_rgba(15,23,42,0.06)] backdrop-blur-xl">
               <p className="text-base font-semibold text-gray-900">{cta.title}</p>
               <p className="mt-1 text-sm text-gray-500">{cta.body}</p>
-              <Link href="/" className="mt-4 inline-block rounded-xl bg-gray-900 px-6 py-3 text-sm font-medium text-white hover:bg-gray-800">
+              <Link href="/" className="mt-4 inline-flex items-center justify-center gap-2 rounded-full bg-gray-950 px-6 py-3 text-sm font-semibold text-white shadow-[0_16px_32px_rgba(15,23,42,0.18)] transition hover:-translate-y-0.5 hover:bg-gray-800">
                 {cta.button}
+                <FiArrowRight aria-hidden="true" />
               </Link>
             </div>
           </>
         )}
 
         <footer className="mt-10 text-center text-xs text-gray-400">
-          Powered by MiroMind Deep Research · SignalHire
+          Powered by SignalHire Deep Research
         </footer>
       </main>
     </div>

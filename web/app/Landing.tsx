@@ -3,6 +3,7 @@
 // Landing.tsx —— 公开首页。
 // hero 直接给搜索输入框, 缩短转化路径; 首屏展示产品真实产出形态。
 import { useState } from "react";
+import { FiArrowRight, FiCheckCircle, FiGithub } from "react-icons/fi";
 import { LogoMark, SecondaryAction } from "@/components/ui/signal-ui";
 
 function ProductPreview() {
@@ -135,7 +136,7 @@ export default function Landing({
                 className="block max-h-[40vh] min-h-[150px] w-full resize-y overflow-y-auto rounded-[18px] bg-white/70 px-3 py-2.5 text-[15px] leading-relaxed text-[var(--sh-ink)] outline-none placeholder:text-[var(--sh-faint)]"
               />
               <div className="mt-1 flex items-center justify-between gap-2 px-1">
-                <span className="text-xs text-[var(--sh-faint)]">{q.length} 字 · ⌘/Ctrl + Enter 搜索</span>
+                <span className="text-xs text-[var(--sh-faint)]">已输入 {q.length} 字</span>
                 <button type="submit" className="sh-primary-action shrink-0 px-6">
                   搜索
                 </button>
@@ -168,7 +169,7 @@ function HowItWorks() {
     },
     {
       n: "2",
-      title: "MiroMind 全网深度核验",
+      title: "多源全网深度核验",
       desc: "覆盖 GitHub / LinkedIn / Wikipedia / Stack Overflow / Google Scholar / arXiv / ORCID 等公开源, 对每条声称做跨源交叉证据。",
     },
     {
@@ -181,16 +182,16 @@ function HowItWorks() {
     <section className="mx-auto max-w-5xl px-4 py-20">
       <div className="mb-12 text-center">
         <p className="text-xs font-semibold uppercase tracking-wider text-gray-400">如何工作</p>
-        <h2 className="mt-2 text-3xl font-bold tracking-tight text-gray-900 sm:text-4xl">从需求到带证据的报告 · 几分钟</h2>
+        <h2 className="mt-2 text-3xl font-semibold tracking-tight text-[var(--sh-ink)] sm:text-4xl">从需求到带证据的报告，几分钟</h2>
       </div>
       <ol className="grid gap-6 md:grid-cols-3">
         {steps.map((s) => (
-          <li key={s.n} className="relative rounded-2xl border border-gray-100 bg-white p-6 shadow-[0_8px_30px_rgba(0,0,0,0.04)]">
-            <span className="absolute -top-4 left-6 inline-flex h-8 w-8 items-center justify-center rounded-full bg-gray-900 text-sm font-semibold text-white shadow-sm">
+          <li key={s.n} className="relative rounded-[28px] border border-black/10 bg-white/84 p-6 shadow-[0_18px_52px_rgba(0,0,0,0.06)]">
+            <span className="absolute -top-4 left-6 inline-flex h-8 w-8 items-center justify-center rounded-full bg-[var(--sh-ink)] text-sm font-semibold text-white shadow-sm">
               {s.n}
             </span>
-            <h3 className="mt-2 text-lg font-semibold text-gray-900">{s.title}</h3>
-            <p className="mt-2 text-sm leading-relaxed text-gray-600">{s.desc}</p>
+            <h3 className="mt-2 text-lg font-semibold text-[var(--sh-ink)]">{s.title}</h3>
+            <p className="mt-2 text-sm leading-relaxed text-[var(--sh-muted)]">{s.desc}</p>
           </li>
         ))}
       </ol>
@@ -208,16 +209,16 @@ function WhyDifferent() {
     { label: "透明度",       linkedin: "只给数据",                 recruiter: "口头汇报",                signalhire: "每条声称可点开看来源", signalhireHi: true },
   ];
   return (
-    <section className="border-y border-gray-100 bg-gray-50/60 py-20">
+    <section className="border-y border-black/5 bg-white/45 py-20">
       <div className="mx-auto max-w-5xl px-4">
         <div className="mb-12 text-center">
           <p className="text-xs font-semibold uppercase tracking-wider text-gray-400">为什么不一样</p>
-          <h2 className="mt-2 text-3xl font-bold tracking-tight text-gray-900 sm:text-4xl">招聘的新基线: 不只是找到, 还要核实</h2>
+          <h2 className="mt-2 text-3xl font-semibold tracking-tight text-[var(--sh-ink)] sm:text-4xl">招聘的新基线: 不只是找到, 还要核实</h2>
           <p className="mx-auto mt-4 max-w-2xl text-base text-gray-600">
             LinkedIn 给你姓名, 猎头给你介绍, SignalHire 给你<span className="font-semibold text-gray-900">证据</span>。
           </p>
         </div>
-        <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-[0_8px_30px_rgba(0,0,0,0.04)]">
+        <div className="overflow-hidden rounded-[28px] border border-black/10 bg-white/86 shadow-[0_18px_52px_rgba(0,0,0,0.06)]">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-gray-100 bg-gray-50/50 text-left">
@@ -234,7 +235,7 @@ function WhyDifferent() {
                   <td className="px-4 py-3 text-gray-600">{r.linkedin}</td>
                   <td className="px-4 py-3 text-gray-600">{r.recruiter}</td>
                   <td className={`px-4 py-3 ${r.signalhireHi ? "font-semibold text-gray-900" : "text-gray-800"}`}>
-                    {r.signalhireHi && <span className="mr-1">✓</span>}
+                    {r.signalhireHi && <FiCheckCircle className="mr-1 inline h-4 w-4 text-emerald-600" aria-hidden="true" />}
                     {r.signalhire}
                   </td>
                 </tr>
@@ -254,7 +255,7 @@ function SampleReports() {
       id: "11e6f828-aaa7-43cd-aaad-88200b532e80",
       kind: "search",
       title: "13 位 AI / LLM Infra 候选人",
-      desc: "一句话 brief → MiroMind 全网研究 → 候选人按匹配度排序的 shortlist。",
+      desc: "一句话 brief，SignalHire 全网研究，候选人按匹配度排序输出 shortlist。",
       tag: "搜人 · shortlist",
     },
     {
@@ -286,7 +287,7 @@ function SampleReports() {
             href={`/r/${s.id}`}
             target="_blank"
             rel="noreferrer"
-            className="group flex flex-col rounded-2xl border border-gray-100 bg-white p-5 shadow-[0_8px_30px_rgba(0,0,0,0.04)] transition hover:-translate-y-0.5 hover:shadow-[0_12px_40px_rgba(0,0,0,0.08)]"
+            className="group flex flex-col rounded-[28px] border border-black/10 bg-white/86 p-5 shadow-[0_18px_52px_rgba(0,0,0,0.06)] transition hover:-translate-y-0.5 hover:border-black/20 hover:shadow-[0_24px_68px_rgba(0,0,0,0.1)]"
           >
             <span className={`mb-3 inline-flex w-fit items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium ring-1 ${
               s.kind === "search"
@@ -297,7 +298,10 @@ function SampleReports() {
             </span>
             <h3 className="text-base font-semibold text-gray-900">{s.title}</h3>
             <p className="mt-1 flex-1 text-sm leading-relaxed text-gray-600">{s.desc}</p>
-            <span className="mt-3 text-sm font-medium text-gray-900 group-hover:underline">查看完整报告 →</span>
+            <span className="mt-3 inline-flex items-center gap-1 text-sm font-semibold text-gray-900 group-hover:underline">
+              查看完整报告
+              <FiArrowRight className="h-4 w-4" aria-hidden="true" />
+            </span>
           </a>
         ))}
       </div>
@@ -308,7 +312,7 @@ function SampleReports() {
 // ───────── 末位 CTA ─────────
 function FinalCTA({ user, onLoginClick }: { user: { email: string } | null; onLoginClick: () => void }) {
   return (
-    <section className="border-t border-gray-100 bg-gradient-to-b from-white to-gray-50 py-20">
+    <section className="border-t border-black/5 bg-white/55 py-20">
       <div className="mx-auto max-w-3xl px-4 text-center">
         <h2 className="text-3xl font-bold tracking-tight text-gray-900 sm:text-4xl">
           停止猜。<span className="text-gray-500">开始查证。</span>
@@ -318,15 +322,18 @@ function FinalCTA({ user, onLoginClick }: { user: { email: string } | null; onLo
         </p>
         <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
           {user ? (
-            <a href="/app" className="rounded-xl bg-gray-900 px-6 py-3 text-sm font-medium text-white shadow-sm hover:bg-gray-800">
-              进入控制台 →
+            <a href="/app" className="sh-primary-action px-6">
+              进入控制台
+              <FiArrowRight className="h-4 w-4" aria-hidden="true" />
             </a>
           ) : (
-            <button onClick={onLoginClick} className="rounded-xl bg-gray-900 px-6 py-3 text-sm font-medium text-white shadow-sm hover:bg-gray-800">
-              免费试用 →
+            <button onClick={onLoginClick} className="sh-primary-action px-6">
+              免费试用
+              <FiArrowRight className="h-4 w-4" aria-hidden="true" />
             </button>
           )}
-          <a href="https://github.com/BIGBEAR-cjx/SignalHire" target="_blank" rel="noreferrer" className="rounded-xl border border-gray-200 bg-white px-6 py-3 text-sm font-medium text-gray-700 hover:border-gray-900">
+          <a href="https://github.com/BIGBEAR-cjx/SignalHire" target="_blank" rel="noreferrer" className="sh-secondary-action px-6">
+            <FiGithub className="h-4 w-4" aria-hidden="true" />
             看 GitHub
           </a>
         </div>
