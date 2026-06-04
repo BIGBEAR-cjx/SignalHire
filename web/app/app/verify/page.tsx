@@ -4,7 +4,9 @@
 // ?demo=1 → 预填 HERO_BIO; ?bio=... 直接预填; ?project=<id> 项目上下文
 import { useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
+import { FiCheckCircle } from "react-icons/fi";
 import ResearchTool from "@/components/ResearchTool";
+import { PageIntro } from "@/components/ui/signal-ui";
 import { HERO_BIO } from "@/lib/cache";
 
 function VerifyInner() {
@@ -24,10 +26,12 @@ function VerifyInner() {
 
   return (
     <div className="space-y-6">
-      <header>
-        <h1 className="text-2xl font-bold tracking-tight text-gray-900">候选人核验台</h1>
-        <p className="mt-1 text-sm text-gray-500">粘贴候选人自述/简历/LinkedIn, 对每条声称做跨源核实。</p>
-      </header>
+      <PageIntro
+        eyebrow={projectName ? "项目内核验" : "候选人核验台"}
+        title="把候选人自述拆成可核验证据。"
+        description={projectName ? `当前项目：${projectName}。核验结果会回到项目上下文。` : "粘贴候选人材料，系统会按声明逐条查证，输出可信度、红旗和可点击来源。"}
+        actions={<span className="inline-flex items-center gap-2 rounded-full bg-white/80 px-3 py-1.5 text-xs font-semibold text-[var(--sh-muted)] ring-1 ring-black/10"><FiCheckCircle className="h-3.5 w-3.5" aria-hidden="true" /> Evidence audit</span>}
+      />
       <ResearchTool mode="verify" initialInput={bio} autoRun={autoRun} projectId={projectId} projectName={projectName} />
     </div>
   );
