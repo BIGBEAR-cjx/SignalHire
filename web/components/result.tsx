@@ -16,6 +16,8 @@ declare module "@/lib/talent-profile.mjs" {
 
 import type { BackfillMergeSummary, CandidateComparisonRow, CandidateEvidenceAuditSummary, CoverageBackfillJob, EvidenceCoverageGroup, ShortlistDeliveryReport, SourceExecutionJob, SourceQueryPlanItem, TalentCandidate, TalentSearchResult } from "@/lib/talent-profile.mjs";
 import { buildCandidateComparisonRows, buildCandidateEvidenceAudit, buildCoverageBackfillPlan, buildEvidenceCoverage, buildShortlistDeliveryReport, buildSourceExecution, buildSourceQueryPlan } from "@/lib/talent-profile.mjs";
+import type { IconType } from "react-icons";
+import { FiCheckCircle, FiExternalLink, FiFlag, FiHelpCircle, FiInfo, FiLink2, FiXCircle } from "react-icons/fi";
 import {
   reportUniqueSources,
   sourceCountChip,
@@ -43,11 +45,25 @@ export type VerifyReport = {
 };
 
 // 裁决语义色 (与 DESIGN-SYSTEM.md 一致)
-const VERDICT: Record<Verdict, { label: string; icon: string; chip: string; bar: string }> = {
-  verified: { label: "已验证", icon: "✓", chip: "bg-emerald-50 text-emerald-700 ring-emerald-200", bar: "border-l-emerald-400" },
-  contradicted: { label: "矛盾", icon: "✕", chip: "bg-red-50 text-red-700 ring-red-200", bar: "border-l-red-400" },
-  unverified: { label: "查无实据", icon: "?", chip: "bg-amber-50 text-amber-700 ring-amber-200", bar: "border-l-amber-400" },
+const VERDICT: Record<Verdict, { label: string; Icon: IconType; chip: string; bar: string }> = {
+  verified: { label: "已验证", Icon: FiCheckCircle, chip: "bg-emerald-50 text-emerald-700 ring-emerald-200", bar: "border-l-emerald-400" },
+  contradicted: { label: "矛盾", Icon: FiXCircle, chip: "bg-red-50 text-red-700 ring-red-200", bar: "border-l-red-400" },
+  unverified: { label: "查无实据", Icon: FiHelpCircle, chip: "bg-amber-50 text-amber-700 ring-amber-200", bar: "border-l-amber-400" },
 };
+
+function ResultSurface({
+  children,
+  className = "",
+}: {
+  children: React.ReactNode;
+  className?: string;
+}) {
+  return (
+    <section className={`rounded-[28px] border border-black/10 bg-white/86 p-5 shadow-[0_18px_52px_rgba(0,0,0,0.06)] ${className}`}>
+      {children}
+    </section>
+  );
+}
 
 function host(url: string): string {
   try { return new URL(url).hostname.replace(/^www\./, ""); } catch { return "来源"; }
@@ -58,9 +74,10 @@ function favicon(url: string): string {
 
 export function VerdictBadge({ v }: { v: Verdict }) {
   const m = VERDICT[v] ?? VERDICT.unverified;
+  const Icon = m.Icon;
   return (
     <span className={`inline-flex shrink-0 items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-semibold ring-1 ${m.chip}`}>
-      <span className="font-bold">{m.icon}</span>
+      <Icon className="h-3.5 w-3.5" aria-hidden="true" />
       {m.label}
     </span>
   );
@@ -73,7 +90,10 @@ export function Tally({ claims }: { claims: Claim[] }) {
     <div className="flex flex-wrap gap-1.5">
       {order.filter((v) => counts[v]).map((v) => (
         <span key={v} className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold ring-1 ${VERDICT[v].chip}`}>
-          <span className="font-bold">{VERDICT[v].icon}</span>
+          {(() => {
+            const Icon = VERDICT[v].Icon;
+            return <Icon className="h-3.5 w-3.5" aria-hidden="true" />;
+          })()}
           {counts[v]} {VERDICT[v].label}
         </span>
       ))}
@@ -94,7 +114,8 @@ export function ClaimBlock({ c }: { c: Claim }) {
             title="覆盖该声称的不同域名数 (越多越可靠)"
             className={`inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[10px] font-medium ring-1 ${sourceCountChip(sourceCount)}`}
           >
-            ⛓ {sourceCountLabel(sourceCount)}
+            <FiLink2 className="h-3 w-3" aria-hidden="true" />
+            {sourceCountLabel(sourceCount)}
           </span>
         </div>
       </div>
@@ -112,7 +133,8 @@ export function ClaimBlock({ c }: { c: Claim }) {
                 >
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img src={favicon(e.url)} alt="" width={12} height={12} className="rounded-sm" />
-                  {host(e.url)} ↗
+                  {host(e.url)}
+                  <FiExternalLink className="h-3 w-3" aria-hidden="true" />
                 </a>
               )}
             </li>
@@ -169,7 +191,7 @@ export function ShortlistDeliveryReportView({ result }: { result: TalentSearchRe
   const report: ShortlistDeliveryReport = buildShortlistDeliveryReport(result);
   if (report.candidate_count === 0) return null;
   return (
-    <section className="rounded-2xl border border-gray-100 bg-white p-5 shadow-[0_8px_30px_rgba(0,0,0,0.06)]">
+    <ResultSurface>
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h2 className="text-lg font-semibold text-gray-900">交付报告摘要</h2>
@@ -237,7 +259,7 @@ export function ShortlistDeliveryReportView({ result }: { result: TalentSearchRe
           )}
         </div>
       )}
-    </section>
+    </ResultSurface>
   );
 }
 
@@ -268,7 +290,7 @@ export function SearchPlanView({ result }: { result: TalentSearchResult }) {
   if (!hasPlan) return null;
   const queryPlan = buildSourceQueryPlan(result) as SourceQueryPlanItem[];
   return (
-    <section className="rounded-2xl border border-gray-100 bg-white p-5 shadow-[0_8px_30px_rgba(0,0,0,0.06)]">
+    <ResultSurface>
       <div>
         <h2 className="text-lg font-semibold text-gray-900">搜索计划</h2>
         <p className="mt-1 text-sm text-gray-500">系统如何拆解岗位画像、选择来源并扩展相邻人才池。</p>
@@ -335,7 +357,7 @@ export function SearchPlanView({ result }: { result: TalentSearchResult }) {
           </ul>
         </div>
       )}
-    </section>
+    </ResultSurface>
   );
 }
 
@@ -365,7 +387,7 @@ export function SourceExecutionView({ result }: { result: TalentSearchResult }) 
   const executedCount = visibleJobs.filter((job) => job.status !== "planned").length;
   const evidenceCount = visibleJobs.reduce((total, job) => total + job.evidence_found, 0);
   return (
-    <section className="rounded-2xl border border-gray-100 bg-white p-5 shadow-[0_8px_30px_rgba(0,0,0,0.06)]">
+    <ResultSurface>
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h2 className="text-lg font-semibold text-gray-900">来源执行记录</h2>
@@ -427,7 +449,7 @@ export function SourceExecutionView({ result }: { result: TalentSearchResult }) 
           );
         })}
       </div>
-    </section>
+    </ResultSurface>
   );
 }
 
@@ -452,7 +474,7 @@ export function CoverageBackfillView({
   const jobs: CoverageBackfillJob[] = plan.jobs.filter((job: CoverageBackfillJob) => job.query || job.reason);
   if (jobs.length === 0) return null;
   return (
-    <section className="rounded-2xl border border-gray-100 bg-white p-5 shadow-[0_8px_30px_rgba(0,0,0,0.06)]">
+    <ResultSurface>
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h2 className="text-lg font-semibold text-gray-900">缺口补搜计划</h2>
@@ -506,7 +528,7 @@ export function CoverageBackfillView({
           );
         })}
       </div>
-    </section>
+    </ResultSurface>
   );
 }
 
@@ -525,7 +547,7 @@ export function BackfillMergeSummaryView({
   const hasCoverage = summary.coverage_gains.length > 0;
   if (!hasCandidates && !hasCoverage && summary.new_candidate_names.length === 0) return null;
   return (
-    <section className="rounded-2xl border border-emerald-100 bg-emerald-50/50 p-5 shadow-[0_8px_30px_rgba(0,0,0,0.06)]">
+    <ResultSurface className="border-emerald-100 bg-emerald-50/60">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h2 className="text-lg font-semibold text-gray-900">补搜证据增量</h2>
@@ -600,13 +622,13 @@ export function BackfillMergeSummaryView({
           {merged ? "已合并回原报告" : mergeDisabled ? "正在合并…" : "合并回原报告"}
         </button>
       )}
-    </section>
+    </ResultSurface>
   );
 }
 
 export function TalentMapView({ result }: { result: TalentSearchResult }) {
   return (
-    <section className="rounded-2xl border border-gray-100 bg-white p-5 shadow-[0_8px_30px_rgba(0,0,0,0.06)]">
+    <ResultSurface>
       <div>
         <h2 className="text-lg font-semibold text-gray-900">AI 人才方向分布</h2>
         <p className="mt-1 text-sm text-gray-500">按岗位画像识别主匹配、相邻可迁移和高潜力人才池。</p>
@@ -625,7 +647,7 @@ export function TalentMapView({ result }: { result: TalentSearchResult }) {
           </article>
         ))}
       </div>
-    </section>
+    </ResultSurface>
   );
 }
 
@@ -634,7 +656,7 @@ export function EvidenceCoverageView({ result }: { result: TalentSearchResult })
   if (coverage.every((item) => item.count === 0)) return null;
   const covered = coverage.filter((item) => item.status === "covered").length;
   return (
-    <section className="rounded-2xl border border-gray-100 bg-white p-5 shadow-[0_8px_30px_rgba(0,0,0,0.06)]">
+    <ResultSurface>
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h2 className="text-lg font-semibold text-gray-900">信息源覆盖</h2>
@@ -661,7 +683,7 @@ export function EvidenceCoverageView({ result }: { result: TalentSearchResult })
           </article>
         ))}
       </div>
-    </section>
+    </ResultSurface>
   );
 }
 
@@ -669,7 +691,7 @@ export function CandidateComparisonView({ result }: { result: unknown }) {
   const rows: CandidateComparisonRow[] = buildCandidateComparisonRows(result);
   if (rows.length === 0) return null;
   return (
-    <section className="rounded-2xl border border-gray-100 bg-white p-5 shadow-[0_8px_30px_rgba(0,0,0,0.06)]">
+    <ResultSurface>
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h2 className="text-lg font-semibold text-gray-900">候选人对比</h2>
@@ -735,7 +757,7 @@ export function CandidateComparisonView({ result }: { result: unknown }) {
           </tbody>
         </table>
       </div>
-    </section>
+    </ResultSurface>
   );
 }
 
@@ -760,7 +782,7 @@ export function ShortlistCard({
   const topSignals = candidate.strongest_signals.slice(0, 3);
 
   return (
-    <article className="rounded-2xl border border-gray-100 bg-white p-5 shadow-[0_8px_30px_rgba(0,0,0,0.06)]">
+    <article className="rounded-[28px] border border-black/10 bg-white/86 p-5 shadow-[0_18px_52px_rgba(0,0,0,0.06)]">
       <div className="flex items-start gap-3">
         <ScorePill score={candidate.match_score} />
         <div className="min-w-0 flex-1">
@@ -786,8 +808,8 @@ export function ShortlistCard({
       {topSignals.length > 0 && (
         <ul className="mt-4 space-y-1.5">
           {topSignals.map((signal) => (
-            <li key={signal} className="text-sm leading-relaxed text-gray-700">
-              <span className="mr-1.5 font-semibold text-emerald-600">✓</span>
+            <li key={signal} className="flex gap-2 text-sm leading-relaxed text-gray-700">
+              <FiCheckCircle className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" aria-hidden="true" />
               {signal}
             </li>
           ))}
@@ -968,7 +990,7 @@ export function EvidenceGraphView({ result, candidate }: { result: TalentSearchR
 
 export function CandidateProfileView({ candidate, result }: { candidate: TalentCandidate; result?: TalentSearchResult }) {
   return (
-    <article className="rounded-2xl border border-gray-100 bg-white p-5 shadow-[0_8px_30px_rgba(0,0,0,0.06)]">
+    <article className="rounded-[28px] border border-black/10 bg-white/86 p-5 shadow-[0_18px_52px_rgba(0,0,0,0.06)]">
       <div className="flex items-start gap-3">
         <ScorePill score={candidate.match_score} />
         <div className="min-w-0">
@@ -1006,7 +1028,7 @@ export function CandidateCard({ c, delay = 0 }: { c: Candidate; delay?: number }
   return (
     <article
       style={{ animationDelay: `${delay}ms` }}
-      className="sh-fade-in-up rounded-2xl border border-gray-100 bg-white p-5 shadow-[0_8px_30px_rgba(0,0,0,0.06)]"
+      className="sh-fade-in-up rounded-[28px] border border-black/10 bg-white/86 p-5 shadow-[0_18px_52px_rgba(0,0,0,0.06)]"
     >
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
@@ -1055,7 +1077,7 @@ export function TrustReportView({ r }: { r: VerifyReport }) {
   const totalSources = reportUniqueSources(r.claims);
   const heuristic = trustHeuristic(r);
   return (
-    <article className="sh-fade-in-up rounded-2xl border border-gray-100 bg-white p-5 shadow-[0_8px_30px_rgba(0,0,0,0.06)]">
+    <article className="sh-fade-in-up rounded-[28px] border border-black/10 bg-white/86 p-5 shadow-[0_18px_52px_rgba(0,0,0,0.06)]">
       <div className="flex items-center justify-between gap-3">
         <div>
           <h3 className="text-lg font-semibold text-gray-900">{r.candidate_name}</h3>
@@ -1081,7 +1103,10 @@ export function TrustReportView({ r }: { r: VerifyReport }) {
       </div>
       {r.red_flags?.length > 0 && (
         <div className="mt-4 rounded-xl border border-red-100 bg-red-50/60 p-4">
-          <p className="text-sm font-semibold text-red-700">🚩 红旗</p>
+          <p className="inline-flex items-center gap-2 text-sm font-semibold text-red-700">
+            <FiFlag className="h-4 w-4" aria-hidden="true" />
+            红旗
+          </p>
           <ul className="mt-1.5 list-disc space-y-1 pl-5 text-sm text-red-600/90">
             {r.red_flags.map((f, i) => <li key={i}>{f}</li>)}
           </ul>
@@ -1090,13 +1115,18 @@ export function TrustReportView({ r }: { r: VerifyReport }) {
 
       {/* 自我披露 / 解读说明 (Phase 2.A.1) */}
       <details className="mt-4 rounded-xl border border-gray-100 bg-gray-50/50 p-3 text-xs text-gray-600">
-        <summary className="cursor-pointer font-medium text-gray-700">如何解读这份报告 · 局限性</summary>
+        <summary className="cursor-pointer font-medium text-gray-700">
+          <span className="inline-flex items-center gap-2">
+            <FiInfo className="h-3.5 w-3.5" aria-hidden="true" />
+            如何解读这份报告 · 局限性
+          </span>
+        </summary>
         <div className="mt-2 space-y-1.5 leading-relaxed">
-          <p>· 本报告由 AI (MiroMind) 自动抓取公开网页生成, 不构成对候选人最终判断, 仅作为<strong>第一道筛查</strong>。</p>
-          <p>· &quot;已核实 / 矛盾 / 未核实&quot;是模型在抓取时的判断, 可能存在误判或漏判, 关键决策请人工复核每条声称的原始链接。</p>
-          <p>· &quot;独立信源数&quot;= 该条声称的 evidence 中不同域名数 ; 数越多通常越可靠, 但同一来源转发不算独立。</p>
-          <p>· 信源时效以抓取时刻为准, 公开网页内容可能已经更新, 请在做最终决策前点击原链接核对。</p>
-          <p>· 未发现红旗 ≠ 候选人完全可信; 已发现红旗 ≠ 候选人不可用 (可能是同名 / 信源错误)。</p>
+          <p>本报告由 AI 自动抓取公开网页生成，不构成对候选人最终判断，仅作为<strong>第一道筛查</strong>。</p>
+          <p>&quot;已核实 / 矛盾 / 未核实&quot;是模型在抓取时的判断，可能存在误判或漏判，关键决策请人工复核每条声称的原始链接。</p>
+          <p>&quot;独立信源数&quot;= 该条声称的 evidence 中不同域名数；数越多通常越可靠，但同一来源转发不算独立。</p>
+          <p>信源时效以抓取时刻为准，公开网页内容可能已经更新，请在做最终决策前点击原链接核对。</p>
+          <p>未发现红旗不代表候选人完全可信；已发现红旗也不代表候选人不可用，可能是同名或信源错误。</p>
         </div>
       </details>
     </article>
