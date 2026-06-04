@@ -22,8 +22,8 @@ function ProductHeroVisual() {
             <span className="h-2.5 w-2.5 rounded-full bg-amber-300" />
             <span className="h-2.5 w-2.5 rounded-full bg-emerald-300" />
           </div>
-          <div className="hidden rounded-full bg-neutral-100 px-4 py-1.5 text-xs font-medium text-[var(--sh-muted)] sm:block">
-            SignalHire 研究工作台
+          <div className="rounded-full bg-neutral-100 px-3 py-1.5 text-xs font-medium text-[var(--sh-muted)] sm:px-4">
+            研究工作台
           </div>
           <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700 ring-1 ring-emerald-100">证据链完成</span>
         </div>
