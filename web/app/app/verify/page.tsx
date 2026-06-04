@@ -30,7 +30,7 @@ function VerifyInner() {
         eyebrow={projectName ? "项目内核验" : "候选人核验台"}
         title="把候选人自述拆成可核验证据。"
         description={projectName ? `当前项目：${projectName}。核验结果会回到项目上下文。` : "粘贴候选人材料，系统会按声明逐条查证，输出可信度、红旗和可点击来源。"}
-        actions={<span className="inline-flex items-center gap-2 rounded-full bg-white/80 px-3 py-1.5 text-xs font-semibold text-[var(--sh-muted)] ring-1 ring-black/10"><FiCheckCircle className="h-3.5 w-3.5" aria-hidden="true" /> Evidence audit</span>}
+        actions={<span className="inline-flex items-center gap-2 rounded-full bg-white/80 px-3 py-1.5 text-xs font-semibold text-[var(--sh-muted)] ring-1 ring-black/10"><FiCheckCircle className="h-3.5 w-3.5" aria-hidden="true" /> 证据核验</span>}
       />
       <ResearchTool mode="verify" initialInput={bio} autoRun={autoRun} projectId={projectId} projectName={projectName} />
     </div>

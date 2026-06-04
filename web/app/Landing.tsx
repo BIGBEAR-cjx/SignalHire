@@ -3,53 +3,102 @@
 // Landing.tsx —— 公开首页。
 // hero 直接给搜索输入框, 缩短转化路径; 首屏展示产品真实产出形态。
 import { useState } from "react";
-import { FiArrowRight, FiCheckCircle, FiGithub } from "react-icons/fi";
+import { FiArrowRight, FiCheckCircle, FiGithub, FiSearch, FiShield, FiUsers } from "react-icons/fi";
 import { LogoMark, SecondaryAction } from "@/components/ui/signal-ui";
 
-function ProductPreview() {
+function ProductHeroVisual() {
   const candidates = [
-    { name: "Ava Chen", role: "LLM Systems Lead", score: 94, evidence: "8 信源" },
-    { name: "Mateo Rossi", role: "Inference Runtime Engineer", score: 89, evidence: "6 信源" },
-    { name: "Nora Singh", role: "AI Infra Researcher", score: 86, evidence: "7 信源" },
+    { name: "Ava Chen", role: "LLM 系统负责人", score: 94, evidence: "8 个信源" },
+    { name: "Mateo Rossi", role: "推理运行时工程师", score: 89, evidence: "6 个信源" },
+    { name: "Nora Singh", role: "AI Infra 研究员", score: 86, evidence: "7 个信源" },
   ];
+  const sources = ["GitHub", "arXiv", "Scholar", "LinkedIn", "公司页面"];
   return (
-    <div className="mx-auto mt-10 grid max-w-5xl gap-4 lg:grid-cols-[1.05fr_0.95fr]">
-      <div className="sh-surface p-5 text-left">
-        <div className="flex items-center justify-between gap-3">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-neutral-500">Shortlist preview</p>
-            <h2 className="mt-2 text-2xl font-semibold text-[var(--sh-ink)]">AI Infra 候选人</h2>
+    <div className="mx-auto mt-12 max-w-6xl text-left">
+      <div className="relative overflow-hidden rounded-[34px] border border-black/10 bg-white/86 p-2 shadow-[0_28px_90px_rgba(0,0,0,0.1)] backdrop-blur-2xl">
+        <div className="flex items-center justify-between rounded-t-[26px] border-b border-black/5 bg-white/78 px-5 py-3">
+          <div className="flex items-center gap-2">
+            <span className="h-2.5 w-2.5 rounded-full bg-red-300" />
+            <span className="h-2.5 w-2.5 rounded-full bg-amber-300" />
+            <span className="h-2.5 w-2.5 rounded-full bg-emerald-300" />
           </div>
-          <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700 ring-1 ring-emerald-100">证据强</span>
+          <div className="hidden rounded-full bg-neutral-100 px-4 py-1.5 text-xs font-medium text-[var(--sh-muted)] sm:block">
+            SignalHire Research Workspace
+          </div>
+          <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700 ring-1 ring-emerald-100">证据链完成</span>
         </div>
-        <div className="mt-5 space-y-3">
-          {candidates.map((candidate) => (
-            <div key={candidate.name} className="rounded-2xl bg-white/80 p-4 ring-1 ring-black/5">
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <p className="text-sm font-semibold text-[var(--sh-ink)]">{candidate.name}</p>
-                  <p className="mt-1 text-xs text-[var(--sh-muted)]">{candidate.role}</p>
+        <div className="grid gap-0 overflow-hidden rounded-b-[26px] bg-[#f5f5f7] lg:grid-cols-[0.88fr_1.12fr]">
+          <div className="border-b border-black/5 bg-white/58 p-5 lg:border-b-0 lg:border-r">
+            <div className="flex items-center gap-3">
+              <span className="inline-flex h-10 w-10 items-center justify-center rounded-2xl bg-blue-50 text-[var(--sh-blue)] ring-1 ring-blue-100">
+                <FiSearch className="h-5 w-5" aria-hidden="true" />
+              </span>
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--sh-faint)]">Talent brief</p>
+                <h2 className="text-xl font-semibold text-[var(--sh-ink)]">欧洲 AI Infra 负责人</h2>
+              </div>
+            </div>
+            <p className="mt-5 text-sm leading-6 text-[var(--sh-muted)]">
+              找到在开源推理框架有真实贡献、能带生产系统落地、近期可能考虑机会的资深候选人。
+            </p>
+            <div className="mt-6 flex flex-wrap gap-2">
+              {sources.map((source) => (
+                <span key={source} className="rounded-full bg-white/84 px-3 py-1.5 text-xs font-semibold text-[var(--sh-muted)] ring-1 ring-black/10">
+                  {source}
+                </span>
+              ))}
+            </div>
+            <div className="mt-6 space-y-3">
+              {["拆解岗位画像", "扩展公开信源", "交叉核验证据"].map((step, index) => (
+                <div key={step} className="flex items-center gap-3 rounded-2xl bg-white/82 px-3 py-3 ring-1 ring-black/5">
+                  <span className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-neutral-950 text-xs font-semibold text-white">{index + 1}</span>
+                  <span className="text-sm font-medium text-[var(--sh-ink)]">{step}</span>
                 </div>
-                <span className="rounded-full bg-neutral-950 px-2.5 py-1 text-xs font-semibold text-white">{candidate.score}</span>
-              </div>
-              <p className="mt-3 text-xs text-[var(--sh-muted)]">{candidate.evidence} · GitHub / arXiv / 公司页面交叉验证</p>
+              ))}
             </div>
-          ))}
-        </div>
-      </div>
-      <div className="sh-surface p-5 text-left">
-        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-neutral-500">Evidence audit</p>
-        <h2 className="mt-2 text-2xl font-semibold text-[var(--sh-ink)]">每条声称都能回到来源</h2>
-        <div className="mt-5 space-y-3">
-          {["维护 vLLM 推理项目", "发表过系统方向论文", "曾在生产环境负责模型服务"].map((claim, index) => (
-            <div key={claim} className="rounded-2xl bg-white/80 p-4 ring-1 ring-black/5">
-              <div className="flex items-start justify-between gap-3">
-                <p className="text-sm text-[var(--sh-ink)]">{claim}</p>
-                <span className="rounded-full bg-blue-50 px-2 py-0.5 text-xs font-semibold text-blue-700 ring-1 ring-blue-100">{index === 1 ? "待核实" : "已验证"}</span>
+          </div>
+          <div className="p-5">
+            <div className="grid gap-3 sm:grid-cols-3">
+              <div className="rounded-3xl bg-white/86 p-4 ring-1 ring-black/5">
+                <FiUsers className="h-5 w-5 text-[var(--sh-blue)]" aria-hidden="true" />
+                <p className="mt-4 text-3xl font-semibold tracking-tight text-[var(--sh-ink)]">13</p>
+                <p className="text-xs text-[var(--sh-muted)]">候选人 shortlist</p>
               </div>
-              <p className="mt-2 text-xs text-[var(--sh-muted)]">来源 {index + 3} 个 · 可点击查看原始页面</p>
+              <div className="rounded-3xl bg-white/86 p-4 ring-1 ring-black/5">
+                <FiShield className="h-5 w-5 text-emerald-600" aria-hidden="true" />
+                <p className="mt-4 text-3xl font-semibold tracking-tight text-[var(--sh-ink)]">82%</p>
+                <p className="text-xs text-[var(--sh-muted)]">关键声称已核实</p>
+              </div>
+              <div className="rounded-3xl bg-white/86 p-4 ring-1 ring-black/5">
+                <FiCheckCircle className="h-5 w-5 text-amber-600" aria-hidden="true" />
+                <p className="mt-4 text-3xl font-semibold tracking-tight text-[var(--sh-ink)]">4</p>
+                <p className="text-xs text-[var(--sh-muted)]">需要追问的风险点</p>
+              </div>
             </div>
-          ))}
+            <div className="mt-4 overflow-hidden rounded-3xl bg-white/90 ring-1 ring-black/5">
+              {candidates.map((candidate, index) => (
+                <div key={candidate.name} className="flex items-center justify-between gap-4 border-b border-black/5 px-4 py-3 last:border-0">
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-semibold text-[var(--sh-ink)]">{candidate.name}</p>
+                    <p className="mt-0.5 truncate text-xs text-[var(--sh-muted)]">{candidate.role}</p>
+                  </div>
+                  <div className="flex shrink-0 items-center gap-3">
+                    <span className="hidden text-xs text-[var(--sh-muted)] sm:inline">{candidate.evidence}</span>
+                    <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${
+                      index === 0 ? "bg-neutral-950 text-white" : "bg-neutral-100 text-[var(--sh-muted)]"
+                    }`}>
+                      {candidate.score}
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div className="mt-4 rounded-3xl bg-neutral-950 p-5 text-white">
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-white/50">Evidence summary</p>
+              <p className="mt-3 text-lg font-semibold">每位候选人的论文、开源、工作经历和公开影响力都被转译成中文结论。</p>
+              <p className="mt-2 text-sm leading-6 text-white/62">招聘团队不用逐页读英文资料，也能看到来源、置信度和下一步追问建议。</p>
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -103,12 +152,12 @@ export default function Landing({
       </nav>
 
       {/* Hero */}
-      <section id="top" className="relative mx-auto min-h-[calc(100vh-72px)] max-w-6xl px-4 pb-10 pt-20 text-center">
+      <section id="top" className="relative mx-auto max-w-6xl px-4 pb-16 pt-16 text-center">
         {/* 中央内容 */}
         <div className="sh-fade-in-up relative z-10 mx-auto max-w-3xl">
-          <p className="text-sm font-semibold text-[var(--sh-muted)]">For AI hiring teams</p>
+          <p className="text-sm font-semibold text-[var(--sh-muted)]">为 HR 和猎头打造的 AI 人才搜索平台</p>
           <h1 className="mt-4 text-5xl font-semibold leading-[1.04] text-[var(--sh-ink)] sm:text-7xl">
-            Find AI talent by evidence.
+            AI 人才搜索，从证据开始。
           </h1>
           <p className="mx-auto mt-5 max-w-2xl text-lg leading-8 text-[var(--sh-muted)]">
             为 HR 和猎头生成全球 AI 人才 shortlist、交叉验证证据和候选人风险摘要。
@@ -147,7 +196,7 @@ export default function Landing({
             <SecondaryAction onClick={onDemo}>查看候选人核验示例</SecondaryAction>
           </div>
         </div>
-        <ProductPreview />
+        <ProductHeroVisual />
       </section>
 
       <HowItWorks />
