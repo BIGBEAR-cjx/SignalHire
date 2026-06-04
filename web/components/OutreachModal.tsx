@@ -1,9 +1,11 @@
 "use client";
 
 // OutreachModal —— AI 外联邮件草稿生成 (Phase 2.A.3)。
-// 4 tone 切换 + 可编辑 subject/body + 📋 复制 + 📧 用邮件 App 发送 (mailto:) + 🔄 重新生成。
+// 4 tone 切换 + 可编辑 subject/body + 复制 + 用邮件 App 发送 (mailto:) + 重新生成。
 // 候选人详情面板/收藏夹/搜人结果都挂同一个 Modal。
 import { useEffect, useRef, useState } from "react";
+import { FiCheckCircle, FiCopy, FiRefreshCw, FiSend, FiX } from "react-icons/fi";
+import { IconButton, SegmentedControl, StatusBadge } from "@/components/ui/signal-ui";
 import {
   buildEvidenceDrivenOutreachDraft,
   buildOutreachEvidenceBrief,
@@ -144,72 +146,58 @@ export default function OutreachModal({ open, onClose, candidate, candidateName,
       onClick={onClose}
     >
       <div
-        className="sh-fade-in-up relative flex w-full max-w-2xl flex-col rounded-2xl border border-gray-100 bg-white p-6 shadow-[0_20px_60px_rgba(0,0,0,0.18)]"
+        className="sh-fade-in-up relative flex w-full max-w-3xl flex-col rounded-[32px] border border-white/70 bg-white/94 p-6 shadow-[0_24px_80px_rgba(0,0,0,0.2)] backdrop-blur-xl"
         onClick={(e) => e.stopPropagation()}
         style={{ maxHeight: "92vh" }}
       >
-        <button onClick={onClose} aria-label="关闭" className="absolute right-4 top-4 text-gray-400 transition hover:text-gray-900">✕</button>
+        <IconButton label="关闭" onClick={onClose} Icon={FiX} className="absolute right-4 top-4" />
 
         <header className="mb-4">
-          <h2 className="text-lg font-bold text-gray-900">起草外联邮件</h2>
-          {candidateName && <p className="mt-0.5 text-sm text-gray-500">写给 {candidateName}</p>}
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-neutral-500">证据外联</p>
+          <h2 className="mt-2 text-2xl font-semibold text-[var(--sh-ink)]">起草外联邮件</h2>
+          {candidateName && <p className="mt-2 text-sm text-[var(--sh-muted)]">写给 {candidateName}</p>}
         </header>
 
-        {/* tone 切换 */}
-        <div className="mb-3 flex flex-wrap items-center gap-1.5">
-          <span className="text-xs font-medium uppercase tracking-wide text-gray-400">语气</span>
-          {TONES.map((t) => (
-            <button
-              key={t.value}
-              onClick={() => setTone(t.value)}
-              disabled={loading}
-              className={`rounded-full px-2.5 py-1 text-xs font-medium transition disabled:opacity-50 ${
-                tone === t.value ? "bg-gray-900 text-white" : "bg-white text-gray-600 ring-1 ring-gray-200 hover:ring-gray-900"
-              }`}
-            >
-              {t.label}
-            </button>
-          ))}
+        <div className="mb-3">
+          <SegmentedControl value={tone} onChange={setTone} items={TONES} />
         </div>
 
-        {/* 你的名字 (localStorage 缓存) */}
         <div className="mb-3">
-          <label className="mb-1 block text-xs font-medium text-gray-600">你的名字 (用于邮件签名)</label>
+          <label className="mb-1 block text-xs font-semibold text-[var(--sh-muted)]">你的名字 (用于邮件签名)</label>
           <input
             value={sender}
             onChange={(e) => saveSender(e.target.value)}
             onBlur={() => { if (sender) regen(); }}
             placeholder="例如:王力"
-            className="block w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-900 outline-none placeholder:text-gray-400 focus:border-gray-900 focus:bg-white"
+            className="block w-full rounded-2xl border border-black/10 bg-white/72 px-4 py-3 text-sm text-[var(--sh-ink)] outline-none placeholder:text-[var(--sh-faint)] focus:border-black/20 focus:bg-white"
           />
         </div>
 
-        {/* 生成出来的草稿 */}
-        <div className="mb-3 flex-1 overflow-y-auto rounded-xl border border-gray-100 bg-gray-50/50 p-3">
+        <div className="mb-3 flex-1 overflow-y-auto rounded-3xl border border-black/10 bg-neutral-50/80 p-4">
           {loading && (
-            <div className="flex items-center gap-2 text-sm text-gray-500">
+            <div className="flex items-center gap-2 text-sm text-[var(--sh-muted)]">
               <span className="inline-block h-2 w-2 animate-pulse rounded-full bg-emerald-500" />
-              MiroMind 起草中…
+              正在根据证据起草…
             </div>
           )}
           {!loading && error && <p className="mb-3 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-700 ring-1 ring-amber-100">{error}</p>}
           {!loading && (
             <div className="space-y-3">
               <div>
-                <label className="mb-1 block text-xs font-medium text-gray-600">主题</label>
+                <label className="mb-1 block text-xs font-semibold text-[var(--sh-muted)]">主题</label>
                 <input
                   value={subject}
                   onChange={(e) => setSubject(e.target.value)}
-                  className="block w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-900 outline-none focus:border-gray-900"
+                  className="block w-full rounded-2xl border border-black/10 bg-white px-4 py-3 text-sm font-semibold text-[var(--sh-ink)] outline-none focus:border-black/20"
                 />
               </div>
               <div>
-                <label className="mb-1 block text-xs font-medium text-gray-600">正文</label>
+                <label className="mb-1 block text-xs font-semibold text-[var(--sh-muted)]">正文</label>
                 <textarea
                   value={body}
                   onChange={(e) => setBody(e.target.value)}
                   rows={10}
-                  className="block w-full resize-y rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm leading-relaxed text-gray-900 outline-none focus:border-gray-900"
+                  className="block w-full resize-y rounded-2xl border border-black/10 bg-white px-4 py-3 text-sm leading-relaxed text-[var(--sh-ink)] outline-none focus:border-black/20"
                 />
               </div>
             </div>
@@ -217,14 +205,15 @@ export default function OutreachModal({ open, onClose, candidate, candidateName,
         </div>
 
         {evidenceBrief && (
-          <section className="mb-3 rounded-xl border border-blue-100 bg-blue-50/60 p-3">
+          <section className="mb-3 rounded-3xl border border-blue-100 bg-blue-50/60 p-4">
             <div className="flex flex-wrap items-center justify-between gap-2">
-              <p className="text-xs font-semibold text-blue-900">本次外联依据</p>
+              <StatusBadge label="本次外联依据" dotClassName="bg-blue-500" className="bg-white text-blue-800 ring-blue-100" />
               <button
                 type="button"
                 onClick={copyEvidence}
-                className="rounded-lg bg-white px-2 py-1 text-xs font-medium text-blue-700 ring-1 ring-blue-100 hover:ring-blue-300"
+                className="inline-flex items-center gap-1.5 rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-blue-700 ring-1 ring-blue-100 hover:ring-blue-300"
               >
+                {evidenceCopied ? <FiCheckCircle className="h-3.5 w-3.5" aria-hidden="true" /> : <FiCopy className="h-3.5 w-3.5" aria-hidden="true" />}
                 {evidenceCopied ? "已复制依据" : "复制依据"}
               </button>
             </div>
@@ -254,28 +243,30 @@ export default function OutreachModal({ open, onClose, candidate, candidateName,
           </section>
         )}
 
-        {/* 操作栏 */}
         <div className="flex flex-wrap items-center justify-end gap-2">
           <button
             onClick={regen}
             disabled={loading}
-            className="rounded-lg border border-gray-200 px-3 py-2 text-sm font-medium text-gray-700 hover:border-gray-900 disabled:opacity-50"
+            className="sh-secondary-action min-h-10 px-3 py-2 text-sm disabled:opacity-50"
           >
-            🔄 重新生成
+            <FiRefreshCw className="h-4 w-4" aria-hidden="true" />
+            重新生成
           </button>
           <button
             onClick={copyAll}
             disabled={loading || !body}
-            className="rounded-lg border border-gray-200 px-3 py-2 text-sm font-medium text-gray-700 hover:border-gray-900 disabled:opacity-50"
+            className="sh-secondary-action min-h-10 px-3 py-2 text-sm disabled:opacity-50"
           >
-            {copied ? "✓ 已复制" : "📋 复制全文"}
+            {copied ? <FiCheckCircle className="h-4 w-4" aria-hidden="true" /> : <FiCopy className="h-4 w-4" aria-hidden="true" />}
+            {copied ? "已复制" : "复制全文"}
           </button>
           <button
             onClick={openMailto}
             disabled={loading || !body}
-            className="rounded-lg bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-800 disabled:opacity-50"
+            className="sh-primary-action min-h-10 px-4 py-2 text-sm disabled:opacity-50"
           >
-            📧 用邮件 App 发送
+            <FiSend className="h-4 w-4" aria-hidden="true" />
+            用邮件 App 发送
           </button>
         </div>
       </div>

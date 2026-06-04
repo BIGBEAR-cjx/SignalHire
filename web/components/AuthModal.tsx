@@ -4,23 +4,12 @@
 // 登录 / 注册两个 tab; 注册若开了邮箱验证, 进入 OTP 验证子步骤。
 // 成功 → onAuthed(user) (父组件关弹窗 + 续跑挂起的动作)。
 import { useEffect, useState } from "react";
+import { FiArrowLeft, FiX } from "react-icons/fi";
+import { IconButton, LogoMark, SegmentedControl } from "@/components/ui/signal-ui";
 import { login, register, verify } from "@/lib/auth";
 
 type Tab = "login" | "register";
 type Stage = "form" | "verify";
-
-function LogoMark({ className = "" }: { className?: string }) {
-  return (
-    <svg viewBox="0 0 512 512" className={className} aria-hidden="true">
-      <g stroke="#111111" strokeWidth={22} fill="none" strokeLinecap="round">
-        <circle cx="256" cy="256" r="130" />
-        <circle cx="256" cy="256" r="70" />
-        <path d="M186 256a70 70 0 1 0 70-70" />
-      </g>
-      <circle cx="256" cy="256" r="16" fill="#9EFF4F" />
-    </svg>
-  );
-}
 
 export default function AuthModal({
   open,
@@ -87,9 +76,9 @@ export default function AuthModal({
   }
 
   const inputCls =
-    "w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5 text-gray-900 outline-none transition placeholder:text-gray-400 focus:border-gray-900 focus:bg-white";
+    "w-full rounded-2xl border border-black/10 bg-white/72 px-4 py-3 text-[var(--sh-ink)] outline-none transition placeholder:text-[var(--sh-faint)] focus:border-black/20 focus:bg-white";
   const btnCls =
-    "w-full rounded-xl bg-gray-900 px-5 py-2.5 font-medium text-white transition hover:bg-gray-800 disabled:opacity-50";
+    "w-full rounded-full bg-[var(--sh-ink)] px-5 py-3 font-semibold text-white transition hover:bg-black disabled:opacity-50";
 
   return (
     <div
@@ -97,27 +86,22 @@ export default function AuthModal({
       onClick={onClose}
     >
       <div
-        className="sh-fade-in-up relative w-full max-w-sm rounded-2xl border border-gray-100 bg-white p-6 shadow-[0_20px_60px_rgba(0,0,0,0.18)]"
+        className="sh-fade-in-up relative w-full max-w-md rounded-[32px] border border-white/70 bg-white/92 p-6 shadow-[0_24px_80px_rgba(0,0,0,0.2)] backdrop-blur-xl"
         onClick={(e) => e.stopPropagation()}
       >
-        <button
-          onClick={onClose}
-          aria-label="关闭"
-          className="absolute right-4 top-4 text-gray-400 transition hover:text-gray-900"
-        >
-          ✕
-        </button>
+        <IconButton label="关闭" onClick={onClose} Icon={FiX} className="absolute right-4 top-4" />
 
-        <div className="mb-5 flex items-center gap-2">
+        <div className="mb-6 flex items-center gap-2">
           <LogoMark className="h-7 w-7" />
-          <span className="text-[16px] font-semibold tracking-tight text-gray-900">SignalHire</span>
+          <span className="text-[16px] font-semibold tracking-tight text-[var(--sh-ink)]">SignalHire</span>
         </div>
 
         {stage === "verify" ? (
           <form onSubmit={submitVerify} className="space-y-3">
-            <h2 className="text-lg font-bold text-gray-900">验证邮箱</h2>
-            <p className="text-sm text-gray-500">
-              验证码已发送到 <span className="font-medium text-gray-700">{email}</span>，请输入。
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-neutral-500">邮箱验证</p>
+            <h2 className="text-2xl font-semibold text-[var(--sh-ink)]">验证邮箱</h2>
+            <p className="text-sm leading-6 text-[var(--sh-muted)]">
+              验证码已发送到 <span className="font-semibold text-[var(--sh-ink)]">{email}</span>，请输入。
             </p>
             <input
               value={otp}
@@ -134,27 +118,27 @@ export default function AuthModal({
             <button
               type="button"
               onClick={() => { setStage("form"); setErr(""); }}
-              className="w-full text-center text-sm text-gray-500 hover:text-gray-900"
+              className="inline-flex w-full items-center justify-center gap-2 rounded-full px-4 py-2 text-sm font-semibold text-[var(--sh-muted)] hover:bg-neutral-100 hover:text-[var(--sh-ink)]"
             >
-              ← 返回
+              <FiArrowLeft className="h-4 w-4" aria-hidden="true" />
+              返回
             </button>
           </form>
         ) : (
           <>
-            {/* tab 切换 */}
-            <div className="mb-5 inline-flex w-full rounded-xl bg-gray-100 p-1">
-              <button
-                onClick={() => switchTab("login")}
-                className={`flex-1 rounded-lg px-4 py-1.5 text-sm font-medium transition ${tab === "login" ? "bg-white text-gray-900 shadow-sm" : "text-gray-500 hover:text-gray-800"}`}
-              >
-                登录
-              </button>
-              <button
-                onClick={() => switchTab("register")}
-                className={`flex-1 rounded-lg px-4 py-1.5 text-sm font-medium transition ${tab === "register" ? "bg-white text-gray-900 shadow-sm" : "text-gray-500 hover:text-gray-800"}`}
-              >
-                注册
-              </button>
+            <div className="mb-5">
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-neutral-500">账户</p>
+              <h2 className="mt-2 text-2xl font-semibold text-[var(--sh-ink)]">{tab === "login" ? "登录控制台" : "创建 SignalHire 账号"}</h2>
+              <div className="mt-4">
+                <SegmentedControl
+                  value={tab}
+                  onChange={switchTab}
+                  items={[
+                    { value: "login", label: "登录" },
+                    { value: "register", label: "注册" },
+                  ]}
+                />
+              </div>
             </div>
 
             <form onSubmit={tab === "login" ? submitLogin : submitRegister} className="space-y-3">
@@ -190,11 +174,11 @@ export default function AuthModal({
               </button>
             </form>
 
-            <p className="mt-4 text-center text-sm text-gray-500">
+            <p className="mt-4 text-center text-sm text-[var(--sh-muted)]">
               {tab === "login" ? "还没有账号？" : "已有账号？"}
               <button
                 onClick={() => switchTab(tab === "login" ? "register" : "login")}
-                className="ml-1 font-medium text-gray-900 underline-offset-4 hover:underline"
+                className="ml-1 font-semibold text-[var(--sh-ink)] underline-offset-4 hover:underline"
               >
                 {tab === "login" ? "去注册" : "去登录"}
               </button>
