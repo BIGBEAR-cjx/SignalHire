@@ -5,6 +5,7 @@
 // 搜索 → TalentMap + ShortlistCard 列表
 // 核验 → TrustReportView
 import { useEffect, useRef, useState } from "react";
+import { FiMail } from "react-icons/fi";
 import {
   BackfillMergeSummaryView,
   CandidateCard,
@@ -23,6 +24,15 @@ import {
   type VerifyReport,
 } from "@/components/result";
 import OutreachModal from "@/components/OutreachModal";
+import {
+  EditableSearchPlanPanel,
+  ProjectContextBanner,
+  ResearchErrorPanel,
+  ResearchInputStage,
+  ResearchResultShell,
+  ResearchShareBar,
+  ResearchTimelinePanel,
+} from "@/components/research-workspace";
 import { buildBackfillMergeSummary, buildEditableSearchPlanDraft, buildFeedbackOptimizedSearchInput, buildSearchInputFromEditablePlan } from "@/lib/talent-profile.mjs";
 import type { BackfillMergeSummary, CoverageBackfillJob, TalentCandidate, TalentSearchResult } from "@/lib/talent-profile.mjs";
 import { buildResearchProgressView } from "@/lib/research-progress.mjs";
@@ -549,87 +559,26 @@ export default function ResearchTool({
 
   return (
     <div className="space-y-5">
-      {/* 项目上下文面包屑 (在某项目下搜/验时显示) */}
       {projectId && (
-        <div className="flex items-center gap-2 rounded-xl border border-emerald-100 bg-emerald-50/60 px-3 py-2 text-sm">
-          <span className="text-base">📁</span>
-          <span className="text-emerald-800">
-            在项目 <span className="font-semibold">{projectName ?? "(本项目)"}</span> 下{isSearch ? "搜人" : "核验"}
-            <span className="text-emerald-600/80"> — 结果和收藏会自动归到此项目</span>
-          </span>
-          <span className="flex-1" />
-          <a href={`/app/projects/${projectId}`} className="text-xs text-emerald-700 underline-offset-2 hover:underline">← 回项目</a>
-        </div>
+        <ProjectContextBanner
+          projectId={projectId}
+          projectName={projectName}
+          mode={mode}
+        />
       )}
 
-      {/* 输入区 */}
-      <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-[0_8px_30px_rgba(0,0,0,0.06)]">
-        <div className="flex items-center justify-between gap-3">
-          <div>
-            <p className="text-xs font-medium uppercase tracking-wide text-gray-400">
-              {isSearch ? "Search Brief" : "Candidate Bio"}
-            </p>
-            <h2 className="mt-1 text-lg font-semibold text-gray-900">
-              {isSearch ? "全球 AI 人才搜索" : "候选人深度核验"}
-            </h2>
-          </div>
-          <span className={`rounded-full px-3 py-1 text-xs font-semibold ring-1 ${
-            isSearch
-              ? "bg-blue-50 text-blue-700 ring-blue-100"
-              : "bg-amber-50 text-amber-800 ring-amber-100"
-          }`}>
-            {isSearch ? "10-15 人 shortlist" : "跨源核验报告"}
-          </span>
-        </div>
+      <ResearchInputStage
+        mode={mode}
+        input={input}
+        onInputChange={setInput}
+        onRun={() => run()}
+        onCreatePlan={isSearch ? createEditablePlan : undefined}
+        loading={loading}
+      />
 
-        <div className="mt-4">
-          <textarea
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            rows={isSearch ? 5 : 7}
-            placeholder={
-              isSearch
-                ? "例如：找做过 LLM inference / serving、熟悉 vLLM 或 Triton、能做 AI infra 落地的 senior engineer，北美或欧洲优先，可远程"
-                : "粘贴候选人的自述 / 简历 / LinkedIn 介绍。我们会对每条声称做跨源核实，给出 verified / contradicted / unverified 报告。"
-            }
-            className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-gray-900 outline-none transition placeholder:text-gray-400 focus:border-gray-900 focus:bg-white"
-          />
-          <button
-            type="button"
-            onClick={() => run()}
-            disabled={loading || !input.trim()}
-            className="mt-4 w-full rounded-xl bg-gray-900 px-5 py-3 font-medium text-white transition hover:bg-gray-800 disabled:opacity-50 sm:w-auto"
-          >
-            {loading
-              ? isSearch ? "正在搜索全球 AI 候选人…" : "正在跨源核验…"
-              : isSearch ? "生成 AI 人才 shortlist" : "核验候选人"}
-          </button>
-          {isSearch && (
-            <button
-              type="button"
-              onClick={createEditablePlan}
-              disabled={loading || !input.trim()}
-              className="mt-3 w-full rounded-xl border border-gray-200 bg-white px-5 py-3 font-medium text-gray-700 transition hover:border-gray-900 disabled:opacity-50 sm:ml-3 sm:mt-4 sm:w-auto"
-            >
-              生成搜索计划
-            </button>
-          )}
-        </div>
-
-        {isSearch && editablePlan && (
-          <div className="mt-5 border-t border-gray-100 pt-5">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <h3 className="text-sm font-semibold text-gray-900">搜索计划</h3>
-              <button
-                type="button"
-                onClick={runEditablePlan}
-                disabled={loading}
-                className="rounded-lg bg-gray-900 px-3 py-2 text-xs font-semibold text-white transition hover:bg-gray-800 disabled:opacity-50"
-              >
-                按计划搜索
-              </button>
-            </div>
-            <div className="mt-4 grid gap-4 md:grid-cols-3">
+      {isSearch && editablePlan && (
+        <EditableSearchPlanPanel onRunPlan={runEditablePlan} loading={loading}>
+          <div className="grid gap-4 md:grid-cols-3">
               <label className="block">
                 <span className="text-xs font-semibold text-emerald-700">必须条件</span>
                 <textarea
@@ -690,109 +639,49 @@ export default function ResearchTool({
                 </div>
               ))}
             </div>
-          </div>
-        )}
-      </div>
+        </EditableSearchPlanPanel>
+      )}
 
       {/* 进度区 */}
       {loading && (
-        <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-[0_8px_30px_rgba(0,0,0,0.06)]">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <div className="flex items-center gap-2 text-sm font-semibold text-gray-900">
-                <span className="inline-block h-2 w-2 animate-pulse rounded-full bg-emerald-500" />
-                实时研究轨迹
-              </div>
-              <p className="mt-1 text-xs text-gray-500">{jobStatus?.label ?? "MiroMind 正在全网搜索 + 交叉核对…"}</p>
-            </div>
-            <button
-              type="button"
-              onClick={stopCurrentRun}
-              className="rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 transition hover:border-gray-900"
-            >
-              停止搜索
-            </button>
-          </div>
-          {jobStatus?.detail && (
-            <p className="mt-2 text-xs text-gray-500">{jobStatus.detail}</p>
-          )}
-          <div className="mt-4 grid gap-3 md:grid-cols-[minmax(0,1fr)_180px]">
-            <div className="rounded-xl border border-emerald-100 bg-emerald-50/60 p-4">
-              <p className="text-xs font-semibold text-emerald-700">{progressView.active?.label}</p>
-              <p className="mt-2 break-all font-mono text-sm text-gray-900">{progressView.active?.detail}</p>
-            </div>
-            <div className="rounded-xl border border-gray-100 bg-gray-50 p-4">
-              <p className="text-xs font-semibold text-gray-500">当前进度</p>
-              <p className="mt-2 text-sm font-semibold text-gray-900">{progressView.statsText}</p>
-            </div>
-          </div>
-          {progressView.timeline.length === 0 ? (
-            <p className="mt-3 text-xs text-gray-500">第一批搜索关键词出现后，会在这里实时展开。</p>
-          ) : (
-            <ol className="mt-4 max-h-80 space-y-3 overflow-auto">
-              {progressView.timeline.map((item) => (
-                <li key={`${item.id}-${item.kind}`} className="rounded-xl border border-gray-100 bg-gray-50 px-3 py-2">
-                  <div className="flex items-center justify-between gap-3">
-                    <span className="text-xs font-semibold text-gray-600">{item.label}</span>
-                    <span className="text-[11px] text-gray-400">#{item.id + 1}</span>
-                  </div>
-                  <p className="mt-1 break-all font-mono text-xs leading-relaxed text-gray-700">{item.detail}</p>
-                </li>
-              ))}
-            </ol>
-          )}
-        </div>
+        <ResearchTimelinePanel
+          label={jobStatus?.label ?? progressView.active?.label}
+          detail={progressView.active?.detail}
+          statsText={progressView.statsText}
+          timeline={progressView.timeline}
+          statusDetail={jobStatus?.detail ?? undefined}
+          onStop={stopCurrentRun}
+        />
       )}
 
       {!loading && jobStatus?.phase === "canceled" && (
-        <div className="rounded-xl border border-amber-100 bg-amber-50 p-4 text-sm text-amber-800">
+        <div className="rounded-3xl border border-amber-100 bg-amber-50/90 p-4 text-sm text-amber-800">
           <p>{jobStatus.detail}</p>
         </div>
       )}
 
       {/* 错误区 */}
       {error && (
-        <div className="rounded-xl border border-red-100 bg-red-50 p-4 text-sm text-red-700">
-          <p>出错: {error}</p>
-          {jobStatus?.canRetry && currentJobId && (
-            <button
-              onClick={retryCurrentJob}
-              className="mt-3 rounded-lg bg-red-700 px-3 py-1.5 text-xs font-medium text-white hover:bg-red-800"
-            >
-              重新研究
-            </button>
-          )}
-        </div>
+        <ResearchErrorPanel
+          error={error}
+          canRetry={Boolean(jobStatus?.canRetry && currentJobId)}
+          onRetry={jobStatus?.canRetry && currentJobId ? retryCurrentJob : undefined}
+        />
       )}
 
       {/* 结果区 */}
       {result && (
-        <div className="space-y-4">
-          <div className="flex items-center justify-between gap-3">
-            {stats ? (
-              <p className="flex items-center gap-2 text-xs text-gray-500">
-                {stats.cached ? (
-                  <span className="rounded-full bg-emerald-50 px-2 py-0.5 font-medium text-emerald-700 ring-1 ring-emerald-200">
-                    预缓存 · 秒出
-                  </span>
-                ) : (
-                  <span>本次研究: 网页搜索 {stats.searches} 次 · 抓取 {stats.fetches} 次</span>
-                )}
-              </p>
-            ) : <span />}
-            {runId && (
-              <button
-                onClick={() => {
+        <ResearchResultShell>
+          <ResearchShareBar
+            statsText={stats ? `本次研究: 网页搜索 ${stats.searches} 次 · 抓取 ${stats.fetches} 次` : undefined}
+            cached={Boolean(stats?.cached)}
+            copied={copied}
+            onCopy={runId ? () => {
                   navigator.clipboard?.writeText(`${location.origin}/r/${runId}`);
                   setCopied(true);
                   setTimeout(() => setCopied(false), 2000);
-                }}
-                className="shrink-0 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 hover:border-gray-900"
-              >
-                {copied ? "✓ 链接已复制" : "🔗 分享报告"}
-              </button>
-            )}
-          </div>
+                } : undefined}
+          />
           {isTalentSearchResult(result) ? (
             <>
               {backfillMergeSummary && (
@@ -896,9 +785,10 @@ export default function ResearchTool({
                       <>
                         <button
                           onClick={() => setOutreachOpen(true)}
-                          className="w-full rounded-xl bg-gradient-to-r from-emerald-500 to-emerald-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:from-emerald-600 hover:to-emerald-700"
+                          className="inline-flex w-full items-center justify-center gap-2 rounded-full bg-[var(--sh-ink)] px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-black"
                         >
-                          ✉️ AI 起草外联邮件给 {result.candidates[selectedCandidateIndex]?.name?.split(" ")[0]}
+                          <FiMail className="h-4 w-4" aria-hidden="true" />
+                          AI 起草外联邮件给 {result.candidates[selectedCandidateIndex]?.name?.split(" ")[0]}
                         </button>
                         <EvidenceGraphView result={result} candidate={result.candidates[selectedCandidateIndex]} />
                         <CandidateProfileView candidate={result.candidates[selectedCandidateIndex]} result={result} />
@@ -913,7 +803,7 @@ export default function ResearchTool({
           ) : (
             (result.candidates ?? []).map((c: Candidate, i: number) => <CandidateCard key={i} c={c} delay={i * 90} />)
           )}
-        </div>
+        </ResearchResultShell>
       )}
 
       {/* AI 外联弹窗 (针对搜人结果里选中的候选人) */}
