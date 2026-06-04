@@ -5,6 +5,7 @@ import {
   FiCheckCircle,
   FiClock,
   FiClipboard,
+  FiX,
   FiFolder,
   FiHome,
   FiLogOut,
@@ -208,6 +209,103 @@ export function EmptyState({
       <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-[var(--sh-muted)]">{description}</p>
       {action && <div className="mt-5 flex justify-center">{action}</div>}
     </Surface>
+  );
+}
+
+export function StatusBadge({
+  label,
+  dotClassName = "bg-neutral-400",
+  className = "",
+}: {
+  label: string;
+  dotClassName?: string;
+  className?: string;
+}) {
+  return (
+    <span className={`inline-flex shrink-0 items-center gap-1.5 rounded-full bg-white/80 px-2.5 py-1 text-xs font-semibold text-[var(--sh-muted)] ring-1 ring-black/10 ${className}`}>
+      <span className={`h-1.5 w-1.5 rounded-full ${dotClassName}`} />
+      {label}
+    </span>
+  );
+}
+
+export function SegmentedControl<T extends string>({
+  items,
+  value,
+  onChange,
+}: {
+  items: Array<{ value: T; label: string; count?: number }>;
+  value: T;
+  onChange: (value: T) => void;
+}) {
+  return (
+    <div className="inline-flex max-w-full flex-wrap gap-1 rounded-full bg-white/72 p-1 ring-1 ring-black/10">
+      {items.map((item) => {
+        const active = value === item.value;
+        return (
+          <button
+            key={item.value}
+            type="button"
+            onClick={() => onChange(item.value)}
+            className={`inline-flex min-h-8 items-center gap-1.5 rounded-full px-3 text-xs font-semibold transition ${
+              active ? "bg-[var(--sh-ink)] text-white shadow-sm" : "text-[var(--sh-muted)] hover:bg-neutral-100"
+            }`}
+          >
+            <span>{item.label}</span>
+            {typeof item.count === "number" && (
+              <span className={active ? "text-white/65" : "text-[var(--sh-faint)]"}>{item.count}</span>
+            )}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+export function IconButton({
+  label,
+  onClick,
+  Icon = FiX,
+  tone = "neutral",
+  className = "",
+}: {
+  label: string;
+  onClick?: () => void;
+  Icon?: IconType;
+  tone?: "neutral" | "danger";
+  className?: string;
+}) {
+  const toneClass = tone === "danger"
+    ? "text-red-600 hover:bg-red-50"
+    : "text-[var(--sh-muted)] hover:bg-neutral-100";
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-label={label}
+      title={label}
+      className={`inline-flex h-9 w-9 items-center justify-center rounded-full transition ${toneClass} ${className}`}
+    >
+      <Icon className="h-4 w-4" aria-hidden="true" />
+    </button>
+  );
+}
+
+export function SoftListRow({
+  children,
+  active = false,
+  className = "",
+}: {
+  children: React.ReactNode;
+  active?: boolean;
+  className?: string;
+}) {
+  return (
+    <div className={`rounded-3xl border bg-white/84 p-4 text-left transition ${
+      active ? "border-[var(--sh-ink)] shadow-[0_18px_48px_rgba(0,0,0,0.08)]" : "border-black/10 hover:border-black/20"
+    } ${className}`}>
+      {children}
+    </div>
   );
 }
 
