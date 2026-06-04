@@ -59,7 +59,7 @@ function ResultSurface({
   className?: string;
 }) {
   return (
-    <section className={`rounded-[28px] border border-black/10 bg-white/86 p-5 shadow-[0_18px_52px_rgba(0,0,0,0.06)] ${className}`}>
+    <section className={`rounded-[28px] border border-black/10 bg-white/86 p-5 shadow-[0_18px_52px_rgba(0,0,0,0.06)] backdrop-blur-xl ${className}`}>
       {children}
     </section>
   );
@@ -160,9 +160,13 @@ const QUALITY: Record<string, string> = {
 };
 
 function ScorePill({ score }: { score: number }) {
-  const tone = score >= 80 ? "bg-emerald-600" : score >= 65 ? "bg-amber-500" : "bg-gray-500";
+  const tone = score >= 80
+    ? "bg-emerald-50 text-emerald-700 ring-emerald-200"
+    : score >= 65
+      ? "bg-amber-50 text-amber-700 ring-amber-200"
+      : "bg-neutral-100 text-neutral-700 ring-neutral-200";
   return (
-    <span className={`inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-xl text-sm font-bold text-white ${tone}`}>
+    <span className={`inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl text-sm font-bold ring-1 ${tone}`}>
       {score}
     </span>
   );
@@ -179,7 +183,7 @@ function QualityPill({ value }: { value: string }) {
 
 function ReportMetric({ label, value, sublabel }: { label: string; value: string | number; sublabel?: string }) {
   return (
-    <div className="rounded-xl bg-gray-50/80 p-4 ring-1 ring-gray-100">
+    <div className="rounded-2xl bg-white/72 p-4 ring-1 ring-black/5">
       <p className="text-2xl font-semibold leading-none text-gray-900">{value}</p>
       <p className="mt-1 text-xs font-semibold text-gray-500">{label}</p>
       {sublabel && <p className="mt-1 text-xs leading-relaxed text-gray-400">{sublabel}</p>}
@@ -212,7 +216,7 @@ export function ShortlistDeliveryReportView({ result }: { result: TalentSearchRe
           <p className="text-sm font-semibold text-gray-900">优先审阅候选人</p>
           <div className="mt-2 grid gap-3 md:grid-cols-2">
             {report.recommended_candidates.map((candidate) => (
-              <article key={candidate.name} className="rounded-xl border border-gray-100 bg-gray-50/70 p-4">
+              <article key={candidate.name} className="rounded-2xl border border-black/10 bg-white/72 p-4">
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
                     <h3 className="text-sm font-semibold text-gray-900">{candidate.name}</h3>
@@ -242,7 +246,7 @@ export function ShortlistDeliveryReportView({ result }: { result: TalentSearchRe
       {(report.report_risks.length > 0 || report.next_steps.length > 0) && (
         <div className="mt-4 grid gap-3 md:grid-cols-2">
           {report.report_risks.length > 0 && (
-            <div className="rounded-xl border border-amber-100 bg-amber-50/50 p-4">
+            <div className="rounded-2xl border border-amber-100 bg-amber-50/60 p-4">
               <p className="text-sm font-semibold text-amber-900">交付风险</p>
               <ul className="mt-2 list-disc space-y-1 pl-5 text-sm leading-relaxed text-amber-800">
                 {report.report_risks.map((risk) => <li key={risk}>{risk}</li>)}
@@ -250,7 +254,7 @@ export function ShortlistDeliveryReportView({ result }: { result: TalentSearchRe
             </div>
           )}
           {report.next_steps.length > 0 && (
-            <div className="rounded-xl border border-blue-100 bg-blue-50/50 p-4">
+            <div className="rounded-2xl border border-blue-100 bg-blue-50/60 p-4">
               <p className="text-sm font-semibold text-blue-900">建议下一步</p>
               <ul className="mt-2 list-disc space-y-1 pl-5 text-sm leading-relaxed text-blue-900/80">
                 {report.next_steps.map((step) => <li key={step}>{step}</li>)}
@@ -817,7 +821,7 @@ export function ShortlistCard({
       )}
 
       {uncertainty && (
-        <p className="mt-3 rounded-xl bg-amber-50 px-3 py-2 text-sm leading-relaxed text-amber-700 ring-1 ring-amber-100">
+        <p className="mt-3 rounded-2xl bg-amber-50 px-3 py-2 text-sm leading-relaxed text-amber-700 ring-1 ring-amber-100">
           {uncertainty}
         </p>
       )}
@@ -827,7 +831,7 @@ export function ShortlistCard({
           type="button"
           onClick={onOpen}
           disabled={!onOpen}
-          className="rounded-lg bg-gray-900 px-3 py-2 text-sm font-semibold text-white hover:bg-gray-800 disabled:cursor-not-allowed disabled:bg-gray-300"
+          className="rounded-full bg-[var(--sh-ink)] px-3.5 py-2 text-sm font-semibold text-white transition hover:bg-black disabled:cursor-not-allowed disabled:bg-gray-300"
         >
           查看详情
         </button>
@@ -835,7 +839,7 @@ export function ShortlistCard({
           type="button"
           onClick={onToggle}
           disabled={!onToggle}
-          className={`rounded-lg px-3 py-2 text-sm font-semibold ring-1 disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-gray-400 disabled:ring-gray-200 ${
+          className={`rounded-full px-3.5 py-2 text-sm font-semibold ring-1 transition disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-gray-400 disabled:ring-gray-200 ${
             selected
               ? "bg-red-50 text-red-700 ring-red-200 hover:bg-red-100"
               : "bg-emerald-50 text-emerald-700 ring-emerald-200 hover:bg-emerald-100"
@@ -856,7 +860,7 @@ function AuditStat({ label, value, tone }: { label: string; value: number; tone:
     gray: "bg-gray-50 text-gray-700 ring-gray-100",
   }[tone];
   return (
-    <div className={`rounded-xl p-3 ring-1 ${toneClass}`}>
+    <div className={`rounded-2xl p-3 ring-1 ${toneClass}`}>
       <p className="text-xl font-semibold leading-none">{value}</p>
       <p className="mt-1 text-xs font-medium">{label}</p>
     </div>
@@ -887,12 +891,12 @@ export function EvidenceAuditView({ candidate, result }: { candidate: TalentCand
     { label: "未验证", items: audit.unverified_claims, chip: "bg-amber-50 text-amber-700 ring-amber-200" },
     { label: "矛盾", items: audit.contradicted_claims, chip: "bg-red-50 text-red-700 ring-red-200" },
     { label: "单一来源", items: audit.single_source_claims, chip: "bg-blue-50 text-blue-700 ring-blue-200" },
-    { label: "身份风险", items: audit.identity_risks, chip: "bg-purple-50 text-purple-700 ring-purple-200" },
+    { label: "身份风险", items: audit.identity_risks, chip: "bg-red-50 text-red-700 ring-red-200" },
     { label: "时效说明", items: audit.recency_notes, chip: "bg-gray-50 text-gray-700 ring-gray-200" },
   ];
 
   return (
-    <section className="rounded-xl border border-gray-100 bg-gray-50/70 p-4">
+    <section className="rounded-2xl border border-black/10 bg-white/72 p-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h4 className="text-sm font-semibold text-gray-900">证据审计</h4>
         <div className="flex flex-wrap items-center gap-2">

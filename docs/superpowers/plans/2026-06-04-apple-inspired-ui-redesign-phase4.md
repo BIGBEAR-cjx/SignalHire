@@ -19,23 +19,23 @@
 
 ## 任务
 
-- [ ] 任务 1：重构登录注册弹窗
+- [x] 任务 1：重构登录注册弹窗
   - 使用统一 Logo、材质面板、分段登录/注册控件、图标关闭按钮。
   - 去掉 `✕`、`←` 文本符号。
   - 验证：登录/注册/验证码表单字段和 submit 函数不变。
 
-- [ ] 任务 2：重构 AI 外联弹窗
+- [x] 任务 2：重构 AI 外联弹窗
   - 改为更宽松的编辑工作台布局。
   - tone 切换使用统一 segmented control。
   - 操作按钮改为图标按钮，不使用 emoji。
   - 验证：生成、复制全文、复制依据、mailto、localStorage sender 逻辑不变。
 
-- [ ] 任务 3：重构结果核心组件
+- [x] 任务 3：重构结果核心组件
   - 统一 `ShortlistDeliveryReportView`、`SearchPlanView`、`ShortlistCard`、`CandidateProfileView`、`CandidateCard`、`TrustReportView` 的壳层样式。
   - 去掉明显符号 `✓`、`✕`、`⛓`、`↗`、`🚩`。
   - 保留原有派生数据 builder 和 props。
 
-- [ ] 任务 4：验证与推送
+- [x] 任务 4：验证与推送
   - `eslint components/AuthModal.tsx components/OutreachModal.tsx components/result.tsx components/ui/signal-ui.tsx`
   - `tsc --noEmit`
   - `node --test auth-session-sync.test.mjs search-page-state.test.mjs research-progress.test.mjs`
