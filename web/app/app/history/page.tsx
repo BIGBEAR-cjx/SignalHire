@@ -3,6 +3,8 @@
 // /app/history —— 历史研究列表。点条目 → 跳对应工具页 + 自动跑。
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { FiCheckCircle, FiSearch } from "react-icons/fi";
+import { EmptyState, PageIntro, PrimaryAction, SecondaryAction, StatusBadge } from "@/components/ui/signal-ui";
 
 type HistoryItem = {
   kind: "search" | "verify";
@@ -25,10 +27,11 @@ export default function HistoryPage() {
 
   return (
     <div className="space-y-6">
-      <header>
-        <h1 className="text-2xl font-bold tracking-tight text-gray-900">历史研究</h1>
-        <p className="mt-1 text-sm text-gray-500">点任意一条秒速重新打开已完成的 shortlist 或核验报告。</p>
-      </header>
+      <PageIntro
+        eyebrow="Research history"
+        title="重新打开每一次人才研究。"
+        description="回看已完成的 shortlist 和核验报告，或用同一画像快速开始下一轮搜索。"
+      />
 
       {error && (
         <p className="rounded-xl border border-red-100 bg-red-50 p-4 text-sm text-red-700">出错: {error}</p>
@@ -39,17 +42,16 @@ export default function HistoryPage() {
       )}
 
       {items && items.length === 0 && (
-        <div className="rounded-2xl border border-dashed border-gray-200 bg-white p-8 text-center">
-          <p className="text-sm text-gray-500">还没有研究记录。先开始一次搜人或核验。</p>
-          <div className="mt-4 flex justify-center gap-3">
-            <Link href="/app/search" className="rounded-xl bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-800">
-              智能搜人
-            </Link>
-            <Link href="/app/verify" className="rounded-xl border border-gray-200 px-4 py-2 text-sm font-medium text-gray-700 hover:border-gray-900">
-              核验候选人
-            </Link>
-          </div>
-        </div>
+        <EmptyState
+          title="还没有研究记录"
+          description="先开始一次搜人或核验，完成后的研究会出现在这里。"
+          action={(
+            <div className="flex flex-wrap justify-center gap-2">
+              <PrimaryAction href="/app/search"><FiSearch className="h-4 w-4" aria-hidden="true" />智能搜人</PrimaryAction>
+              <SecondaryAction href="/app/verify"><FiCheckCircle className="h-4 w-4" aria-hidden="true" />核验候选人</SecondaryAction>
+            </div>
+          )}
+        />
       )}
 
       {items && items.length > 0 && (
@@ -62,18 +64,12 @@ export default function HistoryPage() {
               <li key={i}>
                 <Link
                   href={target}
-                  className="flex items-center justify-between gap-3 rounded-xl border border-gray-200 bg-white px-4 py-3 transition hover:border-blue-400 hover:shadow-sm"
+                  className="flex items-center justify-between gap-3 rounded-3xl border border-black/10 bg-white/84 px-4 py-3 transition hover:border-black/20 hover:shadow-sm"
                 >
                   <span className="flex min-w-0 items-center gap-3">
-                    <span
-                      className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-medium ${
-                        h.kind === "verify"
-                          ? "bg-amber-100 text-amber-800"
-                          : "bg-blue-100 text-blue-800"
-                      }`}
-                    >
-                      {h.kind === "verify" ? "核验" : "搜人"}
-                    </span>
+                    {h.kind === "verify"
+                      ? <StatusBadge label="核验" dotClassName="bg-amber-500" className="bg-amber-50 text-amber-800 ring-amber-100" />
+                      : <StatusBadge label="搜人" dotClassName="bg-blue-500" className="bg-blue-50 text-blue-700 ring-blue-100" />}
                     <span className="min-w-0 truncate text-sm text-gray-800" title={h.query_text}>
                       {h.label}
                     </span>

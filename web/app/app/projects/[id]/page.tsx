@@ -603,7 +603,7 @@ function CandidateDetailPanel({
       <div>
         <div className="mb-1 flex items-center justify-between">
           <label className="text-xs font-medium text-gray-600">备注</label>
-          <span className="text-[11px] text-gray-400">{savedHint ? "✓ 已保存" : "自动保存"}</span>
+          <span className="text-[11px] text-gray-400">{savedHint ? "已保存" : "自动保存"}</span>
         </div>
         <textarea
           value={notes}

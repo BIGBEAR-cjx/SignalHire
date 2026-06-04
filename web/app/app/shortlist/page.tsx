@@ -4,8 +4,18 @@
 // 卡片列表 + 状态筛选 + 状态切换 + 备注 + 详情抽屉 + 删除
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
+import { FiMail, FiPlus, FiTrash2 } from "react-icons/fi";
 import { CandidateProfileView } from "@/components/result";
 import OutreachModal from "@/components/OutreachModal";
+import {
+  EmptyState,
+  IconButton,
+  PageIntro,
+  PrimaryAction,
+  SegmentedControl,
+  StatusBadge,
+  Surface,
+} from "@/components/ui/signal-ui";
 import type { TalentCandidate } from "@/lib/talent-profile.mjs";
 
 type Status = "new" | "contacted" | "interviewing" | "hired" | "rejected";
@@ -49,12 +59,7 @@ function isTalentShape(x: unknown): x is TalentCandidate {
 
 function StatusChip({ status }: { status: Status }) {
   const meta = STATUSES.find((s) => s.value === status) ?? STATUSES[0];
-  return (
-    <span className={`inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-xs font-medium ring-1 ${meta.chipCls}`}>
-      <span className={`h-1.5 w-1.5 rounded-full ${meta.dotCls}`} />
-      {meta.label}
-    </span>
-  );
+  return <StatusBadge label={meta.label} dotClassName={meta.dotCls} className={meta.chipCls} />;
 }
 
 export default function ShortlistPage() {
@@ -63,9 +68,7 @@ export default function ShortlistPage() {
   const [filter, setFilter] = useState<Status | "all">("all");
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
-  useEffect(() => { reload(); }, []);
-
-  async function reload() {
+  const reload = useCallback(async () => {
     try {
       const r = await fetch("/api/shortlist");
       const j = await r.json();
@@ -75,7 +78,9 @@ export default function ShortlistPage() {
     } catch (e) {
       setError((e as Error).message);
     }
-  }
+  }, []);
+
+  useEffect(() => { void reload(); }, [reload]); // eslint-disable-line react-hooks/set-state-in-effect
 
   const filtered = useMemo(() => {
     if (!items) return [];
@@ -94,38 +99,39 @@ export default function ShortlistPage() {
 
   return (
     <div className="space-y-6">
-      <header className="flex items-end justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight text-gray-900">候选池</h1>
-          <p className="mt-1 text-sm text-gray-500">已收藏的候选人, 标状态、记备注、随时回到原次搜索。</p>
-        </div>
-        <Link href="/app/search" className="rounded-xl bg-gray-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-gray-800">
-          + 新建搜人
-        </Link>
-      </header>
+      <PageIntro
+        eyebrow="Candidate pool"
+        title="集中审阅、推进和复盘候选人。"
+        description="把跨项目收藏的人选放到一个工作区里，按状态筛选、补备注、打开证据画像，并直接起草外联。"
+        actions={(
+          <PrimaryAction href="/app/search">
+            <FiPlus className="h-4 w-4" aria-hidden="true" />
+            新建搜人
+          </PrimaryAction>
+        )}
+      />
 
       {error && <p className="rounded-xl border border-red-100 bg-red-50 p-4 text-sm text-red-700">出错: {error}</p>}
 
-      {/* 筛选条 */}
-      <div className="flex flex-wrap items-center gap-1.5">
-        <FilterTab value="all" current={filter} onClick={setFilter} label="全部" count={counts.all} />
-        {STATUSES.map((s) => (
-          <FilterTab key={s.value} value={s.value} current={filter} onClick={setFilter} label={s.label} count={counts[s.value] ?? 0} />
-        ))}
-      </div>
+      <SegmentedControl
+        value={filter}
+        onChange={setFilter}
+        items={[
+          { value: "all", label: "全部", count: counts.all },
+          ...STATUSES.map((s) => ({ value: s.value, label: s.label, count: counts[s.value] ?? 0 })),
+        ]}
+      />
 
       {/* 加载中 */}
       {items === null && !error && <p className="text-sm text-gray-400">加载中…</p>}
 
       {/* 空状态 */}
       {items && items.length === 0 && (
-        <div className="rounded-2xl border border-dashed border-gray-200 bg-white p-8 text-center">
-          <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-emerald-50 text-xl ring-1 ring-emerald-100">📋</div>
-          <p className="text-sm text-gray-500">候选池还是空的。先做一次搜人, 点候选人卡上的「★」收藏。</p>
-          <Link href="/app/search" className="mt-4 inline-block text-sm font-medium text-gray-900 underline-offset-4 hover:underline">
-            智能搜人 →
-          </Link>
-        </div>
+        <EmptyState
+          title="候选池还是空的"
+          description="先做一次搜人，再把合适候选人加入候选池；之后可以在这里统一审阅和推进状态。"
+          action={<PrimaryAction href="/app/search"><FiPlus className="h-4 w-4" aria-hidden="true" />智能搜人</PrimaryAction>}
+        />
       )}
 
       {/* 卡片网格 (左) + 详情抽屉 (右) */}
@@ -152,6 +158,7 @@ export default function ShortlistPage() {
           <div className="lg:sticky lg:top-6 lg:self-start">
             {selected ? (
               <DetailPanel
+                key={selected.id}
                 item={selected}
                 onChanged={(patch) => {
                   setItems((prev) => prev?.map((it) => it.id === selected.id ? { ...it, ...patch } : it) ?? prev);
@@ -162,7 +169,7 @@ export default function ShortlistPage() {
                 }}
               />
             ) : (
-              <div className="rounded-2xl border border-dashed border-gray-200 bg-white p-6 text-sm text-gray-500">
+              <div className="rounded-3xl border border-dashed border-black/10 bg-white/80 p-6 text-sm text-[var(--sh-muted)]">
                 点左侧卡片查看候选人画像、改状态、写备注。
               </div>
             )}
@@ -173,25 +180,6 @@ export default function ShortlistPage() {
   );
 }
 
-function FilterTab({
-  value, current, onClick, label, count,
-}: {
-  value: Status | "all"; current: Status | "all"; onClick: (v: Status | "all") => void; label: string; count: number;
-}) {
-  const active = current === value;
-  return (
-    <button
-      onClick={() => onClick(value)}
-      className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium transition ${
-        active ? "bg-gray-900 text-white" : "bg-white text-gray-600 ring-1 ring-gray-200 hover:ring-gray-900"
-      }`}
-    >
-      <span>{label}</span>
-      <span className={active ? "text-gray-300" : "text-gray-400"}>{count}</span>
-    </button>
-  );
-}
-
 function ItemCard({ item, selected, onClick }: { item: Item; selected: boolean; onClick: () => void }) {
   const c = asCandidate(item.candidate);
   const subtitle = [c.current_role, c.current_company].filter(Boolean).join(" · ") || c.headline || "";
@@ -199,8 +187,8 @@ function ItemCard({ item, selected, onClick }: { item: Item; selected: boolean; 
     <li>
       <button
         onClick={onClick}
-        className={`flex w-full flex-col gap-2 rounded-xl border bg-white p-4 text-left transition ${
-          selected ? "border-gray-900 shadow-[0_8px_30px_rgba(0,0,0,0.06)]" : "border-gray-200 hover:border-gray-400"
+        className={`flex w-full flex-col gap-2 rounded-3xl border bg-white/84 p-4 text-left transition ${
+          selected ? "border-[var(--sh-ink)] shadow-[0_18px_48px_rgba(0,0,0,0.08)]" : "border-black/10 hover:border-black/20"
         }`}
       >
         <div className="flex items-start justify-between gap-3">
@@ -225,7 +213,7 @@ function ItemCard({ item, selected, onClick }: { item: Item; selected: boolean; 
           </div>
         )}
         {item.notes && (
-          <p className="line-clamp-2 text-xs text-gray-600">📝 {item.notes}</p>
+          <p className="line-clamp-2 text-xs text-gray-600">备注：{item.notes}</p>
         )}
       </button>
     </li>
@@ -246,9 +234,6 @@ function DetailPanel({
   const [savedHint, setSavedHint] = useState(false);
   const [outreachOpen, setOutreachOpen] = useState(false);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  // 切换候选人时重置 textarea
-  useEffect(() => { setNotes(item.notes ?? ""); }, [item.id, item.notes]);
 
   async function patch(body: { status?: Status; notes?: string | null }) {
     const r = await fetch(`/api/shortlist/${item.id}`, {
@@ -301,7 +286,7 @@ function DetailPanel({
   const isTalent = isTalentShape(candidate);
 
   return (
-    <div className="space-y-4 rounded-2xl border border-gray-200 bg-white p-5">
+    <Surface className="space-y-4 p-5">
       {/* 状态切换 + 工具栏 */}
       <div className="flex flex-wrap items-center gap-1.5">
         {STATUSES.map((s) => (
@@ -319,17 +304,15 @@ function DetailPanel({
           </button>
         ))}
         <span className="flex-1" />
-        <button onClick={handleDelete} className="rounded-md px-2 py-1 text-xs text-red-600 hover:bg-red-50">
-          移出候选池
-        </button>
+        <IconButton label="移出候选池" onClick={handleDelete} Icon={FiTrash2} tone="danger" />
       </div>
 
-      {/* AI 外联 CTA (Phase 2.A.3) */}
       <button
         onClick={() => setOutreachOpen(true)}
-        className="w-full rounded-xl bg-gradient-to-r from-emerald-500 to-emerald-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:from-emerald-600 hover:to-emerald-700"
+        className="inline-flex w-full items-center justify-center gap-2 rounded-full bg-[var(--sh-ink)] px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-black"
       >
-        ✉️ AI 起草外联邮件
+        <FiMail className="h-4 w-4" aria-hidden="true" />
+        AI 起草外联邮件
       </button>
       <OutreachModal
         open={outreachOpen}
@@ -342,7 +325,7 @@ function DetailPanel({
       <div>
         <div className="mb-1 flex items-center justify-between">
           <label className="text-xs font-medium text-gray-600">备注</label>
-          <span className="text-[11px] text-gray-400">{savedHint ? "✓ 已保存" : "自动保存"}</span>
+          <span className="text-[11px] text-gray-400">{savedHint ? "已保存" : "自动保存"}</span>
         </div>
         <textarea
           value={notes}
@@ -371,7 +354,7 @@ function DetailPanel({
           <LegacyCandidateView candidate={candidate} />
         )}
       </div>
-    </div>
+    </Surface>
   );
 }
 
