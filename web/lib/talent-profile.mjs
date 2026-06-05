@@ -765,6 +765,122 @@ function candidateFitLabel(score, locale) {
   return dossierCopy(locale, "weakMatch");
 }
 
+const READING_SUMMARY_COPY = {
+  zh: {
+    title: "候选人阅读摘要",
+    recommendation: "推荐判断",
+    fitReason: "匹配理由",
+    evidenceConfidence: "证据可信度",
+    riskAndNextStep: "风险与下一步",
+    strong: "强推荐",
+    review: "建议进一步评估",
+    cautious: "谨慎评估",
+    noRole: "公开资料",
+    recommendationBody: "{name} 当前属于{recommendation}：{role}，匹配分 {score}。",
+    directionBody: "主要匹配 {direction}。关键公开信号：{signal}。",
+    noDirectionBody: "暂未归入明确 AI 方向。关键公开信号：{signal}。",
+    noSignal: "需要继续补充可验证的论文、代码、项目或工作经历证据",
+    evidenceBody: "当前有 {sources} 个独立信源，{verified} 条已验证、{unverified} 条查无实据、{contradicted} 条矛盾；整体证据质量为 {quality}。",
+    riskBody: "{risk}。建议先做人工复核，并补齐薄弱来源后再推进沟通。",
+    noRiskBody: "暂未发现明确高风险。建议人工复核原始链接，确认身份、近期经历和可联系性后再推进。",
+  },
+  en: {
+    title: "Candidate reading summary",
+    recommendation: "Recommendation",
+    fitReason: "Fit rationale",
+    evidenceConfidence: "Evidence confidence",
+    riskAndNextStep: "Risk and next step",
+    strong: "strong recommendation",
+    review: "recommended for further review",
+    cautious: "cautious review",
+    noRole: "public profile",
+    recommendationBody: "{name} is currently a {recommendation}: {role}, with a match score of {score}.",
+    directionBody: "Primary fit: {direction}. Key public signal: {signal}.",
+    noDirectionBody: "No specific AI direction is confirmed yet. Key public signal: {signal}.",
+    noSignal: "more verifiable paper, code, project, or work-history evidence is needed",
+    evidenceBody: "Current evidence includes {sources} independent sources, {verified} verified, {unverified} unverified, and {contradicted} contradicted claims; overall evidence quality is {quality}.",
+    riskBody: "{risk}. Human review should check the original links and fill weak sources before outreach.",
+    noRiskBody: "No clear high-risk signal was found yet. Human review should still confirm identity, recent work history, and contactability before outreach.",
+  },
+};
+
+function readingCopy(locale, key, params = {}) {
+  let text = READING_SUMMARY_COPY[locale === "en" ? "en" : "zh"][key] ?? READING_SUMMARY_COPY.zh[key];
+  for (const [name, value] of Object.entries(params)) text = text.replace(`{${name}}`, String(value));
+  return text;
+}
+
+function readingRecommendation(score, locale) {
+  if (score >= 80) return readingCopy(locale, "strong");
+  if (score >= 65) return readingCopy(locale, "review");
+  return readingCopy(locale, "cautious");
+}
+
+/**
+ * @param {{ result?: unknown; candidate?: unknown; locale?: "zh" | "en" }} input
+ */
+export function buildCandidateReadingSummary({ result, candidate, locale = "zh" } = {}) {
+  const normalizedLocale = locale === "en" ? "en" : "zh";
+  const normalizedResult = normalizeTalentSearchResult(result);
+  const suppliedCandidate = normalizeTalentSearchResult({ candidates: [candidate] }).candidates[0];
+  const suppliedName = cleanString(suppliedCandidate?.name);
+  const selected = normalizedResult.candidates.find((item) => item.name.toLowerCase() === suppliedName.toLowerCase()) || suppliedCandidate;
+  const audit = buildCandidateEvidenceAudit({ result: normalizedResult, candidate: selected });
+  const score = clampScore(selected?.match_score);
+  const name = audit.candidate_name || cleanString(selected?.name) || "Unknown candidate";
+  const role = candidateRole(selected) || cleanString(selected?.headline) || readingCopy(normalizedLocale, "noRole");
+  const direction = cleanStringArray(selected?.ai_directions, 1)[0];
+  const signal = cleanStringArray(selected?.strongest_signals, 1)[0]
+    || cleanStringArray(audit.strongest_evidence, 1)[0]
+    || readingCopy(normalizedLocale, "noSignal");
+  const risk = cleanStringArray(audit.risk_flags, 1)[0]
+    || cleanStringArray(audit.weakest_evidence, 1)[0]
+    || cleanStringArray(audit.single_source_claims, 1)[0]
+    || cleanStringArray(audit.unverified_claims, 1)[0]
+    || "";
+  return {
+    title: readingCopy(normalizedLocale, "title"),
+    sections: [
+      {
+        key: "recommendation",
+        label: readingCopy(normalizedLocale, "recommendation"),
+        body: readingCopy(normalizedLocale, "recommendationBody", {
+          name,
+          recommendation: readingRecommendation(score, normalizedLocale),
+          role,
+          score,
+        }),
+      },
+      {
+        key: "fit_reason",
+        label: readingCopy(normalizedLocale, "fitReason"),
+        body: readingCopy(normalizedLocale, direction ? "directionBody" : "noDirectionBody", {
+          direction,
+          signal,
+        }),
+      },
+      {
+        key: "evidence_confidence",
+        label: readingCopy(normalizedLocale, "evidenceConfidence"),
+        body: readingCopy(normalizedLocale, "evidenceBody", {
+          sources: audit.independent_sources,
+          verified: audit.verified_count,
+          unverified: audit.unverified_count,
+          contradicted: audit.contradicted_count,
+          quality: audit.overall_evidence_quality,
+        }),
+      },
+      {
+        key: "risk_next_step",
+        label: readingCopy(normalizedLocale, "riskAndNextStep"),
+        body: risk
+          ? readingCopy(normalizedLocale, "riskBody", { risk })
+          : readingCopy(normalizedLocale, "noRiskBody"),
+      },
+    ],
+  };
+}
+
 function dossierGroupLabel(locale, key) {
   return DOSSIER_GROUP_LABELS[locale === "en" ? "en" : "zh"][key] ?? key;
 }

@@ -3,6 +3,7 @@
 
 declare module "@/lib/talent-profile.mjs" {
   export type CandidateComparisonRow = import("@/lib/talent-profile").CandidateComparisonRow;
+  export type CandidateReadingSummary = import("@/lib/talent-profile").CandidateReadingSummary;
   export type CandidateEvidenceDossier = import("@/lib/talent-profile").CandidateEvidenceDossier;
   export type BackfillMergeSummary = import("@/lib/talent-profile").BackfillMergeSummary;
   export type CoverageBackfillJob = import("@/lib/talent-profile").CoverageBackfillJob;
@@ -15,8 +16,8 @@ declare module "@/lib/talent-profile.mjs" {
   export type TalentSearchResult = import("@/lib/talent-profile").TalentSearchResult;
 }
 
-import type { BackfillMergeSummary, CandidateComparisonRow, CandidateEvidenceAuditSummary, CandidateEvidenceDossier, CoverageBackfillJob, EvidenceCoverageGroup, ShortlistDeliveryReport, SourceExecutionJob, SourceQueryPlanItem, TalentCandidate, TalentSearchResult } from "@/lib/talent-profile.mjs";
-import { buildCandidateComparisonRows, buildCandidateEvidenceAudit, buildCandidateEvidenceDossier, buildCoverageBackfillPlan, buildEvidenceCoverage, buildShortlistDeliveryReport, buildSourceExecution, buildSourceQueryPlan } from "@/lib/talent-profile.mjs";
+import type { BackfillMergeSummary, CandidateComparisonRow, CandidateEvidenceAuditSummary, CandidateReadingSummary, CandidateEvidenceDossier, CoverageBackfillJob, EvidenceCoverageGroup, ShortlistDeliveryReport, SourceExecutionJob, SourceQueryPlanItem, TalentCandidate, TalentSearchResult } from "@/lib/talent-profile.mjs";
+import { buildCandidateComparisonRows, buildCandidateEvidenceAudit, buildCandidateReadingSummary, buildCandidateEvidenceDossier, buildCoverageBackfillPlan, buildEvidenceCoverage, buildShortlistDeliveryReport, buildSourceExecution, buildSourceQueryPlan } from "@/lib/talent-profile.mjs";
 import type { IconType } from "react-icons";
 import { FiCheckCircle, FiExternalLink, FiFlag, FiHelpCircle, FiInfo, FiLink2, FiXCircle } from "react-icons/fi";
 import { t as translate } from "@/lib/i18n.mjs";
@@ -1357,6 +1358,22 @@ function EvidenceList({ title, items, tone }: { title: string; items: string[]; 
   );
 }
 
+function CandidateReadingSummaryView({ summary }: { summary: CandidateReadingSummary }) {
+  return (
+    <section className="mt-5 rounded-2xl border border-black/10 bg-white/82 p-4">
+      <p className="text-xs font-semibold uppercase tracking-[0.14em] text-gray-500">{summary.title}</p>
+      <div className="mt-3 grid gap-3 md:grid-cols-2">
+        {summary.sections.map((section) => (
+          <div key={section.key} className="rounded-xl bg-[var(--sh-canvas)] px-3 py-3 ring-1 ring-black/5">
+            <p className="text-sm font-semibold text-gray-900">{section.label}</p>
+            <p className="mt-1 text-sm leading-relaxed text-gray-700">{section.body}</p>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
 export function EvidenceGraphView({ result, candidate, locale }: { result: TalentSearchResult; candidate: TalentCandidate } & ResultLocaleProps) {
   const graph = result.evidence_graph;
   if (!graph) return null;
@@ -1554,6 +1571,7 @@ export function CandidateProfileView({
   onBackfillJob?: (job: CoverageBackfillJob) => void;
   backfillDisabled?: boolean;
 } & ResultLocaleProps) {
+  const readingSummary = buildCandidateReadingSummary({ result, candidate, locale: locale ?? "zh" }) as CandidateReadingSummary;
   const dossier = buildCandidateEvidenceDossier({ result, candidate, locale: locale ?? "zh" }) as CandidateEvidenceDossier;
 
   return (
@@ -1570,6 +1588,8 @@ export function CandidateProfileView({
           <CandidateMeta candidate={candidate} />
         </div>
       </div>
+
+      <CandidateReadingSummaryView summary={readingSummary} />
 
       <CandidateEvidenceDossierView dossier={dossier} onBackfillJob={onBackfillJob} backfillDisabled={backfillDisabled} locale={locale} />
 

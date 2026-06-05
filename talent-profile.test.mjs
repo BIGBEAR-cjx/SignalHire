@@ -450,6 +450,80 @@ test("builds localized candidate evidence dossier for result review", () => {
   assert.match(en.backfill_jobs[0].reason, /Public voice evidence is missing/);
 });
 
+test("builds localized candidate reading summary before raw evidence", () => {
+  assert.equal(typeof talentProfile.buildCandidateReadingSummary, "function");
+
+  const result = normalizeTalentSearchResult({
+    evidence_graph: {
+      candidates: [
+        {
+          candidate_name: "Ada Lovelace",
+          independent_sources: 4,
+          source_types: ["code", "paper", "company"],
+          strongest_evidence: ["Public serving repository and paper cite the same inference work."],
+          weakest_evidence: ["Availability is inferred from one profile."],
+          cross_validation: "Code, research, and company sources support the core AI infrastructure fit.",
+          risk_flags: ["Availability is single-source."],
+        },
+      ],
+    },
+    candidates: [
+      {
+        name: "Ada Lovelace",
+        current_role: "Staff AI Infrastructure Engineer",
+        current_company: "Example AI",
+        match_score: 91,
+        ai_directions: ["AI Infrastructure / LLM Systems"],
+        strongest_signals: ["Maintains public vLLM serving code"],
+        uncertainties: ["Recent availability is unknown."],
+        claims: [
+          {
+            claim: "Maintains public vLLM serving code",
+            verdict: "verified",
+            evidence: [
+              { note: "GitHub repo", url: "https://github.com/example/vllm", source_type: "code" },
+              { note: "Paper", url: "https://arxiv.org/abs/1234.5678", source_type: "paper" },
+            ],
+          },
+          {
+            claim: "Currently available",
+            verdict: "unverified",
+            evidence: [],
+          },
+        ],
+        evidence_audit: {
+          overall_evidence_quality: "high",
+          single_source_claims: ["Currently available"],
+        },
+      },
+    ],
+  });
+
+  const zh = talentProfile.buildCandidateReadingSummary({ result, candidate: result.candidates[0], locale: "zh" });
+  assert.equal(zh.title, "候选人阅读摘要");
+  assert.equal(zh.sections[0].label, "推荐判断");
+  assert.match(zh.sections[0].body, /Ada Lovelace/);
+  assert.match(zh.sections[0].body, /强推荐/);
+  assert.match(zh.sections[0].body, /Staff AI Infrastructure Engineer/);
+  assert.equal(zh.sections[1].label, "匹配理由");
+  assert.match(zh.sections[1].body, /主要匹配 AI Infrastructure \/ LLM Systems/);
+  assert.match(zh.sections[1].body, /Maintains public vLLM serving code/);
+  assert.equal(zh.sections[2].label, "证据可信度");
+  assert.match(zh.sections[2].body, /4 个独立信源/);
+  assert.match(zh.sections[2].body, /1 条已验证/);
+  assert.equal(zh.sections[3].label, "风险与下一步");
+  assert.match(zh.sections[3].body, /Availability is single-source/);
+  assert.match(zh.sections[3].body, /人工复核/);
+
+  const en = talentProfile.buildCandidateReadingSummary({ result, candidate: result.candidates[0], locale: "en" });
+  assert.equal(en.title, "Candidate reading summary");
+  assert.equal(en.sections[0].label, "Recommendation");
+  assert.match(en.sections[0].body, /strong recommendation/);
+  assert.equal(en.sections[2].label, "Evidence confidence");
+  assert.match(en.sections[2].body, /4 independent sources/);
+  assert.match(en.sections[3].body, /Human review/);
+});
+
 test("builds shortlist delivery report for hiring manager handoff", () => {
   assert.equal(typeof talentProfile.buildShortlistDeliveryReport, "function");
 
