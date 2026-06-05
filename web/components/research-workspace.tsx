@@ -46,6 +46,8 @@ type ResearchRecentViewItem = {
   kind: string;
   label: string;
   detail: string;
+  sourceLabel?: string;
+  intent?: string;
 };
 type ResearchStageViewItem = {
   key: string;
@@ -386,8 +388,16 @@ export function ResearchProcessPanel({
                         <Icon className="h-3.5 w-3.5" aria-hidden="true" />
                         {item.label}
                       </span>
-                      <span className="text-[11px] text-[var(--sh-faint)]">#{item.id + 1}</span>
+                      <span className="inline-flex shrink-0 items-center gap-1.5">
+                        {item.sourceLabel && (
+                          <span className="rounded-full bg-[var(--sh-canvas)] px-2 py-0.5 text-[11px] font-semibold text-[var(--sh-muted)] ring-1 ring-black/5">
+                            {item.sourceLabel}
+                          </span>
+                        )}
+                        <span className="text-[11px] text-[var(--sh-faint)]">#{item.id + 1}</span>
+                      </span>
                     </div>
+                    {item.intent && <p className="mt-2 text-xs leading-5 text-[var(--sh-muted)]">{item.intent}</p>}
                     <p className="mt-2 break-all font-mono text-xs leading-relaxed text-[var(--sh-ink)]">{item.detail}</p>
                   </li>
                 );

@@ -142,6 +142,24 @@ test("extracts recent search and fetch items with stable ids and details", () =>
   ]);
 });
 
+test("adds source labels and verification intent to live research items", () => {
+  const view = buildResearchLoopView({
+    feed: [
+      { id: 1, kind: "search", info: "agent framework site:github.com" },
+      { id: 2, kind: "fetch", info: "https://arxiv.org/abs/2401.12345" },
+    ],
+    live: { searches: 1, fetches: 1 },
+  });
+
+  assert.deepEqual(
+    view.recentItems.map((item) => [item.sourceType, item.sourceLabel, item.intent]),
+    [
+      ["papers", "论文", "读取论文来源，确认研究、论文或引用证据。"],
+      ["github", "GitHub", "查找代码、项目和开源贡献线索。"],
+    ],
+  );
+});
+
 test("requires precision and satisfaction before feedback optimization can run", () => {
   const preview = buildFeedbackOptimizationPreview({
     feedback: { precision: "off", satisfaction: "" },

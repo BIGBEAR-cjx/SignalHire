@@ -26,6 +26,8 @@ export type RecentResearchItem = {
 };
 export type ResearchLoopRecentItem = RecentResearchItem & {
   label: string;
+  sourceLabel: string;
+  intent: string;
 };
 export type ResearchLoopPhase = {
   key: string;

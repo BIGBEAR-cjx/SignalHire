@@ -499,6 +499,8 @@ export function buildResearchLoopView({ feed = [], live = null, jobStatus = null
   const recentItems = extractRecentResearchItems(feed, normalizedLocale).map((item) => ({
     ...item,
     label: msg(normalizedLocale, `research.loop.event.${item.kind}`),
+    sourceLabel: msg(normalizedLocale, `research.loop.source.${item.sourceType}`),
+    intent: msg(normalizedLocale, `research.loop.intent.${item.kind}.${item.sourceType}`),
   }));
   const coverage = inferResearchCoverage(feed).map((item) => ({
     ...item,
