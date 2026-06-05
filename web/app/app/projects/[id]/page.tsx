@@ -392,6 +392,7 @@ export default function ProjectDetailPage() {
     hasResearchRoundsPanel: projectRounds.items.length > 0,
     hasSearchConstraintDiffPanel: true,
     hasProjectHeaderBrief: Boolean((p.brief ?? "").trim()),
+    hasCandidateFeedbackSignalsPanel: !projectConsole.candidateFeedbackSignals.empty,
     locale,
   }) as ProjectControlRoomView;
   const projectHierarchy = buildProjectDetailHierarchy({

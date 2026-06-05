@@ -898,6 +898,32 @@ test("builds a project control room that avoids duplicate project brief summarie
   assert.ok(!room.cards.some((card) => card.key === "brief"));
 });
 
+test("builds a project control room that avoids duplicate candidate feedback signal summaries", () => {
+  assert.equal(typeof researchLoop.buildProjectControlRoom, "function");
+
+  const room = buildProjectControlRoom({
+    locale: "zh",
+    hasCandidateFeedbackSignalsPanel: true,
+    items: [
+      {
+        id: "candidate-1",
+        status: "rejected",
+        candidate: {
+          name: "Wrong Direction",
+          feedback: {
+            precision: "off",
+            satisfaction: "unsatisfied",
+            issue: "wrong_direction",
+            focus: "adjacent_pools",
+          },
+        },
+      },
+    ],
+  });
+
+  assert.ok(!room.cards.some((card) => card.key === "feedback"));
+});
+
 test("builds a project detail hierarchy that avoids duplicate summary panels", () => {
   assert.equal(typeof researchLoop.buildProjectDetailHierarchy, "function");
 
