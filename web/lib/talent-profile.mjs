@@ -695,6 +695,105 @@ export function buildCandidateEvidenceAudit({ result, candidate } = {}) {
   };
 }
 
+const DOSSIER_COPY = {
+  zh: {
+    title: "候选人证据档案",
+    match: "匹配分",
+    sources: "独立信源",
+    quality: "证据质量",
+    verified: "已验证",
+    unverified: "查无实据",
+    contradicted: "矛盾",
+    strongMatch: "强匹配",
+    possibleMatch: "可进一步评估",
+    weakMatch: "需要谨慎评估",
+    conclusion: "{name} 当前可判断为{fit}：{role}{signal}，核心判断基于 {sources} 个独立信源和 {quality} 证据质量。",
+    noRole: "公开资料",
+    signalPrefix: "；主要信号是 {signal}",
+    riskPrefix: "主要风险：{risk}",
+    noMaterialRisk: "暂未发现明确高风险，但仍需要人工复核原始链接。",
+    verdictSummary: "{verified} 条已验证 / {unverified} 条查无实据 / {contradicted} 条矛盾",
+  },
+  en: {
+    title: "Candidate evidence dossier",
+    match: "Match score",
+    sources: "Independent sources",
+    quality: "Evidence quality",
+    verified: "verified",
+    unverified: "unverified",
+    contradicted: "contradicted",
+    strongMatch: "strong match",
+    possibleMatch: "worth further review",
+    weakMatch: "needs cautious review",
+    conclusion: "{name} is currently a {fit}: {role}{signal}. This read is based on {sources} independent sources and {quality} evidence quality.",
+    noRole: "public profile",
+    signalPrefix: "; key signal: {signal}",
+    riskPrefix: "Primary risk: {risk}",
+    noMaterialRisk: "No clear high-risk signal was found yet, but original links still need human review.",
+    verdictSummary: "{verified} verified / {unverified} unverified / {contradicted} contradicted",
+  },
+};
+
+function dossierCopy(locale, key, params = {}) {
+  let text = DOSSIER_COPY[locale === "en" ? "en" : "zh"][key] ?? DOSSIER_COPY.zh[key];
+  for (const [name, value] of Object.entries(params)) text = text.replace(`{${name}}`, String(value));
+  return text;
+}
+
+function candidateFitLabel(score, locale) {
+  if (score >= 80) return dossierCopy(locale, "strongMatch");
+  if (score >= 65) return dossierCopy(locale, "possibleMatch");
+  return dossierCopy(locale, "weakMatch");
+}
+
+/**
+ * @param {{ result?: unknown; candidate?: unknown; locale?: "zh" | "en" }} input
+ */
+export function buildCandidateEvidenceDossier({ result, candidate, locale = "zh" } = {}) {
+  const normalizedResult = normalizeTalentSearchResult(result);
+  const suppliedCandidate = normalizeTalentSearchResult({ candidates: [candidate] }).candidates[0];
+  const suppliedName = cleanString(suppliedCandidate?.name);
+  const resultCandidate = normalizedResult.candidates.find((item) => item.name.toLowerCase() === suppliedName.toLowerCase());
+  const selected = resultCandidate || suppliedCandidate;
+  const audit = buildCandidateEvidenceAudit({ result: normalizedResult, candidate: selected });
+  const score = clampScore(selected?.match_score);
+  const role = candidateRole(selected) || cleanString(selected?.headline) || dossierCopy(locale, "noRole");
+  const topSignal = cleanStringArray(selected?.strongest_signals, 1)[0] || cleanStringArray(audit.strongest_evidence, 1)[0] || "";
+  const risk = cleanStringArray(audit.risk_flags, 1)[0]
+    || cleanStringArray(audit.weakest_evidence, 1)[0]
+    || cleanStringArray(audit.single_source_claims, 1)[0]
+    || cleanStringArray(audit.unverified_claims, 1)[0]
+    || "";
+  const quality = audit.overall_evidence_quality || "medium";
+  const signalText = topSignal ? dossierCopy(locale, "signalPrefix", { signal: topSignal }) : "";
+
+  return {
+    title: dossierCopy(locale, "title"),
+    conclusion: dossierCopy(locale, "conclusion", {
+      name: audit.candidate_name || cleanString(selected?.name) || "Unknown candidate",
+      fit: candidateFitLabel(score, locale),
+      role,
+      signal: signalText,
+      sources: audit.independent_sources,
+      quality,
+    }),
+    risk_summary: risk ? dossierCopy(locale, "riskPrefix", { risk }) : dossierCopy(locale, "noMaterialRisk"),
+    verdict_summary: dossierCopy(locale, "verdictSummary", {
+      verified: audit.verified_count,
+      unverified: audit.unverified_count,
+      contradicted: audit.contradicted_count,
+    }),
+    metrics: [
+      { label: dossierCopy(locale, "match"), value: String(score) },
+      { label: dossierCopy(locale, "sources"), value: String(audit.independent_sources) },
+      { label: dossierCopy(locale, "quality"), value: quality },
+    ],
+    source_types: audit.source_types,
+    primary_evidence: audit.strongest_evidence.slice(0, 3),
+    weak_evidence: audit.weakest_evidence.slice(0, 2),
+  };
+}
+
 function candidateRole(candidate) {
   return [candidate?.current_role, candidate?.current_company].map(cleanString).filter(Boolean).join(" / ");
 }

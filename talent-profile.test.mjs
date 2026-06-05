@@ -361,6 +361,72 @@ test("builds candidate evidence audit summary from claims and evidence graph", (
   assert.deepEqual(summary.risk_flags, ["Current location is single-source.", "Recent availability is unknown."]);
 });
 
+test("builds localized candidate evidence dossier for result review", () => {
+  assert.equal(typeof talentProfile.buildCandidateEvidenceDossier, "function");
+
+  const result = normalizeTalentSearchResult({
+    evidence_graph: {
+      candidates: [
+        {
+          candidate_name: "Ada Lovelace",
+          independent_sources: 4,
+          source_types: ["code", "paper", "company"],
+          strongest_evidence: ["Public serving repository and paper cite the same inference work."],
+          weakest_evidence: ["Availability is inferred from one profile."],
+          cross_validation: "Code, research, and company sources support the core AI infrastructure fit.",
+          risk_flags: ["Availability is single-source."],
+        },
+      ],
+    },
+    candidates: [
+      {
+        name: "Ada Lovelace",
+        current_role: "Staff AI Infrastructure Engineer",
+        current_company: "Example AI",
+        match_score: 91,
+        strongest_signals: ["Maintains public vLLM serving code"],
+        uncertainties: ["Recent availability is unknown."],
+        claims: [
+          {
+            claim: "Maintains public vLLM serving code",
+            verdict: "verified",
+            evidence: [
+              { note: "GitHub repo", url: "https://github.com/example/vllm", source_type: "code" },
+              { note: "Paper", url: "https://arxiv.org/abs/1234.5678", source_type: "paper" },
+            ],
+          },
+          {
+            claim: "Currently available",
+            verdict: "unverified",
+            evidence: [],
+          },
+        ],
+        evidence_audit: {
+          overall_evidence_quality: "high",
+          single_source_claims: ["Currently available"],
+        },
+      },
+    ],
+  });
+
+  const zh = talentProfile.buildCandidateEvidenceDossier({ result, candidate: result.candidates[0], locale: "zh" });
+  assert.equal(zh.title, "候选人证据档案");
+  assert.match(zh.conclusion, /Ada Lovelace/);
+  assert.match(zh.conclusion, /强匹配/);
+  assert.equal(zh.metrics[0].label, "匹配分");
+  assert.equal(zh.metrics[0].value, "91");
+  assert.deepEqual(zh.source_types, ["code", "paper", "company"]);
+  assert.equal(zh.primary_evidence[0], "Public serving repository and paper cite the same inference work.");
+  assert.match(zh.risk_summary, /Availability is single-source/);
+
+  const en = talentProfile.buildCandidateEvidenceDossier({ result, candidate: result.candidates[0], locale: "en" });
+  assert.equal(en.title, "Candidate evidence dossier");
+  assert.match(en.conclusion, /strong match/);
+  assert.equal(en.metrics[1].label, "Independent sources");
+  assert.equal(en.metrics[1].value, "4");
+  assert.match(en.verdict_summary, /1 verified/);
+});
+
 test("builds shortlist delivery report for hiring manager handoff", () => {
   assert.equal(typeof talentProfile.buildShortlistDeliveryReport, "function");
 

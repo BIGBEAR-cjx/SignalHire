@@ -3,6 +3,7 @@
 
 declare module "@/lib/talent-profile.mjs" {
   export type CandidateComparisonRow = import("@/lib/talent-profile").CandidateComparisonRow;
+  export type CandidateEvidenceDossier = import("@/lib/talent-profile").CandidateEvidenceDossier;
   export type BackfillMergeSummary = import("@/lib/talent-profile").BackfillMergeSummary;
   export type CoverageBackfillJob = import("@/lib/talent-profile").CoverageBackfillJob;
   export type CandidateEvidenceAuditSummary = import("@/lib/talent-profile").CandidateEvidenceAuditSummary;
@@ -14,8 +15,8 @@ declare module "@/lib/talent-profile.mjs" {
   export type TalentSearchResult = import("@/lib/talent-profile").TalentSearchResult;
 }
 
-import type { BackfillMergeSummary, CandidateComparisonRow, CandidateEvidenceAuditSummary, CoverageBackfillJob, EvidenceCoverageGroup, ShortlistDeliveryReport, SourceExecutionJob, SourceQueryPlanItem, TalentCandidate, TalentSearchResult } from "@/lib/talent-profile.mjs";
-import { buildCandidateComparisonRows, buildCandidateEvidenceAudit, buildCoverageBackfillPlan, buildEvidenceCoverage, buildShortlistDeliveryReport, buildSourceExecution, buildSourceQueryPlan } from "@/lib/talent-profile.mjs";
+import type { BackfillMergeSummary, CandidateComparisonRow, CandidateEvidenceAuditSummary, CandidateEvidenceDossier, CoverageBackfillJob, EvidenceCoverageGroup, ShortlistDeliveryReport, SourceExecutionJob, SourceQueryPlanItem, TalentCandidate, TalentSearchResult } from "@/lib/talent-profile.mjs";
+import { buildCandidateComparisonRows, buildCandidateEvidenceAudit, buildCandidateEvidenceDossier, buildCoverageBackfillPlan, buildEvidenceCoverage, buildShortlistDeliveryReport, buildSourceExecution, buildSourceQueryPlan } from "@/lib/talent-profile.mjs";
 import type { IconType } from "react-icons";
 import { FiCheckCircle, FiExternalLink, FiFlag, FiHelpCircle, FiInfo, FiLink2, FiXCircle } from "react-icons/fi";
 import { t as translate } from "@/lib/i18n.mjs";
@@ -1382,7 +1383,58 @@ export function EvidenceGraphView({ result, candidate, locale }: { result: Talen
   );
 }
 
+function CandidateEvidenceDossierView({ dossier }: { dossier: CandidateEvidenceDossier }) {
+  return (
+    <section className="mt-5 rounded-2xl border border-black/10 bg-[var(--sh-faint)]/70 p-4">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0 flex-1">
+          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-gray-500">{dossier.title}</p>
+          <p className="mt-2 text-sm leading-relaxed text-gray-900">{dossier.conclusion}</p>
+        </div>
+        <div className="grid grid-cols-3 gap-2">
+          {dossier.metrics.map((metric) => (
+            <div key={metric.label} className="min-w-[74px] rounded-2xl bg-white/80 px-3 py-2 text-center ring-1 ring-black/5">
+              <p className="text-sm font-semibold text-gray-900">{metric.value}</p>
+              <p className="mt-0.5 text-[11px] font-medium leading-tight text-gray-500">{metric.label}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className="mt-3 flex flex-wrap gap-1.5">
+        {dossier.source_types.map((type) => (
+          <span key={type} className="rounded-full bg-white px-2 py-0.5 text-xs font-medium text-blue-700 ring-1 ring-blue-100">
+            {type}
+          </span>
+        ))}
+      </div>
+
+      <div className="mt-3 grid gap-2 md:grid-cols-[1.2fr_0.8fr]">
+        <p className="rounded-xl bg-white/78 px-3 py-2 text-sm leading-relaxed text-gray-700 ring-1 ring-black/5">
+          {dossier.verdict_summary}
+        </p>
+        <p className="rounded-xl bg-white/78 px-3 py-2 text-sm leading-relaxed text-amber-800 ring-1 ring-amber-100">
+          {dossier.risk_summary}
+        </p>
+      </div>
+
+      {dossier.primary_evidence.length > 0 && (
+        <ul className="mt-3 space-y-1.5">
+          {dossier.primary_evidence.map((item) => (
+            <li key={item} className="flex gap-2 text-sm leading-relaxed text-gray-700">
+              <FiCheckCircle className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" aria-hidden="true" />
+              {item}
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
+  );
+}
+
 export function CandidateProfileView({ candidate, result, locale }: { candidate: TalentCandidate; result?: TalentSearchResult } & ResultLocaleProps) {
+  const dossier = buildCandidateEvidenceDossier({ result, candidate, locale: locale ?? "zh" });
+
   return (
     <article className="rounded-[28px] border border-black/10 bg-white/86 p-5 shadow-[0_18px_52px_rgba(0,0,0,0.06)]">
       <div className="flex items-start gap-3">
@@ -1397,6 +1449,8 @@ export function CandidateProfileView({ candidate, result, locale }: { candidate:
           <CandidateMeta candidate={candidate} />
         </div>
       </div>
+
+      <CandidateEvidenceDossierView dossier={dossier} />
 
       {candidate.outreach_angle && (
         <div className="mt-4 rounded-xl border border-blue-100 bg-blue-50/70 p-4">
