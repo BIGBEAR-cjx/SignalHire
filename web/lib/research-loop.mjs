@@ -1443,9 +1443,9 @@ export function buildProjectControlRoom({ project = {}, runs = [], items = [], c
 }
 
 /**
- * @param {{ hasCandidates?: boolean; hasControlRoom?: boolean; hasProjectEvidenceMatrix?: boolean; hasStatusFunnel?: boolean; hasResearchRounds?: boolean; hasSearchConsolePriorities?: boolean; locale?: string }} input
+ * @param {{ hasCandidates?: boolean; hasControlRoom?: boolean; hasProjectEvidenceMatrix?: boolean; hasStatusFunnel?: boolean; hasResearchRounds?: boolean; hasSearchConsolePriorities?: boolean; hasResearchRoundFeedback?: boolean; hasSearchConsoleFeedback?: boolean; locale?: string }} input
  */
-export function buildProjectDetailHierarchy({ hasCandidates = false, hasControlRoom = true, hasProjectEvidenceMatrix = false, hasStatusFunnel = false, hasResearchRounds = false, hasSearchConsolePriorities = false, locale = "zh" } = {}) {
+export function buildProjectDetailHierarchy({ hasCandidates = false, hasControlRoom = true, hasProjectEvidenceMatrix = false, hasStatusFunnel = false, hasResearchRounds = false, hasSearchConsolePriorities = false, hasResearchRoundFeedback = false, hasSearchConsoleFeedback = false, locale = "zh" } = {}) {
   const normalizedLocale = normalizeLocale(locale);
   const hidden = [
     ...(hasControlRoom ? ["action_brief", "candidate_feedback_summary"] : []),
@@ -1453,6 +1453,7 @@ export function buildProjectDetailHierarchy({ hasCandidates = false, hasControlR
     ...(hasStatusFunnel ? ["kpi_strip"] : []),
     ...(hasResearchRounds ? ["latest_round_summary"] : []),
     ...(hasControlRoom && hasSearchConsolePriorities ? ["search_console_priorities"] : []),
+    ...(hasResearchRoundFeedback && hasSearchConsoleFeedback ? ["search_console_feedback"] : []),
   ];
   const notes = normalizedLocale === "en"
     ? {
@@ -1463,6 +1464,7 @@ export function buildProjectDetailHierarchy({ hasCandidates = false, hasControlR
         kpi_strip: "The status funnel already carries candidate totals, status counts, and filtering actions; the KPI strip is a fallback when no funnel is available.",
         latest_round_summary: "The research rounds list already shows the latest round and history; the search console keeps the next-search constraints.",
         search_console_priorities: "The project control room already carries priority actions; search console priorities are a fallback when there is no control room.",
+        search_console_feedback: "The research rounds list already shows search feedback summaries; the search console feedback card is a fallback when rounds have no feedback.",
       }
     : {
         action_brief: "控制台已承接今日优先动作，避免重复显示。",
@@ -1472,6 +1474,7 @@ export function buildProjectDetailHierarchy({ hasCandidates = false, hasControlR
         kpi_strip: "状态漏斗已承接候选人总数、状态计数和筛选动作，KPI 条作为无漏斗时的回退。",
         latest_round_summary: "研究轮次列表已展示最新轮次和历史记录，搜索控制台只保留下一轮搜索约束。",
         search_console_priorities: "项目控制台已承接优先动作，搜索控制台优先级作为无控制台时的回退。",
+        search_console_feedback: "研究轮次列表已展示搜索反馈摘要，搜索控制台反馈卡作为无轮次反馈时的回退。",
       };
   const candidateEvidenceSection = hasProjectEvidenceMatrix ? "candidate_evidence_matrix" : "candidate_evidence";
   const summarySections = hasStatusFunnel ? ["search_console", "status_funnel"] : ["search_console", "kpi_strip", "status_funnel"];

@@ -902,6 +902,20 @@ test("builds a project detail hierarchy that avoids duplicate search console pri
   assert.equal(hierarchy.notes.search_console_priorities, "项目控制台已承接优先动作，搜索控制台优先级作为无控制台时的回退。");
 });
 
+test("builds a project detail hierarchy that avoids duplicate search feedback summaries", () => {
+  assert.equal(typeof researchLoop.buildProjectDetailHierarchy, "function");
+
+  const hierarchy = researchLoop.buildProjectDetailHierarchy({
+    hasCandidates: true,
+    hasResearchRoundFeedback: true,
+    hasSearchConsoleFeedback: true,
+    locale: "zh",
+  });
+
+  assert.ok(hierarchy.hidden.includes("search_console_feedback"));
+  assert.equal(hierarchy.notes.search_console_feedback, "研究轮次列表已展示搜索反馈摘要，搜索控制台反馈卡作为无轮次反馈时的回退。");
+});
+
 test("parses project next-search text into editable constraint sections", () => {
   assert.equal(typeof researchLoop.buildSearchConstraintEditor, "function");
   assert.equal(typeof researchLoop.buildSearchInputFromConstraintEditor, "function");

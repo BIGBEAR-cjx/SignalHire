@@ -397,6 +397,8 @@ export default function ProjectDetailPage() {
     hasStatusFunnel: p.candidates_total > 0,
     hasResearchRounds: projectRounds.items.length > 0,
     hasSearchConsolePriorities: projectConsole.priorities.items.length > 0,
+    hasResearchRoundFeedback: projectRounds.items.some((round) => Boolean(round.feedbackSummary)),
+    hasSearchConsoleFeedback: Boolean(projectConsole.feedback && projectConsole.feedback.items.length > 0),
     locale,
   }) as ProjectDetailHierarchyView;
   const hiddenPanels = new Set(projectHierarchy.hidden);
@@ -407,6 +409,7 @@ export default function ProjectDetailPage() {
   const showCandidateComparison = !hiddenPanels.has("candidate_comparison");
   const showLatestRoundSummary = !hiddenPanels.has("latest_round_summary");
   const showSearchConsolePriorities = !hiddenPanels.has("search_console_priorities");
+  const showSearchConsoleFeedback = !hiddenPanels.has("search_console_feedback");
   const decisionQueue = buildProjectCandidateDecisionQueue({ items: items ?? [], locale });
   const actionBrief = showActionBrief ? buildProjectActionBrief({ items: items ?? [], locale }) as ProjectActionBriefView : null;
   const candidateFeedbackSummary = showCandidateFeedbackSummary ? buildProjectCandidateFeedbackSummary({ items: items ?? [], locale }) as ProjectCandidateFeedbackSummaryView : null;
@@ -448,6 +451,7 @@ export default function ProjectDetailPage() {
         verifyHref={verifyHref}
         showLatestRoundSummary={showLatestRoundSummary}
         showPriorities={showSearchConsolePriorities}
+        showFeedback={showSearchConsoleFeedback}
       />
 
       {showKpiStrip && (
@@ -576,17 +580,22 @@ function ProjectSearchConsolePanel({
   verifyHref,
   showLatestRoundSummary,
   showPriorities,
+  showFeedback,
 }: {
   consoleView: ProjectSearchConsoleView;
   searchHref: string;
   verifyHref: string;
   showLatestRoundSummary: boolean;
   showPriorities: boolean;
+  showFeedback: boolean;
 }) {
   const { t } = useI18n();
-  const gridClassName = showLatestRoundSummary
+  const showFeedbackPanel = showFeedback || !consoleView.candidateFeedbackSignals.empty;
+  const gridClassName = showLatestRoundSummary && showFeedbackPanel
     ? "mt-5 grid gap-3 lg:grid-cols-[minmax(0,1.15fr)_minmax(260px,0.85fr)_minmax(260px,0.85fr)]"
-    : "mt-5 grid gap-3 lg:grid-cols-[minmax(0,1.15fr)_minmax(260px,0.85fr)]";
+    : showLatestRoundSummary || showFeedbackPanel
+      ? "mt-5 grid gap-3 lg:grid-cols-[minmax(0,1.15fr)_minmax(260px,0.85fr)]"
+      : "mt-5 grid gap-3";
   return (
     <Surface className="p-5 md:p-6">
       <div className="flex flex-wrap items-start justify-between gap-4">
@@ -678,33 +687,39 @@ function ProjectSearchConsolePanel({
           </div>
         )}
 
-        <div className="rounded-2xl border border-black/10 bg-white/72 p-4">
-          <p className="text-xs font-semibold text-[var(--sh-muted)]">{consoleView.feedback?.title ?? t("projects.console.feedbackTitle")}</p>
-          {consoleView.feedback && consoleView.feedback.items.length > 0 ? (
-            <div className="mt-3 flex flex-wrap gap-2">
-              {consoleView.feedback.items.map((item) => (
-                <span key={item.key} className="rounded-full bg-blue-50 px-2.5 py-1 text-xs font-medium text-blue-700 ring-1 ring-blue-100">
-                  {item.label}: {item.value}
-                </span>
-              ))}
-            </div>
-          ) : (
-            <p className="mt-3 rounded-2xl border border-dashed border-black/10 bg-white/60 px-3 py-3 text-xs leading-5 text-[var(--sh-faint)]">{t("projects.console.feedbackEmpty")}</p>
-          )}
-          {!consoleView.candidateFeedbackSignals.empty && (
-            <div className="mt-3 rounded-2xl border border-blue-100 bg-blue-50/55 p-3">
-              <p className="text-xs font-semibold text-blue-700">{consoleView.candidateFeedbackSignals.title}</p>
-              <div className="mt-2 space-y-2">
-                {consoleView.candidateFeedbackSignals.items.map((item) => (
-                  <div key={item.key} className="rounded-xl bg-white/78 px-3 py-2 ring-1 ring-blue-100">
-                    <p className="text-xs font-semibold text-blue-800">{item.label}</p>
-                    <p className="mt-1 text-xs leading-5 text-blue-700">{item.detail}</p>
+        {showFeedbackPanel && (
+          <div className="rounded-2xl border border-black/10 bg-white/72 p-4">
+            {showFeedback && (
+              <>
+                <p className="text-xs font-semibold text-[var(--sh-muted)]">{consoleView.feedback?.title ?? t("projects.console.feedbackTitle")}</p>
+                {consoleView.feedback && consoleView.feedback.items.length > 0 ? (
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {consoleView.feedback.items.map((item) => (
+                      <span key={item.key} className="rounded-full bg-blue-50 px-2.5 py-1 text-xs font-medium text-blue-700 ring-1 ring-blue-100">
+                        {item.label}: {item.value}
+                      </span>
+                    ))}
                   </div>
-                ))}
+                ) : (
+                  <p className="mt-3 rounded-2xl border border-dashed border-black/10 bg-white/60 px-3 py-3 text-xs leading-5 text-[var(--sh-faint)]">{t("projects.console.feedbackEmpty")}</p>
+                )}
+              </>
+            )}
+            {!consoleView.candidateFeedbackSignals.empty && (
+              <div className={showFeedback ? "mt-3 rounded-2xl border border-blue-100 bg-blue-50/55 p-3" : "rounded-2xl border border-blue-100 bg-blue-50/55 p-3"}>
+                <p className="text-xs font-semibold text-blue-700">{consoleView.candidateFeedbackSignals.title}</p>
+                <div className="mt-2 space-y-2">
+                  {consoleView.candidateFeedbackSignals.items.map((item) => (
+                    <div key={item.key} className="rounded-xl bg-white/78 px-3 py-2 ring-1 ring-blue-100">
+                      <p className="text-xs font-semibold text-blue-800">{item.label}</p>
+                      <p className="mt-1 text-xs leading-5 text-blue-700">{item.detail}</p>
+                    </div>
+                  ))}
+                </div>
               </div>
-            </div>
-          )}
-        </div>
+            )}
+          </div>
+        )}
       </div>
 
       {showPriorities && consoleView.priorities.items.length > 0 && (
