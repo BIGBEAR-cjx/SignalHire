@@ -46,3 +46,16 @@ test("translates project evidence matrix labels", () => {
     assert.equal(t("en", key), en);
   }
 });
+
+test("translates editable search plan labels", () => {
+  const keys = [
+    ["research.plan.mustHave", "必须条件", "Must-have criteria"],
+    ["research.plan.niceToHave", "加分条件", "Nice-to-have criteria"],
+    ["research.plan.exclusions", "排除条件", "Exclusions"],
+  ];
+
+  for (const [key, zh, en] of keys) {
+    assert.equal(t("zh", key), zh);
+    assert.equal(t("en", key), en);
+  }
+});

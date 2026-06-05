@@ -752,7 +752,7 @@ export default function ResearchTool({
         <EditableSearchPlanPanel onRunPlan={runEditablePlan} loading={loading}>
           <div className="grid gap-4 md:grid-cols-3">
               <label className="block">
-                <span className="text-xs font-semibold text-emerald-700">必须条件</span>
+                <span className="text-xs font-semibold text-emerald-700">{t("research.plan.mustHave")}</span>
                 <textarea
                   value={joinPlanText(editablePlan.search_plan.must_have)}
                   onChange={(e) => updateEditablePlanList("must_have", e.target.value)}
@@ -761,7 +761,7 @@ export default function ResearchTool({
                 />
               </label>
               <label className="block">
-                <span className="text-xs font-semibold text-blue-700">加分条件</span>
+                <span className="text-xs font-semibold text-blue-700">{t("research.plan.niceToHave")}</span>
                 <textarea
                   value={joinPlanText(editablePlan.search_plan.nice_to_have)}
                   onChange={(e) => updateEditablePlanList("nice_to_have", e.target.value)}
@@ -770,7 +770,7 @@ export default function ResearchTool({
                 />
               </label>
               <label className="block">
-                <span className="text-xs font-semibold text-red-700">排除条件</span>
+                <span className="text-xs font-semibold text-red-700">{t("research.plan.exclusions")}</span>
                 <textarea
                   value={joinPlanText(editablePlan.search_plan.exclusions)}
                   onChange={(e) => updateEditablePlanList("exclusions", e.target.value)}
