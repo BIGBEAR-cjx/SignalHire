@@ -29,6 +29,9 @@ export type CandidateReadingSummary = { title: string; sections: Array<{ key: st
 export type CandidateEvidenceDossierGroup = { key: string; label: string; status: "covered" | "missing"; source_types: string[]; missing_source_types: string[]; claim_count: number; evidence_count: number; primary_claims: string[] };
 export type CandidateBackfillDelta = { title: string; merged_at: string; new_evidence_count: number; new_source_types: string[]; new_evidence_urls: string[]; merge_note: string };
 export type CandidateEvidenceDossier = { title: string; conclusion: string; risk_summary: string; verdict_summary: string; metrics: Array<{ label: string; value: string }>; source_types: string[]; primary_evidence: string[]; weak_evidence: string[]; evidence_groups: CandidateEvidenceDossierGroup[]; verification_gaps: string[]; backfill_jobs: CoverageBackfillJob[]; backfill_delta: CandidateBackfillDelta | null };
+export type CandidateEvidenceMatrixSource = { note: string; url: string; host: string; source_type: string };
+export type CandidateEvidenceMatrixRow = { key: string; claim: string; verdict: Verdict; verdict_label: string; evidence_count: number; source_types: string[]; sources: CandidateEvidenceMatrixSource[]; risk_label: string };
+export type CandidateEvidenceMatrix = { title: string; description: string; summary: { verified: number; unverified: number; contradicted: number; no_source: number; single_source: number }; rows: CandidateEvidenceMatrixRow[]; empty: boolean };
 export type ShortlistDeliveryCandidate = { name: string; role: string; match_score: number; evidence_quality: EvidenceQuality; independent_sources: number; recommendation_reason: string; primary_risk: string };
 export type ShortlistDeliveryReport = { brief_summary: string; candidate_count: number; strong_recommendation_count: number; average_match_score: number; high_evidence_count: number; covered_group_count: number; coverage_group_count: number; coverage_summary: Array<{ key: string; label: string; status: string; count: number; source_types: string[]; missing_source_types: string[] }>; recommended_candidates: ShortlistDeliveryCandidate[]; report_risks: string[]; next_steps: string[] };
 export type BackfillMergeCandidate = { candidate_name: string; new_evidence_count: number; new_source_types: string[]; new_evidence_urls: string[]; merge_note: string };
@@ -51,6 +54,7 @@ export function buildCandidateComparisonRows(result: unknown): CandidateComparis
 export function buildCandidateEvidenceAudit(input?: { result?: unknown; candidate?: unknown }): CandidateEvidenceAuditSummary;
 export function buildCandidateReadingSummary(input?: { result?: unknown; candidate?: unknown; locale?: "zh" | "en" }): CandidateReadingSummary;
 export function buildCandidateEvidenceDossier(input?: { result?: unknown; candidate?: unknown; locale?: "zh" | "en" }): CandidateEvidenceDossier;
+export function buildCandidateEvidenceMatrix(input?: { result?: unknown; candidate?: unknown; locale?: "zh" | "en" }): CandidateEvidenceMatrix;
 export function buildShortlistDeliveryReport(result: unknown): ShortlistDeliveryReport;
 export function buildCoverageBackfillPlan(result: unknown): CoverageBackfillPlan;
 export function buildBackfillSearchInput(input?: { job?: unknown; originalQuery?: string }): string;

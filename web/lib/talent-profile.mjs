@@ -759,6 +759,92 @@ function dossierCopy(locale, key, params = {}) {
   return text;
 }
 
+const EVIDENCE_MATRIX_COPY = {
+  zh: {
+    title: "声称与来源矩阵",
+    description: "逐条查看候选人声称、判断状态和公开来源，先处理无来源、单来源和矛盾项。",
+    verified: "已验证",
+    unverified: "查无实据",
+    contradicted: "矛盾",
+    noSource: "无公开来源",
+    singleSource: "单一来源",
+    multiSource: "多来源",
+  },
+  en: {
+    title: "Claim-source matrix",
+    description: "Review each candidate claim, verdict, and public source before acting on weak, single-source, or contradicted items.",
+    verified: "Verified",
+    unverified: "No evidence found",
+    contradicted: "Contradicted",
+    noSource: "No public source",
+    singleSource: "Single source",
+    multiSource: "Multiple sources",
+  },
+};
+
+function evidenceMatrixCopy(locale, key) {
+  return EVIDENCE_MATRIX_COPY[locale === "en" ? "en" : "zh"][key] ?? EVIDENCE_MATRIX_COPY.zh[key];
+}
+
+function evidenceMatrixRiskLabel({ verdict, evidenceCount, locale }) {
+  if (verdict === "contradicted") return evidenceMatrixCopy(locale, "contradicted");
+  if (evidenceCount === 0) return evidenceMatrixCopy(locale, "noSource");
+  if (evidenceCount === 1) return evidenceMatrixCopy(locale, "singleSource");
+  return evidenceMatrixCopy(locale, "multiSource");
+}
+
+/**
+ * @param {{ result?: unknown; candidate?: unknown; locale?: "zh" | "en" }} input
+ */
+export function buildCandidateEvidenceMatrix({ result, candidate, locale = "zh" } = {}) {
+  const normalizedLocale = locale === "en" ? "en" : "zh";
+  const normalizedResult = normalizeTalentSearchResult(result);
+  const suppliedCandidate = normalizeTalentSearchResult({ candidates: [candidate] }).candidates[0];
+  const suppliedName = cleanString(suppliedCandidate?.name);
+  const selected = normalizedResult.candidates.find((item) => item.name.toLowerCase() === suppliedName.toLowerCase()) || suppliedCandidate;
+  const claims = Array.isArray(selected?.claims) ? selected.claims : [];
+  const rows = claims
+    .map((claim, index) => {
+      const evidence = Array.isArray(claim?.evidence) ? claim.evidence : [];
+      const verdict = VERDICTS.includes(claim?.verdict) ? claim.verdict : "unverified";
+      const sources = evidence.map((source) => {
+        const url = cleanString(source?.url);
+        return {
+          note: cleanString(source?.note),
+          url,
+          host: hostFromUrl(url),
+          source_type: cleanString(source?.source_type) || "other",
+        };
+      }).filter((source) => source.url);
+      const sourceTypes = uniqueStrings(sources.map((source) => source.source_type), 8);
+      return {
+        key: `${index}-${cleanString(claim?.claim).slice(0, 36) || "claim"}`,
+        claim: cleanString(claim?.claim),
+        verdict,
+        verdict_label: evidenceMatrixCopy(normalizedLocale, verdict),
+        evidence_count: sources.length,
+        source_types: sourceTypes,
+        sources,
+        risk_label: evidenceMatrixRiskLabel({ verdict, evidenceCount: sources.length, locale: normalizedLocale }),
+      };
+    })
+    .filter((row) => row.claim || row.sources.length);
+
+  return {
+    title: evidenceMatrixCopy(normalizedLocale, "title"),
+    description: evidenceMatrixCopy(normalizedLocale, "description"),
+    summary: {
+      verified: rows.filter((row) => row.verdict === "verified").length,
+      unverified: rows.filter((row) => row.verdict === "unverified").length,
+      contradicted: rows.filter((row) => row.verdict === "contradicted").length,
+      no_source: rows.filter((row) => row.evidence_count === 0).length,
+      single_source: rows.filter((row) => row.evidence_count === 1).length,
+    },
+    rows,
+    empty: rows.length === 0,
+  };
+}
+
 function candidateFitLabel(score, locale) {
   if (score >= 80) return dossierCopy(locale, "strongMatch");
   if (score >= 65) return dossierCopy(locale, "possibleMatch");

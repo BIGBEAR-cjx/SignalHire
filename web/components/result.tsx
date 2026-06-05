@@ -5,6 +5,7 @@ declare module "@/lib/talent-profile.mjs" {
   export type CandidateComparisonRow = import("@/lib/talent-profile").CandidateComparisonRow;
   export type CandidateReadingSummary = import("@/lib/talent-profile").CandidateReadingSummary;
   export type CandidateEvidenceDossier = import("@/lib/talent-profile").CandidateEvidenceDossier;
+  export type CandidateEvidenceMatrix = import("@/lib/talent-profile").CandidateEvidenceMatrix;
   export type BackfillMergeSummary = import("@/lib/talent-profile").BackfillMergeSummary;
   export type CoverageBackfillJob = import("@/lib/talent-profile").CoverageBackfillJob;
   export type CandidateEvidenceAuditSummary = import("@/lib/talent-profile").CandidateEvidenceAuditSummary;
@@ -16,8 +17,8 @@ declare module "@/lib/talent-profile.mjs" {
   export type TalentSearchResult = import("@/lib/talent-profile").TalentSearchResult;
 }
 
-import type { BackfillMergeSummary, CandidateComparisonRow, CandidateEvidenceAuditSummary, CandidateReadingSummary, CandidateEvidenceDossier, CoverageBackfillJob, EvidenceCoverageGroup, ShortlistDeliveryReport, SourceExecutionJob, SourceQueryPlanItem, TalentCandidate, TalentSearchResult } from "@/lib/talent-profile.mjs";
-import { buildCandidateComparisonRows, buildCandidateEvidenceAudit, buildCandidateReadingSummary, buildCandidateEvidenceDossier, buildCoverageBackfillPlan, buildEvidenceCoverage, buildShortlistDeliveryReport, buildSourceExecution, buildSourceQueryPlan } from "@/lib/talent-profile.mjs";
+import type { BackfillMergeSummary, CandidateComparisonRow, CandidateEvidenceAuditSummary, CandidateEvidenceMatrix, CandidateReadingSummary, CandidateEvidenceDossier, CoverageBackfillJob, EvidenceCoverageGroup, ShortlistDeliveryReport, SourceExecutionJob, SourceQueryPlanItem, TalentCandidate, TalentSearchResult } from "@/lib/talent-profile.mjs";
+import { buildCandidateComparisonRows, buildCandidateEvidenceAudit, buildCandidateEvidenceMatrix, buildCandidateReadingSummary, buildCandidateEvidenceDossier, buildCoverageBackfillPlan, buildEvidenceCoverage, buildShortlistDeliveryReport, buildSourceExecution, buildSourceQueryPlan } from "@/lib/talent-profile.mjs";
 import type { IconType } from "react-icons";
 import { FiCheckCircle, FiExternalLink, FiFlag, FiHelpCircle, FiInfo, FiLink2, FiXCircle } from "react-icons/fi";
 import { t as translate } from "@/lib/i18n.mjs";
@@ -164,6 +165,7 @@ const RESULT_COPY = {
     viewDetails: "查看详情",
     removeFromPool: "移出候选池",
     addToPool: "加入候选池",
+    claim: "声称",
     auditTitle: "证据审计",
     dossierCoverage: "证据覆盖",
     verificationGaps: "待补验证",
@@ -276,6 +278,7 @@ const RESULT_COPY = {
     viewDetails: "View details",
     removeFromPool: "Remove from pool",
     addToPool: "Add to pool",
+    claim: "Claim",
     auditTitle: "Evidence audit",
     dossierCoverage: "Evidence coverage",
     verificationGaps: "Verification gaps",
@@ -1406,13 +1409,94 @@ export function EvidenceGraphView({ result, candidate, locale }: { result: Talen
   );
 }
 
+function CandidateEvidenceMatrixView({ matrix, locale }: { matrix: CandidateEvidenceMatrix } & ResultLocaleProps) {
+  if (matrix.empty) return null;
+  return (
+    <div className="mt-4 rounded-xl bg-white/78 p-3 ring-1 ring-black/5">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="text-sm font-semibold text-gray-900">{matrix.title}</p>
+          <p className="mt-1 max-w-3xl text-xs leading-relaxed text-gray-500">{matrix.description}</p>
+        </div>
+        <div className="flex flex-wrap gap-1.5">
+          {(["verified", "unverified", "contradicted"] as Verdict[]).map((verdict) => {
+            const count = matrix.summary[verdict];
+            if (!count) return null;
+            return (
+              <span key={verdict} className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold ring-1 ${VERDICT[verdict].chip}`}>
+                {count} {resultCopy(locale, VERDICT[verdict].labelKey)}
+              </span>
+            );
+          })}
+        </div>
+      </div>
+      <div className="mt-3 overflow-x-auto">
+        <table className="min-w-[720px] w-full border-separate border-spacing-0 text-left text-xs">
+          <thead>
+            <tr className="text-gray-500">
+              <th className="border-b border-black/10 px-2 py-2 font-semibold">{resultCopy(locale, "claim")}</th>
+              <th className="border-b border-black/10 px-2 py-2 font-semibold">{resultCopy(locale, "verified")}</th>
+              <th className="border-b border-black/10 px-2 py-2 font-semibold">{resultCopy(locale, "source")}</th>
+              <th className="border-b border-black/10 px-2 py-2 font-semibold">{resultCopy(locale, "risk")}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {matrix.rows.map((row) => (
+              <tr key={row.key} className="align-top">
+                <td className="border-b border-black/5 px-2 py-2 text-sm leading-relaxed text-gray-900">{row.claim}</td>
+                <td className="border-b border-black/5 px-2 py-2">
+                  <VerdictBadge v={row.verdict} locale={locale} />
+                </td>
+                <td className="border-b border-black/5 px-2 py-2">
+                  {row.sources.length > 0 ? (
+                    <div className="space-y-1.5">
+                      {row.sources.slice(0, 3).map((source) => (
+                        <a
+                          key={source.url}
+                          href={source.url}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="flex min-w-0 items-center gap-1.5 text-blue-700 hover:underline"
+                        >
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img src={favicon(source.url)} alt="" width={12} height={12} className="rounded-sm" />
+                          <span className="truncate">{source.host || host(source.url, locale)}</span>
+                          <span className="shrink-0 rounded-full bg-blue-50 px-1.5 py-0.5 text-[10px] font-medium text-blue-700 ring-1 ring-blue-100">
+                            {source.source_type}
+                          </span>
+                        </a>
+                      ))}
+                      {row.sources.length > 3 && (
+                        <span className="text-[11px] font-medium text-gray-500">+{row.sources.length - 3}</span>
+                      )}
+                    </div>
+                  ) : (
+                    <span className="text-gray-400">{resultCopy(locale, "none")}</span>
+                  )}
+                </td>
+                <td className="border-b border-black/5 px-2 py-2">
+                  <span className="rounded-full bg-gray-100 px-2 py-0.5 font-semibold text-gray-700 ring-1 ring-gray-200">
+                    {row.risk_label}
+                  </span>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
 function CandidateEvidenceDossierView({
   dossier,
+  matrix,
   onBackfillJob,
   backfillDisabled = false,
   locale,
 }: {
   dossier: CandidateEvidenceDossier;
+  matrix: CandidateEvidenceMatrix;
   onBackfillJob?: (job: CoverageBackfillJob) => void;
   backfillDisabled?: boolean;
 } & ResultLocaleProps) {
@@ -1505,6 +1589,8 @@ function CandidateEvidenceDossierView({
         </div>
       )}
 
+      <CandidateEvidenceMatrixView matrix={matrix} locale={locale} />
+
       <div className="mt-3 grid gap-2 md:grid-cols-[1.2fr_0.8fr]">
         <p className="rounded-xl bg-white/78 px-3 py-2 text-sm leading-relaxed text-gray-700 ring-1 ring-black/5">
           {dossier.verdict_summary}
@@ -1573,6 +1659,7 @@ export function CandidateProfileView({
 } & ResultLocaleProps) {
   const readingSummary = buildCandidateReadingSummary({ result, candidate, locale: locale ?? "zh" }) as CandidateReadingSummary;
   const dossier = buildCandidateEvidenceDossier({ result, candidate, locale: locale ?? "zh" }) as CandidateEvidenceDossier;
+  const evidenceMatrix = buildCandidateEvidenceMatrix({ result, candidate, locale: locale ?? "zh" }) as CandidateEvidenceMatrix;
 
   return (
     <article className="rounded-[28px] border border-black/10 bg-white/86 p-5 shadow-[0_18px_52px_rgba(0,0,0,0.06)]">
@@ -1591,7 +1678,7 @@ export function CandidateProfileView({
 
       <CandidateReadingSummaryView summary={readingSummary} />
 
-      <CandidateEvidenceDossierView dossier={dossier} onBackfillJob={onBackfillJob} backfillDisabled={backfillDisabled} locale={locale} />
+      <CandidateEvidenceDossierView dossier={dossier} matrix={evidenceMatrix} onBackfillJob={onBackfillJob} backfillDisabled={backfillDisabled} locale={locale} />
 
       {candidate.outreach_angle && (
         <div className="mt-4 rounded-xl border border-blue-100 bg-blue-50/70 p-4">

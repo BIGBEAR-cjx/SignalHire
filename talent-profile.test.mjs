@@ -450,6 +450,77 @@ test("builds localized candidate evidence dossier for result review", () => {
   assert.match(en.backfill_jobs[0].reason, /Public voice evidence is missing/);
 });
 
+test("builds a candidate claim-source matrix for evidence dossier review", () => {
+  assert.equal(typeof talentProfile.buildCandidateEvidenceMatrix, "function");
+
+  const result = normalizeTalentSearchResult({
+    candidates: [
+      {
+        name: "Ada Lovelace",
+        claims: [
+          {
+            claim: "Maintains public vLLM serving code",
+            verdict: "verified",
+            evidence: [
+              { note: "GitHub repo", url: "https://github.com/example/vllm", source_type: "code" },
+              { note: "Technical post", url: "https://example.com/vllm", source_type: "blog" },
+            ],
+          },
+          {
+            claim: "Currently available",
+            verdict: "unverified",
+            evidence: [],
+          },
+          {
+            claim: "Currently works at OldCo",
+            verdict: "contradicted",
+            evidence: [
+              { note: "Company team page", url: "https://example.ai/team/ada", source_type: "company" },
+            ],
+          },
+        ],
+      },
+    ],
+  });
+
+  const matrix = talentProfile.buildCandidateEvidenceMatrix({
+    result,
+    candidate: result.candidates[0],
+    locale: "zh",
+  });
+
+  assert.equal(matrix.title, "声称与来源矩阵");
+  assert.deepEqual(matrix.summary, {
+    verified: 1,
+    unverified: 1,
+    contradicted: 1,
+    no_source: 1,
+    single_source: 1,
+  });
+  assert.deepEqual(
+    matrix.rows.map((row) => [row.claim, row.verdict, row.verdict_label, row.evidence_count, row.risk_label]),
+    [
+      ["Maintains public vLLM serving code", "verified", "已验证", 2, "多来源"],
+      ["Currently available", "unverified", "查无实据", 0, "无公开来源"],
+      ["Currently works at OldCo", "contradicted", "矛盾", 1, "矛盾"],
+    ],
+  );
+  assert.deepEqual(matrix.rows[0].source_types, ["code", "blog"]);
+  assert.deepEqual(matrix.rows[0].sources.map((source) => [source.host, source.source_type]), [
+    ["github.com", "code"],
+    ["example.com", "blog"],
+  ]);
+  assert.equal(matrix.rows[1].sources.length, 0);
+
+  const en = talentProfile.buildCandidateEvidenceMatrix({
+    result,
+    candidate: result.candidates[0],
+    locale: "en",
+  });
+  assert.equal(en.title, "Claim-source matrix");
+  assert.equal(en.rows[1].risk_label, "No public source");
+});
+
 test("builds localized candidate reading summary before raw evidence", () => {
   assert.equal(typeof talentProfile.buildCandidateReadingSummary, "function");
 
