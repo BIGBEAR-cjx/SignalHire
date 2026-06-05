@@ -32,9 +32,16 @@ export type ResearchLoopPhase = {
   label: string;
   detail: string;
 };
+export type ResearchLoopStage = {
+  key: string;
+  state: "done" | "active" | "pending";
+  label: string;
+  detail: string;
+};
 export type ResearchLoopView = {
   locale: ResearchLoopLocale;
   phase: ResearchLoopPhase;
+  stageTimeline: ResearchLoopStage[];
   statsText: string;
   searches: number;
   fetches: number;

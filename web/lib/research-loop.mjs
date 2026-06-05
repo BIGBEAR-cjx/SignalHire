@@ -2,6 +2,7 @@ import { t as translate } from "./i18n.mjs";
 
 const SOURCE_ORDER = ["github", "papers", "company", "public_web"];
 const PHASE_KEYS = ["planning", "queued", "retrying", "running", "searching", "fetching", "synthesizing", "shortlisting", "done", "error", "canceled"];
+const RESEARCH_STAGE_ORDER = ["planning", "searching", "fetching", "synthesizing", "shortlisting"];
 
 function msg(locale, key, params) {
   return translate(locale, key, params);
@@ -65,6 +66,29 @@ function buildAction(locale, key) {
     label: msg(locale, `feedback.preview.${key}.label`),
     detail: msg(locale, `feedback.preview.${key}.detail`),
   };
+}
+
+function researchStageIndex(phaseKey) {
+  if (phaseKey === "queued" || phaseKey === "retrying" || phaseKey === "running") return 0;
+  if (phaseKey === "done") return RESEARCH_STAGE_ORDER.length;
+  if (phaseKey === "error" || phaseKey === "canceled") return -1;
+  const index = RESEARCH_STAGE_ORDER.indexOf(phaseKey);
+  return index >= 0 ? index : 0;
+}
+
+function buildResearchStageTimeline(locale, phaseKey) {
+  const activeIndex = researchStageIndex(phaseKey);
+  return RESEARCH_STAGE_ORDER.map((key, index) => {
+    let state = "pending";
+    if (activeIndex === RESEARCH_STAGE_ORDER.length || index < activeIndex) state = "done";
+    else if (index === activeIndex) state = "active";
+    return {
+      key,
+      state,
+      label: msg(locale, `research.loop.phase.${key}.label`),
+      detail: msg(locale, `research.loop.phase.${key}.detail`),
+    };
+  });
 }
 
 function pushUniqueAction(actions, locale, key) {
@@ -492,6 +516,8 @@ export function buildResearchLoopView({ feed = [], live = null, jobStatus = null
 
   if (terminalPhase) {
     phaseKey = terminalPhase;
+  } else if (jobStatus?.phase === "synthesizing" || jobStatus?.phase === "shortlisting") {
+    phaseKey = jobStatus.phase;
   } else if (latest?.kind === "fetch") {
     phaseKey = "fetching";
   } else if (latest?.kind === "search") {
@@ -511,6 +537,7 @@ export function buildResearchLoopView({ feed = [], live = null, jobStatus = null
       label: cleanString(jobStatus?.label) || msg(normalizedLocale, `research.loop.phase.${phaseKey}.label`),
       detail: phaseDetail,
     },
+    stageTimeline: buildResearchStageTimeline(normalizedLocale, phaseKey),
     statsText,
     searches,
     fetches,

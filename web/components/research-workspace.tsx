@@ -47,6 +47,12 @@ type ResearchRecentViewItem = {
   label: string;
   detail: string;
 };
+type ResearchStageViewItem = {
+  key: string;
+  state: string;
+  label: string;
+  detail: string;
+};
 type FeedbackOptimizationAction = {
   key: string;
   label: string;
@@ -288,9 +294,16 @@ function recentIcon(kind: string) {
   return kind === "search" ? FiSearch : FiGlobe;
 }
 
+function stageTone(state: string) {
+  if (state === "done") return "border-emerald-100 bg-emerald-50 text-emerald-800";
+  if (state === "active") return "border-neutral-950 bg-neutral-950 text-white";
+  return "border-black/10 bg-white/72 text-[var(--sh-muted)]";
+}
+
 export function ResearchProcessPanel({
   phaseLabel,
   phaseDetail,
+  stageTimeline,
   statsText,
   sourceGroups,
   recentItems,
@@ -299,6 +312,7 @@ export function ResearchProcessPanel({
 }: {
   phaseLabel: string;
   phaseDetail: string;
+  stageTimeline: ResearchStageViewItem[];
   statsText: string;
   sourceGroups: ResearchSourceGroupViewItem[];
   recentItems: ResearchRecentViewItem[];
@@ -323,6 +337,27 @@ export function ResearchProcessPanel({
       </div>
 
       {statusDetail && <p className="mt-3 text-xs leading-5 text-[var(--sh-muted)]">{statusDetail}</p>}
+
+      {stageTimeline.length > 0 && (
+        <ol className="mt-5 grid gap-2 md:grid-cols-5">
+          {stageTimeline.map((stage) => (
+            <li
+              key={stage.key}
+              title={stage.detail}
+              className={`rounded-2xl border px-3 py-3 transition ${stageTone(stage.state)}`}
+            >
+              <div className="flex items-center gap-2">
+                {stage.state === "done" ? (
+                  <FiCheckCircle className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                ) : (
+                  <FiActivity className={`h-3.5 w-3.5 shrink-0 ${stage.state === "active" ? "animate-pulse" : ""}`} aria-hidden="true" />
+                )}
+                <span className="min-w-0 truncate text-xs font-semibold">{stage.label}</span>
+              </div>
+            </li>
+          ))}
+        </ol>
+      )}
 
       <div className="mt-5 grid gap-3 lg:grid-cols-[minmax(0,1fr)_220px]">
         <div className="rounded-2xl border border-emerald-100 bg-emerald-50/70 p-4">

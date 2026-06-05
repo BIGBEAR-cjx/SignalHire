@@ -756,6 +756,7 @@ export default function ResearchTool({
         <ResearchProcessPanel
           phaseLabel={progressView.phase.label}
           phaseDetail={progressView.phase.detail}
+          stageTimeline={progressView.stageTimeline}
           statsText={progressView.statsText}
           sourceGroups={progressView.sourceGroups}
           recentItems={progressView.recentItems}

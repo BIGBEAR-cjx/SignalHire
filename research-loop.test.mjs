@@ -58,6 +58,17 @@ test("builds a Chinese research loop view from active search and fetch events", 
       ["search", "LLM inference engineers site:github.com"],
     ],
   );
+  assert.deepEqual(
+    view.stageTimeline.map((item) => [item.key, item.state]),
+    [
+      ["planning", "done"],
+      ["searching", "done"],
+      ["fetching", "active"],
+      ["synthesizing", "pending"],
+      ["shortlisting", "pending"],
+    ],
+  );
+  assert.equal(view.stageTimeline[2].label, "正在读取来源");
 });
 
 test("builds an English planning state when no research events exist", () => {
@@ -71,6 +82,35 @@ test("builds an English planning state when no research events exist", () => {
   assert.deepEqual(view.coverage, []);
   assert.deepEqual(view.sourceGroups, []);
   assert.deepEqual(view.recentItems, []);
+  assert.deepEqual(
+    view.stageTimeline.map((item) => [item.key, item.state, item.label]),
+    [
+      ["planning", "active", "Planning the search"],
+      ["searching", "pending", "Searching keywords"],
+      ["fetching", "pending", "Reading a source"],
+      ["synthesizing", "pending", "Synthesizing evidence"],
+      ["shortlisting", "pending", "Building the shortlist"],
+    ],
+  );
+});
+
+test("marks synthesis stage active from explicit job status", () => {
+  const view = buildResearchLoopView({
+    feed: mixedFeed,
+    live: { searches: 2, fetches: 4 },
+    jobStatus: { phase: "synthesizing" },
+  });
+
+  assert.deepEqual(
+    view.stageTimeline.map((item) => [item.key, item.state]),
+    [
+      ["planning", "done"],
+      ["searching", "done"],
+      ["fetching", "done"],
+      ["synthesizing", "active"],
+      ["shortlisting", "pending"],
+    ],
+  );
 });
 
 test("infers source coverage from research feed text", () => {
