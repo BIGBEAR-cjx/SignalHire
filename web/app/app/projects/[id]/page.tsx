@@ -378,6 +378,10 @@ export default function ProjectDetailPage() {
     locale,
   }) as ProjectSearchConsoleView;
   const searchHref = `/app/search?project=${id}&q=${encodeURIComponent(projectConsole.nextSearchInput || briefForSearch)}`;
+  const projectRounds = buildProjectResearchRounds({
+    runs: detail.runs,
+    locale,
+  }) as ProjectResearchRoundsView;
   const controlRoom = buildProjectControlRoom({
     project: p,
     runs: detail.runs,
@@ -385,12 +389,9 @@ export default function ProjectDetailPage() {
     candidateCount: p.candidates_total,
     hasFilter: statusFilter !== "all",
     hasCandidateDecisionQueuePanel: Boolean(items && items.length > 0),
+    hasResearchRoundsPanel: projectRounds.items.length > 0,
     locale,
   }) as ProjectControlRoomView;
-  const projectRounds = buildProjectResearchRounds({
-    runs: detail.runs,
-    locale,
-  }) as ProjectResearchRoundsView;
   const projectHierarchy = buildProjectDetailHierarchy({
     hasCandidates: Boolean(items && items.length > 0),
     hasControlRoom: true,
@@ -772,6 +773,11 @@ function ProjectControlRoomPanel({
   const focusBackfillHref = room.focus.backfillInput
     ? `/app/search?project=${projectId}&q=${encodeURIComponent(room.focus.backfillInput)}`
     : "";
+  const cardGridClassName = room.cards.length >= 5
+    ? "md:grid-cols-5"
+    : room.cards.length === 4
+      ? "md:grid-cols-4"
+      : "md:grid-cols-3";
   return (
     <Surface className="p-5 md:p-6">
       <div className="grid gap-5 xl:grid-cols-[minmax(0,1.1fr)_minmax(320px,0.9fr)]">
@@ -805,7 +811,7 @@ function ProjectControlRoomPanel({
         </div>
       </div>
 
-      <dl className="mt-5 grid overflow-hidden rounded-2xl border border-black/10 bg-white/70 md:grid-cols-5">
+      <dl className={`mt-5 grid overflow-hidden rounded-2xl border border-black/10 bg-white/70 ${cardGridClassName}`}>
         {room.cards.map((card, index) => (
           <div key={card.key} className={`p-4 ${index > 0 ? "border-t border-black/10 md:border-l md:border-t-0" : ""}`}>
             <dt className="text-xs font-semibold text-[var(--sh-muted)]">{card.label}</dt>

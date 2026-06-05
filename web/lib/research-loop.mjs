@@ -1359,9 +1359,9 @@ export function buildProjectSearchConsole({ project = {}, runs = [], items = [],
 }
 
 /**
- * @param {{ project?: { name?: string; brief?: string | null }; runs?: Array<{ id?: string; kind?: string; label?: string; summary?: string | null; status?: string; query_text?: string; updated_at?: string; result?: unknown }>; items?: unknown[]; candidateCount?: number; hasFilter?: boolean; hasCandidateDecisionQueuePanel?: boolean; locale?: string }} input
+ * @param {{ project?: { name?: string; brief?: string | null }; runs?: Array<{ id?: string; kind?: string; label?: string; summary?: string | null; status?: string; query_text?: string; updated_at?: string; result?: unknown }>; items?: unknown[]; candidateCount?: number; hasFilter?: boolean; hasCandidateDecisionQueuePanel?: boolean; hasResearchRoundsPanel?: boolean; locale?: string }} input
  */
-export function buildProjectControlRoom({ project = {}, runs = [], items = [], candidateCount = 0, hasFilter = false, hasCandidateDecisionQueuePanel = false, locale = "zh" } = {}) {
+export function buildProjectControlRoom({ project = {}, runs = [], items = [], candidateCount = 0, hasFilter = false, hasCandidateDecisionQueuePanel = false, hasResearchRoundsPanel = false, locale = "zh" } = {}) {
   const normalizedLocale = normalizeLocale(locale);
   const briefText = cleanString(project?.brief) || cleanString(project?.name);
   const consoleView = buildProjectSearchConsole({
@@ -1438,7 +1438,7 @@ export function buildProjectControlRoom({ project = {}, runs = [], items = [], c
           count: needsEvidenceCount,
         }),
       },
-    ].filter((card) => !(hasCandidateDecisionQueuePanel && card.key === "queue")),
+    ].filter((card) => !(hasCandidateDecisionQueuePanel && card.key === "queue") && !(hasResearchRoundsPanel && card.key === "rounds")),
   };
 }
 

@@ -834,6 +834,27 @@ test("builds a project control room that avoids duplicate candidate queue summar
   assert.ok(!room.cards.some((card) => card.key === "queue"));
 });
 
+test("builds a project control room that avoids duplicate research round summaries", () => {
+  assert.equal(typeof researchLoop.buildProjectControlRoom, "function");
+
+  const room = buildProjectControlRoom({
+    locale: "zh",
+    hasResearchRoundsPanel: true,
+    runs: [
+      {
+        id: "run-1",
+        kind: "search",
+        label: "AI Agent 产品工程师",
+        query_text: "找做过 AI Agent 产品落地的工程师",
+        status: "done",
+        updated_at: "2026-06-05T10:00:00.000Z",
+      },
+    ],
+  });
+
+  assert.ok(!room.cards.some((card) => card.key === "rounds"));
+});
+
 test("builds a project detail hierarchy that avoids duplicate summary panels", () => {
   assert.equal(typeof researchLoop.buildProjectDetailHierarchy, "function");
 
