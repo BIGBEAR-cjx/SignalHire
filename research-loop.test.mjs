@@ -160,6 +160,28 @@ test("adds source labels and verification intent to live research items", () => 
   );
 });
 
+test("summarizes observable running search work for the foreground console", () => {
+  const view = buildResearchLoopView({
+    feed: [
+      { id: 1, kind: "search", info: "multimodal agent engineer site:github.com" },
+      { id: 2, kind: "fetch", info: "https://github.com/example/agent-runtime" },
+      { id: 3, kind: "search", info: "multimodal agent engineer site:arxiv.org" },
+      { id: 4, kind: "fetch", info: "https://arxiv.org/abs/2601.12345" },
+    ],
+    live: { searches: 2, fetches: 2 },
+    jobStatus: { phase: "running" },
+    locale: "zh",
+  });
+
+  assert.equal(view.observability.canStop, true);
+  assert.equal(view.observability.currentSearch.label, "正在搜索");
+  assert.equal(view.observability.currentSearch.detail, "multimodal agent engineer site:arxiv.org");
+  assert.equal(view.observability.currentFetch.label, "正在读取");
+  assert.equal(view.observability.currentFetch.detail, "https://arxiv.org/abs/2601.12345");
+  assert.equal(view.observability.coverage.label, "来源覆盖");
+  assert.equal(view.observability.coverage.detail, "GitHub、论文");
+});
+
 test("requires precision and satisfaction before feedback optimization can run", () => {
   const preview = buildFeedbackOptimizationPreview({
     feedback: { precision: "off", satisfaction: "" },

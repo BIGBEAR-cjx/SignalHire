@@ -100,6 +100,39 @@ function buildResearchStageTimeline(locale, phaseKey) {
   });
 }
 
+function latestFeedDetail(feed, kind, locale) {
+  const items = cleanFeed(feed).filter((item) => item?.kind === kind);
+  return eventDetail(items[items.length - 1], locale);
+}
+
+function localizedJoin(locale, values) {
+  const items = values.map(cleanString).filter(Boolean);
+  return items.join(locale === "en" ? ", " : "、");
+}
+
+function buildResearchObservability({ feed = [], coverage = [], phaseKey = "planning", locale = "zh" } = {}) {
+  const normalizedLocale = normalizeLocale(locale);
+  const currentSearch = latestFeedDetail(feed, "search", normalizedLocale) || msg(normalizedLocale, "research.observability.searchWaiting");
+  const currentFetch = latestFeedDetail(feed, "fetch", normalizedLocale) || msg(normalizedLocale, "research.observability.fetchWaiting");
+  const coverageLabels = coverage.map((item) => msg(normalizedLocale, `research.loop.source.${item.key}`));
+  const terminal = phaseKey === "done" || phaseKey === "error" || phaseKey === "canceled";
+  return {
+    canStop: !terminal,
+    currentSearch: {
+      label: msg(normalizedLocale, "research.observability.currentSearch"),
+      detail: currentSearch,
+    },
+    currentFetch: {
+      label: msg(normalizedLocale, "research.observability.currentFetch"),
+      detail: currentFetch,
+    },
+    coverage: {
+      label: msg(normalizedLocale, "research.observability.coverage"),
+      detail: coverageLabels.length ? localizedJoin(normalizedLocale, coverageLabels) : msg(normalizedLocale, "research.observability.coverageWaiting"),
+    },
+  };
+}
+
 function pushUniqueAction(actions, locale, key) {
   if (!actions.some((item) => item.key === key)) {
     actions.push(buildAction(locale, key));
@@ -732,6 +765,7 @@ export function buildResearchLoopView({ feed = [], live = null, jobStatus = null
     recentItems,
     coverage,
     sourceGroups,
+    observability: buildResearchObservability({ feed, coverage, phaseKey, locale: normalizedLocale }),
   };
 }
 

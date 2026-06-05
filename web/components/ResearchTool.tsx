@@ -760,6 +760,7 @@ export default function ResearchTool({
           statsText={progressView.statsText}
           sourceGroups={progressView.sourceGroups}
           recentItems={progressView.recentItems}
+          observability={progressView.observability}
           statusDetail={jobStatus?.detail ?? undefined}
           onStop={stopCurrentRun}
         />

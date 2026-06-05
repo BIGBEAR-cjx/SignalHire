@@ -40,6 +40,16 @@ export type ResearchLoopStage = {
   label: string;
   detail: string;
 };
+export type ResearchObservableCard = {
+  label: string;
+  detail: string;
+};
+export type ResearchObservability = {
+  canStop: boolean;
+  currentSearch: ResearchObservableCard;
+  currentFetch: ResearchObservableCard;
+  coverage: ResearchObservableCard;
+};
 export type ResearchLoopView = {
   locale: ResearchLoopLocale;
   phase: ResearchLoopPhase;
@@ -50,6 +60,7 @@ export type ResearchLoopView = {
   recentItems: ResearchLoopRecentItem[];
   coverage: ResearchCoverageItem[];
   sourceGroups: ResearchSourceGroup[];
+  observability: ResearchObservability;
 };
 
 export type SearchFeedback = {

@@ -55,6 +55,16 @@ type ResearchStageViewItem = {
   label: string;
   detail: string;
 };
+type ResearchObservableCard = {
+  label: string;
+  detail: string;
+};
+type ResearchObservabilityView = {
+  canStop: boolean;
+  currentSearch: ResearchObservableCard;
+  currentFetch: ResearchObservableCard;
+  coverage: ResearchObservableCard;
+};
 type FeedbackOptimizationAction = {
   key: string;
   label: string;
@@ -309,6 +319,7 @@ export function ResearchProcessPanel({
   statsText,
   sourceGroups,
   recentItems,
+  observability,
   statusDetail,
   onStop,
 }: {
@@ -318,6 +329,7 @@ export function ResearchProcessPanel({
   statsText: string;
   sourceGroups: ResearchSourceGroupViewItem[];
   recentItems: ResearchRecentViewItem[];
+  observability: ResearchObservabilityView;
   statusDetail?: string;
   onStop: () => void;
 }) {
@@ -332,13 +344,21 @@ export function ResearchProcessPanel({
           </div>
           <p className="mt-1 text-sm leading-6 text-[var(--sh-muted)]">{phaseLabel}</p>
         </div>
-        <SecondaryAction onClick={onStop} className="min-h-9 px-3 py-2 text-xs">
-          <FiSquare className="h-3.5 w-3.5" aria-hidden="true" />
-          {t("research.stop")}
-        </SecondaryAction>
+        {observability.canStop && (
+          <SecondaryAction onClick={onStop} className="min-h-9 px-3 py-2 text-xs">
+            <FiSquare className="h-3.5 w-3.5" aria-hidden="true" />
+            {t("research.stop")}
+          </SecondaryAction>
+        )}
       </div>
 
       {statusDetail && <p className="mt-3 text-xs leading-5 text-[var(--sh-muted)]">{statusDetail}</p>}
+
+      <div className="mt-5 grid gap-3 lg:grid-cols-3">
+        <ObservableCard icon="search" item={observability.currentSearch} />
+        <ObservableCard icon="fetch" item={observability.currentFetch} />
+        <ObservableCard icon="coverage" item={observability.coverage} />
+      </div>
 
       {stageTimeline.length > 0 && (
         <ol className="mt-5 grid gap-2 md:grid-cols-5">
@@ -434,6 +454,24 @@ export function ResearchProcessPanel({
         </div>
       </div>
     </Surface>
+  );
+}
+
+function ObservableCard({ icon, item }: { icon: "search" | "fetch" | "coverage"; item: ResearchObservableCard }) {
+  const Icon = icon === "search" ? FiSearch : icon === "fetch" ? FiGlobe : FiActivity;
+  const tone = icon === "search"
+    ? "border-blue-100 bg-blue-50/70 text-blue-700"
+    : icon === "fetch"
+      ? "border-emerald-100 bg-emerald-50/70 text-emerald-700"
+      : "border-neutral-200 bg-white/78 text-[var(--sh-muted)]";
+  return (
+    <div className={`rounded-3xl border p-4 ${tone}`}>
+      <div className="flex items-center gap-2">
+        <Icon className="h-4 w-4 shrink-0" aria-hidden="true" />
+        <p className="text-xs font-semibold">{item.label}</p>
+      </div>
+      <p className="mt-3 line-clamp-3 break-all font-mono text-sm leading-6 text-[var(--sh-ink)]">{item.detail}</p>
+    </div>
   );
 }
 
