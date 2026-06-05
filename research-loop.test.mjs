@@ -164,6 +164,57 @@ test("builds localized candidate feedback choices next to reviewed candidate", (
   assert.equal(en.groups[3].options.find((option) => option.value === "adjacent_pools")?.selected, true);
 });
 
+test("builds project candidate decision queues from status and evidence risk", () => {
+  assert.equal(typeof researchLoop.buildProjectCandidateDecisionQueue, "function");
+
+  const items = [
+    {
+      id: "new-strong",
+      status: "new",
+      candidate: { name: "Ada", evidence_audit: { overall_evidence_quality: "high" }, claims: [] },
+    },
+    {
+      id: "weak-evidence",
+      status: "new",
+      candidate: {
+        name: "Grace",
+        evidence_audit: { overall_evidence_quality: "low" },
+        claims: [{ claim: "Built agent infra", verdict: "unverified", evidence: [] }],
+      },
+    },
+    {
+      id: "contacted",
+      status: "contacted",
+      candidate: { name: "Lin", evidence_audit: { overall_evidence_quality: "medium" }, claims: [] },
+    },
+    {
+      id: "rejected",
+      status: "rejected",
+      candidate: { name: "Alan", evidence_audit: { overall_evidence_quality: "high" }, claims: [] },
+    },
+  ];
+
+  const zh = researchLoop.buildProjectCandidateDecisionQueue({ items, locale: "zh" });
+
+  assert.deepEqual(zh.columns.map((column) => [column.key, column.title, column.count]), [
+    ["review", "待看", 1],
+    ["interested", "推进中", 1],
+    ["needs_evidence", "需补证据", 1],
+    ["rejected", "不合适", 1],
+  ]);
+  assert.deepEqual(zh.columns.map((column) => column.items.map((item) => item.id)), [
+    ["new-strong"],
+    ["contacted"],
+    ["weak-evidence"],
+    ["rejected"],
+  ]);
+  assert.match(zh.columns[2].items[0].reason, /证据/);
+
+  const en = researchLoop.buildProjectCandidateDecisionQueue({ items, locale: "en" });
+  assert.equal(en.columns[0].title, "To review");
+  assert.equal(en.columns[2].title, "Needs evidence");
+});
+
 test("builds project next steps for empty and filtered projects", () => {
   assert.deepEqual(buildProjectNextSteps({ candidateCount: 0, runCount: 0 }), {
     locale: "zh",

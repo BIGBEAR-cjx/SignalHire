@@ -78,6 +78,24 @@ export type CandidateFeedbackPanel = {
   description: string;
   groups: CandidateFeedbackGroup[];
 };
+export type ProjectCandidateDecisionQueueItem = {
+  id: string;
+  status: string;
+  name: string;
+  subtitle: string;
+  matchScore: number | null;
+  reason: string;
+};
+export type ProjectCandidateDecisionQueueColumn = {
+  key: string;
+  title: string;
+  count: number;
+  items: ProjectCandidateDecisionQueueItem[];
+};
+export type ProjectCandidateDecisionQueue = {
+  locale: ResearchLoopLocale;
+  columns: ProjectCandidateDecisionQueueColumn[];
+};
 export type PersistedSearchFeedback = {
   version: 1;
   precision: string;
@@ -188,6 +206,10 @@ export function buildCandidateFeedbackPanel(input?: {
   feedback?: SearchFeedback;
   locale?: ResearchLoopLocale | string;
 }): CandidateFeedbackPanel;
+export function buildProjectCandidateDecisionQueue(input?: {
+  items?: unknown[];
+  locale?: ResearchLoopLocale | string;
+}): ProjectCandidateDecisionQueue;
 export function buildPersistedSearchFeedback(input?: {
   feedback?: SearchFeedback;
   optimizedInput?: string;

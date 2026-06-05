@@ -119,6 +119,91 @@ export function buildCandidateFeedbackPanel({ candidate = {}, feedback = {}, loc
   };
 }
 
+const DECISION_QUEUE_COLUMNS = [
+  { key: "review", zh: "待看", en: "To review" },
+  { key: "interested", zh: "推进中", en: "In progress" },
+  { key: "needs_evidence", zh: "需补证据", en: "Needs evidence" },
+  { key: "rejected", zh: "不合适", en: "Not a fit" },
+];
+
+function candidateName(candidate) {
+  return cleanString(candidate?.name) || "Unknown candidate";
+}
+
+function candidateSubtitle(candidate) {
+  return [candidate?.current_role, candidate?.current_company].map(cleanString).filter(Boolean).join(" · ")
+    || cleanString(candidate?.headline);
+}
+
+function candidateEvidenceRisk(candidate) {
+  const quality = cleanString(candidate?.evidence_audit?.overall_evidence_quality).toLowerCase();
+  if (quality === "low") return true;
+  const claims = Array.isArray(candidate?.claims) ? candidate.claims : [];
+  return claims.some((claim) => {
+    const verdict = cleanString(claim?.verdict).toLowerCase();
+    return verdict === "unverified" || verdict === "contradicted";
+  });
+}
+
+function decisionQueueReason(locale, key, item) {
+  const name = candidateName(item?.candidate);
+  const copy = {
+    zh: {
+      review: `${name} 还未处理，建议先查看证据档案并决定是否推进。`,
+      interested: `${name} 已进入沟通或面试流程，继续推进下一步动作。`,
+      needs_evidence: `${name} 存在证据缺口，建议补搜后再做判断。`,
+      rejected: `${name} 已标记为不合适，保留记录避免重复评估。`,
+    },
+    en: {
+      review: `${name} has not been reviewed yet. Check the evidence dossier before deciding.`,
+      interested: `${name} is already in outreach or interview flow. Continue the next action.`,
+      needs_evidence: `${name} has evidence gaps. Backfill evidence before deciding.`,
+      rejected: `${name} is marked as not a fit, so keep it out of the active review queue.`,
+    },
+  }[locale === "en" ? "en" : "zh"];
+  return copy[key] ?? "";
+}
+
+function decisionQueueKey(item) {
+  const status = cleanString(item?.status);
+  if (status === "rejected") return "rejected";
+  if (candidateEvidenceRisk(item?.candidate) && status !== "hired") return "needs_evidence";
+  if (status === "contacted" || status === "interviewing" || status === "hired") return "interested";
+  return "review";
+}
+
+/**
+ * @param {{ items?: unknown[]; locale?: string }} input
+ */
+export function buildProjectCandidateDecisionQueue({ items = [], locale = "zh" } = {}) {
+  const normalizedLocale = normalizeLocale(locale);
+  const columns = DECISION_QUEUE_COLUMNS.map((column) => ({
+    key: column.key,
+    title: normalizedLocale === "en" ? column.en : column.zh,
+    count: 0,
+    items: [],
+  }));
+  const byKey = new Map(columns.map((column) => [column.key, column]));
+
+  for (const item of Array.isArray(items) ? items : []) {
+    if (!isPlainObject(item)) continue;
+    const key = decisionQueueKey(item);
+    const column = byKey.get(key) ?? byKey.get("review");
+    if (!column) continue;
+    column.items.push({
+      id: cleanString(item.id),
+      status: cleanString(item.status) || "new",
+      name: candidateName(item.candidate),
+      subtitle: candidateSubtitle(item.candidate),
+      matchScore: Number.isFinite(Number(item.candidate?.match_score)) ? Math.round(Number(item.candidate.match_score)) : null,
+      reason: decisionQueueReason(normalizedLocale, key, item),
+    });
+  }
+
+  for (const column of columns) column.count = column.items.length;
+  return { locale: normalizedLocale, columns };
+}
+
 function projectAction(locale, key, params) {
   return {
     key,

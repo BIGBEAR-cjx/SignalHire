@@ -19,7 +19,7 @@ import {
   StatusBadge,
   Surface,
 } from "@/components/ui/signal-ui";
-import { buildProjectResearchRounds, buildProjectSearchConsole } from "@/lib/research-loop.mjs";
+import { buildProjectCandidateDecisionQueue, buildProjectResearchRounds, buildProjectSearchConsole } from "@/lib/research-loop.mjs";
 import { buildEvidencePriorityView } from "@/lib/evidence-priority.mjs";
 import type { TalentCandidate } from "@/lib/talent-profile.mjs";
 
@@ -195,7 +195,7 @@ export default function ProjectDetailPage() {
     return items.filter((it) => it.status === statusFilter);
   }, [items, statusFilter]);
 
-  const selectedItem = useMemo(() => filteredItems.find((it) => it.id === selectedItemId) ?? null, [filteredItems, selectedItemId]);
+  const selectedItem = useMemo(() => (items ?? []).find((it) => it.id === selectedItemId) ?? null, [items, selectedItemId]);
   const projectComparisonResult = useMemo(() => ({
     candidates: (items ?? []).map((it) => it.candidate),
   }), [items]);
@@ -245,6 +245,7 @@ export default function ProjectDetailPage() {
     runs: detail.runs,
     locale,
   }) as ProjectResearchRoundsView;
+  const decisionQueue = buildProjectCandidateDecisionQueue({ items: items ?? [], locale });
 
   return (
     <div className="space-y-6">
@@ -274,6 +275,14 @@ export default function ProjectDetailPage() {
       </section>
 
       <StatusFunnel breakdown={detail.breakdown} total={p.candidates_total} current={statusFilter} onClick={setStatusFilter} />
+      {items && items.length > 0 && (
+        <ProjectCandidateDecisionQueuePanel
+          queue={decisionQueue}
+          locale={locale}
+          selectedItemId={selectedItemId}
+          onOpenCandidate={(itemId) => setSelectedItemId(itemId)}
+        />
+      )}
 
       {/* 候选人列表 + 详情面板 */}
       <section className="space-y-3">
@@ -586,6 +595,102 @@ function StatusFunnel({
             </button>
           );
         })}
+      </div>
+    </Surface>
+  );
+}
+
+function ProjectCandidateDecisionQueuePanel({
+  queue,
+  locale,
+  selectedItemId,
+  onOpenCandidate,
+}: {
+  queue: {
+    columns: Array<{
+      key: string;
+      title: string;
+      count: number;
+      items: Array<{
+        id: string;
+        name: string;
+        subtitle: string;
+        matchScore: number | null;
+        reason: string;
+      }>;
+    }>;
+  };
+  locale: "zh" | "en";
+  selectedItemId: string | null;
+  onOpenCandidate: (itemId: string) => void;
+}) {
+  const copy = locale === "en"
+    ? {
+        eyebrow: "Decision queue",
+        title: "Candidate decision queue",
+        description: "Grouped by review, active progress, evidence gaps, and not-a-fit so teams can handle the highest-risk candidates first.",
+        overflow: "more candidates. Use the list below to keep reviewing.",
+        empty: "No candidates",
+      }
+    : {
+        eyebrow: "Decision queue",
+        title: "候选人决策队列",
+        description: "按待看、推进中、需补证据和不合适分组，先处理证据风险和高意向候选人。",
+        overflow: "位，切换下方列表继续查看。",
+        empty: "暂无候选人",
+      };
+  return (
+    <Surface className="p-5">
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-neutral-500">{copy.eyebrow}</p>
+          <h2 className="mt-1 text-xl font-semibold text-[var(--sh-ink)]">{copy.title}</h2>
+        </div>
+        <p className="max-w-xl text-sm leading-6 text-[var(--sh-muted)]">
+          {copy.description}
+        </p>
+      </div>
+
+      <div className="mt-4 grid gap-3 xl:grid-cols-4">
+        {queue.columns.map((column) => (
+          <section key={column.key} className="rounded-3xl border border-black/10 bg-white/72 p-3">
+            <div className="flex items-center justify-between gap-2">
+              <h3 className="text-sm font-semibold text-gray-900">{column.title}</h3>
+              <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs font-semibold tabular-nums text-gray-600">{column.count}</span>
+            </div>
+            <div className="mt-3 space-y-2">
+              {column.items.slice(0, 6).map((item) => (
+                <button
+                  key={item.id}
+                  type="button"
+                  onClick={() => onOpenCandidate(item.id)}
+                  className={`w-full rounded-2xl border p-3 text-left transition ${
+                    selectedItemId === item.id ? "border-[var(--sh-ink)] bg-white shadow-sm" : "border-black/10 bg-white/78 hover:border-black/20"
+                  }`}
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-semibold text-gray-900">{item.name}</p>
+                      {item.subtitle && <p className="mt-0.5 truncate text-xs text-gray-500">{item.subtitle}</p>}
+                    </div>
+                    {typeof item.matchScore === "number" && (
+                      <span className="rounded-md bg-gray-100 px-1.5 py-0.5 text-[11px] font-semibold tabular-nums text-gray-700">{item.matchScore}</span>
+                    )}
+                  </div>
+                  <p className="mt-2 line-clamp-2 text-xs leading-5 text-gray-500">{item.reason}</p>
+                </button>
+              ))}
+              {column.items.length > 6 && (
+                <p className="px-1 text-xs text-gray-400">
+                  {locale === "en" ? `${column.items.length - 6} ${copy.overflow}` : `还有 ${column.items.length - 6} ${copy.overflow}`}
+                </p>
+              )}
+              {column.items.length === 0 && (
+                <p className="rounded-2xl border border-dashed border-black/10 bg-white/50 p-3 text-xs leading-5 text-gray-400">{copy.empty}</p>
+              )}
+            </div>
+          </section>
+        ))}
       </div>
     </Surface>
   );
