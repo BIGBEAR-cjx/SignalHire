@@ -384,6 +384,7 @@ export default function ProjectDetailPage() {
     items: items ?? [],
     candidateCount: p.candidates_total,
     hasFilter: statusFilter !== "all",
+    hasCandidateDecisionQueuePanel: Boolean(items && items.length > 0),
     locale,
   }) as ProjectControlRoomView;
   const projectRounds = buildProjectResearchRounds({

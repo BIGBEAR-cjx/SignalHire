@@ -811,6 +811,29 @@ test("builds a project control room from brief, feedback, rounds, and candidate 
   assert.match(room.cards[4].detail, /需要补证据/);
 });
 
+test("builds a project control room that avoids duplicate candidate queue summaries", () => {
+  assert.equal(typeof researchLoop.buildProjectControlRoom, "function");
+
+  const room = buildProjectControlRoom({
+    locale: "zh",
+    hasCandidateDecisionQueuePanel: true,
+    candidateCount: 1,
+    items: [
+      {
+        id: "candidate-1",
+        status: "new",
+        candidate: {
+          name: "Weak Evidence",
+          evidence_audit: { overall_evidence_quality: "low" },
+          claims: [{ claim: "Agent 产品落地", verdict: "unverified" }],
+        },
+      },
+    ],
+  });
+
+  assert.ok(!room.cards.some((card) => card.key === "queue"));
+});
+
 test("builds a project detail hierarchy that avoids duplicate summary panels", () => {
   assert.equal(typeof researchLoop.buildProjectDetailHierarchy, "function");
 

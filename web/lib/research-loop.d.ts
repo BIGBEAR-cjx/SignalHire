@@ -442,6 +442,7 @@ export function buildProjectControlRoom(input?: {
   items?: unknown[];
   candidateCount?: number;
   hasFilter?: boolean;
+  hasCandidateDecisionQueuePanel?: boolean;
   locale?: ResearchLoopLocale | string;
 }): ProjectControlRoom;
 export function buildProjectDetailHierarchy(input?: {
