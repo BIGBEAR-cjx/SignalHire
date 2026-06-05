@@ -290,6 +290,7 @@ export type ProjectControlRoom = {
     targetItemId: string;
     backfillInput: string;
   };
+  nextSteps: ProjectNextSteps;
   cards: ProjectControlRoomCard[];
 };
 export type ProjectDetailHierarchy = {

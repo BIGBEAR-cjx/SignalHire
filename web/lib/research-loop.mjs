@@ -1393,6 +1393,7 @@ export function buildProjectControlRoom({ project = {}, runs = [], items = [], c
       targetItemId: actionBrief.primaryAction.targetItemId,
       backfillInput: actionBrief.primaryAction.backfillInput,
     },
+    nextSteps: consoleView.nextSteps,
     cards: [
       {
         key: "brief",

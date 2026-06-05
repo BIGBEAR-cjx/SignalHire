@@ -124,6 +124,7 @@ type ProjectControlRoomView = {
     targetItemId: string;
     backfillInput: string;
   };
+  nextSteps: ProjectNextStepsView;
   cards: Array<{
     key: string;
     label: string;
@@ -817,6 +818,19 @@ function ProjectControlRoomPanel({
               </PrimaryAction>
             )}
           </div>
+          {room.nextSteps.actions.length > 0 && (
+            <div className="mt-4 border-t border-black/10 pt-3">
+              <p className="text-xs font-semibold text-[var(--sh-muted)]">{room.nextSteps.title}</p>
+              <ul className="mt-2 space-y-2">
+                {room.nextSteps.actions.map((action) => (
+                  <li key={action.key} className="rounded-xl bg-white/68 px-3 py-2 ring-1 ring-black/5">
+                    <p className="text-xs font-semibold text-[var(--sh-ink)]">{action.label}</p>
+                    <p className="mt-0.5 line-clamp-2 text-xs leading-5 text-[var(--sh-muted)]">{action.detail}</p>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
         </div>
       </div>
 

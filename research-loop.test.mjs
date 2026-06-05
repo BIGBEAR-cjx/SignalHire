@@ -924,6 +924,42 @@ test("builds a project control room that avoids duplicate candidate feedback sig
   assert.ok(!room.cards.some((card) => card.key === "feedback"));
 });
 
+test("builds a project control room with recommended next steps", () => {
+  assert.equal(typeof researchLoop.buildProjectControlRoom, "function");
+
+  const room = buildProjectControlRoom({
+    locale: "zh",
+    project: {
+      name: "AI Agent 产品工程师",
+      brief: "找做过 AI Agent 产品落地和开源工具的资深工程师",
+    },
+    candidateCount: 2,
+    items: [
+      {
+        id: "candidate-1",
+        status: "new",
+        candidate: { name: "Ada", evidence_audit: { overall_evidence_quality: "high" }, claims: [] },
+      },
+    ],
+    runs: [
+      {
+        id: "run-1",
+        kind: "search",
+        label: "AI Agent 产品工程师",
+        query_text: "找做过 AI Agent 产品落地和开源工具的资深工程师",
+        status: "done",
+        updated_at: "2026-06-05T10:00:00.000Z",
+      },
+    ],
+  });
+
+  assert.equal(room.nextSteps.title, "下一步建议");
+  assert.deepEqual(
+    room.nextSteps.actions.map((item) => item.key),
+    ["review_candidates", "review_latest_run"],
+  );
+});
+
 test("builds a project detail hierarchy that avoids duplicate summary panels", () => {
   assert.equal(typeof researchLoop.buildProjectDetailHierarchy, "function");
 
