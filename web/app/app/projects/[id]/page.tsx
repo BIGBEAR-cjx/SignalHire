@@ -20,7 +20,7 @@ import {
   Surface,
 } from "@/components/ui/signal-ui";
 import { buildCandidateFeedbackPanel, buildProjectActionBrief, buildProjectCandidateDecisionQueue, buildProjectCandidateFeedbackSummary, buildProjectResearchRounds, buildProjectSearchConsole } from "@/lib/research-loop.mjs";
-import { buildEvidencePriorityView, buildProjectEvidenceMatrix } from "@/lib/evidence-priority.mjs";
+import { buildCandidateDecisionSignal, buildEvidencePriorityView, buildProjectEvidenceMatrix } from "@/lib/evidence-priority.mjs";
 import type { TalentCandidate } from "@/lib/talent-profile.mjs";
 
 type ProjectStatus = "open" | "paused" | "closed";
@@ -447,7 +447,7 @@ export default function ProjectDetailPage() {
             <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(360px,0.85fr)]">
               <ul className="space-y-2">
                 {filteredItems.map((it) => (
-                  <CandidateItem key={it.id} item={it} selected={selectedItemId === it.id} onClick={() => setSelectedItemId(it.id)} />
+                  <CandidateItem key={it.id} item={it} locale={locale} selected={selectedItemId === it.id} onClick={() => setSelectedItemId(it.id)} />
                 ))}
                 {filteredItems.length === 0 && (
                   <li><EmptyState title="这个状态下没有候选人" description="切换状态筛选，或继续补充候选人。" /></li>
@@ -1237,10 +1237,11 @@ function ProjectHeader({ detail, onChanged, onDelete }: { detail: ProjectDetail;
   );
 }
 
-function CandidateItem({ item, selected, onClick }: { item: ShortlistItem; selected: boolean; onClick: () => void }) {
+function CandidateItem({ item, locale, selected, onClick }: { item: ShortlistItem; locale: "zh" | "en"; selected: boolean; onClick: () => void }) {
   const c = asCandidate(item.candidate);
   const subtitle = [c.current_role, c.current_company].filter(Boolean).join(" · ") || c.headline || "";
   const status = SHORT_STATUS.find((s) => s.value === item.status) ?? SHORT_STATUS[0];
+  const signal = buildCandidateDecisionSignal({ candidate: item.candidate, locale, status: item.status });
   return (
     <li>
       <button
@@ -1255,12 +1256,18 @@ function CandidateItem({ item, selected, onClick }: { item: ShortlistItem; selec
             {subtitle && <p className="mt-0.5 truncate text-xs text-gray-500">{subtitle}</p>}
           </div>
           <div className="flex shrink-0 items-center gap-2">
-            {typeof c.match_score === "number" && (
-              <span className="rounded-md bg-gray-100 px-1.5 py-0.5 text-[11px] font-medium tabular-nums text-gray-700">{c.match_score}</span>
-            )}
             <StatusBadge label={status.label} dotClassName={status.dot} className={status.chip} />
           </div>
         </div>
+        <div className="grid gap-2 sm:grid-cols-3">
+          {[signal.match, signal.evidence, signal.sources].map((metric) => (
+            <span key={metric.key} className="rounded-2xl bg-gray-50 px-3 py-2 ring-1 ring-black/5">
+              <span className="block text-[11px] font-medium text-gray-500">{metric.label}</span>
+              <span className="mt-0.5 block text-xs font-semibold tabular-nums text-gray-900">{metric.value}</span>
+            </span>
+          ))}
+        </div>
+        <p className="line-clamp-2 text-xs leading-5 text-gray-500">{signal.hint}</p>
         {item.notes && <p className="line-clamp-2 text-xs text-gray-600">备注：{item.notes}</p>}
       </button>
     </li>

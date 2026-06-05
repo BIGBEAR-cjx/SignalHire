@@ -18,6 +18,7 @@ import {
   StatusBadge,
   Surface,
 } from "@/components/ui/signal-ui";
+import { buildCandidateDecisionSignal } from "@/lib/evidence-priority.mjs";
 import type { TalentCandidate } from "@/lib/talent-profile.mjs";
 
 type Status = "new" | "contacted" | "interviewing" | "hired" | "rejected";
@@ -66,7 +67,7 @@ function StatusChip({ status }: { status: Status }) {
 }
 
 export default function ShortlistPage() {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const [items, setItems] = useState<Item[] | null>(null);
   const [error, setError] = useState("");
   const [filter, setFilter] = useState<Status | "all">("all");
@@ -148,6 +149,7 @@ export default function ShortlistPage() {
               <ItemCard
                 key={it.id}
                 item={it}
+                locale={locale}
                 selected={selectedId === it.id}
                 onClick={() => setSelectedId(it.id)}
               />
@@ -183,10 +185,11 @@ export default function ShortlistPage() {
   );
 }
 
-function ItemCard({ item, selected, onClick }: { item: Item; selected: boolean; onClick: () => void }) {
+function ItemCard({ item, locale, selected, onClick }: { item: Item; locale: "zh" | "en"; selected: boolean; onClick: () => void }) {
   const { t } = useI18n();
   const c = asCandidate(item.candidate);
   const subtitle = [c.current_role, c.current_company].filter(Boolean).join(" · ") || c.headline || "";
+  const signal = buildCandidateDecisionSignal({ candidate: item.candidate, locale, status: item.status });
   return (
     <li>
       <button
@@ -201,14 +204,18 @@ function ItemCard({ item, selected, onClick }: { item: Item; selected: boolean; 
             {subtitle && <p className="mt-0.5 truncate text-xs text-gray-500">{subtitle}</p>}
           </div>
           <div className="flex shrink-0 items-center gap-2">
-            {typeof c.match_score === "number" && (
-              <span className="rounded-md bg-gray-100 px-1.5 py-0.5 text-[11px] font-medium tabular-nums text-gray-700">
-                {c.match_score}
-              </span>
-            )}
             <StatusChip status={item.status} />
           </div>
         </div>
+        <div className="grid gap-2 sm:grid-cols-3">
+          {[signal.match, signal.evidence, signal.sources].map((metric) => (
+            <span key={metric.key} className="rounded-2xl bg-gray-50 px-3 py-2 ring-1 ring-black/5">
+              <span className="block text-[11px] font-medium text-gray-500">{metric.label}</span>
+              <span className="mt-0.5 block text-xs font-semibold tabular-nums text-gray-900">{metric.value}</span>
+            </span>
+          ))}
+        </div>
+        <p className="line-clamp-2 text-xs leading-5 text-gray-500">{signal.hint}</p>
         {(c.ai_directions?.length ?? 0) > 0 && (
           <div className="flex flex-wrap gap-1">
             {(c.ai_directions ?? []).slice(0, 3).map((d) => (

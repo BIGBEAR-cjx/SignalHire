@@ -88,6 +88,51 @@ test("marks high match, high evidence, low risk candidates ready to review", () 
   assert.match(item.recommended_action, /候选人详情/);
 });
 
+test("builds separate match and evidence signals for candidate cards", () => {
+  assert.equal(typeof evidencePriority.buildCandidateDecisionSignal, "function");
+
+  const weakEvidenceCandidate = candidateFixture({
+    name: "Signal Candidate",
+    match_score: 87,
+    claims: [
+      {
+        claim: "Built an agent workflow",
+        verdict: "verified",
+        evidence: [{ note: "project", url: "https://example.com/project", source_type: "project" }],
+      },
+      { claim: "Led production deployment", verdict: "unverified", evidence: [] },
+    ],
+    evidence_audit: {
+      verified_claims: [],
+      unverified_claims: ["Led production deployment"],
+      contradicted_claims: [],
+      single_source_claims: [],
+      identity_risks: [],
+      recency_notes: [],
+      overall_evidence_quality: "low",
+    },
+    independent_sources: 1,
+    source_types: ["project"],
+  });
+
+  const zh = evidencePriority.buildCandidateDecisionSignal({ candidate: weakEvidenceCandidate, locale: "zh" });
+  assert.equal(zh.match.label, "匹配");
+  assert.equal(zh.match.value, "87");
+  assert.equal(zh.evidence.label, "证据");
+  assert.equal(zh.evidence.value, "弱");
+  assert.equal(zh.sources.label, "来源");
+  assert.equal(zh.sources.value, "1");
+  assert.equal(zh.priority, "needs_backfill");
+  assert.equal(zh.priorityLabel, "需要补证据");
+  assert.match(zh.hint, /公开来源/);
+
+  const en = evidencePriority.buildCandidateDecisionSignal({ candidate: weakEvidenceCandidate, locale: "en" });
+  assert.equal(en.match.label, "Match");
+  assert.equal(en.evidence.value, "Low");
+  assert.equal(en.sources.label, "Sources");
+  assert.equal(en.priorityLabel, "Needs evidence");
+});
+
 test("marks thin or unverified evidence as needing backfill", () => {
   const thinEvidenceCandidate = candidateFixture({
     name: "Grace Hopper",

@@ -212,6 +212,62 @@ export function buildEvidencePriorityItem({ candidate, result, locale, candidate
   };
 }
 
+function evidenceQualityLabel(value, locale) {
+  const normalizedLocale = normalizeLocale(locale);
+  const quality = cleanString(value).toLowerCase();
+  const copy = {
+    zh: { high: "强", medium: "中", low: "弱" },
+    en: { high: "High", medium: "Medium", low: "Low" },
+  }[normalizedLocale];
+  return copy[quality] || (normalizedLocale === "en" ? "Unknown" : "未知");
+}
+
+function compactPriorityLabel(priority, fallback, locale) {
+  const normalizedLocale = normalizeLocale(locale);
+  const copy = {
+    zh: {
+      ready_to_review: "可优先审阅",
+      needs_backfill: "需要补证据",
+      risk_review: "风险复核",
+    },
+    en: {
+      ready_to_review: "Ready to review",
+      needs_backfill: "Needs evidence",
+      risk_review: "Risk review",
+    },
+  }[normalizedLocale];
+  return copy[normalizePriority(priority)] || fallback;
+}
+
+/**
+ * @param {{ candidate?: unknown; result?: unknown; locale?: string; candidateIndex?: number; status?: string }} input
+ */
+export function buildCandidateDecisionSignal({ candidate, result, locale, candidateIndex = 0, status = "new" } = {}) {
+  const normalizedLocale = normalizeLocale(locale);
+  const item = buildEvidencePriorityItem({ candidate, result, locale: normalizedLocale, candidateIndex });
+  return {
+    match: {
+      key: "match",
+      label: normalizedLocale === "en" ? "Match" : "匹配",
+      value: String(item.match_score),
+    },
+    evidence: {
+      key: "evidence",
+      label: normalizedLocale === "en" ? "Evidence" : "证据",
+      value: evidenceQualityLabel(item.evidence_quality, normalizedLocale),
+      raw: item.evidence_quality,
+    },
+    sources: {
+      key: "sources",
+      label: normalizedLocale === "en" ? "Sources" : "来源",
+      value: String(item.independent_sources),
+    },
+    priority: item.priority,
+    priorityLabel: compactPriorityLabel(item.priority, item.priority_label, normalizedLocale),
+    hint: decisionHint(status, item.priority, normalizedLocale),
+  };
+}
+
 export function buildEvidencePriorityView({ result, candidates, locale } = {}) {
   const normalizedLocale = normalizeLocale(locale);
   const normalizedResult = normalizeTalentSearchResult(result);

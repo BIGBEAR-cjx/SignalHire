@@ -30,6 +30,20 @@ export type EvidencePriorityView = {
   items: EvidencePriorityItem[];
   empty: boolean;
 };
+export type CandidateDecisionSignalMetric = {
+  key: string;
+  label: string;
+  value: string;
+  raw?: string;
+};
+export type CandidateDecisionSignal = {
+  match: CandidateDecisionSignalMetric;
+  evidence: CandidateDecisionSignalMetric;
+  sources: CandidateDecisionSignalMetric;
+  priority: EvidencePriority;
+  priorityLabel: string;
+  hint: string;
+};
 export type ProjectEvidenceMatrixSummary = EvidencePrioritySummary & {
   total: number;
   active: number;
@@ -72,3 +86,11 @@ export function buildEvidencePriorityItem(input?: {
   locale?: string;
   candidateIndex?: number;
 }): EvidencePriorityItem;
+
+export function buildCandidateDecisionSignal(input?: {
+  candidate?: unknown;
+  result?: unknown;
+  locale?: string;
+  candidateIndex?: number;
+  status?: string;
+}): CandidateDecisionSignal;
