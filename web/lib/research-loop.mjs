@@ -131,6 +131,39 @@ function buildRoundFeedbackSummary(run, locale) {
 }
 
 /**
+ * @param {{ runs?: Array<{ updated_at?: string; result?: unknown }>; baseInput?: string; locale?: string }} input
+ */
+export function buildLatestProjectFeedbackPreference({ runs = [], baseInput = "", locale = "zh" } = {}) {
+  const normalizedLocale = normalizeLocale(locale);
+  const normalizedRuns = Array.isArray(runs) ? runs.filter(Boolean) : [];
+  const latestRun = normalizedRuns
+    .map((run, index) => ({ run, index, feedback: feedbackFromRunResult(run?.result) }))
+    .filter(({ feedback }) => cleanString(feedback?.optimized_query))
+    .sort((a, b) => timestampMs(b.run?.updated_at) - timestampMs(a.run?.updated_at) || b.index - a.index)[0];
+
+  if (!latestRun) {
+    return {
+      locale: normalizedLocale,
+      canApply: false,
+      title: msg(normalizedLocale, "search.feedbackPreference.title"),
+      detail: "",
+      optimizedInput: cleanString(baseInput),
+      items: [],
+    };
+  }
+
+  const summary = buildRoundFeedbackSummary({ result: { search_feedback: latestRun.feedback } }, normalizedLocale);
+  return {
+    locale: normalizedLocale,
+    canApply: true,
+    title: msg(normalizedLocale, "search.feedbackPreference.title"),
+    detail: msg(normalizedLocale, "search.feedbackPreference.detail"),
+    optimizedInput: cleanString(latestRun.feedback?.optimized_query),
+    items: summary?.items ?? [],
+  };
+}
+
+/**
  * @param {{ runs?: Array<{ id?: string; kind?: string; label?: string; summary?: string | null; status?: string; query_text?: string; updated_at?: string; result?: unknown }>; locale?: string }} input
  */
 export function buildProjectResearchRounds({ runs = [], locale = "zh" } = {}) {

@@ -53,6 +53,16 @@ type FeedbackOptimizationPreviewModel = {
   statusText: string;
   actions: FeedbackOptimizationAction[];
 };
+export type ProjectFeedbackPreferenceView = {
+  title: string;
+  detail: string;
+  optimizedInput: string;
+  items: Array<{
+    key: string;
+    label: string;
+    value: string;
+  }>;
+};
 
 export function ProjectContextBanner({
   projectId,
@@ -75,6 +85,36 @@ export function ProjectContextBanner({
         <FiArrowLeft className="h-3.5 w-3.5" aria-hidden="true" />
         {t("research.backProject")}
       </Link>
+    </div>
+  );
+}
+
+export function ProjectFeedbackPreferenceBanner({
+  preference,
+}: {
+  preference: ProjectFeedbackPreferenceView;
+}) {
+  return (
+    <div className="rounded-[22px] border border-black/10 bg-white/78 px-4 py-4 text-sm shadow-[0_14px_36px_rgba(0,0,0,0.04)] md:px-5">
+      <div className="flex flex-wrap items-start gap-3">
+        <span className="mt-0.5 inline-flex h-8 w-8 items-center justify-center rounded-full bg-[var(--sh-ink)] text-white">
+          <FiRefreshCw className="h-4 w-4" aria-hidden="true" />
+        </span>
+        <div className="min-w-0 flex-1">
+          <p className="font-semibold text-[var(--sh-ink)]">{preference.title}</p>
+          <p className="mt-1 text-xs leading-5 text-[var(--sh-muted)]">{preference.detail}</p>
+          {preference.items.length > 0 && (
+            <div className="mt-3 flex flex-wrap gap-2">
+              {preference.items.map((item) => (
+                <span key={item.key} className="inline-flex max-w-full items-center gap-1 rounded-full border border-black/10 bg-[var(--sh-canvas)] px-3 py-1 text-xs text-[var(--sh-muted)]">
+                  <span className="font-semibold text-[var(--sh-ink)]">{item.label}</span>
+                  <span>{item.value}</span>
+                </span>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   );
 }

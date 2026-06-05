@@ -30,11 +30,13 @@ import {
   EditableSearchPlanPanel,
   FeedbackOptimizationPreview,
   ProjectContextBanner,
+  ProjectFeedbackPreferenceBanner,
   ResearchErrorPanel,
   ResearchInputStage,
   ResearchProcessPanel,
   ResearchResultShell,
   ResearchShareBar,
+  type ProjectFeedbackPreferenceView,
 } from "@/components/research-workspace";
 import { buildBackfillMergeSummary, buildEditableSearchPlanDraft, buildFeedbackOptimizedSearchInput, buildSearchInputFromEditablePlan } from "@/lib/talent-profile.mjs";
 import type { BackfillMergeSummary, CoverageBackfillJob, TalentCandidate, TalentSearchResult } from "@/lib/talent-profile.mjs";
@@ -164,12 +166,14 @@ export default function ResearchTool({
   autoRun = false,
   projectId,           // 在某项目上下文里搜/验 → 入队 + 收藏自动归项目
   projectName,         // 仅显示
+  projectFeedbackPreference,
 }: {
   mode: "search" | "verify";
   initialInput?: string;
   autoRun?: boolean; // 进页面就自动跑 (用于历史回放 / hero 提交带 query 过来)
   projectId?: string;
   projectName?: string;
+  projectFeedbackPreference?: ProjectFeedbackPreferenceView | null;
 }) {
   const { locale, t } = useI18n();
   const [input, setInput] = useState(initialInput);
@@ -197,11 +201,24 @@ export default function ResearchTool({
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const abortRef = useRef<AbortController | null>(null);
   const runTokenRef = useRef(0);
+  const appliedPreferenceRef = useRef("");
 
   function stopPolling() {
     if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null; }
   }
   useEffect(() => stopPolling, []);
+  useEffect(() => {
+    const optimizedInput = projectFeedbackPreference?.optimizedInput?.trim();
+    if (mode !== "search" || !optimizedInput) return;
+    if (appliedPreferenceRef.current === optimizedInput) return;
+    setInput((current) => {
+      const currentInput = current.trim();
+      const initial = initialInput.trim();
+      if (currentInput && currentInput !== initial) return current;
+      appliedPreferenceRef.current = optimizedInput;
+      return optimizedInput;
+    });
+  }, [initialInput, mode, projectFeedbackPreference?.optimizedInput]);
 
   function beginPolling(jobId: string, context?: BackfillContext, token = runTokenRef.current) {
     stopPolling();
@@ -599,6 +616,10 @@ export default function ResearchTool({
           projectName={projectName}
           mode={mode}
         />
+      )}
+
+      {isSearch && projectFeedbackPreference && (
+        <ProjectFeedbackPreferenceBanner preference={projectFeedbackPreference} />
       )}
 
       <ResearchInputStage

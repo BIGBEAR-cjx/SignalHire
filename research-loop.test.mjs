@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 
 import {
   buildFeedbackOptimizationPreview,
+  buildLatestProjectFeedbackPreference,
   buildPersistedSearchFeedback,
   buildProjectResearchRounds,
   buildProjectNextSteps,
@@ -261,6 +262,76 @@ test("builds English empty project research rounds", () => {
   assert.equal(rounds.title, "Project search rounds");
   assert.equal(rounds.emptyText, "No project search rounds yet.");
   assert.deepEqual(rounds.items, []);
+});
+
+test("builds the latest project feedback preference from saved search feedback", () => {
+  const preference = buildLatestProjectFeedbackPreference({
+    locale: "zh",
+    baseInput: "原始画像",
+    runs: [
+      {
+        id: "old-run",
+        updated_at: "2026-06-05T09:00:00.000Z",
+        result: {
+          search_feedback: {
+            precision: "accurate",
+            satisfaction: "satisfied",
+            optimized_query: "旧的优化画像",
+          },
+        },
+      },
+      {
+        id: "latest-run",
+        updated_at: "2026-06-05T10:00:00.000Z",
+        result: {
+          search_feedback: {
+            precision: "partial",
+            satisfaction: "mixed",
+            issue: "weak_evidence",
+            focus: "expand_sources",
+            optimized_query: "新的优化画像",
+          },
+        },
+      },
+    ],
+  });
+
+  assert.equal(preference.canApply, true);
+  assert.equal(preference.title, "已应用最近反馈偏好");
+  assert.equal(preference.detail, "已把最近一轮反馈转成下一轮搜索条件，开始前仍可继续编辑。");
+  assert.equal(preference.optimizedInput, "新的优化画像");
+  assert.deepEqual(
+    preference.items.map((item) => [item.label, item.value]),
+    [
+      ["精准度", "部分精准"],
+      ["满意度", "一般"],
+      ["主要问题", "证据不足"],
+      ["下一轮方向", "扩来源"],
+    ],
+  );
+});
+
+test("does not apply project feedback preference without a saved optimized query", () => {
+  const preference = buildLatestProjectFeedbackPreference({
+    locale: "en",
+    baseInput: "Original profile",
+    runs: [
+      {
+        id: "run-with-feedback",
+        updated_at: "2026-06-05T10:00:00.000Z",
+        result: {
+          search_feedback: {
+            precision: "off",
+            satisfaction: "unsatisfied",
+          },
+        },
+      },
+    ],
+  });
+
+  assert.equal(preference.canApply, false);
+  assert.equal(preference.optimizedInput, "Original profile");
+  assert.deepEqual(preference.items, []);
 });
 
 test("builds a persisted search feedback payload with optimization actions", () => {

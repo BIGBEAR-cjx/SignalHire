@@ -106,6 +106,18 @@ export type ProjectResearchRounds = {
   emptyText: string;
   items: ProjectResearchRoundItem[];
 };
+export type ProjectFeedbackPreference = {
+  locale: ResearchLoopLocale;
+  canApply: boolean;
+  title: string;
+  detail: string;
+  optimizedInput: string;
+  items: Array<{
+    key: string;
+    label: string;
+    value: string;
+  }>;
+};
 
 export function buildResearchLoopView(input?: {
   feed?: ResearchLoopFeedItem[];
@@ -152,3 +164,11 @@ export function buildProjectResearchRounds(input?: {
   }>;
   locale?: ResearchLoopLocale | string;
 }): ProjectResearchRounds;
+export function buildLatestProjectFeedbackPreference(input?: {
+  runs?: Array<{
+    updated_at?: string;
+    result?: unknown;
+  }>;
+  baseInput?: string;
+  locale?: ResearchLoopLocale | string;
+}): ProjectFeedbackPreference;
