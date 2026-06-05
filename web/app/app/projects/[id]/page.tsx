@@ -49,6 +49,10 @@ type ProjectResearchRoundsView = {
     queryText: string;
     description: string;
     nextSearchInput: string;
+    feedbackSummary: null | {
+      title: string;
+      items: Array<{ key: string; label: string; value: string }>;
+    };
   }>;
 };
 
@@ -86,6 +90,7 @@ interface ProjectDetail {
     status: string;
     query_text: string;
     updated_at: string;
+    result?: unknown;
   }>;
 }
 
@@ -423,6 +428,18 @@ function ProjectResearchRoundsPanel({
                     <p className="mt-1 text-xs leading-5 text-[var(--sh-muted)]">{round.description}</p>
                     {(round.summary || round.status) && (
                       <p className="mt-2 text-xs text-[var(--sh-faint)]">{round.summary || round.status}</p>
+                    )}
+                    {round.feedbackSummary && (
+                      <div className="mt-3 rounded-2xl border border-blue-100 bg-blue-50/60 p-3">
+                        <p className="text-xs font-semibold text-blue-700">{round.feedbackSummary.title}</p>
+                        <div className="mt-2 flex flex-wrap gap-2">
+                          {round.feedbackSummary.items.map((item) => (
+                            <span key={item.key} className="rounded-full bg-white px-2.5 py-1 text-xs font-medium text-blue-700 ring-1 ring-blue-100">
+                              {item.label}: {item.value}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
                     )}
                   </div>
                   <div className="flex shrink-0 flex-wrap gap-2">

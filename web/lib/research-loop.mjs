@@ -101,7 +101,37 @@ function runDescription(locale, variant, params) {
 }
 
 /**
- * @param {{ runs?: Array<{ id?: string; kind?: string; label?: string; summary?: string | null; status?: string; query_text?: string; updated_at?: string }>; locale?: string }} input
+ * @param {unknown} value
+ */
+function feedbackFromRunResult(value) {
+  if (!isPlainObject(value) || !isPlainObject(value.search_feedback)) return null;
+  return value.search_feedback;
+}
+
+function feedbackValueLabel(locale, key, value) {
+  const normalized = cleanString(value);
+  if (!normalized) return "";
+  return msg(locale, `feedback.${key}.${normalized}`);
+}
+
+function buildRoundFeedbackSummary(run, locale) {
+  const feedback = feedbackFromRunResult(run?.result);
+  if (!feedback) return null;
+  const items = [
+    ["precision", msg(locale, "projects.rounds.feedback.precision"), feedbackValueLabel(locale, "precision", feedback.precision)],
+    ["satisfaction", msg(locale, "projects.rounds.feedback.satisfaction"), feedbackValueLabel(locale, "satisfaction", feedback.satisfaction)],
+    ["issue", msg(locale, "projects.rounds.feedback.issue"), feedbackValueLabel(locale, "issue", feedback.issue)],
+    ["focus", msg(locale, "projects.rounds.feedback.focus"), feedbackValueLabel(locale, "focus", feedback.focus)],
+  ].flatMap(([key, label, value]) => cleanString(value) ? [{ key, label, value }] : []);
+  if (!items.length) return null;
+  return {
+    title: msg(locale, "projects.rounds.feedbackTitle"),
+    items,
+  };
+}
+
+/**
+ * @param {{ runs?: Array<{ id?: string; kind?: string; label?: string; summary?: string | null; status?: string; query_text?: string; updated_at?: string; result?: unknown }>; locale?: string }} input
  */
 export function buildProjectResearchRounds({ runs = [], locale = "zh" } = {}) {
   const normalizedLocale = normalizeLocale(locale);
@@ -135,6 +165,7 @@ export function buildProjectResearchRounds({ runs = [], locale = "zh" } = {}) {
       updatedAt: cleanString(run?.updated_at),
       description,
       nextSearchInput: run?.kind === "verify" ? "" : queryText,
+      feedbackSummary: buildRoundFeedbackSummary(run, normalizedLocale),
     };
   });
 

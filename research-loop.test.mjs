@@ -165,6 +165,14 @@ test("builds project research rounds from newest-first project runs", () => {
         status: "done",
         summary: "Found replacement candidates",
         updated_at: "2026-06-05T12:00:00.000Z",
+        result: {
+          search_feedback: {
+            precision: "off",
+            satisfaction: "unsatisfied",
+            issue: "weak_evidence",
+            focus: "expand_sources",
+          },
+        },
       },
       {
         id: "run-2",
@@ -199,6 +207,51 @@ test("builds project research rounds from newest-first project runs", () => {
   );
   assert.equal(rounds.items[0].nextSearchInput, rounds.items[0].queryText);
   assert.match(rounds.items[0].description, /根据上一轮反馈/);
+  assert.equal(rounds.items[0].feedbackSummary.title, "本轮反馈");
+  assert.deepEqual(
+    rounds.items[0].feedbackSummary.items.map((item) => [item.key, item.label, item.value]),
+    [
+      ["precision", "精准度", "不精准"],
+      ["satisfaction", "满意度", "不满意"],
+      ["issue", "主要问题", "证据不足"],
+      ["focus", "下一轮方向", "扩来源"],
+    ],
+  );
+});
+
+test("builds English feedback summaries for project research rounds", () => {
+  const rounds = buildProjectResearchRounds({
+    locale: "en",
+    runs: [
+      {
+        id: "run-1",
+        kind: "search",
+        label: "Senior LLM infra engineer",
+        query_text: "Senior LLM infra engineer",
+        status: "done",
+        updated_at: "2026-06-05T10:00:00.000Z",
+        result: {
+          search_feedback: {
+            precision: "partial",
+            satisfaction: "mixed",
+            issue: "wrong_seniority",
+            focus: "higher_seniority",
+          },
+        },
+      },
+    ],
+  });
+
+  assert.equal(rounds.items[0].feedbackSummary.title, "Round feedback");
+  assert.deepEqual(
+    rounds.items[0].feedbackSummary.items.map((item) => [item.label, item.value]),
+    [
+      ["Precision", "Partly precise"],
+      ["Satisfaction", "Mixed"],
+      ["Main issue", "Wrong seniority"],
+      ["Next-round focus", "Higher seniority"],
+    ],
+  );
 });
 
 test("builds English empty project research rounds", () => {

@@ -261,13 +261,14 @@ export interface ProjectRun {
   status: string;
   query_text: string;
   updated_at: string;
+  result?: unknown;
 }
 export async function projectRuns(userId: string, projectId: string, limit = 50): Promise<ProjectRun[]> {
   if (!client) return [];
   try {
     const { data, error } = await client.database
       .from("research_runs")
-      .select("id,kind,label,summary,status,query_text,updated_at")
+      .select("id,kind,label,summary,status,query_text,updated_at,result")
       .eq("user_id", userId)
       .eq("project_id", projectId)
       .order("updated_at", { ascending: false })

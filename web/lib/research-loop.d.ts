@@ -91,6 +91,14 @@ export type ProjectResearchRoundItem = {
   updatedAt: string;
   description: string;
   nextSearchInput: string;
+  feedbackSummary: null | {
+    title: string;
+    items: Array<{
+      key: string;
+      label: string;
+      value: string;
+    }>;
+  };
 };
 export type ProjectResearchRounds = {
   locale: ResearchLoopLocale;
@@ -140,6 +148,7 @@ export function buildProjectResearchRounds(input?: {
     status?: string;
     query_text?: string;
     updated_at?: string;
+    result?: unknown;
   }>;
   locale?: ResearchLoopLocale | string;
 }): ProjectResearchRounds;
