@@ -356,12 +356,12 @@ export default function ProjectDetailPage() {
       <div className="space-y-4">
         <SecondaryAction href="/app/projects" className="min-h-9 px-3 py-2 text-xs">
           <FiArrowLeft className="h-3.5 w-3.5" aria-hidden="true" />
-          回项目列表
+          {t("projects.detail.backToProjects")}
         </SecondaryAction>
         {error ? (
           <p className="rounded-xl border border-red-100 bg-red-50 p-4 text-sm text-red-700">{error}</p>
         ) : (
-          <LoadingState title="正在加载项目" description="正在读取项目画像、候选人和历史研究。" />
+          <LoadingState title={t("projects.detail.loading.title")} description={t("projects.detail.loading.desc")} />
         )}
       </div>
     );
@@ -435,7 +435,7 @@ export default function ProjectDetailPage() {
     <div className="space-y-6">
       <SecondaryAction href="/app/projects" className="min-h-9 px-3 py-2 text-xs">
         <FiArrowLeft className="h-3.5 w-3.5" aria-hidden="true" />
-        回项目列表
+        {t("projects.detail.backToProjects")}
       </SecondaryAction>
 
       {/* 头部: name + brief 编辑 + 状态 + 删除 */}
@@ -476,13 +476,13 @@ export default function ProjectDetailPage() {
 
       {showKpiStrip && (
         <section className="grid grid-cols-2 gap-3 sm:grid-cols-5">
-          <KpiCard label="候选人" value={p.candidates_total} sub="人" />
+          <KpiCard label={t("projects.detail.kpi.candidates")} value={p.candidates_total} sub={t("projects.detail.kpi.people")} />
           {SHORT_STATUS.map((s) => (
             <KpiCard
               key={s.value}
               label={t(s.labelKey)}
               value={detail.breakdown[s.value] ?? 0}
-              sub="人"
+              sub={t("projects.detail.kpi.people")}
               accentDot={s.dot}
               onClick={() => setStatusFilter(s.value)}
             />
@@ -504,7 +504,7 @@ export default function ProjectDetailPage() {
       {/* 候选人列表 + 详情面板 */}
       <section className="space-y-3">
         <div className="flex items-end justify-between">
-          <h2 className="text-sm font-semibold text-gray-700">候选人</h2>
+          <h2 className="text-sm font-semibold text-gray-700">{t("projects.detail.candidates.title")}</h2>
           {items && items.length > 0 && showCandidateStatusTabs && (
             <SegmentedControl
               value={statusFilter}
@@ -520,10 +520,10 @@ export default function ProjectDetailPage() {
         </div>
 
         {items === null && (
-          <LoadingState title="正在加载候选人" description="正在同步本项目下的候选人状态和证据画像。" />
+          <LoadingState title={t("projects.detail.candidates.loadingTitle")} description={t("projects.detail.candidates.loadingDesc")} />
         )}
         {items && items.length === 0 && (
-          <EmptyState title="本项目还没有候选人" description="先在本项目下启动一次搜人，候选人会自动回到这个项目空间。" />
+          <EmptyState title={t("projects.detail.candidates.emptyTitle")} description={t("projects.detail.candidates.emptyDesc")} />
         )}
         {items && items.length > 0 && (
           <div className="space-y-4">
@@ -553,7 +553,7 @@ export default function ProjectDetailPage() {
                   <CandidateItem key={it.id} item={it} locale={locale} selected={selectedItemId === it.id} onClick={() => setSelectedItemId(it.id)} />
                 ))}
                 {filteredItems.length === 0 && (
-                  <li><EmptyState title="这个状态下没有候选人" description="切换状态筛选，或继续补充候选人。" /></li>
+                  <li><EmptyState title={t("projects.detail.candidates.filteredEmptyTitle")} description={t("projects.detail.candidates.filteredEmptyDesc")} /></li>
                 )}
               </ul>
               <div className="lg:sticky lg:top-6 lg:self-start">
@@ -579,7 +579,7 @@ export default function ProjectDetailPage() {
                   />
                 ) : (
                   <div className="rounded-3xl border border-dashed border-black/10 bg-white/80 p-5 text-sm text-[var(--sh-muted)]">
-                    点左侧候选人查看画像、切状态、写备注。
+                    {t("projects.detail.candidates.selectHint")}
                   </div>
                 )}
               </div>
@@ -945,8 +945,8 @@ function StatusFunnel({
     <Surface className="p-5">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-neutral-500">候选人漏斗</p>
-          <h2 className="mt-1 text-xl font-semibold text-[var(--sh-ink)]">状态漏斗</h2>
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-neutral-500">{t("projects.detail.funnel.eyebrow")}</p>
+          <h2 className="mt-1 text-xl font-semibold text-[var(--sh-ink)]">{t("projects.detail.funnel.title")}</h2>
         </div>
         <button
           type="button"

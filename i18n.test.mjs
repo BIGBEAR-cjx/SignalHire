@@ -91,3 +91,28 @@ test("translates project detail status labels", () => {
     assert.equal(t("en", key), en);
   }
 });
+
+test("translates project detail shell labels", () => {
+  const keys = [
+    ["projects.detail.backToProjects", "回项目列表", "Back to projects"],
+    ["projects.detail.loading.title", "正在加载项目", "Loading project"],
+    ["projects.detail.loading.desc", "正在读取项目画像、候选人和历史研究。", "Reading project profile, candidates, and research history."],
+    ["projects.detail.kpi.candidates", "候选人", "Candidates"],
+    ["projects.detail.kpi.people", "人", "people"],
+    ["projects.detail.candidates.title", "候选人", "Candidates"],
+    ["projects.detail.candidates.loadingTitle", "正在加载候选人", "Loading candidates"],
+    ["projects.detail.candidates.loadingDesc", "正在同步本项目下的候选人状态和证据画像。", "Syncing candidate status and evidence profiles for this project."],
+    ["projects.detail.candidates.emptyTitle", "本项目还没有候选人", "No candidates in this project yet"],
+    ["projects.detail.candidates.emptyDesc", "先在本项目下启动一次搜人，候选人会自动回到这个项目空间。", "Run a search in this project first. Candidates will return to this project space automatically."],
+    ["projects.detail.candidates.filteredEmptyTitle", "这个状态下没有候选人", "No candidates in this status"],
+    ["projects.detail.candidates.filteredEmptyDesc", "切换状态筛选，或继续补充候选人。", "Switch status filters or add more candidates."],
+    ["projects.detail.candidates.selectHint", "点左侧候选人查看画像、切状态、写备注。", "Select a candidate on the left to view the profile, change status, and add notes."],
+    ["projects.detail.funnel.eyebrow", "候选人漏斗", "Candidate funnel"],
+    ["projects.detail.funnel.title", "状态漏斗", "Status funnel"],
+  ];
+
+  for (const [key, zh, en] of keys) {
+    assert.equal(t("zh", key), zh);
+    assert.equal(t("en", key), en);
+  }
+});
