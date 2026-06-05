@@ -395,6 +395,7 @@ export default function ProjectDetailPage() {
   const hiddenPanels = new Set(projectHierarchy.hidden);
   const showActionBrief = !hiddenPanels.has("action_brief");
   const showCandidateFeedbackSummary = !hiddenPanels.has("candidate_feedback_summary");
+  const showCandidateEvidencePriority = !hiddenPanels.has("candidate_evidence_priority");
   const showCandidateComparison = !hiddenPanels.has("candidate_comparison");
   const projectRounds = buildProjectResearchRounds({
     runs: detail.runs,
@@ -489,7 +490,7 @@ export default function ProjectDetailPage() {
         )}
         {items && items.length > 0 && (
           <div className="space-y-4">
-            {projectEvidencePriorityView && (
+            {projectEvidencePriorityView && showCandidateEvidencePriority && (
               <EvidencePriorityPanel
                 view={projectEvidencePriorityView}
                 compact

@@ -845,6 +845,20 @@ test("builds a project detail hierarchy that avoids duplicate candidate review p
   assert.equal(hierarchy.notes.candidate_comparison, "项目证据矩阵已承接候选人对比指标，通用对比面板作为无矩阵时的回退。");
 });
 
+test("builds a project detail hierarchy that avoids duplicate evidence priority panels", () => {
+  assert.equal(typeof researchLoop.buildProjectDetailHierarchy, "function");
+
+  const hierarchy = researchLoop.buildProjectDetailHierarchy({
+    hasCandidates: true,
+    hasControlRoom: true,
+    hasProjectEvidenceMatrix: true,
+    locale: "zh",
+  });
+
+  assert.ok(hierarchy.hidden.includes("candidate_evidence_priority"));
+  assert.equal(hierarchy.notes.candidate_evidence_priority, "项目证据矩阵已包含证据优先级、信源和下一步动作，紧凑优先级面板作为无矩阵时的回退。");
+});
+
 test("parses project next-search text into editable constraint sections", () => {
   assert.equal(typeof researchLoop.buildSearchConstraintEditor, "function");
   assert.equal(typeof researchLoop.buildSearchInputFromConstraintEditor, "function");

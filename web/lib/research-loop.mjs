@@ -1449,17 +1449,19 @@ export function buildProjectDetailHierarchy({ hasCandidates = false, hasControlR
   const normalizedLocale = normalizeLocale(locale);
   const hidden = [
     ...(hasControlRoom ? ["action_brief", "candidate_feedback_summary"] : []),
-    ...(hasProjectEvidenceMatrix ? ["candidate_comparison"] : []),
+    ...(hasProjectEvidenceMatrix ? ["candidate_evidence_priority", "candidate_comparison"] : []),
   ];
   const notes = normalizedLocale === "en"
     ? {
         action_brief: "The control room already carries today's priority action, so the standalone summary is hidden.",
         candidate_feedback_summary: "The control room already carries feedback learning; candidate feedback signals stay in the search console.",
+        candidate_evidence_priority: "The project evidence matrix already carries evidence priority, sources, and next actions; the compact priority panel is a fallback when no matrix is available.",
         candidate_comparison: "The project evidence matrix already carries candidate comparison metrics; the generic comparison panel is a fallback when no matrix is available.",
       }
     : {
         action_brief: "控制台已承接今日优先动作，避免重复显示。",
         candidate_feedback_summary: "控制台已承接反馈学习摘要，保留候选人反馈信号在搜索控制台中。",
+        candidate_evidence_priority: "项目证据矩阵已包含证据优先级、信源和下一步动作，紧凑优先级面板作为无矩阵时的回退。",
         candidate_comparison: "项目证据矩阵已承接候选人对比指标，通用对比面板作为无矩阵时的回退。",
       };
   const candidateEvidenceSection = hasProjectEvidenceMatrix ? "candidate_evidence_matrix" : "candidate_evidence";
