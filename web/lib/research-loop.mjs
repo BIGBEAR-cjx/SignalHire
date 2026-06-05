@@ -1443,14 +1443,15 @@ export function buildProjectControlRoom({ project = {}, runs = [], items = [], c
 }
 
 /**
- * @param {{ hasCandidates?: boolean; hasControlRoom?: boolean; hasProjectEvidenceMatrix?: boolean; hasStatusFunnel?: boolean; locale?: string }} input
+ * @param {{ hasCandidates?: boolean; hasControlRoom?: boolean; hasProjectEvidenceMatrix?: boolean; hasStatusFunnel?: boolean; hasResearchRounds?: boolean; locale?: string }} input
  */
-export function buildProjectDetailHierarchy({ hasCandidates = false, hasControlRoom = true, hasProjectEvidenceMatrix = false, hasStatusFunnel = false, locale = "zh" } = {}) {
+export function buildProjectDetailHierarchy({ hasCandidates = false, hasControlRoom = true, hasProjectEvidenceMatrix = false, hasStatusFunnel = false, hasResearchRounds = false, locale = "zh" } = {}) {
   const normalizedLocale = normalizeLocale(locale);
   const hidden = [
     ...(hasControlRoom ? ["action_brief", "candidate_feedback_summary"] : []),
     ...(hasProjectEvidenceMatrix ? ["candidate_evidence_priority", "candidate_comparison"] : []),
     ...(hasStatusFunnel ? ["kpi_strip"] : []),
+    ...(hasResearchRounds ? ["latest_round_summary"] : []),
   ];
   const notes = normalizedLocale === "en"
     ? {
@@ -1459,6 +1460,7 @@ export function buildProjectDetailHierarchy({ hasCandidates = false, hasControlR
         candidate_evidence_priority: "The project evidence matrix already carries evidence priority, sources, and next actions; the compact priority panel is a fallback when no matrix is available.",
         candidate_comparison: "The project evidence matrix already carries candidate comparison metrics; the generic comparison panel is a fallback when no matrix is available.",
         kpi_strip: "The status funnel already carries candidate totals, status counts, and filtering actions; the KPI strip is a fallback when no funnel is available.",
+        latest_round_summary: "The research rounds list already shows the latest round and history; the search console keeps the next-search constraints.",
       }
     : {
         action_brief: "控制台已承接今日优先动作，避免重复显示。",
@@ -1466,6 +1468,7 @@ export function buildProjectDetailHierarchy({ hasCandidates = false, hasControlR
         candidate_evidence_priority: "项目证据矩阵已包含证据优先级、信源和下一步动作，紧凑优先级面板作为无矩阵时的回退。",
         candidate_comparison: "项目证据矩阵已承接候选人对比指标，通用对比面板作为无矩阵时的回退。",
         kpi_strip: "状态漏斗已承接候选人总数、状态计数和筛选动作，KPI 条作为无漏斗时的回退。",
+        latest_round_summary: "研究轮次列表已展示最新轮次和历史记录，搜索控制台只保留下一轮搜索约束。",
       };
   const candidateEvidenceSection = hasProjectEvidenceMatrix ? "candidate_evidence_matrix" : "candidate_evidence";
   const summarySections = hasStatusFunnel ? ["search_console", "status_funnel"] : ["search_console", "kpi_strip", "status_funnel"];

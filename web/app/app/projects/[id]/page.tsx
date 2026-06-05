@@ -386,11 +386,16 @@ export default function ProjectDetailPage() {
     hasFilter: statusFilter !== "all",
     locale,
   }) as ProjectControlRoomView;
+  const projectRounds = buildProjectResearchRounds({
+    runs: detail.runs,
+    locale,
+  }) as ProjectResearchRoundsView;
   const projectHierarchy = buildProjectDetailHierarchy({
     hasCandidates: Boolean(items && items.length > 0),
     hasControlRoom: true,
     hasProjectEvidenceMatrix: Boolean(projectEvidenceMatrix),
     hasStatusFunnel: p.candidates_total > 0,
+    hasResearchRounds: projectRounds.items.length > 0,
     locale,
   }) as ProjectDetailHierarchyView;
   const hiddenPanels = new Set(projectHierarchy.hidden);
@@ -399,10 +404,7 @@ export default function ProjectDetailPage() {
   const showCandidateFeedbackSummary = !hiddenPanels.has("candidate_feedback_summary");
   const showCandidateEvidencePriority = !hiddenPanels.has("candidate_evidence_priority");
   const showCandidateComparison = !hiddenPanels.has("candidate_comparison");
-  const projectRounds = buildProjectResearchRounds({
-    runs: detail.runs,
-    locale,
-  }) as ProjectResearchRoundsView;
+  const showLatestRoundSummary = !hiddenPanels.has("latest_round_summary");
   const decisionQueue = buildProjectCandidateDecisionQueue({ items: items ?? [], locale });
   const actionBrief = showActionBrief ? buildProjectActionBrief({ items: items ?? [], locale }) as ProjectActionBriefView : null;
   const candidateFeedbackSummary = showCandidateFeedbackSummary ? buildProjectCandidateFeedbackSummary({ items: items ?? [], locale }) as ProjectCandidateFeedbackSummaryView : null;
@@ -438,7 +440,12 @@ export default function ProjectDetailPage() {
         <ProjectCandidateFeedbackSummaryPanel summary={candidateFeedbackSummary} />
       )}
 
-      <ProjectSearchConsolePanel consoleView={projectConsole} searchHref={searchHref} verifyHref={verifyHref} />
+      <ProjectSearchConsolePanel
+        consoleView={projectConsole}
+        searchHref={searchHref}
+        verifyHref={verifyHref}
+        showLatestRoundSummary={showLatestRoundSummary}
+      />
 
       {showKpiStrip && (
         <section className="grid grid-cols-2 gap-3 sm:grid-cols-5">
@@ -564,12 +571,17 @@ function ProjectSearchConsolePanel({
   consoleView,
   searchHref,
   verifyHref,
+  showLatestRoundSummary,
 }: {
   consoleView: ProjectSearchConsoleView;
   searchHref: string;
   verifyHref: string;
+  showLatestRoundSummary: boolean;
 }) {
   const { t } = useI18n();
+  const gridClassName = showLatestRoundSummary
+    ? "mt-5 grid gap-3 lg:grid-cols-[minmax(0,1.15fr)_minmax(260px,0.85fr)_minmax(260px,0.85fr)]"
+    : "mt-5 grid gap-3 lg:grid-cols-[minmax(0,1.15fr)_minmax(260px,0.85fr)]";
   return (
     <Surface className="p-5 md:p-6">
       <div className="flex flex-wrap items-start justify-between gap-4">
@@ -590,7 +602,7 @@ function ProjectSearchConsolePanel({
         </div>
       </div>
 
-      <div className="mt-5 grid gap-3 lg:grid-cols-[minmax(0,1.15fr)_minmax(260px,0.85fr)_minmax(260px,0.85fr)]">
+      <div className={gridClassName}>
         <div className="rounded-2xl border border-black/10 bg-white/72 p-4">
           <p className="text-xs font-semibold text-[var(--sh-muted)]">{consoleView.briefTitle}</p>
           <p className="mt-2 whitespace-pre-line text-sm leading-6 text-[var(--sh-ink)]">{consoleView.briefText}</p>
@@ -639,25 +651,27 @@ function ProjectSearchConsolePanel({
           )}
         </div>
 
-        <div className="rounded-2xl border border-black/10 bg-white/72 p-4">
-          <p className="text-xs font-semibold text-[var(--sh-muted)]">{consoleView.latestRoundTitle}</p>
-          {consoleView.latestRound ? (
-            <>
-              <div className="mt-2 flex flex-wrap items-center gap-2">
-                <span className="rounded-full bg-neutral-950 px-2.5 py-1 text-xs font-semibold text-white">#{consoleView.latestRound.roundNumber}</span>
-                <KindBadge kind={consoleView.latestRound.kind} />
-                <span className="rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-[var(--sh-muted)] ring-1 ring-black/10">{consoleView.latestRound.badge}</span>
-              </div>
-              <p className="mt-3 line-clamp-2 text-sm font-semibold text-[var(--sh-ink)]">{consoleView.latestRound.label}</p>
-              <p className="mt-1 text-xs leading-5 text-[var(--sh-muted)]">{consoleView.latestRound.description}</p>
-              {(consoleView.latestRound.summary || consoleView.latestRound.status) && (
-                <p className="mt-2 text-xs text-[var(--sh-faint)]">{consoleView.latestRound.summary || consoleView.latestRound.status}</p>
-              )}
-            </>
-          ) : (
-            <p className="mt-3 rounded-2xl border border-dashed border-black/10 bg-white/60 px-3 py-3 text-xs leading-5 text-[var(--sh-faint)]">{consoleView.latestRoundEmpty}</p>
-          )}
-        </div>
+        {showLatestRoundSummary && (
+          <div className="rounded-2xl border border-black/10 bg-white/72 p-4">
+            <p className="text-xs font-semibold text-[var(--sh-muted)]">{consoleView.latestRoundTitle}</p>
+            {consoleView.latestRound ? (
+              <>
+                <div className="mt-2 flex flex-wrap items-center gap-2">
+                  <span className="rounded-full bg-neutral-950 px-2.5 py-1 text-xs font-semibold text-white">#{consoleView.latestRound.roundNumber}</span>
+                  <KindBadge kind={consoleView.latestRound.kind} />
+                  <span className="rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-[var(--sh-muted)] ring-1 ring-black/10">{consoleView.latestRound.badge}</span>
+                </div>
+                <p className="mt-3 line-clamp-2 text-sm font-semibold text-[var(--sh-ink)]">{consoleView.latestRound.label}</p>
+                <p className="mt-1 text-xs leading-5 text-[var(--sh-muted)]">{consoleView.latestRound.description}</p>
+                {(consoleView.latestRound.summary || consoleView.latestRound.status) && (
+                  <p className="mt-2 text-xs text-[var(--sh-faint)]">{consoleView.latestRound.summary || consoleView.latestRound.status}</p>
+                )}
+              </>
+            ) : (
+              <p className="mt-3 rounded-2xl border border-dashed border-black/10 bg-white/60 px-3 py-3 text-xs leading-5 text-[var(--sh-faint)]">{consoleView.latestRoundEmpty}</p>
+            )}
+          </div>
+        )}
 
         <div className="rounded-2xl border border-black/10 bg-white/72 p-4">
           <p className="text-xs font-semibold text-[var(--sh-muted)]">{consoleView.feedback?.title ?? t("projects.console.feedbackTitle")}</p>

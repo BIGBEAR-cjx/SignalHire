@@ -874,6 +874,20 @@ test("builds a project detail hierarchy that avoids duplicate status count panel
   assert.equal(hierarchy.notes.kpi_strip, "状态漏斗已承接候选人总数、状态计数和筛选动作，KPI 条作为无漏斗时的回退。");
 });
 
+test("builds a project detail hierarchy that avoids duplicate research round summaries", () => {
+  assert.equal(typeof researchLoop.buildProjectDetailHierarchy, "function");
+
+  const hierarchy = researchLoop.buildProjectDetailHierarchy({
+    hasCandidates: true,
+    hasControlRoom: true,
+    hasResearchRounds: true,
+    locale: "zh",
+  });
+
+  assert.ok(hierarchy.hidden.includes("latest_round_summary"));
+  assert.equal(hierarchy.notes.latest_round_summary, "研究轮次列表已展示最新轮次和历史记录，搜索控制台只保留下一轮搜索约束。");
+});
+
 test("parses project next-search text into editable constraint sections", () => {
   assert.equal(typeof researchLoop.buildSearchConstraintEditor, "function");
   assert.equal(typeof researchLoop.buildSearchInputFromConstraintEditor, "function");
