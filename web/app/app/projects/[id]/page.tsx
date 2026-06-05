@@ -7,6 +7,7 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { FiArrowLeft, FiCheckCircle, FiMail, FiSearch, FiTrash2 } from "react-icons/fi";
 import { CandidateComparisonView, CandidateProfileView } from "@/components/result";
+import { useI18n } from "@/components/LanguageProvider";
 import OutreachModal from "@/components/OutreachModal";
 import {
   EmptyState,
@@ -18,10 +19,21 @@ import {
   StatusBadge,
   Surface,
 } from "@/components/ui/signal-ui";
+import { buildProjectNextSteps } from "@/lib/research-loop.mjs";
 import type { TalentCandidate } from "@/lib/talent-profile.mjs";
 
 type ProjectStatus = "open" | "paused" | "closed";
 type ShortlistStatus = "new" | "contacted" | "interviewing" | "hired" | "rejected";
+type ProjectNextStepsView = {
+  locale: string;
+  title: string;
+  latestRunLabel?: string;
+  actions: Array<{
+    key: string;
+    label: string;
+    detail: string;
+  }>;
+};
 
 const PROJ_STATUS_META: Record<ProjectStatus, { label: string; chip: string; dot: string }> = {
   open:   { label: "进行中", chip: "bg-emerald-50 text-emerald-700 ring-emerald-200", dot: "bg-emerald-500" },
@@ -88,6 +100,7 @@ function isTalentShape(x: unknown): x is TalentCandidate {
 export default function ProjectDetailPage() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
+  const { locale } = useI18n();
   const id = String(params?.id ?? "");
 
   const [detail, setDetail] = useState<ProjectDetail | null>(null);
@@ -166,6 +179,15 @@ export default function ProjectDetailPage() {
 
   const p = detail.project;
   const briefForSearch = (p.brief ?? "").trim() || p.name;
+  const searchHref = `/app/search?project=${id}&q=${encodeURIComponent(briefForSearch)}`;
+  const verifyHref = `/app/verify?project=${id}`;
+  const projectNextSteps = buildProjectNextSteps({
+    candidateCount: p.candidates_total,
+    runCount: detail.runs.length,
+    hasFilter: statusFilter !== "all",
+    latestRunLabel: detail.runs[0]?.label ?? "",
+    locale,
+  });
 
   return (
     <div className="space-y-6">
@@ -197,18 +219,20 @@ export default function ProjectDetailPage() {
       {/* 动作 */}
       <div className="flex flex-wrap gap-2">
         <PrimaryAction
-          href={`/app/search?project=${id}&q=${encodeURIComponent(briefForSearch)}`}
+          href={searchHref}
         >
           <FiSearch className="h-4 w-4" aria-hidden="true" />
           在本项目下搜人
         </PrimaryAction>
         <SecondaryAction
-          href={`/app/verify?project=${id}`}
+          href={verifyHref}
         >
           <FiCheckCircle className="h-4 w-4" aria-hidden="true" />
           在本项目下核验
         </SecondaryAction>
       </div>
+
+      <ProjectNextStepPanel steps={projectNextSteps} searchHref={searchHref} verifyHref={verifyHref} />
 
       {/* 候选人列表 + 详情面板 */}
       <section className="space-y-3">
@@ -236,7 +260,7 @@ export default function ProjectDetailPage() {
         )}
         {items && items.length > 0 && (
           <div className="space-y-4">
-            <CandidateComparisonView result={projectComparisonResult} />
+            <CandidateComparisonView result={projectComparisonResult} locale={locale} />
             <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(360px,0.85fr)]">
               <ul className="space-y-2">
                 {filteredItems.map((it) => (
@@ -251,6 +275,7 @@ export default function ProjectDetailPage() {
                   <CandidateDetailPanel
                     key={selectedItem.id}
                     item={selectedItem}
+                    locale={locale}
                     onChanged={(patch) => {
                       setItems((prev) => prev?.map((it) => it.id === selectedItem.id ? { ...it, ...patch } : it) ?? prev);
                       reloadDetail();
@@ -305,6 +330,45 @@ export default function ProjectDetailPage() {
         </section>
       )}
     </div>
+  );
+}
+
+function ProjectNextStepPanel({
+  steps,
+  searchHref,
+  verifyHref,
+}: {
+  steps: ProjectNextStepsView;
+  searchHref: string;
+  verifyHref: string;
+}) {
+  const { t } = useI18n();
+  return (
+    <Surface className="p-5 md:p-6">
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div className="max-w-2xl">
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-neutral-500">{steps.title}</p>
+          <div className="mt-3 grid gap-3 md:grid-cols-3">
+            {steps.actions.map((action) => (
+              <div key={action.key} className="rounded-2xl border border-black/10 bg-white/72 p-4">
+                <p className="text-sm font-semibold text-[var(--sh-ink)]">{action.label}</p>
+                <p className="mt-1 text-xs leading-5 text-[var(--sh-muted)]">{action.detail}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+        <div className="flex shrink-0 flex-wrap gap-2">
+          <PrimaryAction href={searchHref}>
+            <FiSearch className="h-4 w-4" aria-hidden="true" />
+            {t("projects.searchInProject")}
+          </PrimaryAction>
+          <SecondaryAction href={verifyHref}>
+            <FiCheckCircle className="h-4 w-4" aria-hidden="true" />
+            {t("projects.verifyInProject")}
+          </SecondaryAction>
+        </div>
+      </div>
+    </Surface>
   );
 }
 
@@ -513,12 +577,13 @@ function CandidateItem({ item, selected, onClick }: { item: ShortlistItem; selec
 }
 
 function CandidateDetailPanel({
-  item, onChanged, onDeleted, onUnassigned,
+  item, onChanged, onDeleted, onUnassigned, locale,
 }: {
   item: ShortlistItem;
   onChanged: (patch: Partial<ShortlistItem>) => void;
   onDeleted: () => void;
   onUnassigned: () => void;
+  locale: "zh" | "en";
 }) {
   const [savingStatus, setSavingStatus] = useState(false);
   const [notes, setNotes] = useState(item.notes ?? "");
@@ -625,7 +690,7 @@ function CandidateDetailPanel({
 
       <div className="border-t border-gray-100 pt-4">
         {isTalent ? (
-          <CandidateProfileView candidate={candidate as TalentCandidate} />
+          <CandidateProfileView candidate={candidate as TalentCandidate} locale={locale} />
         ) : (
           <LegacyCandidateView candidate={candidate} />
         )}

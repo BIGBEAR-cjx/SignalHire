@@ -1,10 +1,13 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
 import {
+  FiActivity,
   FiArrowLeft,
   FiCheckCircle,
   FiEdit3,
+  FiGlobe,
   FiPlay,
+  FiRefreshCw,
   FiSearch,
   FiShare2,
   FiSquare,
@@ -18,6 +21,37 @@ export type ResearchTimelineItem = {
   kind: "search" | "fetch";
   label: string;
   detail: string;
+};
+
+export type FeedbackChoiceGroup = {
+  key: string;
+  label: string;
+  options: Array<{
+    value: string;
+    label: string;
+    selected: boolean;
+  }>;
+};
+type ResearchCoverageViewItem = {
+  key: string;
+  label: string;
+  count: number;
+};
+type ResearchRecentViewItem = {
+  id: number;
+  kind: string;
+  label: string;
+  detail: string;
+};
+type FeedbackOptimizationAction = {
+  key: string;
+  label: string;
+  detail: string;
+};
+type FeedbackOptimizationPreviewModel = {
+  canRun: boolean;
+  statusText: string;
+  actions: FeedbackOptimizationAction[];
 };
 
 export function ProjectContextBanner({
@@ -195,6 +229,187 @@ export function ResearchTimelinePanel({
           ))}
         </ol>
       )}
+    </Surface>
+  );
+}
+
+function coverageTone(key: string) {
+  if (key === "github") return "bg-neutral-950 text-white ring-neutral-950";
+  if (key === "papers") return "bg-blue-50 text-blue-700 ring-blue-100";
+  if (key === "company") return "bg-emerald-50 text-emerald-700 ring-emerald-100";
+  return "bg-white/80 text-[var(--sh-muted)] ring-black/10";
+}
+
+function recentIcon(kind: string) {
+  return kind === "search" ? FiSearch : FiGlobe;
+}
+
+export function ResearchProcessPanel({
+  phaseLabel,
+  phaseDetail,
+  statsText,
+  coverage,
+  recentItems,
+  statusDetail,
+  onStop,
+}: {
+  phaseLabel: string;
+  phaseDetail: string;
+  statsText: string;
+  coverage: ResearchCoverageViewItem[];
+  recentItems: ResearchRecentViewItem[];
+  statusDetail?: string;
+  onStop: () => void;
+}) {
+  const { t } = useI18n();
+  return (
+    <Surface className="p-5 md:p-6">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="max-w-2xl">
+          <div className="flex items-center gap-2 text-sm font-semibold text-[var(--sh-ink)]">
+            <span className="inline-block h-2 w-2 animate-pulse rounded-full bg-emerald-500" />
+            {t("research.processTitle")}
+          </div>
+          <p className="mt-1 text-sm leading-6 text-[var(--sh-muted)]">{phaseLabel}</p>
+        </div>
+        <SecondaryAction onClick={onStop} className="min-h-9 px-3 py-2 text-xs">
+          <FiSquare className="h-3.5 w-3.5" aria-hidden="true" />
+          {t("research.stop")}
+        </SecondaryAction>
+      </div>
+
+      {statusDetail && <p className="mt-3 text-xs leading-5 text-[var(--sh-muted)]">{statusDetail}</p>}
+
+      <div className="mt-5 grid gap-3 lg:grid-cols-[minmax(0,1fr)_220px]">
+        <div className="rounded-2xl border border-emerald-100 bg-emerald-50/70 p-4">
+          <p className="text-xs font-semibold text-emerald-700">{t("research.currentAction")}</p>
+          <p className="mt-2 break-all font-mono text-sm leading-6 text-[var(--sh-ink)]">{phaseDetail || t("research.currentFallback")}</p>
+        </div>
+        <div className="rounded-2xl bg-white/72 p-4 ring-1 ring-black/5">
+          <p className="text-xs font-semibold text-[var(--sh-muted)]">{t("research.progress")}</p>
+          <p className="mt-2 text-sm font-semibold text-[var(--sh-ink)]">{statsText}</p>
+        </div>
+      </div>
+
+      <div className="mt-5 grid gap-4 lg:grid-cols-[minmax(0,1fr)_280px]">
+        <div>
+          <p className="text-xs font-semibold text-[var(--sh-muted)]">{t("research.recentTitle")}</p>
+          {recentItems.length === 0 ? (
+            <p className="mt-3 rounded-2xl border border-dashed border-black/10 bg-white/60 px-4 py-3 text-xs text-[var(--sh-faint)]">{t("research.timelineEmpty")}</p>
+          ) : (
+            <ol className="mt-3 max-h-80 space-y-3 overflow-auto pr-1">
+              {recentItems.map((item) => {
+                const Icon = recentIcon(item.kind);
+                return (
+                  <li key={`${item.id}-${item.kind}`} className="rounded-2xl bg-white/72 px-3 py-3 ring-1 ring-black/5">
+                    <div className="flex items-center justify-between gap-3">
+                      <span className="inline-flex items-center gap-2 text-xs font-semibold text-[var(--sh-muted)]">
+                        <Icon className="h-3.5 w-3.5" aria-hidden="true" />
+                        {item.label}
+                      </span>
+                      <span className="text-[11px] text-[var(--sh-faint)]">#{item.id + 1}</span>
+                    </div>
+                    <p className="mt-2 break-all font-mono text-xs leading-relaxed text-[var(--sh-ink)]">{item.detail}</p>
+                  </li>
+                );
+              })}
+            </ol>
+          )}
+        </div>
+        <div>
+          <p className="text-xs font-semibold text-[var(--sh-muted)]">{t("research.coverageTitle")}</p>
+          {coverage.length === 0 ? (
+            <p className="mt-3 rounded-2xl border border-dashed border-black/10 bg-white/60 px-4 py-3 text-xs leading-5 text-[var(--sh-faint)]">{t("research.coverageEmpty")}</p>
+          ) : (
+            <div className="mt-3 flex flex-wrap gap-2">
+              {coverage.map((item) => (
+                <span key={item.key} className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold ring-1 ${coverageTone(item.key)}`}>
+                  {item.label}
+                  <span className="font-mono text-[11px] opacity-75">{item.count}</span>
+                </span>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    </Surface>
+  );
+}
+
+export function FeedbackOptimizationPreview({
+  groups,
+  preview,
+  loading,
+  onSelect,
+  onRun,
+}: {
+  groups: FeedbackChoiceGroup[];
+  preview: FeedbackOptimizationPreviewModel;
+  loading: boolean;
+  onSelect: (key: string, value: string) => void;
+  onRun: () => void;
+}) {
+  const { t } = useI18n();
+  return (
+    <Surface className="p-5 md:p-6">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="max-w-2xl">
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-neutral-500">{t("feedback.eyebrow")}</p>
+          <h2 className="mt-1 text-xl font-semibold text-[var(--sh-ink)]">{t("feedback.title")}</h2>
+          <p className="mt-1 text-sm leading-6 text-[var(--sh-muted)]">{t("feedback.desc")}</p>
+        </div>
+        <PrimaryAction
+          onClick={onRun}
+          disabled={loading || !preview.canRun}
+          className="px-4"
+        >
+          <FiRefreshCw className="h-4 w-4" aria-hidden="true" />
+          {t("feedback.run")}
+        </PrimaryAction>
+      </div>
+
+      <div className="mt-4 grid gap-4 md:grid-cols-2">
+        {groups.map((group) => (
+          <div key={group.key}>
+            <p className="text-xs font-semibold text-[var(--sh-muted)]">{group.label}</p>
+            <div className="mt-2 flex flex-wrap gap-2">
+              {group.options.map((option) => (
+                <button
+                  key={option.value}
+                  type="button"
+                  aria-pressed={option.selected}
+                  onClick={() => onSelect(group.key, option.value)}
+                  className={`rounded-full border px-3 py-1.5 text-sm font-medium transition ${
+                    option.selected
+                      ? "border-[var(--sh-ink)] bg-[var(--sh-ink)] text-white"
+                      : "border-black/10 bg-white/72 text-[var(--sh-muted)] hover:border-black/20 hover:bg-white"
+                  }`}
+                >
+                  {option.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div className="mt-5 rounded-2xl border border-black/10 bg-white/72 p-4">
+        <div className="flex items-center gap-2">
+          <FiActivity className="h-4 w-4 text-[var(--sh-muted)]" aria-hidden="true" />
+          <p className="text-sm font-semibold text-[var(--sh-ink)]">{t("feedback.previewTitle")}</p>
+        </div>
+        <p className="mt-2 text-sm leading-6 text-[var(--sh-muted)]">{preview.statusText}</p>
+        {preview.actions.length > 0 && (
+          <ul className="mt-3 grid gap-2 md:grid-cols-2">
+            {preview.actions.map((action: FeedbackOptimizationAction) => (
+              <li key={action.key} className="rounded-2xl bg-white px-3 py-3 ring-1 ring-black/5">
+                <p className="text-sm font-semibold text-[var(--sh-ink)]">{action.label}</p>
+                <p className="mt-1 text-xs leading-5 text-[var(--sh-muted)]">{action.detail}</p>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
     </Surface>
   );
 }

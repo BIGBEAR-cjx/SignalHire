@@ -27,6 +27,8 @@ import {
   uniqueSourcesOf,
 } from "@/lib/source-quality";
 
+type Locale = "zh" | "en";
+
 export type Verdict = "verified" | "contradicted" | "unverified";
 export type Evidence = { note: string; url: string };
 export type Claim = { claim: string; verdict: Verdict; evidence: Evidence[] };
@@ -44,11 +46,240 @@ export type VerifyReport = {
   red_flags: string[];
 };
 
+type ResultLocaleProps = { locale?: Locale };
+
+const RESULT_COPY = {
+  zh: {
+    unknownCandidate: "未知候选人",
+    source: "来源",
+    verified: "已验证",
+    contradicted: "矛盾",
+    unverified: "查无实据",
+    sourceCountTitle: "覆盖该声称的不同域名数 (越多越可靠)",
+    evidenceStrong: "证据强",
+    evidenceMedium: "证据中等",
+    evidenceWeak: "证据弱",
+    deliveryTitle: "交付报告摘要",
+    deliveryBadge: "招聘候选名单",
+    candidates: "候选人",
+    strongRecommendations: "{count} 位强推荐",
+    averageMatch: "平均匹配分",
+    strongEvidenceCandidates: "证据强候选人",
+    sourceCoverage: "信息源覆盖",
+    priorityReview: "优先审阅候选人",
+    sourcesShort: "信源",
+    deliveryRisks: "交付风险",
+    nextSteps: "建议下一步",
+    searchPlanTitle: "搜索计划",
+    searchPlanDesc: "系统如何拆解岗位画像、选择来源并扩展相邻人才池。",
+    mustHave: "必须条件",
+    niceToHave: "加分条件",
+    exclusions: "排除条件",
+    notIdentified: "未识别",
+    sourceQueryPlan: "来源查询计划",
+    items: "条",
+    adjacentPools: "相邻人才池",
+    research: "研究",
+    practice: "实践",
+    work_history: "工作经历",
+    public_voice: "公开表达",
+    planned: "待执行",
+    completed: "已完成",
+    partial: "部分完成",
+    failed: "失败",
+    sourceExecutionTitle: "来源执行记录",
+    sourceExecutionReturned: "记录每类来源任务的实际查询、具体链接、证据数量和后续缺口。",
+    sourceExecutionPlanned: "本次结果未返回执行记录，先展示可执行的来源任务计划。",
+    executed: "已执行",
+    evidence: "证据",
+    links: "链接",
+    leads: "线索",
+    backfillTitle: "缺口补搜计划",
+    backfillDesc: "把缺失或偏弱的信息源覆盖转成下一轮可执行查询。",
+    gaps: "个缺口",
+    plannedBackfill: "待补搜",
+    completedBackfill: "已补齐",
+    skippedBackfill: "已跳过",
+    affectedCandidates: "影响候选人",
+    prioritySources: "优先来源",
+    enqueueingBackfill: "补搜入队中…",
+    backfillGap: "补搜这个缺口",
+    backfillDeltaTitle: "补搜证据增量",
+    merged: "已合并",
+    mergeable: "可合并",
+    newSources: "新增来源",
+    newEvidence: "+{count} 证据",
+    backfillNewCandidates: "补搜还发现新候选人：{names}",
+    mergedBack: "已合并回原报告",
+    merging: "正在合并…",
+    mergeBack: "合并回原报告",
+    talentMapTitle: "AI 人才方向分布",
+    talentMapDesc: "按岗位画像识别主匹配、相邻可迁移和高潜力人才池。",
+    people: "人",
+    evidenceCoverageTitle: "信息源覆盖",
+    evidenceCoverageDesc: "按研究、实践、工作经历和公开表达检查交叉验证基础。",
+    missing: "缺",
+    comparisonTitle: "候选人对比",
+    comparisonDesc: "按匹配度、证据强度、能力拆解和主要风险快速排序审阅。",
+    direction: "方向",
+    match: "匹配",
+    achievements: "成果",
+    skills: "技能",
+    workHistory: "经历",
+    sourceTypes: "信源",
+    signalRisk: "主要信号 / 风险",
+    gapPrefix: "缺口",
+    viewDetails: "查看详情",
+    removeFromPool: "移出候选池",
+    addToPool: "加入候选池",
+    auditTitle: "证据审计",
+    independentSources: "{count} 个独立信源",
+    singleSourceClaims: "单源声称",
+    identityRisk: "身份风险",
+    recencyNotes: "时效说明",
+    none: "无",
+    strongestEvidence: "最强证据",
+    weakEvidence: "弱证据",
+    riskFlags: "风险提示",
+    evidenceGraph: "证据图",
+    risk: "风险",
+    outreachAngle: "外联角度",
+    homepage: "主页",
+    trust: "可信度",
+    high: "高",
+    medium: "中",
+    low: "低",
+    redFlags: "红旗",
+    reportBasedOn: "报告基于 {count} 个独立信源",
+    reportCaveatTitle: "如何解读这份报告 · 局限性",
+    caveat1: "本报告由 AI 自动抓取公开网页生成，不构成对候选人最终判断，仅作为第一道筛查。",
+    caveat2: "\"已核实 / 矛盾 / 未核实\"是模型在抓取时的判断，可能存在误判或漏判，关键决策请人工复核每条声称的原始链接。",
+    caveat3: "\"独立信源数\"= 该条声称的 evidence 中不同域名数；数越多通常越可靠，但同一来源转发不算独立。",
+    caveat4: "信源时效以抓取时刻为准，公开网页内容可能已经更新，请在做最终决策前点击原链接核对。",
+    caveat5: "未发现红旗不代表候选人完全可信；已发现红旗也不代表候选人不可用，可能是同名或信源错误。",
+  },
+  en: {
+    unknownCandidate: "Unknown candidate",
+    source: "Source",
+    verified: "Verified",
+    contradicted: "Contradicted",
+    unverified: "No evidence found",
+    sourceCountTitle: "Number of distinct domains covering this claim (more is stronger)",
+    evidenceStrong: "Strong evidence",
+    evidenceMedium: "Moderate evidence",
+    evidenceWeak: "Weak evidence",
+    deliveryTitle: "Delivery summary",
+    deliveryBadge: "Recruiting shortlist",
+    candidates: "Candidates",
+    strongRecommendations: "{count} strong recommendations",
+    averageMatch: "Average match",
+    strongEvidenceCandidates: "Strong-evidence candidates",
+    sourceCoverage: "Source coverage",
+    priorityReview: "Priority review candidates",
+    sourcesShort: "sources",
+    deliveryRisks: "Delivery risks",
+    nextSteps: "Suggested next steps",
+    searchPlanTitle: "Search plan",
+    searchPlanDesc: "How the system decomposed the role profile, selected sources, and expanded adjacent talent pools.",
+    mustHave: "Must-have",
+    niceToHave: "Nice-to-have",
+    exclusions: "Exclusions",
+    notIdentified: "Not identified",
+    sourceQueryPlan: "Source query plan",
+    items: "items",
+    adjacentPools: "Adjacent talent pools",
+    research: "Research",
+    practice: "Practice",
+    work_history: "Work history",
+    public_voice: "Public voice",
+    planned: "Planned",
+    completed: "Completed",
+    partial: "Partial",
+    failed: "Failed",
+    sourceExecutionTitle: "Source execution log",
+    sourceExecutionReturned: "Shows the actual query, links, evidence count, and remaining gaps for each source task.",
+    sourceExecutionPlanned: "This result did not return execution logs, so the executable source plan is shown instead.",
+    executed: "executed",
+    evidence: "evidence",
+    links: "links",
+    leads: "Leads",
+    backfillTitle: "Gap backfill plan",
+    backfillDesc: "Turns missing or weak source coverage into executable queries for the next round.",
+    gaps: "gaps",
+    plannedBackfill: "Backfill planned",
+    completedBackfill: "Backfilled",
+    skippedBackfill: "Skipped",
+    affectedCandidates: "Affected candidates",
+    prioritySources: "Priority sources",
+    enqueueingBackfill: "Queueing backfill...",
+    backfillGap: "Backfill this gap",
+    backfillDeltaTitle: "Backfill evidence delta",
+    merged: "Merged",
+    mergeable: "Mergeable",
+    newSources: "New sources",
+    newEvidence: "+{count} evidence",
+    backfillNewCandidates: "Backfill also found new candidates: {names}",
+    mergedBack: "Merged into original report",
+    merging: "Merging...",
+    mergeBack: "Merge into original report",
+    talentMapTitle: "AI talent map",
+    talentMapDesc: "Groups candidates by primary fit, adjacent transferability, and high-potential talent pools.",
+    people: "people",
+    evidenceCoverageTitle: "Source coverage",
+    evidenceCoverageDesc: "Checks the cross-validation base across research, practice, work history, and public voice.",
+    missing: "Missing",
+    comparisonTitle: "Candidate comparison",
+    comparisonDesc: "Quickly rank candidates by match, evidence strength, capability breakdown, and primary risks.",
+    direction: "Direction",
+    match: "Match",
+    achievements: "Achievements",
+    skills: "Skills",
+    workHistory: "Work history",
+    sourceTypes: "Sources",
+    signalRisk: "Key signal / risk",
+    gapPrefix: "Gap",
+    viewDetails: "View details",
+    removeFromPool: "Remove from pool",
+    addToPool: "Add to pool",
+    auditTitle: "Evidence audit",
+    independentSources: "{count} independent sources",
+    singleSourceClaims: "Single-source claims",
+    identityRisk: "Identity risk",
+    recencyNotes: "Recency notes",
+    none: "None",
+    strongestEvidence: "Strongest evidence",
+    weakEvidence: "Weak evidence",
+    riskFlags: "Risk flags",
+    evidenceGraph: "Evidence graph",
+    risk: "Risk",
+    outreachAngle: "Outreach angle",
+    homepage: "Website",
+    trust: "Trust",
+    high: "High",
+    medium: "Medium",
+    low: "Low",
+    redFlags: "Red flags",
+    reportBasedOn: "Based on {count} independent sources",
+    reportCaveatTitle: "How to read this report · limitations",
+    caveat1: "This report is generated by AI from public web pages. It is a first screening aid, not a final judgment on the candidate.",
+    caveat2: "\"Verified / contradicted / unverified\" are model judgments at crawl time and may contain false positives or omissions. Review the original links before making important decisions.",
+    caveat3: "\"Independent sources\" means distinct domains in the evidence for a claim. More sources usually help, but reposts from one origin are not independent.",
+    caveat4: "Source freshness is based on crawl time. Public pages may have changed; check the original links before final decisions.",
+    caveat5: "No red flags does not mean the candidate is fully reliable. A red flag does not mean the candidate is unusable; it may come from name ambiguity or source error.",
+  },
+} as const;
+
+function resultCopy(locale: Locale | undefined, key: keyof typeof RESULT_COPY.zh, params: Record<string, string | number> = {}) {
+  let text: string = RESULT_COPY[locale === "en" ? "en" : "zh"][key] ?? RESULT_COPY.zh[key];
+  for (const [name, value] of Object.entries(params)) text = text.replace(`{${name}}`, String(value));
+  return text;
+}
+
 // 裁决语义色 (与 DESIGN-SYSTEM.md 一致)
-const VERDICT: Record<Verdict, { label: string; Icon: IconType; chip: string; bar: string }> = {
-  verified: { label: "已验证", Icon: FiCheckCircle, chip: "bg-emerald-50 text-emerald-700 ring-emerald-200", bar: "border-l-emerald-400" },
-  contradicted: { label: "矛盾", Icon: FiXCircle, chip: "bg-red-50 text-red-700 ring-red-200", bar: "border-l-red-400" },
-  unverified: { label: "查无实据", Icon: FiHelpCircle, chip: "bg-amber-50 text-amber-700 ring-amber-200", bar: "border-l-amber-400" },
+const VERDICT: Record<Verdict, { labelKey: "verified" | "contradicted" | "unverified"; Icon: IconType; chip: string; panel: string }> = {
+  verified: { labelKey: "verified", Icon: FiCheckCircle, chip: "bg-emerald-50 text-emerald-700 ring-emerald-200", panel: "border-emerald-100 bg-emerald-50/45" },
+  contradicted: { labelKey: "contradicted", Icon: FiXCircle, chip: "bg-red-50 text-red-700 ring-red-200", panel: "border-red-100 bg-red-50/45" },
+  unverified: { labelKey: "unverified", Icon: FiHelpCircle, chip: "bg-amber-50 text-amber-700 ring-amber-200", panel: "border-amber-100 bg-amber-50/45" },
 };
 
 function ResultSurface({
@@ -65,25 +296,25 @@ function ResultSurface({
   );
 }
 
-function host(url: string): string {
-  try { return new URL(url).hostname.replace(/^www\./, ""); } catch { return "来源"; }
+function host(url: string, locale?: Locale): string {
+  try { return new URL(url).hostname.replace(/^www\./, ""); } catch { return resultCopy(locale, "source"); }
 }
 function favicon(url: string): string {
   try { return `https://www.google.com/s2/favicons?domain=${new URL(url).hostname}&sz=64`; } catch { return ""; }
 }
 
-export function VerdictBadge({ v }: { v: Verdict }) {
+export function VerdictBadge({ v, locale }: { v: Verdict } & ResultLocaleProps) {
   const m = VERDICT[v] ?? VERDICT.unverified;
   const Icon = m.Icon;
   return (
     <span className={`inline-flex shrink-0 items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-semibold ring-1 ${m.chip}`}>
       <Icon className="h-3.5 w-3.5" aria-hidden="true" />
-      {m.label}
+      {resultCopy(locale, m.labelKey)}
     </span>
   );
 }
 
-export function Tally({ claims }: { claims: Claim[] }) {
+export function Tally({ claims, locale }: { claims: Claim[] } & ResultLocaleProps) {
   const counts = claims.reduce((a, c) => ((a[c.verdict] = (a[c.verdict] ?? 0) + 1), a), {} as Record<Verdict, number>);
   const order: Verdict[] = ["verified", "unverified", "contradicted"];
   return (
@@ -94,28 +325,28 @@ export function Tally({ claims }: { claims: Claim[] }) {
             const Icon = VERDICT[v].Icon;
             return <Icon className="h-3.5 w-3.5" aria-hidden="true" />;
           })()}
-          {counts[v]} {VERDICT[v].label}
+          {counts[v]} {resultCopy(locale, VERDICT[v].labelKey)}
         </span>
       ))}
     </div>
   );
 }
 
-export function ClaimBlock({ c }: { c: Claim }) {
+export function ClaimBlock({ c, locale }: { c: Claim } & ResultLocaleProps) {
   const m = VERDICT[c.verdict] ?? VERDICT.unverified;
   const sourceCount = uniqueSourcesOf(c);
   return (
-    <div className={`rounded-xl border-l-2 bg-gray-50/70 p-3.5 ${m.bar}`}>
+    <div className={`rounded-xl border p-3.5 ${m.panel}`}>
       <div className="flex items-start justify-between gap-3">
         <p className="text-sm leading-relaxed text-gray-900">{c.claim}</p>
         <div className="flex shrink-0 flex-col items-end gap-1">
-          <VerdictBadge v={c.verdict} />
+          <VerdictBadge v={c.verdict} locale={locale} />
           <span
-            title="覆盖该声称的不同域名数 (越多越可靠)"
+            title={resultCopy(locale, "sourceCountTitle")}
             className={`inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[10px] font-medium ring-1 ${sourceCountChip(sourceCount)}`}
           >
             <FiLink2 className="h-3 w-3" aria-hidden="true" />
-            {sourceCountLabel(sourceCount)}
+            {sourceCountLabel(sourceCount, locale)}
           </span>
         </div>
       </div>
@@ -133,7 +364,7 @@ export function ClaimBlock({ c }: { c: Claim }) {
                 >
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img src={favicon(e.url)} alt="" width={12} height={12} className="rounded-sm" />
-                  {host(e.url)}
+                  {host(e.url, locale)}
                   <FiExternalLink className="h-3 w-3" aria-hidden="true" />
                 </a>
               )}
@@ -172,8 +403,8 @@ function ScorePill({ score }: { score: number }) {
   );
 }
 
-function QualityPill({ value }: { value: string }) {
-  const label = value === "high" ? "证据强" : value === "low" ? "证据弱" : "证据中等";
+function QualityPill({ value, locale }: { value: string } & ResultLocaleProps) {
+  const label = value === "high" ? resultCopy(locale, "evidenceStrong") : value === "low" ? resultCopy(locale, "evidenceWeak") : resultCopy(locale, "evidenceMedium");
   return (
     <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-semibold ring-1 ${QUALITY[value] ?? QUALITY.medium}`}>
       {label}
@@ -191,29 +422,29 @@ function ReportMetric({ label, value, sublabel }: { label: string; value: string
   );
 }
 
-export function ShortlistDeliveryReportView({ result }: { result: TalentSearchResult }) {
+export function ShortlistDeliveryReportView({ result, locale }: { result: TalentSearchResult } & ResultLocaleProps) {
   const report: ShortlistDeliveryReport = buildShortlistDeliveryReport(result);
   if (report.candidate_count === 0) return null;
   return (
     <ResultSurface>
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h2 className="text-lg font-semibold text-gray-900">交付报告摘要</h2>
+          <h2 className="text-lg font-semibold text-gray-900">{resultCopy(locale, "deliveryTitle")}</h2>
           <p className="mt-1 text-sm leading-relaxed text-gray-600">{report.brief_summary}</p>
         </div>
         <span className="rounded-full bg-gray-900 px-2.5 py-1 text-xs font-semibold text-white">
-          招聘候选名单
+          {resultCopy(locale, "deliveryBadge")}
         </span>
       </div>
       <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <ReportMetric label="候选人" value={report.candidate_count} sublabel={`${report.strong_recommendation_count} 位强推荐`} />
-        <ReportMetric label="平均匹配分" value={report.average_match_score} />
-        <ReportMetric label="证据强候选人" value={report.high_evidence_count} />
-        <ReportMetric label="信息源覆盖" value={`${report.covered_group_count}/${report.coverage_group_count}`} />
+        <ReportMetric label={resultCopy(locale, "candidates")} value={report.candidate_count} sublabel={resultCopy(locale, "strongRecommendations", { count: report.strong_recommendation_count })} />
+        <ReportMetric label={resultCopy(locale, "averageMatch")} value={report.average_match_score} />
+        <ReportMetric label={resultCopy(locale, "strongEvidenceCandidates")} value={report.high_evidence_count} />
+        <ReportMetric label={resultCopy(locale, "sourceCoverage")} value={`${report.covered_group_count}/${report.coverage_group_count}`} />
       </div>
       {report.recommended_candidates.length > 0 && (
         <div className="mt-4">
-          <p className="text-sm font-semibold text-gray-900">优先审阅候选人</p>
+          <p className="text-sm font-semibold text-gray-900">{resultCopy(locale, "priorityReview")}</p>
           <div className="mt-2 grid gap-3 md:grid-cols-2">
             {report.recommended_candidates.map((candidate) => (
               <article key={candidate.name} className="rounded-2xl border border-black/10 bg-white/72 p-4">
@@ -230,10 +461,10 @@ export function ShortlistDeliveryReportView({ result }: { result: TalentSearchRe
                   <p className="mt-2 text-sm leading-relaxed text-gray-700">{candidate.recommendation_reason}</p>
                 )}
                 <div className="mt-2 flex flex-wrap gap-1.5">
-                  <QualityPill value={candidate.evidence_quality} />
+                  <QualityPill value={candidate.evidence_quality} locale={locale} />
                   {candidate.independent_sources > 0 && (
                     <span className="rounded-full bg-white px-2 py-0.5 text-xs font-medium text-gray-600 ring-1 ring-gray-200">
-                      {candidate.independent_sources} 信源
+                      {candidate.independent_sources} {resultCopy(locale, "sourcesShort")}
                     </span>
                   )}
                 </div>
@@ -247,7 +478,7 @@ export function ShortlistDeliveryReportView({ result }: { result: TalentSearchRe
         <div className="mt-4 grid gap-3 md:grid-cols-2">
           {report.report_risks.length > 0 && (
             <div className="rounded-2xl border border-amber-100 bg-amber-50/60 p-4">
-              <p className="text-sm font-semibold text-amber-900">交付风险</p>
+              <p className="text-sm font-semibold text-amber-900">{resultCopy(locale, "deliveryRisks")}</p>
               <ul className="mt-2 list-disc space-y-1 pl-5 text-sm leading-relaxed text-amber-800">
                 {report.report_risks.map((risk) => <li key={risk}>{risk}</li>)}
               </ul>
@@ -255,7 +486,7 @@ export function ShortlistDeliveryReportView({ result }: { result: TalentSearchRe
           )}
           {report.next_steps.length > 0 && (
             <div className="rounded-2xl border border-blue-100 bg-blue-50/60 p-4">
-              <p className="text-sm font-semibold text-blue-900">建议下一步</p>
+              <p className="text-sm font-semibold text-blue-900">{resultCopy(locale, "nextSteps")}</p>
               <ul className="mt-2 list-disc space-y-1 pl-5 text-sm leading-relaxed text-blue-900/80">
                 {report.next_steps.map((step) => <li key={step}>{step}</li>)}
               </ul>
@@ -267,7 +498,7 @@ export function ShortlistDeliveryReportView({ result }: { result: TalentSearchRe
   );
 }
 
-function PlanList({ title, items, tone }: { title: string; items: string[]; tone: "emerald" | "blue" | "red" }) {
+function PlanList({ title, items, tone, locale }: { title: string; items: string[]; tone: "emerald" | "blue" | "red" } & ResultLocaleProps) {
   const toneClass = {
     emerald: "bg-emerald-50 text-emerald-700 ring-emerald-100",
     blue: "bg-blue-50 text-blue-700 ring-blue-100",
@@ -281,13 +512,13 @@ function PlanList({ title, items, tone }: { title: string; items: string[]; tone
           {items.map((item) => <li key={item}>{item}</li>)}
         </ul>
       ) : (
-        <p className="mt-2 text-sm opacity-70">未识别</p>
+        <p className="mt-2 text-sm opacity-70">{resultCopy(locale, "notIdentified")}</p>
       )}
     </div>
   );
 }
 
-export function SearchPlanView({ result }: { result: TalentSearchResult }) {
+export function SearchPlanView({ result, locale }: { result: TalentSearchResult } & ResultLocaleProps) {
   const plan = result.search_plan;
   if (!plan) return null;
   const hasPlan = plan.must_have.length || plan.nice_to_have.length || plan.exclusions.length || plan.source_strategy.length || plan.adjacent_pools.length;
@@ -296,13 +527,13 @@ export function SearchPlanView({ result }: { result: TalentSearchResult }) {
   return (
     <ResultSurface>
       <div>
-        <h2 className="text-lg font-semibold text-gray-900">搜索计划</h2>
-        <p className="mt-1 text-sm text-gray-500">系统如何拆解岗位画像、选择来源并扩展相邻人才池。</p>
+        <h2 className="text-lg font-semibold text-gray-900">{resultCopy(locale, "searchPlanTitle")}</h2>
+        <p className="mt-1 text-sm text-gray-500">{resultCopy(locale, "searchPlanDesc")}</p>
       </div>
       <div className="mt-4 grid gap-3 md:grid-cols-3">
-        <PlanList title="必须条件" items={plan.must_have} tone="emerald" />
-        <PlanList title="加分条件" items={plan.nice_to_have} tone="blue" />
-        <PlanList title="排除条件" items={plan.exclusions} tone="red" />
+        <PlanList title={resultCopy(locale, "mustHave")} items={plan.must_have} tone="emerald" locale={locale} />
+        <PlanList title={resultCopy(locale, "niceToHave")} items={plan.nice_to_have} tone="blue" locale={locale} />
+        <PlanList title={resultCopy(locale, "exclusions")} items={plan.exclusions} tone="red" locale={locale} />
       </div>
       {plan.source_strategy.length > 0 && (
         <div className="mt-4 grid gap-3 md:grid-cols-2">
@@ -318,9 +549,9 @@ export function SearchPlanView({ result }: { result: TalentSearchResult }) {
       {queryPlan.length > 0 && (
         <div className="mt-4 rounded-xl border border-gray-100 bg-gray-50/70 p-4">
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <p className="text-sm font-semibold text-gray-900">来源查询计划</p>
+            <p className="text-sm font-semibold text-gray-900">{resultCopy(locale, "sourceQueryPlan")}</p>
             <span className="rounded-full bg-white px-2 py-0.5 text-xs font-semibold text-gray-600 ring-1 ring-gray-200">
-              {queryPlan.length} 条
+              {queryPlan.length} {resultCopy(locale, "items")}
             </span>
           </div>
           <div className="mt-3 space-y-2">
@@ -333,7 +564,7 @@ export function SearchPlanView({ result }: { result: TalentSearchResult }) {
                   <span className="rounded-full bg-blue-50 px-2 py-0.5 text-xs font-medium text-blue-700 ring-1 ring-blue-100">
                     {item.source_type}
                   </span>
-                  <span className="text-xs text-gray-400">{coverageGroupLabel(item.coverage_group)}</span>
+                  <span className="text-xs text-gray-400">{coverageGroupLabel(item.coverage_group, locale)}</span>
                 </div>
                 <p className="mt-2 break-words font-mono text-xs leading-relaxed text-gray-700">{item.query}</p>
                 {(item.target || item.reason) && (
@@ -350,7 +581,7 @@ export function SearchPlanView({ result }: { result: TalentSearchResult }) {
       )}
       {plan.adjacent_pools.length > 0 && (
         <div className="mt-4 rounded-xl border border-blue-100 bg-blue-50/60 p-4">
-          <p className="text-sm font-semibold text-blue-900">相邻人才池</p>
+          <p className="text-sm font-semibold text-blue-900">{resultCopy(locale, "adjacentPools")}</p>
           <ul className="mt-2 space-y-2 text-sm leading-relaxed text-blue-900/80">
             {plan.adjacent_pools.map((pool, i) => (
               <li key={`${pool.pool}-${i}`}>
@@ -365,25 +596,25 @@ export function SearchPlanView({ result }: { result: TalentSearchResult }) {
   );
 }
 
-function coverageGroupLabel(value: string) {
+function coverageGroupLabel(value: string, locale?: Locale) {
   return {
-    research: "研究",
-    practice: "实践",
-    work_history: "工作经历",
-    public_voice: "公开表达",
+    research: resultCopy(locale, "research"),
+    practice: resultCopy(locale, "practice"),
+    work_history: resultCopy(locale, "work_history"),
+    public_voice: resultCopy(locale, "public_voice"),
   }[value] ?? value;
 }
 
-function sourceExecutionStatusMeta(status: SourceExecutionJob["status"]) {
+function sourceExecutionStatusMeta(status: SourceExecutionJob["status"], locale?: Locale) {
   return {
-    planned: { label: "待执行", chip: "bg-gray-50 text-gray-600 ring-gray-200" },
-    completed: { label: "已完成", chip: "bg-emerald-50 text-emerald-700 ring-emerald-200" },
-    partial: { label: "部分完成", chip: "bg-amber-50 text-amber-700 ring-amber-200" },
-    failed: { label: "失败", chip: "bg-red-50 text-red-700 ring-red-200" },
+    planned: { label: resultCopy(locale, "planned"), chip: "bg-gray-50 text-gray-600 ring-gray-200" },
+    completed: { label: resultCopy(locale, "completed"), chip: "bg-emerald-50 text-emerald-700 ring-emerald-200" },
+    partial: { label: resultCopy(locale, "partial"), chip: "bg-amber-50 text-amber-700 ring-amber-200" },
+    failed: { label: resultCopy(locale, "failed"), chip: "bg-red-50 text-red-700 ring-red-200" },
   }[status] ?? { label: status, chip: "bg-gray-50 text-gray-600 ring-gray-200" };
 }
 
-export function SourceExecutionView({ result }: { result: TalentSearchResult }) {
+export function SourceExecutionView({ result, locale }: { result: TalentSearchResult } & ResultLocaleProps) {
   const execution = buildSourceExecution(result);
   const visibleJobs: SourceExecutionJob[] = execution.jobs.filter((job: SourceExecutionJob) => job.status !== "planned" || job.query || job.next_action);
   if (visibleJobs.length === 0) return null;
@@ -394,24 +625,24 @@ export function SourceExecutionView({ result }: { result: TalentSearchResult }) 
     <ResultSurface>
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h2 className="text-lg font-semibold text-gray-900">来源执行记录</h2>
+          <h2 className="text-lg font-semibold text-gray-900">{resultCopy(locale, "sourceExecutionTitle")}</h2>
           <p className="mt-1 text-sm text-gray-500">
-            {hasReturnedExecution ? "记录每类来源任务的实际查询、具体链接、证据数量和后续缺口。" : "本次结果未返回执行记录，先展示可执行的来源任务计划。"}
+            {hasReturnedExecution ? resultCopy(locale, "sourceExecutionReturned") : resultCopy(locale, "sourceExecutionPlanned")}
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
           <span className="rounded-full bg-gray-100 px-2.5 py-1 text-xs font-semibold text-gray-600">
-            {executedCount} / {visibleJobs.length} 已执行
+            {executedCount} / {visibleJobs.length} {resultCopy(locale, "executed")}
           </span>
           <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700 ring-1 ring-emerald-100">
-            {evidenceCount} 条证据
+            {evidenceCount} {resultCopy(locale, "evidence")}
           </span>
         </div>
       </div>
       {execution.summary && <p className="mt-3 text-sm leading-relaxed text-gray-600">{execution.summary}</p>}
       <div className="mt-4 grid gap-3 md:grid-cols-2">
         {visibleJobs.map((job) => {
-          const status = sourceExecutionStatusMeta(job.status);
+          const status = sourceExecutionStatusMeta(job.status, locale);
           return (
             <article key={job.job_id} className="rounded-xl border border-gray-100 bg-gray-50/70 p-4">
               <div className="flex flex-wrap items-center gap-2">
@@ -421,16 +652,16 @@ export function SourceExecutionView({ result }: { result: TalentSearchResult }) 
                 <span className="rounded-full bg-white px-2 py-0.5 text-xs font-medium text-blue-700 ring-1 ring-blue-100">
                   {job.source_type}
                 </span>
-                <span className="text-xs text-gray-400">{coverageGroupLabel(job.coverage_group)}</span>
+                <span className="text-xs text-gray-400">{coverageGroupLabel(job.coverage_group, locale)}</span>
               </div>
               <p className="mt-3 break-words font-mono text-xs leading-relaxed text-gray-700">{job.query}</p>
               <div className="mt-3 flex flex-wrap gap-2 text-xs font-semibold text-gray-600">
-                <span className="rounded-full bg-white px-2 py-0.5 ring-1 ring-gray-200">{job.urls_found} 链接</span>
-                <span className="rounded-full bg-white px-2 py-0.5 ring-1 ring-gray-200">{job.evidence_found} 证据</span>
+                <span className="rounded-full bg-white px-2 py-0.5 ring-1 ring-gray-200">{job.urls_found} {resultCopy(locale, "links")}</span>
+                <span className="rounded-full bg-white px-2 py-0.5 ring-1 ring-gray-200">{job.evidence_found} {resultCopy(locale, "evidence")}</span>
               </div>
               {job.candidate_leads.length > 0 && (
                 <p className="mt-2 text-xs leading-relaxed text-gray-500">
-                  线索：{job.candidate_leads.slice(0, 4).join(", ")}
+                  {resultCopy(locale, "leads")}: {job.candidate_leads.slice(0, 4).join(", ")}
                 </p>
               )}
               {job.source_urls.length > 0 && (
@@ -438,7 +669,7 @@ export function SourceExecutionView({ result }: { result: TalentSearchResult }) 
                   {job.source_urls.slice(0, 3).map((url) => (
                     <li key={url} className="truncate">
                       <a className="hover:text-gray-900 hover:underline" href={url} target="_blank" rel="noreferrer">
-                        {host(url)}
+                        {host(url, locale)}
                       </a>
                     </li>
                   ))}
@@ -457,11 +688,11 @@ export function SourceExecutionView({ result }: { result: TalentSearchResult }) 
   );
 }
 
-function backfillStatusMeta(status: CoverageBackfillJob["status"]) {
+function backfillStatusMeta(status: CoverageBackfillJob["status"], locale?: Locale) {
   return {
-    planned: { label: "待补搜", chip: "bg-blue-50 text-blue-700 ring-blue-100" },
-    completed: { label: "已补齐", chip: "bg-emerald-50 text-emerald-700 ring-emerald-200" },
-    skipped: { label: "已跳过", chip: "bg-gray-50 text-gray-600 ring-gray-200" },
+    planned: { label: resultCopy(locale, "plannedBackfill"), chip: "bg-blue-50 text-blue-700 ring-blue-100" },
+    completed: { label: resultCopy(locale, "completedBackfill"), chip: "bg-emerald-50 text-emerald-700 ring-emerald-200" },
+    skipped: { label: resultCopy(locale, "skippedBackfill"), chip: "bg-gray-50 text-gray-600 ring-gray-200" },
   }[status] ?? { label: status, chip: "bg-gray-50 text-gray-600 ring-gray-200" };
 }
 
@@ -469,11 +700,12 @@ export function CoverageBackfillView({
   result,
   onBackfillJob,
   backfillDisabled = false,
+  locale,
 }: {
   result: TalentSearchResult;
   onBackfillJob?: (job: CoverageBackfillJob) => void;
   backfillDisabled?: boolean;
-}) {
+} & ResultLocaleProps) {
   const plan = buildCoverageBackfillPlan(result);
   const jobs: CoverageBackfillJob[] = plan.jobs.filter((job: CoverageBackfillJob) => job.query || job.reason);
   if (jobs.length === 0) return null;
@@ -481,17 +713,17 @@ export function CoverageBackfillView({
     <ResultSurface>
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h2 className="text-lg font-semibold text-gray-900">缺口补搜计划</h2>
-          <p className="mt-1 text-sm text-gray-500">把缺失或偏弱的信息源覆盖转成下一轮可执行查询。</p>
+          <h2 className="text-lg font-semibold text-gray-900">{resultCopy(locale, "backfillTitle")}</h2>
+          <p className="mt-1 text-sm text-gray-500">{resultCopy(locale, "backfillDesc")}</p>
         </div>
         <span className="rounded-full bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-700 ring-1 ring-blue-100">
-          {jobs.length} 个缺口
+          {jobs.length} {resultCopy(locale, "gaps")}
         </span>
       </div>
       {plan.summary && <p className="mt-3 text-sm leading-relaxed text-gray-600">{plan.summary}</p>}
       <div className="mt-4 grid gap-3 md:grid-cols-2">
         {jobs.map((job) => {
-          const status = backfillStatusMeta(job.status);
+          const status = backfillStatusMeta(job.status, locale);
           return (
             <article key={job.gap_id} className="rounded-xl border border-blue-100 bg-blue-50/40 p-4">
               <div className="flex flex-wrap items-center gap-2">
@@ -504,18 +736,18 @@ export function CoverageBackfillView({
                 <span className="rounded-full bg-white px-2 py-0.5 text-xs font-medium text-blue-700 ring-1 ring-blue-100">
                   {job.missing_source_type}
                 </span>
-                <span className="text-xs text-gray-500">{coverageGroupLabel(job.coverage_group)}</span>
+                <span className="text-xs text-gray-500">{coverageGroupLabel(job.coverage_group, locale)}</span>
               </div>
               <p className="mt-3 break-words font-mono text-xs leading-relaxed text-gray-700">{job.query}</p>
               {job.reason && <p className="mt-2 text-xs leading-relaxed text-gray-600">{job.reason}</p>}
               {job.candidate_names.length > 0 && (
                 <p className="mt-2 text-xs leading-relaxed text-blue-900/70">
-                  影响候选人：{job.candidate_names.slice(0, 5).join(", ")}
+                  {resultCopy(locale, "affectedCandidates")}: {job.candidate_names.slice(0, 5).join(", ")}
                 </p>
               )}
               {job.source_types_to_check.length > 0 && (
                 <p className="mt-1 text-xs leading-relaxed text-gray-500">
-                  优先来源：{job.source_types_to_check.join(", ")}
+                  {resultCopy(locale, "prioritySources")}: {job.source_types_to_check.join(", ")}
                 </p>
               )}
               {onBackfillJob && (
@@ -525,7 +757,7 @@ export function CoverageBackfillView({
                   disabled={backfillDisabled || job.status !== "planned"}
                   className="mt-3 rounded-lg bg-gray-900 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-50"
                 >
-                  {backfillDisabled ? "补搜入队中…" : "补搜这个缺口"}
+                  {backfillDisabled ? resultCopy(locale, "enqueueingBackfill") : resultCopy(locale, "backfillGap")}
                 </button>
               )}
             </article>
@@ -541,12 +773,13 @@ export function BackfillMergeSummaryView({
   onMerge,
   mergeDisabled = false,
   merged = false,
+  locale,
 }: {
   summary: BackfillMergeSummary;
   onMerge?: () => void;
   mergeDisabled?: boolean;
   merged?: boolean;
-}) {
+} & ResultLocaleProps) {
   const hasCandidates = summary.improved_candidates.length > 0;
   const hasCoverage = summary.coverage_gains.length > 0;
   if (!hasCandidates && !hasCoverage && summary.new_candidate_names.length === 0) return null;
@@ -554,11 +787,11 @@ export function BackfillMergeSummaryView({
     <ResultSurface className="border-emerald-100 bg-emerald-50/60">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h2 className="text-lg font-semibold text-gray-900">补搜证据增量</h2>
+          <h2 className="text-lg font-semibold text-gray-900">{resultCopy(locale, "backfillDeltaTitle")}</h2>
           <p className="mt-1 text-sm text-emerald-900/70">{summary.summary}</p>
         </div>
         <span className="rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-emerald-700 ring-1 ring-emerald-200">
-          {merged ? "已合并" : "可合并"}
+          {merged ? resultCopy(locale, "merged") : resultCopy(locale, "mergeable")}
         </span>
       </div>
       {hasCoverage && (
@@ -573,7 +806,7 @@ export function BackfillMergeSummaryView({
               </div>
               {gain.added_source_types.length > 0 && (
                 <p className="mt-2 text-xs leading-relaxed text-gray-600">
-                  新增来源：{gain.added_source_types.join(", ")}
+                  {resultCopy(locale, "newSources")}: {gain.added_source_types.join(", ")}
                 </p>
               )}
             </article>
@@ -587,7 +820,7 @@ export function BackfillMergeSummaryView({
               <div className="flex flex-wrap items-center gap-2">
                 <h3 className="text-sm font-semibold text-gray-900">{candidate.candidate_name}</h3>
                 <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-semibold text-emerald-700 ring-1 ring-emerald-200">
-                  +{candidate.new_evidence_count} 证据
+                  {resultCopy(locale, "newEvidence", { count: candidate.new_evidence_count })}
                 </span>
                 {candidate.new_source_types.map((type) => (
                   <span key={type} className="rounded-full bg-blue-50 px-2 py-0.5 text-xs font-medium text-blue-700 ring-1 ring-blue-100">
@@ -601,7 +834,7 @@ export function BackfillMergeSummaryView({
                   {candidate.new_evidence_urls.slice(0, 4).map((url) => (
                     <li key={url} className="truncate">
                       <a className="hover:text-gray-900 hover:underline" href={url} target="_blank" rel="noreferrer">
-                        {host(url)}
+                        {host(url, locale)}
                       </a>
                     </li>
                   ))}
@@ -613,7 +846,7 @@ export function BackfillMergeSummaryView({
       )}
       {summary.new_candidate_names.length > 0 && (
         <p className="mt-4 text-xs leading-relaxed text-gray-600">
-          补搜还发现新候选人：{summary.new_candidate_names.join(", ")}
+          {resultCopy(locale, "backfillNewCandidates", { names: summary.new_candidate_names.join(", ") })}
         </p>
       )}
       {onMerge && (
@@ -623,19 +856,19 @@ export function BackfillMergeSummaryView({
           disabled={mergeDisabled || merged}
           className="mt-4 rounded-lg bg-gray-900 px-3 py-2 text-xs font-semibold text-white transition hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-50"
         >
-          {merged ? "已合并回原报告" : mergeDisabled ? "正在合并…" : "合并回原报告"}
+          {merged ? resultCopy(locale, "mergedBack") : mergeDisabled ? resultCopy(locale, "merging") : resultCopy(locale, "mergeBack")}
         </button>
       )}
     </ResultSurface>
   );
 }
 
-export function TalentMapView({ result }: { result: TalentSearchResult }) {
+export function TalentMapView({ result, locale }: { result: TalentSearchResult } & ResultLocaleProps) {
   return (
     <ResultSurface>
       <div>
-        <h2 className="text-lg font-semibold text-gray-900">AI 人才方向分布</h2>
-        <p className="mt-1 text-sm text-gray-500">按岗位画像识别主匹配、相邻可迁移和高潜力人才池。</p>
+        <h2 className="text-lg font-semibold text-gray-900">{resultCopy(locale, "talentMapTitle")}</h2>
+        <p className="mt-1 text-sm text-gray-500">{resultCopy(locale, "talentMapDesc")}</p>
       </div>
       <div className="mt-4 grid gap-3 md:grid-cols-3">
         {result.talent_map.map((item) => (
@@ -643,7 +876,7 @@ export function TalentMapView({ result }: { result: TalentSearchResult }) {
             <div className="flex items-start justify-between gap-3">
               <h3 className="text-sm font-semibold text-gray-900">{item.direction}</h3>
               <span className="rounded-full bg-white px-2 py-0.5 text-xs font-semibold text-gray-600 ring-1 ring-gray-200">
-                {item.candidate_count} 人
+                {item.candidate_count} {resultCopy(locale, "people")}
               </span>
             </div>
             <p className="mt-2 text-xs font-medium text-blue-600">{item.fit}</p>
@@ -655,7 +888,7 @@ export function TalentMapView({ result }: { result: TalentSearchResult }) {
   );
 }
 
-export function EvidenceCoverageView({ result }: { result: TalentSearchResult }) {
+export function EvidenceCoverageView({ result, locale }: { result: TalentSearchResult } & ResultLocaleProps) {
   const coverage = buildEvidenceCoverage(result) as EvidenceCoverageGroup[];
   if (coverage.every((item) => item.count === 0)) return null;
   const covered = coverage.filter((item) => item.status === "covered").length;
@@ -663,8 +896,8 @@ export function EvidenceCoverageView({ result }: { result: TalentSearchResult })
     <ResultSurface>
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h2 className="text-lg font-semibold text-gray-900">信息源覆盖</h2>
-          <p className="mt-1 text-sm text-gray-500">按研究、实践、工作经历和公开表达检查交叉验证基础。</p>
+          <h2 className="text-lg font-semibold text-gray-900">{resultCopy(locale, "evidenceCoverageTitle")}</h2>
+          <p className="mt-1 text-sm text-gray-500">{resultCopy(locale, "evidenceCoverageDesc")}</p>
         </div>
         <span className="rounded-full bg-gray-100 px-2.5 py-1 text-xs font-semibold text-gray-600">
           {covered} / {coverage.length}
@@ -682,7 +915,7 @@ export function EvidenceCoverageView({ result }: { result: TalentSearchResult })
             {item.source_types.length > 0 ? (
               <p className="mt-2 text-xs leading-relaxed text-gray-600">{item.source_types.join(", ")}</p>
             ) : (
-              <p className="mt-2 text-xs leading-relaxed text-amber-700">缺 {item.missing_source_types.slice(0, 2).join(", ")}</p>
+              <p className="mt-2 text-xs leading-relaxed text-amber-700">{resultCopy(locale, "missing")} {item.missing_source_types.slice(0, 2).join(", ")}</p>
             )}
           </article>
         ))}
@@ -691,15 +924,15 @@ export function EvidenceCoverageView({ result }: { result: TalentSearchResult })
   );
 }
 
-export function CandidateComparisonView({ result }: { result: unknown }) {
+export function CandidateComparisonView({ result, locale }: { result: unknown } & ResultLocaleProps) {
   const rows: CandidateComparisonRow[] = buildCandidateComparisonRows(result);
   if (rows.length === 0) return null;
   return (
     <ResultSurface>
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h2 className="text-lg font-semibold text-gray-900">候选人对比</h2>
-          <p className="mt-1 text-sm text-gray-500">按匹配度、证据强度、能力拆解和主要风险快速排序审阅。</p>
+          <h2 className="text-lg font-semibold text-gray-900">{resultCopy(locale, "comparisonTitle")}</h2>
+          <p className="mt-1 text-sm text-gray-500">{resultCopy(locale, "comparisonDesc")}</p>
         </div>
         <span className="rounded-full bg-gray-100 px-2.5 py-1 text-xs font-semibold text-gray-600">
           {rows.length} 人
@@ -708,16 +941,16 @@ export function CandidateComparisonView({ result }: { result: unknown }) {
       <div className="mt-4 overflow-x-auto">
         <table className="min-w-[960px] w-full border-separate border-spacing-0 text-left text-sm">
           <thead>
-            <tr className="text-xs font-semibold uppercase tracking-wide text-gray-400">
-              <th className="border-b border-gray-100 px-3 py-2">候选人</th>
-              <th className="border-b border-gray-100 px-3 py-2">方向</th>
-              <th className="border-b border-gray-100 px-3 py-2 text-right">匹配</th>
-              <th className="border-b border-gray-100 px-3 py-2 text-right">成果</th>
-              <th className="border-b border-gray-100 px-3 py-2 text-right">技能</th>
-              <th className="border-b border-gray-100 px-3 py-2 text-right">经历</th>
-              <th className="border-b border-gray-100 px-3 py-2 text-right">证据</th>
-              <th className="border-b border-gray-100 px-3 py-2">信源</th>
-              <th className="border-b border-gray-100 px-3 py-2">主要信号 / 风险</th>
+            <tr className="text-xs font-semibold text-gray-400">
+              <th className="border-b border-gray-100 px-3 py-2">{resultCopy(locale, "candidates")}</th>
+              <th className="border-b border-gray-100 px-3 py-2">{resultCopy(locale, "direction")}</th>
+              <th className="border-b border-gray-100 px-3 py-2 text-right">{resultCopy(locale, "match")}</th>
+              <th className="border-b border-gray-100 px-3 py-2 text-right">{resultCopy(locale, "achievements")}</th>
+              <th className="border-b border-gray-100 px-3 py-2 text-right">{resultCopy(locale, "skills")}</th>
+              <th className="border-b border-gray-100 px-3 py-2 text-right">{resultCopy(locale, "workHistory")}</th>
+              <th className="border-b border-gray-100 px-3 py-2 text-right">{resultCopy(locale, "evidence")}</th>
+              <th className="border-b border-gray-100 px-3 py-2">{resultCopy(locale, "sourceTypes")}</th>
+              <th className="border-b border-gray-100 px-3 py-2">{resultCopy(locale, "signalRisk")}</th>
             </tr>
           </thead>
           <tbody>
@@ -733,7 +966,7 @@ export function CandidateComparisonView({ result }: { result: unknown }) {
                       {row.primary_direction}
                     </span>
                   ) : (
-                    <span className="text-xs text-gray-400">未识别</span>
+                    <span className="text-xs text-gray-400">{resultCopy(locale, "notIdentified")}</span>
                   )}
                   {row.secondary_directions && <p className="mt-1 text-xs leading-relaxed text-gray-500">{row.secondary_directions}</p>}
                 </td>
@@ -744,7 +977,7 @@ export function CandidateComparisonView({ result }: { result: unknown }) {
                 <td className="border-b border-gray-100 px-3 py-3 text-right">
                   <div className="flex flex-col items-end gap-1">
                     <span className="font-medium text-gray-700">{row.evidence_score}</span>
-                    <QualityPill value={row.evidence_quality} />
+                    <QualityPill value={row.evidence_quality} locale={locale} />
                   </div>
                 </td>
                 <td className="border-b border-gray-100 px-3 py-3">
@@ -754,7 +987,7 @@ export function CandidateComparisonView({ result }: { result: unknown }) {
                 <td className="border-b border-gray-100 px-3 py-3">
                   {row.top_signal && <p className="text-xs leading-relaxed text-emerald-700">{row.top_signal}</p>}
                   {row.risk_summary && <p className="mt-1 text-xs leading-relaxed text-amber-700">{row.risk_summary}</p>}
-                  {row.coverage_gaps && <p className="mt-1 text-xs leading-relaxed text-gray-500">缺口: {row.coverage_gaps}</p>}
+                  {row.coverage_gaps && <p className="mt-1 text-xs leading-relaxed text-gray-500">{resultCopy(locale, "gapPrefix")}: {row.coverage_gaps}</p>}
                 </td>
               </tr>
             ))}
@@ -776,12 +1009,13 @@ export function ShortlistCard({
   selected,
   onToggle,
   onOpen,
+  locale,
 }: {
   candidate: TalentCandidate;
   selected: boolean;
   onToggle?: () => void;
   onOpen?: () => void;
-}) {
+} & ResultLocaleProps) {
   const uncertainty = candidate.uncertainties[0];
   const topSignals = candidate.strongest_signals.slice(0, 3);
 
@@ -792,7 +1026,7 @@ export function ShortlistCard({
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
             <h3 className="text-lg font-semibold text-gray-900">{candidate.name}</h3>
-            <QualityPill value={candidate.evidence_audit.overall_evidence_quality} />
+            <QualityPill value={candidate.evidence_audit.overall_evidence_quality} locale={locale} />
           </div>
           {candidate.headline && <p className="mt-1 text-sm leading-relaxed text-gray-700">{candidate.headline}</p>}
           <CandidateMeta candidate={candidate} />
@@ -833,7 +1067,7 @@ export function ShortlistCard({
           disabled={!onOpen}
           className="rounded-full bg-[var(--sh-ink)] px-3.5 py-2 text-sm font-semibold text-white transition hover:bg-black disabled:cursor-not-allowed disabled:bg-gray-300"
         >
-          查看详情
+          {resultCopy(locale, "viewDetails")}
         </button>
         <button
           type="button"
@@ -845,7 +1079,7 @@ export function ShortlistCard({
               : "bg-emerald-50 text-emerald-700 ring-emerald-200 hover:bg-emerald-100"
           }`}
         >
-          {selected ? "移出候选池" : "加入候选池"}
+          {selected ? resultCopy(locale, "removeFromPool") : resultCopy(locale, "addToPool")}
         </button>
       </div>
     </article>
@@ -867,7 +1101,7 @@ function AuditStat({ label, value, tone }: { label: string; value: number; tone:
   );
 }
 
-function AuditItemList({ label, items, chip }: { label: string; items: string[]; chip: string }) {
+function AuditItemList({ label, items, chip, locale }: { label: string; items: string[]; chip: string } & ResultLocaleProps) {
   return (
     <div>
       <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-semibold ring-1 ${chip}`}>
@@ -878,41 +1112,41 @@ function AuditItemList({ label, items, chip }: { label: string; items: string[];
           {items.map((item) => <li key={item}>{item}</li>)}
         </ul>
       ) : (
-        <p className="mt-1.5 text-sm text-gray-400">无</p>
+        <p className="mt-1.5 text-sm text-gray-400">{resultCopy(locale, "none")}</p>
       )}
     </div>
   );
 }
 
-export function EvidenceAuditView({ candidate, result }: { candidate: TalentCandidate; result?: TalentSearchResult }) {
+export function EvidenceAuditView({ candidate, result, locale }: { candidate: TalentCandidate; result?: TalentSearchResult } & ResultLocaleProps) {
   const audit: CandidateEvidenceAuditSummary = buildCandidateEvidenceAudit({ result, candidate });
   const rows = [
-    { label: "已验证", items: audit.verified_claims, chip: "bg-emerald-50 text-emerald-700 ring-emerald-200" },
-    { label: "未验证", items: audit.unverified_claims, chip: "bg-amber-50 text-amber-700 ring-amber-200" },
-    { label: "矛盾", items: audit.contradicted_claims, chip: "bg-red-50 text-red-700 ring-red-200" },
-    { label: "单一来源", items: audit.single_source_claims, chip: "bg-blue-50 text-blue-700 ring-blue-200" },
-    { label: "身份风险", items: audit.identity_risks, chip: "bg-red-50 text-red-700 ring-red-200" },
-    { label: "时效说明", items: audit.recency_notes, chip: "bg-gray-50 text-gray-700 ring-gray-200" },
+    { label: resultCopy(locale, "verified"), items: audit.verified_claims, chip: "bg-emerald-50 text-emerald-700 ring-emerald-200" },
+    { label: resultCopy(locale, "unverified"), items: audit.unverified_claims, chip: "bg-amber-50 text-amber-700 ring-amber-200" },
+    { label: resultCopy(locale, "contradicted"), items: audit.contradicted_claims, chip: "bg-red-50 text-red-700 ring-red-200" },
+    { label: resultCopy(locale, "singleSourceClaims"), items: audit.single_source_claims, chip: "bg-blue-50 text-blue-700 ring-blue-200" },
+    { label: resultCopy(locale, "identityRisk"), items: audit.identity_risks, chip: "bg-red-50 text-red-700 ring-red-200" },
+    { label: resultCopy(locale, "recencyNotes"), items: audit.recency_notes, chip: "bg-gray-50 text-gray-700 ring-gray-200" },
   ];
 
   return (
     <section className="rounded-2xl border border-black/10 bg-white/72 p-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <h4 className="text-sm font-semibold text-gray-900">证据审计</h4>
+        <h4 className="text-sm font-semibold text-gray-900">{resultCopy(locale, "auditTitle")}</h4>
         <div className="flex flex-wrap items-center gap-2">
           {audit.independent_sources > 0 && (
             <span className="rounded-full bg-white px-2 py-0.5 text-xs font-semibold text-gray-600 ring-1 ring-gray-200">
-              {audit.independent_sources} 个独立信源
+              {resultCopy(locale, "independentSources", { count: audit.independent_sources })}
             </span>
           )}
-          <QualityPill value={audit.overall_evidence_quality} />
+          <QualityPill value={audit.overall_evidence_quality} locale={locale} />
         </div>
       </div>
       <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
-        <AuditStat label="已验证" value={audit.verified_count} tone="emerald" />
-        <AuditStat label="未验证" value={audit.unverified_count} tone="amber" />
-        <AuditStat label="矛盾" value={audit.contradicted_count} tone="red" />
-        <AuditStat label="单源声称" value={audit.single_source_claims.length} tone="gray" />
+        <AuditStat label={resultCopy(locale, "verified")} value={audit.verified_count} tone="emerald" />
+        <AuditStat label={resultCopy(locale, "unverified")} value={audit.unverified_count} tone="amber" />
+        <AuditStat label={resultCopy(locale, "contradicted")} value={audit.contradicted_count} tone="red" />
+        <AuditStat label={resultCopy(locale, "singleSourceClaims")} value={audit.single_source_claims.length} tone="gray" />
       </div>
       {audit.source_types.length > 0 && (
         <div className="mt-3 flex flex-wrap gap-1.5">
@@ -929,15 +1163,15 @@ export function EvidenceAuditView({ candidate, result }: { candidate: TalentCand
         </p>
       )}
       <div className="mt-3 space-y-3">
-        {rows.map((row) => <AuditItemList key={row.label} {...row} />)}
+        {rows.map((row) => <AuditItemList key={row.label} {...row} locale={locale} />)}
         {audit.strongest_evidence.length > 0 && (
-          <AuditItemList label="最强证据" items={audit.strongest_evidence} chip="bg-emerald-50 text-emerald-700 ring-emerald-200" />
+          <AuditItemList label={resultCopy(locale, "strongestEvidence")} items={audit.strongest_evidence} chip="bg-emerald-50 text-emerald-700 ring-emerald-200" locale={locale} />
         )}
         {audit.weakest_evidence.length > 0 && (
-          <AuditItemList label="弱证据" items={audit.weakest_evidence} chip="bg-amber-50 text-amber-700 ring-amber-200" />
+          <AuditItemList label={resultCopy(locale, "weakEvidence")} items={audit.weakest_evidence} chip="bg-amber-50 text-amber-700 ring-amber-200" locale={locale} />
         )}
         {audit.risk_flags.length > 0 && (
-          <AuditItemList label="风险提示" items={audit.risk_flags} chip="bg-red-50 text-red-700 ring-red-200" />
+          <AuditItemList label={resultCopy(locale, "riskFlags")} items={audit.risk_flags} chip="bg-red-50 text-red-700 ring-red-200" locale={locale} />
         )}
       </div>
     </section>
@@ -960,7 +1194,7 @@ function EvidenceList({ title, items, tone }: { title: string; items: string[]; 
   );
 }
 
-export function EvidenceGraphView({ result, candidate }: { result: TalentSearchResult; candidate: TalentCandidate }) {
+export function EvidenceGraphView({ result, candidate, locale }: { result: TalentSearchResult; candidate: TalentCandidate } & ResultLocaleProps) {
   const graph = result.evidence_graph;
   if (!graph) return null;
   const node = graph.candidates.find((item) => item.candidate_name === candidate.name);
@@ -968,10 +1202,10 @@ export function EvidenceGraphView({ result, candidate }: { result: TalentSearchR
   return (
     <section className="rounded-xl border border-gray-100 bg-gray-50/70 p-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <h4 className="text-sm font-semibold text-gray-900">证据图</h4>
+        <h4 className="text-sm font-semibold text-gray-900">{resultCopy(locale, "evidenceGraph")}</h4>
         {node && (
           <span className="rounded-full bg-white px-2 py-0.5 text-xs font-semibold text-gray-600 ring-1 ring-gray-200">
-            {node.independent_sources} 个独立信源
+            {resultCopy(locale, "independentSources", { count: node.independent_sources })}
           </span>
         )}
       </div>
@@ -985,14 +1219,14 @@ export function EvidenceGraphView({ result, candidate }: { result: TalentSearchR
         </div>
       ) : null}
       {node?.cross_validation ? <p className="mt-3 text-sm leading-relaxed text-gray-700">{node.cross_validation}</p> : null}
-      {node?.strongest_evidence.length ? <EvidenceList title="最强证据" items={node.strongest_evidence} tone="emerald" /> : null}
-      {node?.weakest_evidence.length ? <EvidenceList title="弱证据" items={node.weakest_evidence} tone="amber" /> : null}
-      {node?.risk_flags.length ? <EvidenceList title="风险" items={node.risk_flags} tone="red" /> : null}
+      {node?.strongest_evidence.length ? <EvidenceList title={resultCopy(locale, "strongestEvidence")} items={node.strongest_evidence} tone="emerald" /> : null}
+      {node?.weakest_evidence.length ? <EvidenceList title={resultCopy(locale, "weakEvidence")} items={node.weakest_evidence} tone="amber" /> : null}
+      {node?.risk_flags.length ? <EvidenceList title={resultCopy(locale, "risk")} items={node.risk_flags} tone="red" /> : null}
     </section>
   );
 }
 
-export function CandidateProfileView({ candidate, result }: { candidate: TalentCandidate; result?: TalentSearchResult }) {
+export function CandidateProfileView({ candidate, result, locale }: { candidate: TalentCandidate; result?: TalentSearchResult } & ResultLocaleProps) {
   return (
     <article className="rounded-[28px] border border-black/10 bg-white/86 p-5 shadow-[0_18px_52px_rgba(0,0,0,0.06)]">
       <div className="flex items-start gap-3">
@@ -1010,25 +1244,25 @@ export function CandidateProfileView({ candidate, result }: { candidate: TalentC
 
       {candidate.outreach_angle && (
         <div className="mt-4 rounded-xl border border-blue-100 bg-blue-50/70 p-4">
-          <p className="text-sm font-semibold text-blue-700">外联角度</p>
+          <p className="text-sm font-semibold text-blue-700">{resultCopy(locale, "outreachAngle")}</p>
           <p className="mt-1 text-sm leading-relaxed text-blue-900">{candidate.outreach_angle}</p>
         </div>
       )}
 
       <div className="mt-4">
-        <EvidenceAuditView candidate={candidate} result={result} />
+        <EvidenceAuditView candidate={candidate} result={result} locale={locale} />
       </div>
 
       {candidate.claims.length > 0 && (
         <div className="mt-4 space-y-2.5">
-          {candidate.claims.map((claim, i) => <ClaimBlock key={i} c={claim} />)}
+          {candidate.claims.map((claim, i) => <ClaimBlock key={i} c={claim} locale={locale} />)}
         </div>
       )}
     </article>
   );
 }
 
-export function CandidateCard({ c, delay = 0 }: { c: Candidate; delay?: number }) {
+export function CandidateCard({ c, delay = 0, locale }: { c: Candidate; delay?: number } & ResultLocaleProps) {
   return (
     <article
       style={{ animationDelay: `${delay}ms` }}
@@ -1042,12 +1276,12 @@ export function CandidateCard({ c, delay = 0 }: { c: Candidate; delay?: number }
         <div className="flex shrink-0 gap-2">
           {c.links?.github && <LinkPill href={c.links.github}>GitHub</LinkPill>}
           {c.links?.linkedin && <LinkPill href={c.links.linkedin}>LinkedIn</LinkPill>}
-          {c.links?.other && <LinkPill href={c.links.other}>主页</LinkPill>}
+          {c.links?.other && <LinkPill href={c.links.other}>{resultCopy(locale, "homepage")}</LinkPill>}
         </div>
       </div>
-      {c.claims?.length > 0 && <div className="mt-3"><Tally claims={c.claims} /></div>}
+      {c.claims?.length > 0 && <div className="mt-3"><Tally claims={c.claims} locale={locale} /></div>}
       <div className="mt-3 space-y-2.5">
-        {c.claims?.map((cl, i) => <ClaimBlock key={i} c={cl} />)}
+        {c.claims?.map((cl, i) => <ClaimBlock key={i} c={cl} locale={locale} />)}
       </div>
       <p className="mt-4 border-t border-gray-100 pt-3 text-sm italic text-gray-500">{c.summary}</p>
     </article>
@@ -1055,12 +1289,12 @@ export function CandidateCard({ c, delay = 0 }: { c: Candidate; delay?: number }
 }
 
 // 可信度环形大徽章
-function TrustRing({ level }: { level: "high" | "medium" | "low" }) {
+function TrustRing({ level, locale }: { level: "high" | "medium" | "low" } & ResultLocaleProps) {
   const meta = {
-    high: { label: "高", ring: "ring-emerald-200 text-emerald-700 bg-emerald-50", pct: 92, stroke: "#10b981" },
-    medium: { label: "中", ring: "ring-amber-200 text-amber-700 bg-amber-50", pct: 58, stroke: "#f59e0b" },
-    low: { label: "低", ring: "ring-red-200 text-red-700 bg-red-50", pct: 24, stroke: "#ef4444" },
-  }[level] ?? { label: "低", ring: "ring-red-200 text-red-700 bg-red-50", pct: 24, stroke: "#ef4444" };
+    high: { label: resultCopy(locale, "high"), ring: "ring-emerald-200 text-emerald-700 bg-emerald-50", pct: 92, stroke: "#10b981" },
+    medium: { label: resultCopy(locale, "medium"), ring: "ring-amber-200 text-amber-700 bg-amber-50", pct: 58, stroke: "#f59e0b" },
+    low: { label: resultCopy(locale, "low"), ring: "ring-red-200 text-red-700 bg-red-50", pct: 24, stroke: "#ef4444" },
+  }[level] ?? { label: resultCopy(locale, "low"), ring: "ring-red-200 text-red-700 bg-red-50", pct: 24, stroke: "#ef4444" };
   const r = 26, circ = 2 * Math.PI * r;
   return (
     <div className="relative flex h-20 w-20 shrink-0 items-center justify-center">
@@ -1070,46 +1304,46 @@ function TrustRing({ level }: { level: "high" | "medium" | "low" }) {
           strokeDasharray={circ} strokeDashoffset={circ * (1 - meta.pct / 100)} />
       </svg>
       <div className="text-center">
-        <div className="text-[9px] font-medium uppercase tracking-wide text-gray-400">可信度</div>
+        <div className="text-[9px] font-medium text-gray-400">{resultCopy(locale, "trust")}</div>
         <div className={`text-xl font-bold leading-none ${level === "high" ? "text-emerald-600" : level === "medium" ? "text-amber-600" : "text-red-600"}`}>{meta.label}</div>
       </div>
     </div>
   );
 }
 
-export function TrustReportView({ r }: { r: VerifyReport }) {
+export function TrustReportView({ r, locale }: { r: VerifyReport } & ResultLocaleProps) {
   const totalSources = reportUniqueSources(r.claims);
-  const heuristic = trustHeuristic(r);
+  const heuristic = trustHeuristic(r, locale);
   return (
     <article className="sh-fade-in-up rounded-[28px] border border-black/10 bg-white/86 p-5 shadow-[0_18px_52px_rgba(0,0,0,0.06)]">
       <div className="flex items-center justify-between gap-3">
         <div>
           <h3 className="text-lg font-semibold text-gray-900">{r.candidate_name}</h3>
-          {r.claims?.length > 0 && <div className="mt-2"><Tally claims={r.claims} /></div>}
+          {r.claims?.length > 0 && <div className="mt-2"><Tally claims={r.claims} locale={locale} /></div>}
         </div>
-        <TrustRing level={r.overall_trust} />
+        <TrustRing level={r.overall_trust} locale={locale} />
       </div>
 
       {/* 信源汇总 + 启发式信任度 (Phase 2.A.1 透明度增强) */}
       {r.claims?.length > 0 && (
         <div className="mt-3 flex flex-wrap items-center gap-2 rounded-xl border border-gray-100 bg-gray-50/70 px-3 py-2 text-xs text-gray-600">
-          <span className="font-medium text-gray-700">报告基于 {totalSources} 个独立信源</span>
+          <span className="font-medium text-gray-700">{resultCopy(locale, "reportBasedOn", { count: totalSources })}</span>
           <span className="text-gray-300">·</span>
           <span title={heuristic.hint} className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 font-medium ring-1 ${trustHeuristicChip(heuristic.level)}`}>
             {heuristic.label}
           </span>
-          <span className="text-gray-400">— {heuristic.hint}</span>
+          <span className="text-gray-400">- {heuristic.hint}</span>
         </div>
       )}
 
       <div className="mt-4 space-y-2.5">
-        {r.claims?.map((cl, i) => <ClaimBlock key={i} c={cl} />)}
+        {r.claims?.map((cl, i) => <ClaimBlock key={i} c={cl} locale={locale} />)}
       </div>
       {r.red_flags?.length > 0 && (
         <div className="mt-4 rounded-xl border border-red-100 bg-red-50/60 p-4">
           <p className="inline-flex items-center gap-2 text-sm font-semibold text-red-700">
             <FiFlag className="h-4 w-4" aria-hidden="true" />
-            红旗
+            {resultCopy(locale, "redFlags")}
           </p>
           <ul className="mt-1.5 list-disc space-y-1 pl-5 text-sm text-red-600/90">
             {r.red_flags.map((f, i) => <li key={i}>{f}</li>)}
@@ -1122,15 +1356,15 @@ export function TrustReportView({ r }: { r: VerifyReport }) {
         <summary className="cursor-pointer font-medium text-gray-700">
           <span className="inline-flex items-center gap-2">
             <FiInfo className="h-3.5 w-3.5" aria-hidden="true" />
-            如何解读这份报告 · 局限性
+            {resultCopy(locale, "reportCaveatTitle")}
           </span>
         </summary>
         <div className="mt-2 space-y-1.5 leading-relaxed">
-          <p>本报告由 AI 自动抓取公开网页生成，不构成对候选人最终判断，仅作为<strong>第一道筛查</strong>。</p>
-          <p>&quot;已核实 / 矛盾 / 未核实&quot;是模型在抓取时的判断，可能存在误判或漏判，关键决策请人工复核每条声称的原始链接。</p>
-          <p>&quot;独立信源数&quot;= 该条声称的 evidence 中不同域名数；数越多通常越可靠，但同一来源转发不算独立。</p>
-          <p>信源时效以抓取时刻为准，公开网页内容可能已经更新，请在做最终决策前点击原链接核对。</p>
-          <p>未发现红旗不代表候选人完全可信；已发现红旗也不代表候选人不可用，可能是同名或信源错误。</p>
+          <p>{resultCopy(locale, "caveat1")}</p>
+          <p>{resultCopy(locale, "caveat2")}</p>
+          <p>{resultCopy(locale, "caveat3")}</p>
+          <p>{resultCopy(locale, "caveat4")}</p>
+          <p>{resultCopy(locale, "caveat5")}</p>
         </div>
       </details>
     </article>

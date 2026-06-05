@@ -5,7 +5,7 @@
 // 搜索 → TalentMap + ShortlistCard 列表
 // 核验 → TrustReportView
 import { useEffect, useRef, useState } from "react";
-import { FiMail, FiRefreshCw } from "react-icons/fi";
+import { FiMail } from "react-icons/fi";
 import { useI18n } from "@/components/LanguageProvider";
 import {
   BackfillMergeSummaryView,
@@ -26,21 +26,18 @@ import {
 } from "@/components/result";
 import OutreachModal from "@/components/OutreachModal";
 import {
-  PrimaryAction,
-  Surface,
-} from "@/components/ui/signal-ui";
-import {
   EditableSearchPlanPanel,
+  FeedbackOptimizationPreview,
   ProjectContextBanner,
   ResearchErrorPanel,
   ResearchInputStage,
+  ResearchProcessPanel,
   ResearchResultShell,
   ResearchShareBar,
-  ResearchTimelinePanel,
 } from "@/components/research-workspace";
 import { buildBackfillMergeSummary, buildEditableSearchPlanDraft, buildFeedbackOptimizedSearchInput, buildSearchInputFromEditablePlan } from "@/lib/talent-profile.mjs";
 import type { BackfillMergeSummary, CoverageBackfillJob, TalentCandidate, TalentSearchResult } from "@/lib/talent-profile.mjs";
-import { buildResearchProgressView } from "@/lib/research-progress.mjs";
+import { buildFeedbackOptimizationPreview, buildResearchLoopView } from "@/lib/research-loop.mjs";
 
 type FeedItem = { id: number; kind: "search" | "fetch"; info: string };
 type SearchResult = { candidates?: Candidate[] } | TalentSearchResult;
@@ -141,18 +138,18 @@ function isTalentSearchResult(result: AppResult | null): result is TalentSearchR
   return Boolean(result && "talent_map" in result && "search_brief" in result && Array.isArray((result as TalentSearchResult).candidates));
 }
 
-function userFacingStatus(view: JobStatusView, elapsedMs: number): JobStatusView {
+function userFacingStatus(view: JobStatusView, elapsedMs: number, t: (key: string, params?: Record<string, string | number>) => string): JobStatusView {
   if (view.phase === "queued" && elapsedMs > WORKER_DELAY_MS) {
     return {
       ...view,
-      label: "研究服务暂时繁忙",
-      detail: "任务还在队列中，worker 可能正在处理上一条或暂时离线。页面会继续自动等待，完成后也会进入搜索历史。",
+      label: t("research.status.busy.label"),
+      detail: t("research.status.busy.detail"),
     };
   }
   if (view.phase === "retrying" && elapsedMs > WORKER_DELAY_MS) {
     return {
       ...view,
-      detail: `${view.detail} 页面会继续自动等待；如果最终失败，会提供重新研究按钮。`,
+      detail: t("research.status.retryingSlow.detail", { detail: view.detail }),
     };
   }
   return view;
@@ -212,7 +209,7 @@ export default function ResearchTool({
       const elapsedMs = Date.now() - startedAt;
       if (elapsedMs > JOB_TIMEOUT_MS) {
         stopPolling();
-        setError("研究服务暂时繁忙或 worker 离线较久。任务仍保留在后台，完成后会出现在历史里，也可以稍后重新研究。");
+        setError(t("research.status.timeout"));
         setLoading(false);
         return;
       }
@@ -221,7 +218,7 @@ export default function ResearchTool({
         const j: StatusResponse = await r.json();
         if (token !== runTokenRef.current) return;
         pollFailures = 0;
-        if (j.status_view) setJobStatus(userFacingStatus(j.status_view, elapsedMs));
+        if (j.status_view) setJobStatus(userFacingStatus(j.status_view, elapsedMs, t));
         const p = j.progress;
         if (p) {
           setLive({ searches: p.searches ?? 0, fetches: p.fetches ?? 0 });
@@ -255,8 +252,8 @@ export default function ResearchTool({
         if (pollFailures >= 3) {
           setJobStatus({
             phase: "queued",
-            label: "正在重新连接状态服务",
-            detail: "状态查询连接不稳定，研究任务仍在后台继续。页面会自动重试。",
+            label: t("research.status.reconnect.label"),
+            detail: t("research.status.reconnect.detail"),
             canRetry: false,
           });
         }
@@ -331,7 +328,7 @@ export default function ResearchTool({
         if (!res.ok) { setError(j.error ?? `HTTP ${res.status}`); setLoading(false); return; }
         if (j.queued && j.jobId) {
           setCurrentJobId(j.jobId);
-          setJobStatus({ phase: "queued", label: "已进入研究队列", detail: "等待 worker 认领任务。", canRetry: false });
+          setJobStatus({ phase: "queued", label: t("research.status.queued.label"), detail: t("research.status.queued.detail"), canRetry: false });
           beginPolling(j.jobId, undefined, token);
         } else {
           setError(j.error ?? "出错了"); setLoading(false);
@@ -406,8 +403,8 @@ export default function ResearchTool({
     setError("");
     setJobStatus({
       phase: "canceled",
-      label: "搜索已停止",
-      detail: "你已停止本次搜索。可以调整条件后重新搜索。",
+      label: t("research.status.canceled.label"),
+      detail: t("research.status.canceled.detail"),
       canRetry: false,
     });
     setCurrentJobId(null);
@@ -424,7 +421,7 @@ export default function ResearchTool({
     if (!currentJobId) return;
     stopPolling();
     setLoading(true); setError(""); setResult(null); setFeed([]); setLive(null);
-    setJobStatus({ phase: "queued", label: "已重新入队", detail: "等待 worker 重新认领任务。", canRetry: false });
+    setJobStatus({ phase: "queued", label: t("research.status.requeued.label"), detail: t("research.status.requeued.detail"), canRetry: false });
     try {
       const res = await fetch("/api/retry", {
         method: "POST",
@@ -445,7 +442,7 @@ export default function ResearchTool({
     if (loading || !isTalentSearchResult(result)) return;
     stopPolling();
     setLoading(true); setError(""); setStats(null); setFeed([]); setLive(null);
-    setJobStatus({ phase: "queued", label: "补搜已进入研究队列", detail: "等待 worker 认领这个证据缺口任务。", canRetry: false });
+    setJobStatus({ phase: "queued", label: t("research.status.backfillQueued.label"), detail: t("research.status.backfillQueued.detail"), canRetry: false });
     setCurrentJobId(null);
     const context = { originalResult: result, originalRunId: runId, job };
     setBackfillContext(context);
@@ -560,8 +557,17 @@ export default function ResearchTool({
   }
 
   const isSearch = mode === "search";
-  const hasCoreSearchFeedback = Boolean(searchFeedback.precision && searchFeedback.satisfaction);
-  const progressView = buildResearchProgressView({ feed, live });
+  const progressView = buildResearchLoopView({ feed, live, jobStatus, locale });
+  const feedbackPreview = buildFeedbackOptimizationPreview({ feedback: searchFeedback, locale });
+  const feedbackGroups = SEARCH_FEEDBACK_GROUPS.map((group) => ({
+    key: group.key,
+    label: t(group.labelKey),
+    options: group.options.map((option) => ({
+      value: String(option.value),
+      label: t(option.labelKey),
+      selected: searchFeedback[group.key] === option.value,
+    })),
+  }));
 
   return (
     <div className="space-y-5">
@@ -650,11 +656,12 @@ export default function ResearchTool({
 
       {/* 进度区 */}
       {loading && (
-        <ResearchTimelinePanel
-          label={jobStatus?.label ?? progressView.active?.label}
-          detail={progressView.active?.detail}
+        <ResearchProcessPanel
+          phaseLabel={progressView.phase.label}
+          phaseDetail={progressView.phase.detail}
           statsText={progressView.statsText}
-          timeline={progressView.timeline}
+          coverage={progressView.coverage}
+          recentItems={progressView.recentItems}
           statusDetail={jobStatus?.detail ?? undefined}
           onStop={stopCurrentRun}
         />
@@ -696,63 +703,23 @@ export default function ResearchTool({
                   onMerge={backfillContext?.originalRunId && runId ? mergeBackfillIntoOriginal : undefined}
                   mergeDisabled={mergingBackfill}
                   merged={Boolean(mergedOriginalRunId)}
+                  locale={locale}
                 />
               )}
-              <SearchPlanView result={result} />
-              <ShortlistDeliveryReportView result={result} />
-              <SourceExecutionView result={result} />
-              <CoverageBackfillView result={result} onBackfillJob={enqueueBackfillJob} backfillDisabled={loading} />
-              <EvidenceCoverageView result={result} />
-              <TalentMapView result={result} />
-              <CandidateComparisonView result={result} />
-              <Surface className="p-5 md:p-6">
-                <div className="flex flex-wrap items-start justify-between gap-3">
-                  <div>
-                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-neutral-500">{t("feedback.eyebrow")}</p>
-                    <h2 className="mt-1 text-xl font-semibold text-[var(--sh-ink)]">{t("feedback.title")}</h2>
-                    <p className="mt-1 text-sm leading-6 text-[var(--sh-muted)]">
-                      {t("feedback.desc")}
-                    </p>
-                  </div>
-                  <PrimaryAction
-                    onClick={runFeedbackOptimizedSearch}
-                    disabled={loading || !hasCoreSearchFeedback}
-                    className="px-4"
-                  >
-                    <FiRefreshCw className="h-4 w-4" aria-hidden="true" />
-                    {t("feedback.run")}
-                  </PrimaryAction>
-                </div>
-                <div className="mt-4 grid gap-4 md:grid-cols-2">
-                  {SEARCH_FEEDBACK_GROUPS.map((group) => (
-                    <div key={group.key}>
-                      <p className="text-xs font-semibold text-[var(--sh-muted)]">{t(group.labelKey)}</p>
-                      <div className="mt-2 flex flex-wrap gap-2">
-                        {group.options.map((option) => {
-                          const selected = searchFeedback[group.key] === option.value;
-                          return (
-                            <button
-                              key={option.value}
-                              type="button"
-                              onClick={() => updateSearchFeedback(group.key, option.value)}
-                              className={`rounded-full border px-3 py-1.5 text-sm font-medium transition ${
-                                selected
-                                  ? "border-[var(--sh-ink)] bg-[var(--sh-ink)] text-white"
-                                  : "border-black/10 bg-white/72 text-[var(--sh-muted)] hover:border-black/20 hover:bg-white"
-                              }`}
-                            >
-                              {t(option.labelKey)}
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-                {!hasCoreSearchFeedback && (
-                  <p className="mt-4 text-xs text-[var(--sh-faint)]">{t("feedback.hint")}</p>
-                )}
-              </Surface>
+              <SearchPlanView result={result} locale={locale} />
+              <ShortlistDeliveryReportView result={result} locale={locale} />
+              <SourceExecutionView result={result} locale={locale} />
+              <CoverageBackfillView result={result} onBackfillJob={enqueueBackfillJob} backfillDisabled={loading} locale={locale} />
+              <EvidenceCoverageView result={result} locale={locale} />
+              <TalentMapView result={result} locale={locale} />
+              <CandidateComparisonView result={result} locale={locale} />
+              <FeedbackOptimizationPreview
+                groups={feedbackGroups}
+                preview={feedbackPreview}
+                loading={loading}
+                onSelect={(key, value) => updateSearchFeedback(key as SearchFeedbackField, value as SearchFeedbackState[SearchFeedbackField])}
+                onRun={runFeedbackOptimizedSearch}
+              />
               <section className="space-y-3">
                 <div className="flex flex-wrap items-end justify-between gap-3">
                   <div>
@@ -780,6 +747,7 @@ export default function ResearchTool({
                         selected={shortlist.includes(i)}
                         onOpen={() => setSelectedCandidateIndex(i)}
                         onToggle={() => toggleShortlist(i, candidate)}
+                        locale={locale}
                       />
                     ))}
                   </div>
@@ -797,8 +765,8 @@ export default function ResearchTool({
                           <FiMail className="h-4 w-4" aria-hidden="true" />
                           {t("result.outreachTo", { name: result.candidates[selectedCandidateIndex]?.name?.split(" ")[0] ?? "" })}
                         </button>
-                        <EvidenceGraphView result={result} candidate={result.candidates[selectedCandidateIndex]} />
-                        <CandidateProfileView candidate={result.candidates[selectedCandidateIndex]} result={result} />
+                        <EvidenceGraphView result={result} candidate={result.candidates[selectedCandidateIndex]} locale={locale} />
+                        <CandidateProfileView candidate={result.candidates[selectedCandidateIndex]} result={result} locale={locale} />
                       </>
                     )}
                   </div>
@@ -806,9 +774,9 @@ export default function ResearchTool({
               </section>
             </>
           ) : isVerifyReport(result) ? (
-            <TrustReportView r={result} />
+            <TrustReportView r={result} locale={locale} />
           ) : (
-            (result.candidates ?? []).map((c: Candidate, i: number) => <CandidateCard key={i} c={c} delay={i * 90} />)
+            (result.candidates ?? []).map((c: Candidate, i: number) => <CandidateCard key={i} c={c} delay={i * 90} locale={locale} />)
           )}
         </ResearchResultShell>
       )}

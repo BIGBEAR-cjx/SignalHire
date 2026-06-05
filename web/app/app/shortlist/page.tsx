@@ -354,7 +354,7 @@ function DetailPanel({
       {/* 候选人画像 */}
       <div className="border-t border-gray-100 pt-4">
         {isTalent ? (
-          <CandidateProfileView candidate={candidate as TalentCandidate} />
+          <CandidateProfileView candidate={candidate as TalentCandidate} locale={locale} />
         ) : (
           <LegacyCandidateView candidate={candidate} />
         )}
