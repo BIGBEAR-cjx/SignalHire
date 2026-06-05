@@ -77,6 +77,71 @@ function projectAction(locale, key, params) {
   };
 }
 
+function timestampMs(value) {
+  const time = Date.parse(cleanString(value));
+  return Number.isFinite(time) ? time : 0;
+}
+
+function runVariant(run, roundNumber) {
+  const label = cleanString(run?.label);
+  const queryText = cleanString(run?.query_text);
+  const text = `${label}\n${queryText}`.toLowerCase();
+  if (run?.kind === "verify") return "verify";
+  if (text.includes("feedback-optimized signalhire search") || text.includes("user feedback from reviewed shortlist")) return "feedback";
+  if (label.startsWith("补搜") || text.includes("backfill signalhire search")) return "backfill";
+  return roundNumber <= 1 ? "initial" : "followup";
+}
+
+function runDescription(locale, variant, params) {
+  return msg(locale, `projects.rounds.${variant}.description`, params);
+}
+
+/**
+ * @param {{ runs?: Array<{ id?: string; kind?: string; label?: string; summary?: string | null; status?: string; query_text?: string; updated_at?: string }>; locale?: string }} input
+ */
+export function buildProjectResearchRounds({ runs = [], locale = "zh" } = {}) {
+  const normalizedLocale = normalizeLocale(locale);
+  const normalizedRuns = Array.isArray(runs) ? runs.filter(Boolean) : [];
+  const chronological = normalizedRuns
+    .map((run, index) => ({ run, index }))
+    .sort((a, b) => timestampMs(a.run?.updated_at) - timestampMs(b.run?.updated_at) || a.index - b.index);
+  const roundNumbers = new Map();
+  chronological.forEach(({ run, index }, roundIndex) => {
+    roundNumbers.set(cleanString(run?.id) || String(index), roundIndex + 1);
+  });
+
+  const items = normalizedRuns.map((run, index) => {
+    const id = cleanString(run?.id) || String(index);
+    const roundNumber = roundNumbers.get(id) || index + 1;
+    const variant = runVariant(run, roundNumber);
+    const label = cleanString(run?.label) || msg(normalizedLocale, "projects.rounds.untitled");
+    const queryText = cleanString(run?.query_text);
+    const summary = cleanString(run?.summary);
+    const description = runDescription(normalizedLocale, variant, { round: roundNumber, label });
+    return {
+      id,
+      roundNumber,
+      kind: run?.kind === "verify" ? "verify" : "search",
+      variant,
+      badge: msg(normalizedLocale, `projects.rounds.${variant}.badge`),
+      label,
+      summary,
+      status: cleanString(run?.status),
+      queryText,
+      updatedAt: cleanString(run?.updated_at),
+      description,
+      nextSearchInput: run?.kind === "verify" ? "" : queryText,
+    };
+  });
+
+  return {
+    locale: normalizedLocale,
+    title: msg(normalizedLocale, "projects.rounds.title"),
+    emptyText: msg(normalizedLocale, "projects.rounds.empty"),
+    items,
+  };
+}
+
 /**
  * @param {Array<{ id?: number; kind?: string; info?: string }> | undefined} feed
  */

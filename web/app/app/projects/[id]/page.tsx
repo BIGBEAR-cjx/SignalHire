@@ -5,7 +5,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { FiArrowLeft, FiCheckCircle, FiMail, FiSearch, FiTrash2 } from "react-icons/fi";
+import { FiArrowLeft, FiCheckCircle, FiMail, FiRefreshCw, FiSearch, FiTrash2 } from "react-icons/fi";
 import { CandidateComparisonView, CandidateProfileView, EvidencePriorityPanel } from "@/components/result";
 import { useI18n } from "@/components/LanguageProvider";
 import OutreachModal from "@/components/OutreachModal";
@@ -19,7 +19,7 @@ import {
   StatusBadge,
   Surface,
 } from "@/components/ui/signal-ui";
-import { buildProjectNextSteps } from "@/lib/research-loop.mjs";
+import { buildProjectNextSteps, buildProjectResearchRounds } from "@/lib/research-loop.mjs";
 import { buildEvidencePriorityView } from "@/lib/evidence-priority.mjs";
 import type { TalentCandidate } from "@/lib/talent-profile.mjs";
 
@@ -33,6 +33,22 @@ type ProjectNextStepsView = {
     key: string;
     label: string;
     detail: string;
+  }>;
+};
+type ProjectResearchRoundsView = {
+  title: string;
+  emptyText: string;
+  items: Array<{
+    id: string;
+    roundNumber: number;
+    kind: "search" | "verify";
+    badge: string;
+    label: string;
+    summary: string;
+    status: string;
+    queryText: string;
+    description: string;
+    nextSearchInput: string;
   }>;
 };
 
@@ -196,6 +212,10 @@ export default function ProjectDetailPage() {
     latestRunLabel: detail.runs[0]?.label ?? "",
     locale,
   });
+  const projectRounds = buildProjectResearchRounds({
+    runs: detail.runs,
+    locale,
+  }) as ProjectResearchRoundsView;
 
   return (
     <div className="space-y-6">
@@ -321,33 +341,7 @@ export default function ProjectDetailPage() {
         )}
       </section>
 
-      {/* 历史搜索 */}
-      {detail.runs.length > 0 && (
-        <section className="space-y-2">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-neutral-500">研究历史</p>
-            <h2 className="mt-1 text-xl font-semibold text-[var(--sh-ink)]">本项目历史研究 ({detail.runs.length})</h2>
-          </div>
-          <ul className="space-y-2">
-            {detail.runs.map((r) => {
-              const target = r.kind === "search"
-                ? `/app/search?project=${id}&q=${encodeURIComponent(r.query_text)}`
-                : `/app/verify?project=${id}&bio=${encodeURIComponent(r.query_text)}`;
-              return (
-                <li key={r.id}>
-                  <Link href={target} className="flex items-center justify-between gap-3 rounded-3xl border border-black/10 bg-white/84 px-4 py-3 transition hover:border-black/20 hover:shadow-sm">
-                    <span className="flex min-w-0 items-center gap-2">
-                      <KindBadge kind={r.kind} />
-                      <span className="min-w-0 truncate text-sm text-gray-800" title={r.query_text}>{r.label}</span>
-                    </span>
-                    <span className="shrink-0 text-xs text-gray-400">{r.summary ?? r.status}</span>
-                  </Link>
-                </li>
-              );
-            })}
-          </ul>
-        </section>
-      )}
+      <ProjectResearchRoundsPanel rounds={projectRounds} projectId={id} />
     </div>
   );
 }
@@ -391,9 +385,74 @@ function ProjectNextStepPanel({
   );
 }
 
+function ProjectResearchRoundsPanel({
+  rounds,
+  projectId,
+}: {
+  rounds: ProjectResearchRoundsView;
+  projectId: string;
+}) {
+  const { t } = useI18n();
+  return (
+    <Surface className="p-5 md:p-6">
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-neutral-500">{t("projects.rounds.eyebrow")}</p>
+          <h2 className="mt-1 text-xl font-semibold text-[var(--sh-ink)]">{rounds.title} ({rounds.items.length})</h2>
+        </div>
+      </div>
+      {rounds.items.length === 0 ? (
+        <p className="mt-4 rounded-2xl border border-dashed border-black/10 bg-white/60 px-4 py-3 text-sm text-[var(--sh-faint)]">{rounds.emptyText}</p>
+      ) : (
+        <ol className="mt-4 space-y-3">
+          {rounds.items.map((round) => {
+            const continueHref = round.kind === "search" && round.nextSearchInput
+              ? `/app/search?project=${projectId}&q=${encodeURIComponent(round.nextSearchInput)}`
+              : "";
+            const reportHref = `/r/${round.id}`;
+            return (
+              <li key={round.id} className="rounded-3xl border border-black/10 bg-white/84 p-4">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="rounded-full bg-neutral-950 px-2.5 py-1 text-xs font-semibold text-white">#{round.roundNumber}</span>
+                      <KindBadge kind={round.kind} />
+                      <span className="rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-[var(--sh-muted)] ring-1 ring-black/10">{round.badge}</span>
+                    </div>
+                    <p className="mt-3 truncate text-sm font-semibold text-[var(--sh-ink)]" title={round.queryText}>{round.label}</p>
+                    <p className="mt-1 text-xs leading-5 text-[var(--sh-muted)]">{round.description}</p>
+                    {(round.summary || round.status) && (
+                      <p className="mt-2 text-xs text-[var(--sh-faint)]">{round.summary || round.status}</p>
+                    )}
+                  </div>
+                  <div className="flex shrink-0 flex-wrap gap-2">
+                    {continueHref && (
+                      <SecondaryAction href={continueHref} className="min-h-9 px-3 py-2 text-xs">
+                        <FiRefreshCw className="h-3.5 w-3.5" aria-hidden="true" />
+                        {t("projects.rounds.nextSearch")}
+                      </SecondaryAction>
+                    )}
+                    {round.status === "done" && (
+                      <SecondaryAction href={reportHref} className="min-h-9 px-3 py-2 text-xs">
+                        <FiCheckCircle className="h-3.5 w-3.5" aria-hidden="true" />
+                        {t("projects.rounds.viewReport")}
+                      </SecondaryAction>
+                    )}
+                  </div>
+                </div>
+              </li>
+            );
+          })}
+        </ol>
+      )}
+    </Surface>
+  );
+}
+
 function KindBadge({ kind }: { kind: "search" | "verify" }) {
-  if (kind === "search") return <StatusBadge label="搜人" dotClassName="bg-blue-500" className="bg-blue-50 text-blue-700 ring-blue-100" />;
-  return <StatusBadge label="核验" dotClassName="bg-amber-500" className="bg-amber-50 text-amber-800 ring-amber-100" />;
+  const { t } = useI18n();
+  if (kind === "search") return <StatusBadge label={t("projects.kind.search")} dotClassName="bg-blue-500" className="bg-blue-50 text-blue-700 ring-blue-100" />;
+  return <StatusBadge label={t("projects.kind.verify")} dotClassName="bg-amber-500" className="bg-amber-50 text-amber-800 ring-amber-100" />;
 }
 
 function StatusFunnel({

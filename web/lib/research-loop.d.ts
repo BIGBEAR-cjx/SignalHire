@@ -68,6 +68,26 @@ export type ProjectNextSteps = {
   latestRunLabel: string;
   actions: ProjectNextStepAction[];
 };
+export type ProjectResearchRoundItem = {
+  id: string;
+  roundNumber: number;
+  kind: "search" | "verify";
+  variant: string;
+  badge: string;
+  label: string;
+  summary: string;
+  status: string;
+  queryText: string;
+  updatedAt: string;
+  description: string;
+  nextSearchInput: string;
+};
+export type ProjectResearchRounds = {
+  locale: ResearchLoopLocale;
+  title: string;
+  emptyText: string;
+  items: ProjectResearchRoundItem[];
+};
 
 export function buildResearchLoopView(input?: {
   feed?: ResearchLoopFeedItem[];
@@ -88,3 +108,15 @@ export function buildProjectNextSteps(input?: {
   latestRunLabel?: string;
   locale?: ResearchLoopLocale | string;
 }): ProjectNextSteps;
+export function buildProjectResearchRounds(input?: {
+  runs?: Array<{
+    id?: string;
+    kind?: string;
+    label?: string;
+    summary?: string | null;
+    status?: string;
+    query_text?: string;
+    updated_at?: string;
+  }>;
+  locale?: ResearchLoopLocale | string;
+}): ProjectResearchRounds;

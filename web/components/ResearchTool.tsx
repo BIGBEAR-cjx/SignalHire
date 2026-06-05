@@ -392,7 +392,9 @@ export default function ResearchTool({
 
   function runFeedbackOptimizedSearch() {
     if (!isTalentSearchResult(result)) return;
-    run(buildFeedbackOptimizedSearchInput({ result, feedback: searchFeedback }), { preserveInput: true });
+    const optimizedInput = buildFeedbackOptimizedSearchInput({ result, feedback: searchFeedback });
+    setInput(optimizedInput);
+    run(optimizedInput, { preserveInput: true });
   }
 
   function stopCurrentRun() {

@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 
 import {
   buildFeedbackOptimizationPreview,
+  buildProjectResearchRounds,
   buildProjectNextSteps,
   buildResearchLoopView,
   extractRecentResearchItems,
@@ -149,4 +150,60 @@ test("builds project next steps for empty and filtered projects", () => {
     ["review_candidates", "review_latest_run", "clear_filter"],
   );
   assert.match(filtered.actions[1].detail, /LLM infra search/);
+});
+
+test("builds project research rounds from newest-first project runs", () => {
+  const rounds = buildProjectResearchRounds({
+    runs: [
+      {
+        id: "run-3",
+        kind: "search",
+        label: "Feedback-optimized SignalHire search.",
+        query_text: "Feedback-optimized SignalHire search.\nUser feedback from reviewed shortlist:\nPrecision: 不精准",
+        status: "done",
+        summary: "Found replacement candidates",
+        updated_at: "2026-06-05T12:00:00.000Z",
+      },
+      {
+        id: "run-2",
+        kind: "search",
+        label: "补搜 practice/code",
+        query_text: "Backfill SignalHire search for missing evidence",
+        status: "done",
+        summary: "Filled code evidence",
+        updated_at: "2026-06-05T11:00:00.000Z",
+      },
+      {
+        id: "run-1",
+        kind: "search",
+        label: "Senior LLM infra engineer",
+        query_text: "Senior LLM infra engineer",
+        status: "done",
+        summary: "Initial shortlist",
+        updated_at: "2026-06-05T10:00:00.000Z",
+      },
+    ],
+  });
+
+  assert.equal(rounds.locale, "zh");
+  assert.equal(rounds.title, "项目搜索轮次");
+  assert.deepEqual(
+    rounds.items.map((item) => [item.id, item.roundNumber, item.kind, item.variant, item.badge]),
+    [
+      ["run-3", 3, "search", "feedback", "反馈优化"],
+      ["run-2", 2, "search", "backfill", "证据补搜"],
+      ["run-1", 1, "search", "initial", "首轮搜索"],
+    ],
+  );
+  assert.equal(rounds.items[0].nextSearchInput, rounds.items[0].queryText);
+  assert.match(rounds.items[0].description, /根据上一轮反馈/);
+});
+
+test("builds English empty project research rounds", () => {
+  const rounds = buildProjectResearchRounds({ runs: [], locale: "en" });
+
+  assert.equal(rounds.locale, "en");
+  assert.equal(rounds.title, "Project search rounds");
+  assert.equal(rounds.emptyText, "No project search rounds yet.");
+  assert.deepEqual(rounds.items, []);
 });
