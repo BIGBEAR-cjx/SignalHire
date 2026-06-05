@@ -713,6 +713,7 @@ const DOSSIER_COPY = {
     riskPrefix: "主要风险：{risk}",
     noMaterialRisk: "暂未发现明确高风险，但仍需要人工复核原始链接。",
     verdictSummary: "{verified} 条已验证 / {unverified} 条查无实据 / {contradicted} 条矛盾",
+    gapSummary: "缺少{label}证据，建议补搜 {sources} 来源。",
   },
   en: {
     title: "Candidate evidence dossier",
@@ -731,6 +732,22 @@ const DOSSIER_COPY = {
     riskPrefix: "Primary risk: {risk}",
     noMaterialRisk: "No clear high-risk signal was found yet, but original links still need human review.",
     verdictSummary: "{verified} verified / {unverified} unverified / {contradicted} contradicted",
+    gapSummary: "{label} evidence is missing. Backfill {sources} sources.",
+  },
+};
+
+const DOSSIER_GROUP_LABELS = {
+  zh: {
+    research: "研究",
+    practice: "实践",
+    work_history: "工作经历",
+    public_voice: "公开表达",
+  },
+  en: {
+    research: "Research",
+    practice: "Practice",
+    work_history: "Work history",
+    public_voice: "Public voice",
   },
 };
 
@@ -744,6 +761,40 @@ function candidateFitLabel(score, locale) {
   if (score >= 80) return dossierCopy(locale, "strongMatch");
   if (score >= 65) return dossierCopy(locale, "possibleMatch");
   return dossierCopy(locale, "weakMatch");
+}
+
+function dossierGroupLabel(locale, key) {
+  return DOSSIER_GROUP_LABELS[locale === "en" ? "en" : "zh"][key] ?? key;
+}
+
+function buildDossierEvidenceGroups({ audit, claims, locale }) {
+  const claimRows = (Array.isArray(claims) ? claims : [])
+    .map((claim) => ({
+      claim: cleanString(claim?.claim),
+      sourceTypes: uniqueStrings((Array.isArray(claim?.evidence) ? claim.evidence : [])
+        .map((evidence) => cleanString(evidence?.source_type).toLowerCase())
+        .filter(Boolean), 12),
+      evidenceCount: Array.isArray(claim?.evidence) ? claim.evidence.length : 0,
+    }))
+    .filter((row) => row.claim || row.sourceTypes.length);
+  const auditSourceTypes = new Set(cleanStringArray(audit?.source_types, 12).map((type) => type.toLowerCase()));
+
+  return EVIDENCE_COVERAGE_GROUPS.map((group) => {
+    const sourceTypes = group.source_types.filter((type) => auditSourceTypes.has(type));
+    const rows = claimRows.filter((row) => row.sourceTypes.some((type) => group.source_types.includes(type)));
+    const evidenceCount = rows.reduce((total, row) => total + row.sourceTypes.filter((type) => group.source_types.includes(type)).length, 0);
+    const covered = sourceTypes.length > 0 || evidenceCount > 0;
+    return {
+      key: group.key,
+      label: dossierGroupLabel(locale, group.key),
+      status: covered ? "covered" : "missing",
+      source_types: sourceTypes,
+      missing_source_types: group.source_types.filter((type) => !sourceTypes.includes(type)),
+      claim_count: rows.length,
+      evidence_count: evidenceCount,
+      primary_claims: uniqueStrings(rows.map((row) => row.claim).filter(Boolean), 3),
+    };
+  });
 }
 
 /**
@@ -766,6 +817,13 @@ export function buildCandidateEvidenceDossier({ result, candidate, locale = "zh"
     || "";
   const quality = audit.overall_evidence_quality || "medium";
   const signalText = topSignal ? dossierCopy(locale, "signalPrefix", { signal: topSignal }) : "";
+  const evidenceGroups = buildDossierEvidenceGroups({ audit, claims: selected?.claims, locale });
+  const verificationGaps = evidenceGroups
+    .filter((group) => group.status === "missing")
+    .map((group) => dossierCopy(locale, "gapSummary", {
+      label: group.label,
+      sources: group.missing_source_types.join(", "),
+    }));
 
   return {
     title: dossierCopy(locale, "title"),
@@ -791,6 +849,8 @@ export function buildCandidateEvidenceDossier({ result, candidate, locale = "zh"
     source_types: audit.source_types,
     primary_evidence: audit.strongest_evidence.slice(0, 3),
     weak_evidence: audit.weakest_evidence.slice(0, 2),
+    evidence_groups: evidenceGroups,
+    verification_gaps: verificationGaps,
   };
 }
 

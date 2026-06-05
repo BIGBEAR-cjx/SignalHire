@@ -418,6 +418,18 @@ test("builds localized candidate evidence dossier for result review", () => {
   assert.deepEqual(zh.source_types, ["code", "paper", "company"]);
   assert.equal(zh.primary_evidence[0], "Public serving repository and paper cite the same inference work.");
   assert.match(zh.risk_summary, /Availability is single-source/);
+  assert.deepEqual(
+    zh.evidence_groups.map((group) => [group.key, group.label, group.status, group.source_types, group.claim_count]),
+    [
+      ["research", "研究", "covered", ["paper"], 1],
+      ["practice", "实践", "covered", ["code"], 1],
+      ["work_history", "工作经历", "covered", ["company"], 0],
+      ["public_voice", "公开表达", "missing", [], 0],
+    ],
+  );
+  assert.deepEqual(zh.evidence_groups[0].primary_claims, ["Maintains public vLLM serving code"]);
+  assert.deepEqual(zh.evidence_groups[3].missing_source_types, ["talk", "blog", "podcast", "interview"]);
+  assert.ok(zh.verification_gaps.some((gap) => /缺少公开表达证据/.test(gap)));
 
   const en = talentProfile.buildCandidateEvidenceDossier({ result, candidate: result.candidates[0], locale: "en" });
   assert.equal(en.title, "Candidate evidence dossier");
@@ -425,6 +437,8 @@ test("builds localized candidate evidence dossier for result review", () => {
   assert.equal(en.metrics[1].label, "Independent sources");
   assert.equal(en.metrics[1].value, "4");
   assert.match(en.verdict_summary, /1 verified/);
+  assert.equal(en.evidence_groups[0].label, "Research");
+  assert.ok(en.verification_gaps.some((gap) => /Public voice evidence is missing/.test(gap)));
 });
 
 test("builds shortlist delivery report for hiring manager handoff", () => {

@@ -163,6 +163,8 @@ const RESULT_COPY = {
     removeFromPool: "移出候选池",
     addToPool: "加入候选池",
     auditTitle: "证据审计",
+    dossierCoverage: "证据覆盖",
+    verificationGaps: "待补验证",
     independentSources: "{count} 个独立信源",
     singleSourceClaims: "单源声称",
     identityRisk: "身份风险",
@@ -272,6 +274,8 @@ const RESULT_COPY = {
     removeFromPool: "Remove from pool",
     addToPool: "Add to pool",
     auditTitle: "Evidence audit",
+    dossierCoverage: "Evidence coverage",
+    verificationGaps: "Verification gaps",
     independentSources: "{count} independent sources",
     singleSourceClaims: "Single-source claims",
     identityRisk: "Identity risk",
@@ -1383,7 +1387,7 @@ export function EvidenceGraphView({ result, candidate, locale }: { result: Talen
   );
 }
 
-function CandidateEvidenceDossierView({ dossier }: { dossier: CandidateEvidenceDossier }) {
+function CandidateEvidenceDossierView({ dossier, locale }: { dossier: CandidateEvidenceDossier } & ResultLocaleProps) {
   return (
     <section className="mt-5 rounded-2xl border border-black/10 bg-[var(--sh-faint)]/70 p-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
@@ -1409,6 +1413,33 @@ function CandidateEvidenceDossierView({ dossier }: { dossier: CandidateEvidenceD
         ))}
       </div>
 
+      {dossier.evidence_groups.length > 0 && (
+        <div className="mt-4">
+          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-gray-500">{resultCopy(locale, "dossierCoverage")}</p>
+          <div className="mt-2 grid gap-2 sm:grid-cols-2">
+            {dossier.evidence_groups.map((group) => {
+              const covered = group.status === "covered";
+              return (
+                <div key={group.key} className={`rounded-xl px-3 py-2 ring-1 ${covered ? "bg-white/80 ring-black/5" : "bg-amber-50/70 ring-amber-100"}`}>
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-sm font-semibold text-gray-900">{group.label}</span>
+                    <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${covered ? "bg-emerald-50 text-emerald-700" : "bg-amber-100 text-amber-800"}`}>
+                      {covered ? resultCopy(locale, "evidence") : resultCopy(locale, "missing")}
+                    </span>
+                  </div>
+                  <p className="mt-1 text-xs text-gray-500">
+                    {group.source_types.length > 0 ? group.source_types.join(", ") : group.missing_source_types.join(", ")}
+                  </p>
+                  {group.primary_claims.length > 0 && (
+                    <p className="mt-1 line-clamp-2 text-xs leading-relaxed text-gray-700">{group.primary_claims.join(" / ")}</p>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
       <div className="mt-3 grid gap-2 md:grid-cols-[1.2fr_0.8fr]">
         <p className="rounded-xl bg-white/78 px-3 py-2 text-sm leading-relaxed text-gray-700 ring-1 ring-black/5">
           {dossier.verdict_summary}
@@ -1428,12 +1459,26 @@ function CandidateEvidenceDossierView({ dossier }: { dossier: CandidateEvidenceD
           ))}
         </ul>
       )}
+
+      {dossier.verification_gaps.length > 0 && (
+        <div className="mt-3 rounded-xl bg-amber-50/80 px-3 py-2 ring-1 ring-amber-100">
+          <p className="text-xs font-semibold text-amber-800">{resultCopy(locale, "verificationGaps")}</p>
+          <ul className="mt-1 space-y-1">
+            {dossier.verification_gaps.map((gap) => (
+              <li key={gap} className="flex gap-2 text-sm leading-relaxed text-amber-900">
+                <FiFlag className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" aria-hidden="true" />
+                {gap}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
     </section>
   );
 }
 
 export function CandidateProfileView({ candidate, result, locale }: { candidate: TalentCandidate; result?: TalentSearchResult } & ResultLocaleProps) {
-  const dossier = buildCandidateEvidenceDossier({ result, candidate, locale: locale ?? "zh" });
+  const dossier = buildCandidateEvidenceDossier({ result, candidate, locale: locale ?? "zh" }) as CandidateEvidenceDossier;
 
   return (
     <article className="rounded-[28px] border border-black/10 bg-white/86 p-5 shadow-[0_18px_52px_rgba(0,0,0,0.06)]">
@@ -1450,7 +1495,7 @@ export function CandidateProfileView({ candidate, result, locale }: { candidate:
         </div>
       </div>
 
-      <CandidateEvidenceDossierView dossier={dossier} />
+      <CandidateEvidenceDossierView dossier={dossier} locale={locale} />
 
       {candidate.outreach_angle && (
         <div className="mt-4 rounded-xl border border-blue-100 bg-blue-50/70 p-4">
