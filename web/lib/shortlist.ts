@@ -126,12 +126,14 @@ export async function updateItem(input: {
   status?: ShortlistStatus;
   notes?: string | null;
   projectId?: string | null;
+  candidate?: unknown;
 }): Promise<boolean> {
   if (!client) return false;
   const patch: Record<string, unknown> = { updated_at: new Date().toISOString() };
   if (input.status !== undefined) patch.status = input.status;
   if (input.notes !== undefined) patch.notes = input.notes;
   if (input.projectId !== undefined) patch.project_id = input.projectId;
+  if (input.candidate !== undefined) patch.candidate = input.candidate;
   try {
     const { data, error } = await client.database
       .from(TABLE)

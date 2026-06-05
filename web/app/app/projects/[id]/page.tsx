@@ -19,7 +19,7 @@ import {
   StatusBadge,
   Surface,
 } from "@/components/ui/signal-ui";
-import { buildProjectCandidateDecisionQueue, buildProjectResearchRounds, buildProjectSearchConsole } from "@/lib/research-loop.mjs";
+import { buildCandidateFeedbackPanel, buildProjectCandidateDecisionQueue, buildProjectResearchRounds, buildProjectSearchConsole } from "@/lib/research-loop.mjs";
 import { buildEvidencePriorityView, buildProjectEvidenceMatrix } from "@/lib/evidence-priority.mjs";
 import type { TalentCandidate } from "@/lib/talent-profile.mjs";
 
@@ -60,6 +60,11 @@ type ProjectSearchConsoleView = {
   refinementSuggestions: {
     title: string;
     items: Array<{ key: string; label: string; detail: string }>;
+  };
+  candidateFeedbackSignals: {
+    title: string;
+    items: Array<{ key: string; label: string; detail: string }>;
+    empty: boolean;
   };
   nextSteps: ProjectNextStepsView;
   priorities: {
@@ -178,6 +183,22 @@ type CandidateLike = {
   ai_directions?: string[];
 };
 function asCandidate(x: unknown): CandidateLike { return (x ?? {}) as CandidateLike; }
+type CandidateFeedbackValue = {
+  precision?: string;
+  satisfaction?: string;
+  issue?: string;
+  focus?: string;
+};
+function isRecord(x: unknown): x is Record<string, unknown> {
+  return Boolean(x && typeof x === "object" && !Array.isArray(x));
+}
+function candidateFeedback(candidate: unknown): CandidateFeedbackValue {
+  if (!isRecord(candidate) || !isRecord(candidate.feedback)) return {};
+  return candidate.feedback as CandidateFeedbackValue;
+}
+function candidateWithFeedback(candidate: unknown, feedback: CandidateFeedbackValue): Record<string, unknown> {
+  return isRecord(candidate) ? { ...candidate, feedback } : { feedback };
+}
 function isTalentShape(x: unknown): x is TalentCandidate {
   const c = asCandidate(x);
   return typeof c.match_score === "number" && Array.isArray(c.ai_directions);
@@ -507,6 +528,19 @@ function ProjectSearchConsolePanel({
             </div>
           ) : (
             <p className="mt-3 rounded-2xl border border-dashed border-black/10 bg-white/60 px-3 py-3 text-xs leading-5 text-[var(--sh-faint)]">{t("projects.console.feedbackEmpty")}</p>
+          )}
+          {!consoleView.candidateFeedbackSignals.empty && (
+            <div className="mt-3 rounded-2xl border border-blue-100 bg-blue-50/55 p-3">
+              <p className="text-xs font-semibold text-blue-700">{consoleView.candidateFeedbackSignals.title}</p>
+              <div className="mt-2 space-y-2">
+                {consoleView.candidateFeedbackSignals.items.map((item) => (
+                  <div key={item.key} className="rounded-xl bg-white/78 px-3 py-2 ring-1 ring-blue-100">
+                    <p className="text-xs font-semibold text-blue-800">{item.label}</p>
+                    <p className="mt-1 text-xs leading-5 text-blue-700">{item.detail}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
           )}
         </div>
       </div>
@@ -1060,6 +1094,7 @@ function CandidateDetailPanel({
   const [savingStatus, setSavingStatus] = useState(false);
   const [notes, setNotes] = useState(item.notes ?? "");
   const [savedHint, setSavedHint] = useState(false);
+  const [savingFeedback, setSavingFeedback] = useState("");
   const [outreachOpen, setOutreachOpen] = useState(false);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -1090,6 +1125,21 @@ function CandidateDetailPanel({
     debounceRef.current = setTimeout(() => saveNotes(v), 800);
   }
 
+  async function setCandidateFeedback(group: string, value: string) {
+    const prevCandidate = item.candidate;
+    const nextFeedback = { ...candidateFeedback(prevCandidate), [group]: value };
+    const nextCandidate = candidateWithFeedback(prevCandidate, nextFeedback);
+    setSavingFeedback(`${group}:${value}`);
+    onChanged({ candidate: nextCandidate });
+    try {
+      await patch({ candidate: nextCandidate });
+    } catch {
+      onChanged({ candidate: prevCandidate });
+    } finally {
+      setSavingFeedback("");
+    }
+  }
+
   async function handleDelete() {
     if (!confirm("把这个候选人移出候选池?")) return;
     const r = await fetch(`/api/shortlist/${item.id}`, { method: "DELETE" });
@@ -1107,6 +1157,14 @@ function CandidateDetailPanel({
 
   const candidate = item.candidate;
   const isTalent = isTalentShape(candidate);
+  const feedbackPanel = buildCandidateFeedbackPanel({ candidate, feedback: candidateFeedback(candidate), locale });
+  const feedbackCopy = locale === "en"
+    ? {
+        saved: "Saved into next-round search signals.",
+      }
+    : {
+        saved: "会同步到下一轮搜索优化。",
+      };
 
   return (
     <Surface className="space-y-4 p-5">
@@ -1127,6 +1185,43 @@ function CandidateDetailPanel({
         <span className="flex-1" />
         <button onClick={unassignFromProject} className="rounded-full px-2.5 py-1 text-xs font-semibold text-gray-600 hover:bg-gray-50">移出项目</button>
         <IconButton label="删除候选人" onClick={handleDelete} Icon={FiTrash2} tone="danger" />
+      </div>
+
+      <div className="rounded-2xl border border-black/10 bg-white/78 p-4">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h3 className="text-sm font-semibold text-gray-900">{feedbackPanel.title}</h3>
+            <p className="mt-1 text-xs leading-5 text-gray-500">{feedbackPanel.description}</p>
+          </div>
+          <span className="rounded-full bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-700 ring-1 ring-blue-100">{feedbackCopy.saved}</span>
+        </div>
+        <div className="mt-4 space-y-3">
+          {feedbackPanel.groups.map((group) => (
+            <div key={group.key}>
+              <p className="text-xs font-semibold text-gray-500">{group.label}</p>
+              <div className="mt-2 flex flex-wrap gap-2">
+                {group.options.map((option) => {
+                  const saving = savingFeedback === `${group.key}:${option.value}`;
+                  return (
+                    <button
+                      key={option.value}
+                      type="button"
+                      disabled={Boolean(savingFeedback)}
+                      onClick={() => setCandidateFeedback(group.key, option.value)}
+                      className={`rounded-full px-2.5 py-1 text-xs font-semibold transition disabled:opacity-50 ${
+                        option.selected
+                          ? "bg-gray-900 text-white"
+                          : "bg-white text-gray-600 ring-1 ring-gray-200 hover:ring-gray-900"
+                      }`}
+                    >
+                      {saving ? "..." : option.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
+        </div>
       </div>
 
       <button

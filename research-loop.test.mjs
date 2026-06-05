@@ -500,6 +500,72 @@ test("turns candidate status signals into next-round project search refinements"
   assert.match(consoleView.nextSearchInput, /参考已推进候选人/);
 });
 
+test("turns reviewed candidate feedback into project search signals", () => {
+  assert.equal(typeof researchLoop.buildProjectCandidateFeedbackSignals, "function");
+
+  const consoleView = buildProjectSearchConsole({
+    locale: "zh",
+    project: {
+      name: "AI Agent 产品工程师",
+      brief: "找做过 AI Agent 产品落地和开源工具的资深工程师",
+    },
+    candidateCount: 2,
+    items: [
+      {
+        id: "candidate-1",
+        status: "rejected",
+        candidate: {
+          name: "Wrong Direction",
+          feedback: {
+            precision: "off",
+            satisfaction: "unsatisfied",
+            issue: "wrong_direction",
+            focus: "adjacent_pools",
+          },
+          evidence_audit: { overall_evidence_quality: "high" },
+          claims: [],
+        },
+      },
+      {
+        id: "candidate-2",
+        status: "new",
+        candidate: {
+          name: "Weak Evidence",
+          feedback: {
+            precision: "partial",
+            satisfaction: "mixed",
+            issue: "weak_evidence",
+            focus: "stronger_evidence",
+          },
+          evidence_audit: { overall_evidence_quality: "low" },
+          claims: [{ claim: "Agent 产品落地", verdict: "unverified" }],
+        },
+      },
+    ],
+    runs: [
+      {
+        id: "run-1",
+        kind: "search",
+        label: "AI Agent 产品工程师",
+        query_text: "找做过 AI Agent 产品落地和开源工具的资深工程师",
+        status: "done",
+        updated_at: "2026-06-05T10:00:00.000Z",
+      },
+    ],
+  });
+
+  assert.equal(consoleView.candidateFeedbackSignals.title, "候选人反馈信号");
+  assert.deepEqual(
+    consoleView.candidateFeedbackSignals.items.map((item) => item.key),
+    ["tighten_profile", "strengthen_evidence", "expand_sources"],
+  );
+  assert.match(consoleView.candidateFeedbackSignals.items[0].detail, /Wrong Direction/);
+  assert.match(consoleView.candidateFeedbackSignals.items[1].detail, /Weak Evidence/);
+  assert.match(consoleView.nextSearchInput, /候选人反馈优化建议/);
+  assert.match(consoleView.nextSearchInput, /收紧候选画像/);
+  assert.match(consoleView.nextSearchInput, /补强证据要求/);
+});
+
 test("builds project research rounds from newest-first project runs", () => {
   const rounds = buildProjectResearchRounds({
     runs: [

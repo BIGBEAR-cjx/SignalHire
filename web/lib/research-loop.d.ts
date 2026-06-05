@@ -149,6 +149,18 @@ export type ProjectSearchRefinementSuggestions = {
   title: string;
   items: ProjectSearchRefinementSuggestion[];
 };
+export type ProjectCandidateFeedbackSignal = {
+  key: string;
+  label: string;
+  detail: string;
+  instruction: string;
+};
+export type ProjectCandidateFeedbackSignals = {
+  locale: ResearchLoopLocale;
+  title: string;
+  items: ProjectCandidateFeedbackSignal[];
+  empty: boolean;
+};
 export type ProjectSearchConsole = {
   locale: ResearchLoopLocale;
   title: string;
@@ -177,6 +189,7 @@ export type ProjectSearchConsole = {
   };
   nextSearchInput: string;
   refinementSuggestions: ProjectSearchRefinementSuggestions;
+  candidateFeedbackSignals: ProjectCandidateFeedbackSignals;
   nextSteps: ProjectNextSteps;
   priorities: ProjectCommandPriorities;
 };
@@ -247,6 +260,10 @@ export function buildProjectSearchRefinementSuggestions(input?: {
   items?: unknown[];
   locale?: ResearchLoopLocale | string;
 }): ProjectSearchRefinementSuggestions;
+export function buildProjectCandidateFeedbackSignals(input?: {
+  items?: unknown[];
+  locale?: ResearchLoopLocale | string;
+}): ProjectCandidateFeedbackSignals;
 export function buildPersistedSearchFeedback(input?: {
   feedback?: SearchFeedback;
   optimizedInput?: string;

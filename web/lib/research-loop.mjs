@@ -68,6 +68,15 @@ function buildAction(locale, key) {
   };
 }
 
+const FEEDBACK_ACTION_ORDER = [
+  "tighten_profile",
+  "strengthen_evidence",
+  "expand_sources",
+  "adjust_candidate_pool",
+  "adjust_seniority",
+  "adjust_location",
+];
+
 function researchStageIndex(phaseKey) {
   if (phaseKey === "queued" || phaseKey === "retrying" || phaseKey === "running") return 0;
   if (phaseKey === "done") return RESEARCH_STAGE_ORDER.length;
@@ -403,6 +412,73 @@ function appendSearchRefinementInstructions(input, refinements) {
     : [];
   if (!base || !instructions.length) return base;
   return `${base}\n\n${msg(refinements.locale, "projects.refinements.searchSection")}\n- ${instructions.join("\n- ")}`;
+}
+
+function feedbackFromCandidate(candidate) {
+  if (isPlainObject(candidate?.feedback)) return candidate.feedback;
+  if (isPlainObject(candidate?.candidate_feedback)) return candidate.candidate_feedback;
+  return null;
+}
+
+/**
+ * @param {{ items?: unknown[]; locale?: string }} input
+ */
+export function buildProjectCandidateFeedbackSignals({ items = [], locale = "zh" } = {}) {
+  const normalizedLocale = normalizeLocale(locale);
+  const aggregates = new Map();
+  const normalizedItems = Array.isArray(items) ? items.filter(isPlainObject) : [];
+
+  for (const item of normalizedItems) {
+    const candidate = isPlainObject(item?.candidate) ? item.candidate : {};
+    const feedback = feedbackFromCandidate(candidate);
+    if (!feedback) continue;
+    const preview = buildFeedbackOptimizationPreview({ feedback, locale: normalizedLocale });
+    if (!preview.canRun) continue;
+    const name = candidateName(candidate);
+    for (const action of preview.actions) {
+      if (!aggregates.has(action.key)) {
+        aggregates.set(action.key, {
+          key: action.key,
+          label: action.label,
+          detail: action.detail,
+          names: [],
+          count: 0,
+        });
+      }
+      const aggregate = aggregates.get(action.key);
+      aggregate.count += 1;
+      if (!aggregate.names.some((existing) => existing.toLowerCase() === name.toLowerCase())) aggregate.names.push(name);
+    }
+  }
+
+  const itemsOut = Array.from(aggregates.values())
+    .sort((a, b) => FEEDBACK_ACTION_ORDER.indexOf(a.key) - FEEDBACK_ACTION_ORDER.indexOf(b.key))
+    .slice(0, 3)
+    .map((item) => {
+      const names = localizedList(normalizedLocale, item.names);
+      return {
+        key: item.key,
+        label: item.label,
+        detail: msg(normalizedLocale, "projects.candidateFeedbackSignals.detail", { count: item.count, names, action: item.label }),
+        instruction: `${item.label}: ${item.detail}`,
+      };
+    });
+
+  return {
+    locale: normalizedLocale,
+    title: msg(normalizedLocale, "projects.candidateFeedbackSignals.title"),
+    items: itemsOut,
+    empty: itemsOut.length === 0,
+  };
+}
+
+function appendCandidateFeedbackInstructions(input, feedbackSignals) {
+  const base = cleanString(input);
+  const instructions = Array.isArray(feedbackSignals?.items)
+    ? feedbackSignals.items.map((item) => cleanString(item.instruction)).filter(Boolean)
+    : [];
+  if (!base || !instructions.length) return base;
+  return `${base}\n\n${msg(feedbackSignals.locale, "projects.candidateFeedbackSignals.searchSection")}\n- ${instructions.join("\n- ")}`;
 }
 
 function timestampMs(value) {
@@ -840,12 +916,13 @@ export function buildProjectSearchConsole({ project = {}, runs = [], items = [],
     ? { title: msg(normalizedLocale, "projects.console.feedbackTitle"), items: feedbackPreference.items }
     : rounds.items.find((item) => item.feedbackSummary)?.feedbackSummary ?? null;
   const refinementSuggestions = buildProjectSearchRefinementSuggestions({ items, locale: normalizedLocale });
+  const candidateFeedbackSignals = buildProjectCandidateFeedbackSignals({ items, locale: normalizedLocale });
   const nextSearchBase = feedbackPreference.canApply
     ? feedbackPreference.optimizedInput
     : cleanString(rounds.items.find((item) => item.kind === "search" && item.nextSearchInput)?.nextSearchInput) || briefText;
   const nextSearchInput = feedbackPreference.canApply
     ? nextSearchBase
-    : appendSearchRefinementInstructions(nextSearchBase, refinementSuggestions);
+    : appendCandidateFeedbackInstructions(appendSearchRefinementInstructions(nextSearchBase, refinementSuggestions), candidateFeedbackSignals);
   const nextSteps = buildProjectNextSteps({
     candidateCount,
     runCount: Array.isArray(runs) ? runs.length : 0,
@@ -872,6 +949,7 @@ export function buildProjectSearchConsole({ project = {}, runs = [], items = [],
     feedback: latestFeedback,
     nextSearchInput,
     refinementSuggestions,
+    candidateFeedbackSignals,
     nextSteps,
     priorities,
   };
