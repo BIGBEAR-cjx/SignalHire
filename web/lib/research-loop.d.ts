@@ -14,6 +14,10 @@ export type ResearchCoverageItem = {
   label: string;
   count: number;
 };
+export type ResearchSourceGroup = ResearchCoverageItem & {
+  latestKind: string;
+  latestDetail: string;
+};
 export type RecentResearchItem = {
   id: number;
   kind: string;
@@ -36,6 +40,7 @@ export type ResearchLoopView = {
   fetches: number;
   recentItems: ResearchLoopRecentItem[];
   coverage: ResearchCoverageItem[];
+  sourceGroups: ResearchSourceGroup[];
 };
 
 export type SearchFeedback = {
@@ -126,6 +131,7 @@ export function buildResearchLoopView(input?: {
   locale?: ResearchLoopLocale | string;
 }): ResearchLoopView;
 export function inferResearchCoverage(feed?: ResearchLoopFeedItem[]): ResearchCoverageItem[];
+export function buildResearchSourceGroups(feed?: ResearchLoopFeedItem[], locale?: ResearchLoopLocale | string): ResearchSourceGroup[];
 export function extractRecentResearchItems(feed?: ResearchLoopFeedItem[], locale?: ResearchLoopLocale | string): RecentResearchItem[];
 export function buildFeedbackOptimizationPreview(input?: {
   feedback?: SearchFeedback;

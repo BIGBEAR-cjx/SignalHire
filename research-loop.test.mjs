@@ -38,6 +38,15 @@ test("builds a Chinese research loop view from active search and fetch events", 
     ["github", "papers", "company", "public_web"],
   );
   assert.deepEqual(
+    view.sourceGroups.map((item) => [item.key, item.count, item.latestKind, item.latestDetail]),
+    [
+      ["github", 2, "fetch", "https://github.com/example/inference-runtime"],
+      ["papers", 1, "fetch", "https://arxiv.org/abs/2401.12345"],
+      ["company", 1, "fetch", "https://openai.com/research"],
+      ["public_web", 1, "fetch", "https://example.dev/blog/ai-systems"],
+    ],
+  );
+  assert.deepEqual(
     view.recentItems.map((item) => [item.kind, item.detail]),
     [
       ["fetch", "https://example.dev/blog/ai-systems"],
@@ -58,6 +67,7 @@ test("builds an English planning state when no research events exist", () => {
   assert.equal(view.phase.detail, "Breaking down the profile into keywords and source targets.");
   assert.equal(view.statsText, "Waiting for the first research event");
   assert.deepEqual(view.coverage, []);
+  assert.deepEqual(view.sourceGroups, []);
   assert.deepEqual(view.recentItems, []);
 });
 

@@ -248,6 +248,36 @@ export function inferResearchCoverage(feed) {
 }
 
 /**
+ * @param {Array<{ id?: number; kind?: string; info?: string }> | undefined} feed
+ */
+export function buildResearchSourceGroups(feed, locale = "zh") {
+  const normalizedLocale = normalizeLocale(locale);
+  const groups = new Map(SOURCE_ORDER.map((key) => [key, {
+    key,
+    label: msg(normalizedLocale, `research.loop.source.${key}`),
+    count: 0,
+    latestKind: "",
+    latestDetail: "",
+  }]));
+
+  for (const item of cleanFeed(feed)) {
+    if (item?.kind !== "search" && item?.kind !== "fetch") continue;
+    const detail = eventDetail(item, normalizedLocale);
+    const key = sourceTypeForText(detail);
+    const group = groups.get(key);
+    if (!group) continue;
+    group.count += 1;
+    group.latestKind = item.kind;
+    group.latestDetail = detail;
+  }
+
+  return SOURCE_ORDER.flatMap((key) => {
+    const group = groups.get(key);
+    return group && group.count > 0 ? [group] : [];
+  });
+}
+
+/**
  * @param {{ feed?: Array<{ id?: number; kind?: string; info?: string }>; live?: { searches?: number; fetches?: number } | null; jobStatus?: { phase?: string; label?: string; detail?: string; canRetry?: boolean } | null; locale?: string }} input
  */
 export function buildResearchLoopView({ feed = [], live = null, jobStatus = null, locale = "zh" } = {}) {
@@ -260,6 +290,7 @@ export function buildResearchLoopView({ feed = [], live = null, jobStatus = null
     ...item,
     label: msg(normalizedLocale, `research.loop.source.${item.key}`),
   }));
+  const sourceGroups = buildResearchSourceGroups(feed, normalizedLocale);
   const searches = Number(live?.searches ?? cleanFeed(feed).filter((item) => item?.kind === "search").length);
   const fetches = Number(live?.fetches ?? cleanFeed(feed).filter((item) => item?.kind === "fetch").length);
   const statsText = searches || fetches
@@ -295,6 +326,7 @@ export function buildResearchLoopView({ feed = [], live = null, jobStatus = null
     fetches,
     recentItems,
     coverage,
+    sourceGroups,
   };
 }
 

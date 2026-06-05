@@ -703,7 +703,7 @@ export default function ResearchTool({
           phaseLabel={progressView.phase.label}
           phaseDetail={progressView.phase.detail}
           statsText={progressView.statsText}
-          coverage={progressView.coverage}
+          sourceGroups={progressView.sourceGroups}
           recentItems={progressView.recentItems}
           statusDetail={jobStatus?.detail ?? undefined}
           onStop={stopCurrentRun}

@@ -37,6 +37,10 @@ type ResearchCoverageViewItem = {
   label: string;
   count: number;
 };
+type ResearchSourceGroupViewItem = ResearchCoverageViewItem & {
+  latestKind: string;
+  latestDetail: string;
+};
 type ResearchRecentViewItem = {
   id: number;
   kind: string;
@@ -288,7 +292,7 @@ export function ResearchProcessPanel({
   phaseLabel,
   phaseDetail,
   statsText,
-  coverage,
+  sourceGroups,
   recentItems,
   statusDetail,
   onStop,
@@ -296,7 +300,7 @@ export function ResearchProcessPanel({
   phaseLabel: string;
   phaseDetail: string;
   statsText: string;
-  coverage: ResearchCoverageViewItem[];
+  sourceGroups: ResearchSourceGroupViewItem[];
   recentItems: ResearchRecentViewItem[];
   statusDetail?: string;
   onStop: () => void;
@@ -358,16 +362,28 @@ export function ResearchProcessPanel({
         </div>
         <div>
           <p className="text-xs font-semibold text-[var(--sh-muted)]">{t("research.coverageTitle")}</p>
-          {coverage.length === 0 ? (
+          {sourceGroups.length === 0 ? (
             <p className="mt-3 rounded-2xl border border-dashed border-black/10 bg-white/60 px-4 py-3 text-xs leading-5 text-[var(--sh-faint)]">{t("research.coverageEmpty")}</p>
           ) : (
-            <div className="mt-3 flex flex-wrap gap-2">
-              {coverage.map((item) => (
-                <span key={item.key} className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold ring-1 ${coverageTone(item.key)}`}>
-                  {item.label}
-                  <span className="font-mono text-[11px] opacity-75">{item.count}</span>
-                </span>
-              ))}
+            <div className="mt-3 space-y-2">
+              {sourceGroups.map((item) => {
+                const Icon = recentIcon(item.latestKind);
+                return (
+                  <div key={item.key} className="rounded-2xl bg-white/72 px-3 py-3 ring-1 ring-black/5">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold ring-1 ${coverageTone(item.key)}`}>
+                        {item.label}
+                        <span className="font-mono text-[11px] opacity-75">{item.count}</span>
+                      </span>
+                      <span className="inline-flex items-center gap-1 text-[11px] text-[var(--sh-faint)]">
+                        <Icon className="h-3 w-3" aria-hidden="true" />
+                        {item.latestKind === "search" ? t("research.loop.event.search") : t("research.loop.event.fetch")}
+                      </span>
+                    </div>
+                    <p className="mt-2 line-clamp-3 break-all font-mono text-[11px] leading-5 text-[var(--sh-muted)]">{item.latestDetail}</p>
+                  </div>
+                );
+              })}
             </div>
           )}
         </div>
