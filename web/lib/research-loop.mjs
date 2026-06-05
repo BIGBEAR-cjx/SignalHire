@@ -730,6 +730,94 @@ function buildNextSearchConstraintDiff({ baseInput = "", optimizedInput = "", re
   };
 }
 
+function normalizedSectionTitle(value) {
+  return cleanString(value).replace(/[:：]\s*$/, "");
+}
+
+function sectionKeyForTitle(title, locale) {
+  const normalized = normalizedSectionTitle(title).toLowerCase();
+  const projectRefinements = normalizedSectionTitle(msg(locale, "projects.refinements.searchSection")).toLowerCase();
+  const candidateFeedback = normalizedSectionTitle(msg(locale, "projects.candidateFeedbackSignals.searchSection")).toLowerCase();
+  if (normalized === projectRefinements) return "project_refinements";
+  if (normalized === candidateFeedback) return "candidate_feedback";
+  return `section_${normalized.replace(/\s+/g, "_") || "constraints"}`;
+}
+
+function labelForConstraintSection(key, fallback, locale) {
+  if (key === "project_refinements") return normalizedSectionTitle(msg(locale, "projects.refinements.searchSection"));
+  if (key === "candidate_feedback") return normalizedSectionTitle(msg(locale, "projects.candidateFeedbackSignals.searchSection"));
+  return normalizedSectionTitle(fallback) || msg(locale, "search.constraintEditor.sectionFallback");
+}
+
+/**
+ * @param {{ input?: string; locale?: string }} input
+ */
+export function buildSearchConstraintEditor({ input = "", locale = "zh" } = {}) {
+  const normalizedLocale = normalizeLocale(locale);
+  const lines = cleanString(input).split(/\r?\n/);
+  const baseLines = [];
+  const sections = [];
+  let currentSection = null;
+
+  for (const rawLine of lines) {
+    const line = cleanString(rawLine);
+    if (!line) continue;
+    const sectionTitle = /[:：]$/.test(line) ? line : "";
+    if (sectionTitle) {
+      if (currentSection) sections.push(currentSection);
+      const key = sectionKeyForTitle(sectionTitle, normalizedLocale);
+      currentSection = {
+        key,
+        label: labelForConstraintSection(key, sectionTitle, normalizedLocale),
+        items: [],
+      };
+      continue;
+    }
+    if (currentSection) {
+      currentSection.items.push(line.replace(/^[-*]\s*/, ""));
+    } else {
+      baseLines.push(line);
+    }
+  }
+  if (currentSection) sections.push(currentSection);
+
+  const filteredSections = sections
+    .map((section) => ({
+      ...section,
+      items: section.items.map(cleanString).filter(Boolean),
+    }))
+    .filter((section) => section.items.length > 0);
+
+  return {
+    locale: normalizedLocale,
+    title: msg(normalizedLocale, "search.constraintEditor.title"),
+    description: msg(normalizedLocale, "search.constraintEditor.description"),
+    base: {
+      label: msg(normalizedLocale, "search.constraintEditor.baseLabel"),
+      value: baseLines.join("\n"),
+    },
+    sections: filteredSections,
+    empty: !baseLines.length && filteredSections.length === 0,
+  };
+}
+
+/**
+ * @param {{ editor?: { base?: { value?: string }; sections?: Array<{ label?: string; items?: string[] }> } }} input
+ */
+export function buildSearchInputFromConstraintEditor({ editor = {} } = {}) {
+  const base = cleanString(editor?.base?.value);
+  const sections = Array.isArray(editor?.sections) ? editor.sections : [];
+  const chunks = [];
+  if (base) chunks.push(base);
+  for (const section of sections) {
+    const label = normalizedSectionTitle(section?.label);
+    const items = Array.isArray(section?.items) ? section.items.map(cleanString).filter(Boolean) : [];
+    if (!label || !items.length) continue;
+    chunks.push(`${label}：\n- ${items.join("\n- ")}`);
+  }
+  return chunks.join("\n\n");
+}
+
 function timestampMs(value) {
   const time = Date.parse(cleanString(value));
   return Number.isFinite(time) ? time : 0;

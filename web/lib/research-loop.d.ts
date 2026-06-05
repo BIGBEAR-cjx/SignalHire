@@ -187,6 +187,41 @@ export type ProjectCandidateFeedbackSignals = {
   items: ProjectCandidateFeedbackSignal[];
   empty: boolean;
 };
+export type SearchConstraintChange = {
+  key: string;
+  type: "add" | "strengthen" | "reduce" | string;
+  typeLabel: string;
+  sourceLabel: string;
+  label: string;
+  detail: string;
+};
+export type NextSearchConstraintDiff = {
+  locale: ResearchLoopLocale;
+  title: string;
+  originalTitle: string;
+  optimizedTitle: string;
+  originalInput: string;
+  optimizedInput: string;
+  editableHint: string;
+  changes: SearchConstraintChange[];
+  empty: boolean;
+};
+export type SearchConstraintEditorSection = {
+  key: string;
+  label: string;
+  items: string[];
+};
+export type SearchConstraintEditor = {
+  locale: ResearchLoopLocale;
+  title: string;
+  description: string;
+  base: {
+    label: string;
+    value: string;
+  };
+  sections: SearchConstraintEditorSection[];
+  empty: boolean;
+};
 export type ProjectSearchConsole = {
   locale: ResearchLoopLocale;
   title: string;
@@ -216,6 +251,7 @@ export type ProjectSearchConsole = {
   nextSearchInput: string;
   refinementSuggestions: ProjectSearchRefinementSuggestions;
   candidateFeedbackSignals: ProjectCandidateFeedbackSignals;
+  constraintDiff: NextSearchConstraintDiff;
   nextSteps: ProjectNextSteps;
   priorities: ProjectCommandPriorities;
 };
@@ -294,6 +330,16 @@ export function buildProjectCandidateFeedbackSignals(input?: {
   items?: unknown[];
   locale?: ResearchLoopLocale | string;
 }): ProjectCandidateFeedbackSignals;
+export function buildSearchConstraintEditor(input?: {
+  input?: string;
+  locale?: ResearchLoopLocale | string;
+}): SearchConstraintEditor;
+export function buildSearchInputFromConstraintEditor(input?: {
+  editor?: {
+    base?: { value?: string };
+    sections?: Array<{ label?: string; items?: string[] }>;
+  };
+}): string;
 export function buildPersistedSearchFeedback(input?: {
   feedback?: SearchFeedback;
   optimizedInput?: string;

@@ -38,9 +38,10 @@ import {
   ResearchShareBar,
   type ProjectFeedbackPreferenceView,
 } from "@/components/research-workspace";
+import { Surface } from "@/components/ui/signal-ui";
 import { buildBackfillMergeSummary, buildEditableSearchPlanDraft, buildFeedbackOptimizedSearchInput, buildSearchInputFromEditablePlan } from "@/lib/talent-profile.mjs";
 import type { BackfillMergeSummary, CoverageBackfillJob, TalentCandidate, TalentSearchResult } from "@/lib/talent-profile.mjs";
-import { buildCandidateFeedbackPanel, buildFeedbackOptimizationPreview, buildResearchLoopView } from "@/lib/research-loop.mjs";
+import { buildCandidateFeedbackPanel, buildFeedbackOptimizationPreview, buildResearchLoopView, buildSearchConstraintEditor, buildSearchInputFromConstraintEditor } from "@/lib/research-loop.mjs";
 import { buildEvidencePriorityView } from "@/lib/evidence-priority.mjs";
 
 type FeedItem = { id: number; kind: "search" | "fetch"; info: string };
@@ -90,6 +91,7 @@ type CandidateFeedbackPanelView = {
     options: Array<{ value: string; label: string; selected: boolean }>;
   }>;
 };
+type SearchConstraintEditorView = ReturnType<typeof buildSearchConstraintEditor>;
 
 const WORKER_DELAY_MS = 2 * 60 * 1000;
 const JOB_TIMEOUT_MS = 15 * 60 * 1000;
@@ -449,6 +451,26 @@ export default function ResearchTool({
     run(buildSearchInputFromEditablePlan({ draft: editablePlan }), { preserveInput: true });
   }
 
+  function updateConstraintEditorBase(editor: SearchConstraintEditorView, value: string) {
+    setInput(buildSearchInputFromConstraintEditor({
+      editor: {
+        ...editor,
+        base: { ...editor.base, value },
+      },
+    }));
+  }
+
+  function updateConstraintEditorSection(editor: SearchConstraintEditorView, key: string, value: string) {
+    setInput(buildSearchInputFromConstraintEditor({
+      editor: {
+        ...editor,
+        sections: editor.sections.map((section) => section.key === key
+          ? { ...section, items: splitPlanText(value) }
+          : section),
+      },
+    }));
+  }
+
   function updateSearchFeedback(key: SearchFeedbackField, value: SearchFeedbackState[SearchFeedbackField]) {
     setSearchFeedback((current) => ({
       ...current,
@@ -646,6 +668,9 @@ export default function ResearchTool({
   const progressView = buildResearchLoopView({ feed, live, jobStatus, locale });
   const feedbackPreview = buildFeedbackOptimizationPreview({ feedback: searchFeedback, locale });
   const evidencePriorityView = isTalentSearchResult(result) ? buildEvidencePriorityView({ result, locale }) : null;
+  const constraintEditor = isSearch && !loading && !result
+    ? buildSearchConstraintEditor({ input, locale })
+    : null;
   const selectedTalentCandidate = isTalentSearchResult(result) && selectedCandidateIndex !== null
     ? result.candidates[selectedCandidateIndex] ?? null
     : null;
@@ -684,6 +709,44 @@ export default function ResearchTool({
         onCreatePlan={isSearch ? createEditablePlan : undefined}
         loading={loading}
       />
+
+      {constraintEditor && constraintEditor.sections.length > 0 && (
+        <Surface className="p-5 md:p-6">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div className="max-w-2xl">
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-neutral-500">{constraintEditor.title}</p>
+              <p className="mt-2 text-sm leading-6 text-[var(--sh-muted)]">{constraintEditor.description}</p>
+            </div>
+            <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-[var(--sh-muted)] ring-1 ring-black/10">
+              {constraintEditor.sections.length}
+            </span>
+          </div>
+          <div className="mt-5 grid gap-4 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
+            <label className="block">
+              <span className="text-xs font-semibold text-[var(--sh-muted)]">{constraintEditor.base.label}</span>
+              <textarea
+                value={constraintEditor.base.value}
+                onChange={(event) => updateConstraintEditorBase(constraintEditor, event.target.value)}
+                rows={5}
+                className="mt-2 block w-full resize-y rounded-2xl border border-black/10 bg-white/78 px-3 py-3 text-sm leading-6 text-[var(--sh-ink)] outline-none transition focus:border-black/20 focus:bg-white"
+              />
+            </label>
+            <div className="grid gap-3">
+              {constraintEditor.sections.map((section) => (
+                <label key={section.key} className="block rounded-2xl border border-black/10 bg-white/70 p-3">
+                  <span className="text-xs font-semibold text-[var(--sh-muted)]">{section.label}</span>
+                  <textarea
+                    value={joinPlanText(section.items)}
+                    onChange={(event) => updateConstraintEditorSection(constraintEditor, section.key, event.target.value)}
+                    rows={Math.max(3, section.items.length + 1)}
+                    className="mt-2 block w-full resize-y rounded-xl border border-black/10 bg-[var(--sh-canvas)] px-3 py-2 text-sm leading-6 text-[var(--sh-ink)] outline-none transition focus:border-black/20 focus:bg-white"
+                  />
+                </label>
+              ))}
+            </div>
+          </div>
+        </Surface>
+      )}
 
       {isSearch && editablePlan && (
         <EditableSearchPlanPanel onRunPlan={runEditablePlan} loading={loading}>

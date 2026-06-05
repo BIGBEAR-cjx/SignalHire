@@ -709,6 +709,52 @@ test("builds an editable next-search constraint diff from project signals", () =
   );
 });
 
+test("parses project next-search text into editable constraint sections", () => {
+  assert.equal(typeof researchLoop.buildSearchConstraintEditor, "function");
+  assert.equal(typeof researchLoop.buildSearchInputFromConstraintEditor, "function");
+
+  const input = [
+    "找做过 AI Agent 产品落地和开源工具的资深工程师",
+    "",
+    "候选人状态优化建议：",
+    "- 避开已拒绝画像：降低通用 Chatbot 的权重，寻找更贴近项目画像的人选。",
+    "- 优先交叉核验：要求候选人具备可公开验证的论文、代码、项目、任职或技术写作证据。",
+    "",
+    "候选人反馈优化建议：",
+    "- 收紧候选画像: 提高必备技能、方向和资历匹配门槛，减少明显不相关候选人。",
+    "- 补强证据要求: 优先寻找可交叉核验的项目、论文、代码、公开发言或任职证据。",
+  ].join("\n");
+
+  const editor = researchLoop.buildSearchConstraintEditor({ input, locale: "zh" });
+
+  assert.equal(editor.title, "编辑下一轮搜索约束");
+  assert.equal(editor.base.label, "基础画像");
+  assert.equal(editor.base.value, "找做过 AI Agent 产品落地和开源工具的资深工程师");
+  assert.deepEqual(
+    editor.sections.map((section) => [section.key, section.label, section.items.length]),
+    [
+      ["project_refinements", "候选人状态优化建议", 2],
+      ["candidate_feedback", "候选人反馈优化建议", 2],
+    ],
+  );
+  assert.equal(editor.sections[0].items[0], "避开已拒绝画像：降低通用 Chatbot 的权重，寻找更贴近项目画像的人选。");
+  assert.equal(editor.empty, false);
+
+  const rebuilt = researchLoop.buildSearchInputFromConstraintEditor({
+    editor: {
+      ...editor,
+      base: { ...editor.base, value: "更新后的基础画像" },
+      sections: editor.sections.map((section) => section.key === "candidate_feedback"
+        ? { ...section, items: [...section.items, "扩大公开来源覆盖"] }
+        : section),
+    },
+  });
+
+  assert.match(rebuilt, /^更新后的基础画像/);
+  assert.match(rebuilt, /候选人状态优化建议：\n- 避开已拒绝画像/);
+  assert.match(rebuilt, /候选人反馈优化建议：[\s\S]*- 扩大公开来源覆盖/);
+});
+
 test("summarizes reviewed candidate feedback at project level", () => {
   assert.equal(typeof researchLoop.buildProjectCandidateFeedbackSummary, "function");
 
