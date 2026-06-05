@@ -1357,3 +1357,87 @@ export function buildProjectSearchConsole({ project = {}, runs = [], items = [],
     priorities,
   };
 }
+
+/**
+ * @param {{ project?: { name?: string; brief?: string | null }; runs?: Array<{ id?: string; kind?: string; label?: string; summary?: string | null; status?: string; query_text?: string; updated_at?: string; result?: unknown }>; items?: unknown[]; candidateCount?: number; hasFilter?: boolean; locale?: string }} input
+ */
+export function buildProjectControlRoom({ project = {}, runs = [], items = [], candidateCount = 0, hasFilter = false, locale = "zh" } = {}) {
+  const normalizedLocale = normalizeLocale(locale);
+  const briefText = cleanString(project?.brief) || cleanString(project?.name);
+  const consoleView = buildProjectSearchConsole({
+    project,
+    runs,
+    items,
+    candidateCount,
+    hasFilter,
+    locale: normalizedLocale,
+  });
+  const queue = buildProjectCandidateDecisionQueue({ items, locale: normalizedLocale });
+  const actionBrief = buildProjectActionBrief({ items, locale: normalizedLocale });
+  const feedbackSummary = buildProjectCandidateFeedbackSummary({ items, locale: normalizedLocale });
+  const roundCount = Array.isArray(runs) ? runs.length : 0;
+  const nextChangeCount = consoleView.constraintDiff.changes.length;
+  const needsEvidenceCount = queueCount(queue, "needs_evidence");
+  const latestLabel = consoleView.latestRound?.label || msg(normalizedLocale, "projects.controlRoom.cards.rounds.empty");
+
+  return {
+    locale: normalizedLocale,
+    title: msg(normalizedLocale, "projects.controlRoom.title"),
+    description: msg(normalizedLocale, "projects.controlRoom.desc"),
+    focusTitle: msg(normalizedLocale, "projects.controlRoom.focusTitle"),
+    focus: {
+      key: actionBrief.primaryAction.key,
+      label: actionBrief.primaryAction.label,
+      detail: actionBrief.summary,
+      actionDetail: actionBrief.primaryAction.detail,
+      targetItemId: actionBrief.primaryAction.targetItemId,
+      backfillInput: actionBrief.primaryAction.backfillInput,
+    },
+    cards: [
+      {
+        key: "brief",
+        label: msg(normalizedLocale, "projects.controlRoom.cards.brief.label"),
+        value: briefText
+          ? msg(normalizedLocale, "projects.controlRoom.cards.brief.defined")
+          : msg(normalizedLocale, "projects.controlRoom.cards.brief.empty"),
+        detail: msg(normalizedLocale, "projects.controlRoom.cards.brief.detail", {
+          brief: briefText || msg(normalizedLocale, "projects.noBrief"),
+        }),
+      },
+      {
+        key: "feedback",
+        label: msg(normalizedLocale, "projects.controlRoom.cards.feedback.label"),
+        value: String(feedbackSummary.reviewedCount),
+        detail: msg(normalizedLocale, "projects.controlRoom.cards.feedback.detail", {
+          summary: feedbackSummary.summary,
+        }),
+      },
+      {
+        key: "next_search",
+        label: msg(normalizedLocale, "projects.controlRoom.cards.nextSearch.label"),
+        value: String(nextChangeCount),
+        detail: msg(normalizedLocale, "projects.controlRoom.cards.nextSearch.detail", {
+          title: consoleView.constraintDiff.title,
+          count: nextChangeCount,
+        }),
+      },
+      {
+        key: "rounds",
+        label: msg(normalizedLocale, "projects.controlRoom.cards.rounds.label"),
+        value: String(roundCount),
+        detail: msg(normalizedLocale, "projects.controlRoom.cards.rounds.detail", {
+          count: roundCount,
+          latest: latestLabel,
+        }),
+      },
+      {
+        key: "queue",
+        label: msg(normalizedLocale, "projects.controlRoom.cards.queue.label"),
+        value: String(needsEvidenceCount),
+        detail: msg(normalizedLocale, "projects.controlRoom.cards.queue.detail", {
+          count: needsEvidenceCount,
+        }),
+      },
+    ],
+  };
+}

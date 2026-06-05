@@ -271,6 +271,27 @@ export type ProjectSearchConsole = {
   nextSteps: ProjectNextSteps;
   priorities: ProjectCommandPriorities;
 };
+export type ProjectControlRoomCard = {
+  key: string;
+  label: string;
+  value: string;
+  detail: string;
+};
+export type ProjectControlRoom = {
+  locale: ResearchLoopLocale;
+  title: string;
+  description: string;
+  focusTitle: string;
+  focus: {
+    key: string;
+    label: string;
+    detail: string;
+    actionDetail: string;
+    targetItemId: string;
+    backfillInput: string;
+  };
+  cards: ProjectControlRoomCard[];
+};
 export type ProjectResearchRoundItem = {
   id: string;
   roundNumber: number;
@@ -396,6 +417,26 @@ export function buildProjectSearchConsole(input?: {
   hasFilter?: boolean;
   locale?: ResearchLoopLocale | string;
 }): ProjectSearchConsole;
+export function buildProjectControlRoom(input?: {
+  project?: {
+    name?: string;
+    brief?: string | null;
+  };
+  runs?: Array<{
+    id?: string;
+    kind?: string;
+    label?: string;
+    summary?: string | null;
+    status?: string;
+    query_text?: string;
+    updated_at?: string;
+    result?: unknown;
+  }>;
+  items?: unknown[];
+  candidateCount?: number;
+  hasFilter?: boolean;
+  locale?: ResearchLoopLocale | string;
+}): ProjectControlRoom;
 export function buildProjectResearchRounds(input?: {
   runs?: Array<{
     id?: string;

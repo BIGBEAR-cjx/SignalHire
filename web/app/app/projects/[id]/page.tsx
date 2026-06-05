@@ -19,7 +19,7 @@ import {
   StatusBadge,
   Surface,
 } from "@/components/ui/signal-ui";
-import { buildCandidateFeedbackPanel, buildProjectActionBrief, buildProjectCandidateDecisionQueue, buildProjectCandidateFeedbackSummary, buildProjectResearchRounds, buildProjectSearchConsole } from "@/lib/research-loop.mjs";
+import { buildCandidateFeedbackPanel, buildProjectActionBrief, buildProjectCandidateDecisionQueue, buildProjectCandidateFeedbackSummary, buildProjectControlRoom, buildProjectResearchRounds, buildProjectSearchConsole } from "@/lib/research-loop.mjs";
 import { buildCandidateDecisionSignal, buildEvidencePriorityView, buildProjectEvidenceMatrix } from "@/lib/evidence-priority.mjs";
 import type { TalentCandidate } from "@/lib/talent-profile.mjs";
 
@@ -110,6 +110,25 @@ type ProjectActionBriefView = {
     detail: string;
     targetItemId: string;
     backfillInput: string;
+  }>;
+};
+type ProjectControlRoomView = {
+  title: string;
+  description: string;
+  focusTitle: string;
+  focus: {
+    key: string;
+    label: string;
+    detail: string;
+    actionDetail: string;
+    targetItemId: string;
+    backfillInput: string;
+  };
+  cards: Array<{
+    key: string;
+    label: string;
+    value: string;
+    detail: string;
   }>;
 };
 type ProjectCandidateFeedbackSummaryView = {
@@ -356,6 +375,14 @@ export default function ProjectDetailPage() {
     locale,
   }) as ProjectSearchConsoleView;
   const searchHref = `/app/search?project=${id}&q=${encodeURIComponent(projectConsole.nextSearchInput || briefForSearch)}`;
+  const controlRoom = buildProjectControlRoom({
+    project: p,
+    runs: detail.runs,
+    items: items ?? [],
+    candidateCount: p.candidates_total,
+    hasFilter: statusFilter !== "all",
+    locale,
+  }) as ProjectControlRoomView;
   const projectRounds = buildProjectResearchRounds({
     runs: detail.runs,
     locale,
@@ -373,6 +400,13 @@ export default function ProjectDetailPage() {
 
       {/* 头部: name + brief 编辑 + 状态 + 删除 */}
       <ProjectHeader key={`${p.id}:${p.name}:${p.brief ?? ""}`} detail={detail} onChanged={reloadDetail} onDelete={deleteProject} />
+
+      <ProjectControlRoomPanel
+        room={controlRoom}
+        searchHref={searchHref}
+        projectId={id}
+        onOpenCandidate={(itemId) => setSelectedItemId(itemId)}
+      />
 
       <ProjectActionBriefPanel
         brief={actionBrief}
@@ -648,6 +682,66 @@ function ProjectSearchConsolePanel({
           </div>
         </div>
       )}
+    </Surface>
+  );
+}
+
+function ProjectControlRoomPanel({
+  room,
+  searchHref,
+  projectId,
+  onOpenCandidate,
+}: {
+  room: ProjectControlRoomView;
+  searchHref: string;
+  projectId: string;
+  onOpenCandidate: (itemId: string) => void;
+}) {
+  const focusBackfillHref = room.focus.backfillInput
+    ? `/app/search?project=${projectId}&q=${encodeURIComponent(room.focus.backfillInput)}`
+    : "";
+  return (
+    <Surface className="p-5 md:p-6">
+      <div className="grid gap-5 xl:grid-cols-[minmax(0,1.1fr)_minmax(320px,0.9fr)]">
+        <div className="min-w-0">
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-neutral-500">{room.title}</p>
+          <h2 className="mt-1 text-2xl font-semibold tracking-tight text-[var(--sh-ink)]">{room.focus.label}</h2>
+          <p className="mt-2 max-w-3xl text-sm leading-6 text-[var(--sh-muted)]">{room.description}</p>
+        </div>
+        <div className="rounded-2xl bg-[var(--sh-canvas)] p-4">
+          <p className="text-xs font-semibold text-[var(--sh-muted)]">{room.focusTitle}</p>
+          <p className="mt-2 text-sm font-semibold text-[var(--sh-ink)]">{room.focus.detail}</p>
+          {room.focus.actionDetail && <p className="mt-1 text-xs leading-5 text-[var(--sh-muted)]">{room.focus.actionDetail}</p>}
+          <div className="mt-3">
+            {focusBackfillHref ? (
+              <PrimaryAction href={focusBackfillHref}>
+                <FiAlertTriangle className="h-4 w-4" aria-hidden="true" />
+                {room.focus.label}
+              </PrimaryAction>
+            ) : room.focus.targetItemId ? (
+              <PrimaryAction onClick={() => onOpenCandidate(room.focus.targetItemId)}>
+                <FiAlertTriangle className="h-4 w-4" aria-hidden="true" />
+                {room.focus.label}
+              </PrimaryAction>
+            ) : (
+              <PrimaryAction href={searchHref}>
+                <FiSearch className="h-4 w-4" aria-hidden="true" />
+                {room.focus.label}
+              </PrimaryAction>
+            )}
+          </div>
+        </div>
+      </div>
+
+      <dl className="mt-5 grid overflow-hidden rounded-2xl border border-black/10 bg-white/70 md:grid-cols-5">
+        {room.cards.map((card, index) => (
+          <div key={card.key} className={`p-4 ${index > 0 ? "border-t border-black/10 md:border-l md:border-t-0" : ""}`}>
+            <dt className="text-xs font-semibold text-[var(--sh-muted)]">{card.label}</dt>
+            <dd className="mt-1 text-2xl font-semibold tabular-nums text-[var(--sh-ink)]">{card.value}</dd>
+            <p className="mt-1 line-clamp-2 text-xs leading-5 text-[var(--sh-muted)]">{card.detail}</p>
+          </div>
+        ))}
+      </dl>
     </Surface>
   );
 }
