@@ -455,6 +455,8 @@ export function buildProjectDetailHierarchy(input?: {
   hasSearchConsoleFeedback?: boolean;
   hasConstraintDiffRefinements?: boolean;
   hasSearchRefinementSuggestions?: boolean;
+  hasHeaderBrief?: boolean;
+  hasSearchConsoleBrief?: boolean;
   locale?: ResearchLoopLocale | string;
 }): ProjectDetailHierarchy;
 export function buildProjectResearchRounds(input?: {

@@ -929,6 +929,19 @@ test("builds a project detail hierarchy that avoids duplicate search refinement 
   assert.equal(hierarchy.notes.search_refinement_suggestions, "下一轮搜索约束 diff 已展示候选人状态优化，详情建议块作为无 diff 覆盖时的回退。");
 });
 
+test("builds a project detail hierarchy that avoids duplicate project brief summaries", () => {
+  assert.equal(typeof researchLoop.buildProjectDetailHierarchy, "function");
+
+  const hierarchy = researchLoop.buildProjectDetailHierarchy({
+    hasHeaderBrief: true,
+    hasSearchConsoleBrief: true,
+    locale: "zh",
+  });
+
+  assert.ok(hierarchy.hidden.includes("search_console_brief"));
+  assert.equal(hierarchy.notes.search_console_brief, "项目头部已展示并可编辑 brief，搜索控制台只保留下一轮搜索约束。");
+});
+
 test("parses project next-search text into editable constraint sections", () => {
   assert.equal(typeof researchLoop.buildSearchConstraintEditor, "function");
   assert.equal(typeof researchLoop.buildSearchInputFromConstraintEditor, "function");

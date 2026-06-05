@@ -401,6 +401,8 @@ export default function ProjectDetailPage() {
     hasSearchConsoleFeedback: Boolean(projectConsole.feedback && projectConsole.feedback.items.length > 0),
     hasConstraintDiffRefinements: projectConsole.constraintDiff.changes.some((change) => change.sourceLabel === projectConsole.refinementSuggestions.title),
     hasSearchRefinementSuggestions: projectConsole.refinementSuggestions.items.length > 0,
+    hasHeaderBrief: Boolean((p.brief ?? "").trim()),
+    hasSearchConsoleBrief: Boolean(projectConsole.briefText.trim()),
     locale,
   }) as ProjectDetailHierarchyView;
   const hiddenPanels = new Set(projectHierarchy.hidden);
@@ -413,6 +415,7 @@ export default function ProjectDetailPage() {
   const showSearchConsolePriorities = !hiddenPanels.has("search_console_priorities");
   const showSearchConsoleFeedback = !hiddenPanels.has("search_console_feedback");
   const showSearchRefinementSuggestions = !hiddenPanels.has("search_refinement_suggestions");
+  const showSearchConsoleBrief = !hiddenPanels.has("search_console_brief");
   const decisionQueue = buildProjectCandidateDecisionQueue({ items: items ?? [], locale });
   const actionBrief = showActionBrief ? buildProjectActionBrief({ items: items ?? [], locale }) as ProjectActionBriefView : null;
   const candidateFeedbackSummary = showCandidateFeedbackSummary ? buildProjectCandidateFeedbackSummary({ items: items ?? [], locale }) as ProjectCandidateFeedbackSummaryView : null;
@@ -456,6 +459,7 @@ export default function ProjectDetailPage() {
         showPriorities={showSearchConsolePriorities}
         showFeedback={showSearchConsoleFeedback}
         showRefinementSuggestions={showSearchRefinementSuggestions}
+        showBrief={showSearchConsoleBrief}
       />
 
       {showKpiStrip && (
@@ -586,6 +590,7 @@ function ProjectSearchConsolePanel({
   showPriorities,
   showFeedback,
   showRefinementSuggestions,
+  showBrief,
 }: {
   consoleView: ProjectSearchConsoleView;
   searchHref: string;
@@ -594,6 +599,7 @@ function ProjectSearchConsolePanel({
   showPriorities: boolean;
   showFeedback: boolean;
   showRefinementSuggestions: boolean;
+  showBrief: boolean;
 }) {
   const { t } = useI18n();
   const showFeedbackPanel = showFeedback || !consoleView.candidateFeedbackSignals.empty;
@@ -624,9 +630,13 @@ function ProjectSearchConsolePanel({
 
       <div className={gridClassName}>
         <div className="rounded-2xl border border-black/10 bg-white/72 p-4">
-          <p className="text-xs font-semibold text-[var(--sh-muted)]">{consoleView.briefTitle}</p>
-          <p className="mt-2 whitespace-pre-line text-sm leading-6 text-[var(--sh-ink)]">{consoleView.briefText}</p>
-          <div className="mt-4 rounded-2xl bg-[var(--sh-canvas)] px-3 py-3">
+          {showBrief && (
+            <>
+              <p className="text-xs font-semibold text-[var(--sh-muted)]">{consoleView.briefTitle}</p>
+              <p className="mt-2 whitespace-pre-line text-sm leading-6 text-[var(--sh-ink)]">{consoleView.briefText}</p>
+            </>
+          )}
+          <div className={showBrief ? "mt-4 rounded-2xl bg-[var(--sh-canvas)] px-3 py-3" : "rounded-2xl bg-[var(--sh-canvas)] px-3 py-3"}>
             <p className="text-xs font-semibold text-[var(--sh-muted)]">{t("projects.console.nextSearchTitle")}</p>
             <p className="mt-1 line-clamp-3 whitespace-pre-line text-xs leading-5 text-[var(--sh-ink)]">{consoleView.nextSearchInput}</p>
           </div>
