@@ -135,6 +135,7 @@ const RESULT_COPY = {
     enqueueingBackfill: "补搜入队中…",
     backfillGap: "补搜这个缺口",
     backfillDeltaTitle: "补搜证据增量",
+    candidateBackfillMerged: "已回流到候选人档案",
     merged: "已合并",
     mergeable: "可合并",
     newSources: "新增来源",
@@ -246,6 +247,7 @@ const RESULT_COPY = {
     enqueueingBackfill: "Queueing backfill...",
     backfillGap: "Backfill this gap",
     backfillDeltaTitle: "Backfill evidence delta",
+    candidateBackfillMerged: "Merged into this candidate dossier",
     merged: "Merged",
     mergeable: "Mergeable",
     newSources: "New sources",
@@ -1421,6 +1423,43 @@ function CandidateEvidenceDossierView({
           </span>
         ))}
       </div>
+
+      {dossier.backfill_delta && (
+        <div className="mt-4 rounded-xl bg-emerald-50/80 px-3 py-3 ring-1 ring-emerald-100">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <p className="text-sm font-semibold text-emerald-900">{dossier.backfill_delta.title}</p>
+              <p className="mt-0.5 text-xs text-emerald-800/70">{resultCopy(locale, "candidateBackfillMerged")}</p>
+            </div>
+            <span className="rounded-full bg-white px-2 py-0.5 text-xs font-semibold text-emerald-700 ring-1 ring-emerald-200">
+              {resultCopy(locale, "newEvidence", { count: dossier.backfill_delta.new_evidence_count })}
+            </span>
+          </div>
+          {dossier.backfill_delta.merge_note && (
+            <p className="mt-2 text-sm leading-relaxed text-emerald-950">{dossier.backfill_delta.merge_note}</p>
+          )}
+          {dossier.backfill_delta.new_source_types.length > 0 && (
+            <div className="mt-2 flex flex-wrap gap-1.5">
+              {dossier.backfill_delta.new_source_types.map((type) => (
+                <span key={type} className="rounded-full bg-white px-2 py-0.5 text-xs font-medium text-blue-700 ring-1 ring-blue-100">
+                  {type}
+                </span>
+              ))}
+            </div>
+          )}
+          {dossier.backfill_delta.new_evidence_urls.length > 0 && (
+            <ul className="mt-2 space-y-1 text-xs leading-relaxed text-emerald-900/80">
+              {dossier.backfill_delta.new_evidence_urls.slice(0, 3).map((url) => (
+                <li key={url} className="truncate">
+                  <a className="hover:text-emerald-950 hover:underline" href={url} target="_blank" rel="noreferrer">
+                    {host(url, locale)}
+                  </a>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
 
       {dossier.evidence_groups.length > 0 && (
         <div className="mt-4">

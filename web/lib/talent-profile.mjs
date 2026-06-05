@@ -714,6 +714,7 @@ const DOSSIER_COPY = {
     noMaterialRisk: "暂未发现明确高风险，但仍需要人工复核原始链接。",
     verdictSummary: "{verified} 条已验证 / {unverified} 条查无实据 / {contradicted} 条矛盾",
     gapSummary: "缺少{label}证据，建议补搜 {sources} 来源。",
+    backfillDeltaTitle: "补搜新增证据",
   },
   en: {
     title: "Candidate evidence dossier",
@@ -733,6 +734,7 @@ const DOSSIER_COPY = {
     noMaterialRisk: "No clear high-risk signal was found yet, but original links still need human review.",
     verdictSummary: "{verified} verified / {unverified} unverified / {contradicted} contradicted",
     gapSummary: "{label} evidence is missing. Backfill {sources} sources.",
+    backfillDeltaTitle: "Backfill evidence added",
   },
 };
 
@@ -830,6 +832,25 @@ function buildDossierBackfillJobs({ evidenceGroups, candidate, result, locale })
     .slice(0, 4);
 }
 
+function buildDossierBackfillDelta({ result, candidateName, locale }) {
+  const source = isPlainObject(result) ? result : {};
+  const merge = isPlainObject(source.backfill_merge) ? source.backfill_merge : {};
+  const summary = isPlainObject(merge.summary) ? merge.summary : {};
+  const improved = Array.isArray(summary.improved_candidates) ? summary.improved_candidates : [];
+  const candidate = improved
+    .filter(isPlainObject)
+    .find((item) => cleanString(item.candidate_name).toLowerCase() === cleanString(candidateName).toLowerCase());
+  if (!candidate) return null;
+  return {
+    title: dossierCopy(locale, "backfillDeltaTitle"),
+    merged_at: cleanString(merge.merged_at),
+    new_evidence_count: normalizeCount(candidate.new_evidence_count),
+    new_source_types: cleanStringArray(candidate.new_source_types, 12),
+    new_evidence_urls: normalizeSourceUrls(candidate.new_evidence_urls, 12),
+    merge_note: cleanString(candidate.merge_note),
+  };
+}
+
 /**
  * @param {{ result?: unknown; candidate?: unknown; locale?: "zh" | "en" }} input
  */
@@ -858,6 +879,7 @@ export function buildCandidateEvidenceDossier({ result, candidate, locale = "zh"
       sources: group.missing_source_types.join(", "),
     }));
   const backfillJobs = buildDossierBackfillJobs({ evidenceGroups, candidate: selected, result: normalizedResult, locale });
+  const backfillDelta = buildDossierBackfillDelta({ result, candidateName: selected?.name, locale });
 
   return {
     title: dossierCopy(locale, "title"),
@@ -886,6 +908,7 @@ export function buildCandidateEvidenceDossier({ result, candidate, locale = "zh"
     evidence_groups: evidenceGroups,
     verification_gaps: verificationGaps,
     backfill_jobs: backfillJobs,
+    backfill_delta: backfillDelta,
   };
 }
 

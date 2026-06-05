@@ -843,6 +843,13 @@ test("merges backfill evidence into the original talent report", () => {
   );
   assert.equal(merged.coverage_backfill.jobs.find((job) => job.gap_id === "practice-code")?.status, "completed");
   assert.equal(merged.backfill_merge.merged_at, "2026-06-03T00:00:00.000Z");
+  const dossier = talentProfile.buildCandidateEvidenceDossier({ result: merged, candidate, locale: "zh" });
+  assert.equal(dossier.backfill_delta.title, "补搜新增证据");
+  assert.equal(dossier.backfill_delta.merged_at, "2026-06-03T00:00:00.000Z");
+  assert.equal(dossier.backfill_delta.new_evidence_count, 1);
+  assert.deepEqual(dossier.backfill_delta.new_source_types, ["code"]);
+  assert.deepEqual(dossier.backfill_delta.new_evidence_urls, ["https://github.com/example/vllm"]);
+  assert.match(dossier.backfill_delta.merge_note, /新增 code 来源证据/);
 
   const mergedAgain = talentProfile.mergeBackfillResult({ originalResult: merged, backfillResult, mergedAt: "2026-06-03T00:01:00.000Z" });
   const urls = mergedAgain.candidates
