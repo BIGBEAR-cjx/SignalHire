@@ -1443,9 +1443,9 @@ export function buildProjectControlRoom({ project = {}, runs = [], items = [], c
 }
 
 /**
- * @param {{ hasCandidates?: boolean; hasControlRoom?: boolean; hasProjectEvidenceMatrix?: boolean; hasStatusFunnel?: boolean; hasResearchRounds?: boolean; hasSearchConsolePriorities?: boolean; hasResearchRoundFeedback?: boolean; hasSearchConsoleFeedback?: boolean; hasConstraintDiffRefinements?: boolean; hasSearchRefinementSuggestions?: boolean; hasHeaderBrief?: boolean; hasSearchConsoleBrief?: boolean; hasCandidateStatusTabs?: boolean; locale?: string }} input
+ * @param {{ hasCandidates?: boolean; hasControlRoom?: boolean; hasProjectEvidenceMatrix?: boolean; hasStatusFunnel?: boolean; hasResearchRounds?: boolean; hasSearchConsolePriorities?: boolean; hasResearchRoundFeedback?: boolean; hasSearchConsoleFeedback?: boolean; hasConstraintDiffRefinements?: boolean; hasSearchRefinementSuggestions?: boolean; hasConstraintDiffCandidateFeedback?: boolean; hasCandidateFeedbackSignals?: boolean; hasHeaderBrief?: boolean; hasSearchConsoleBrief?: boolean; hasCandidateStatusTabs?: boolean; locale?: string }} input
  */
-export function buildProjectDetailHierarchy({ hasCandidates = false, hasControlRoom = true, hasProjectEvidenceMatrix = false, hasStatusFunnel = false, hasResearchRounds = false, hasSearchConsolePriorities = false, hasResearchRoundFeedback = false, hasSearchConsoleFeedback = false, hasConstraintDiffRefinements = false, hasSearchRefinementSuggestions = false, hasHeaderBrief = false, hasSearchConsoleBrief = false, hasCandidateStatusTabs = false, locale = "zh" } = {}) {
+export function buildProjectDetailHierarchy({ hasCandidates = false, hasControlRoom = true, hasProjectEvidenceMatrix = false, hasStatusFunnel = false, hasResearchRounds = false, hasSearchConsolePriorities = false, hasResearchRoundFeedback = false, hasSearchConsoleFeedback = false, hasConstraintDiffRefinements = false, hasSearchRefinementSuggestions = false, hasConstraintDiffCandidateFeedback = false, hasCandidateFeedbackSignals = false, hasHeaderBrief = false, hasSearchConsoleBrief = false, hasCandidateStatusTabs = false, locale = "zh" } = {}) {
   const normalizedLocale = normalizeLocale(locale);
   const hidden = [
     ...(hasControlRoom ? ["action_brief", "candidate_feedback_summary"] : []),
@@ -1455,6 +1455,7 @@ export function buildProjectDetailHierarchy({ hasCandidates = false, hasControlR
     ...(hasControlRoom && hasSearchConsolePriorities ? ["search_console_priorities"] : []),
     ...(hasResearchRoundFeedback && hasSearchConsoleFeedback ? ["search_console_feedback"] : []),
     ...(hasConstraintDiffRefinements && hasSearchRefinementSuggestions ? ["search_refinement_suggestions"] : []),
+    ...(hasConstraintDiffCandidateFeedback && hasCandidateFeedbackSignals ? ["candidate_feedback_signals"] : []),
     ...(hasHeaderBrief && hasSearchConsoleBrief ? ["search_console_brief"] : []),
     ...(hasStatusFunnel && hasCandidateStatusTabs ? ["candidate_status_tabs"] : []),
   ];
@@ -1469,6 +1470,7 @@ export function buildProjectDetailHierarchy({ hasCandidates = false, hasControlR
         search_console_priorities: "The project control room already carries priority actions; search console priorities are a fallback when there is no control room.",
         search_console_feedback: "The research rounds list already shows search feedback summaries; the search console feedback card is a fallback when rounds have no feedback.",
         search_refinement_suggestions: "The next-search constraint diff already shows candidate-status refinements; the detailed suggestions block is a fallback when the diff does not cover them.",
+        candidate_feedback_signals: "The next-search constraint diff already shows candidate feedback signals; the detailed block is a fallback when the diff does not cover them.",
         search_console_brief: "The project header already shows and edits the brief; the search console keeps only next-search constraints.",
         candidate_status_tabs: "The status funnel already carries candidate status counts and filtering; list tabs are a fallback when no funnel is available.",
       }
@@ -1482,6 +1484,7 @@ export function buildProjectDetailHierarchy({ hasCandidates = false, hasControlR
         search_console_priorities: "项目控制台已承接优先动作，搜索控制台优先级作为无控制台时的回退。",
         search_console_feedback: "研究轮次列表已展示搜索反馈摘要，搜索控制台反馈卡作为无轮次反馈时的回退。",
         search_refinement_suggestions: "下一轮搜索约束 diff 已展示候选人状态优化，详情建议块作为无 diff 覆盖时的回退。",
+        candidate_feedback_signals: "下一轮搜索约束 diff 已展示候选人反馈信号，详情块作为无 diff 覆盖时的回退。",
         search_console_brief: "项目头部已展示并可编辑 brief，搜索控制台只保留下一轮搜索约束。",
         candidate_status_tabs: "状态漏斗已承接候选人状态计数和筛选，列表分段控件作为无漏斗时的回退。",
       };

@@ -1042,6 +1042,19 @@ test("builds a project detail hierarchy that avoids duplicate search refinement 
   assert.equal(hierarchy.notes.search_refinement_suggestions, "下一轮搜索约束 diff 已展示候选人状态优化，详情建议块作为无 diff 覆盖时的回退。");
 });
 
+test("builds a project detail hierarchy that avoids duplicate candidate feedback signal details", () => {
+  assert.equal(typeof researchLoop.buildProjectDetailHierarchy, "function");
+
+  const hierarchy = researchLoop.buildProjectDetailHierarchy({
+    hasConstraintDiffCandidateFeedback: true,
+    hasCandidateFeedbackSignals: true,
+    locale: "zh",
+  });
+
+  assert.ok(hierarchy.hidden.includes("candidate_feedback_signals"));
+  assert.equal(hierarchy.notes.candidate_feedback_signals, "下一轮搜索约束 diff 已展示候选人反馈信号，详情块作为无 diff 覆盖时的回退。");
+});
+
 test("builds a project detail hierarchy that avoids duplicate project brief summaries", () => {
   assert.equal(typeof researchLoop.buildProjectDetailHierarchy, "function");
 

@@ -406,6 +406,8 @@ export default function ProjectDetailPage() {
     hasSearchConsoleFeedback: Boolean(projectConsole.feedback && projectConsole.feedback.items.length > 0),
     hasConstraintDiffRefinements: projectConsole.constraintDiff.changes.some((change) => change.sourceLabel === projectConsole.refinementSuggestions.title),
     hasSearchRefinementSuggestions: projectConsole.refinementSuggestions.items.length > 0,
+    hasConstraintDiffCandidateFeedback: projectConsole.constraintDiff.changes.some((change) => change.sourceLabel === projectConsole.candidateFeedbackSignals.title),
+    hasCandidateFeedbackSignals: !projectConsole.candidateFeedbackSignals.empty,
     hasHeaderBrief: Boolean((p.brief ?? "").trim()),
     hasSearchConsoleBrief: Boolean(projectConsole.briefText.trim()),
     hasCandidateStatusTabs: Boolean(items && items.length > 0),
@@ -421,6 +423,7 @@ export default function ProjectDetailPage() {
   const showSearchConsolePriorities = !hiddenPanels.has("search_console_priorities");
   const showSearchConsoleFeedback = !hiddenPanels.has("search_console_feedback");
   const showSearchRefinementSuggestions = !hiddenPanels.has("search_refinement_suggestions");
+  const showCandidateFeedbackSignals = !hiddenPanels.has("candidate_feedback_signals");
   const showSearchConsoleBrief = !hiddenPanels.has("search_console_brief");
   const showCandidateStatusTabs = !hiddenPanels.has("candidate_status_tabs");
   const decisionQueue = buildProjectCandidateDecisionQueue({ items: items ?? [], locale });
@@ -466,6 +469,7 @@ export default function ProjectDetailPage() {
         showPriorities={showSearchConsolePriorities}
         showFeedback={showSearchConsoleFeedback}
         showRefinementSuggestions={showSearchRefinementSuggestions}
+        showCandidateFeedbackSignals={showCandidateFeedbackSignals}
         showBrief={showSearchConsoleBrief}
       />
 
@@ -597,6 +601,7 @@ function ProjectSearchConsolePanel({
   showPriorities,
   showFeedback,
   showRefinementSuggestions,
+  showCandidateFeedbackSignals,
   showBrief,
 }: {
   consoleView: ProjectSearchConsoleView;
@@ -606,10 +611,11 @@ function ProjectSearchConsolePanel({
   showPriorities: boolean;
   showFeedback: boolean;
   showRefinementSuggestions: boolean;
+  showCandidateFeedbackSignals: boolean;
   showBrief: boolean;
 }) {
   const { t } = useI18n();
-  const showFeedbackPanel = showFeedback || !consoleView.candidateFeedbackSignals.empty;
+  const showFeedbackPanel = showFeedback || (showCandidateFeedbackSignals && !consoleView.candidateFeedbackSignals.empty);
   const gridClassName = showLatestRoundSummary && showFeedbackPanel
     ? "mt-5 grid gap-3 lg:grid-cols-[minmax(0,1.15fr)_minmax(260px,0.85fr)_minmax(260px,0.85fr)]"
     : showLatestRoundSummary || showFeedbackPanel
@@ -728,7 +734,7 @@ function ProjectSearchConsolePanel({
                 )}
               </>
             )}
-            {!consoleView.candidateFeedbackSignals.empty && (
+            {showCandidateFeedbackSignals && !consoleView.candidateFeedbackSignals.empty && (
               <div className={showFeedback ? "mt-3 rounded-2xl border border-blue-100 bg-blue-50/55 p-3" : "rounded-2xl border border-blue-100 bg-blue-50/55 p-3"}>
                 <p className="text-xs font-semibold text-blue-700">{consoleView.candidateFeedbackSignals.title}</p>
                 <div className="mt-2 space-y-2">

@@ -460,6 +460,8 @@ export function buildProjectDetailHierarchy(input?: {
   hasSearchConsoleFeedback?: boolean;
   hasConstraintDiffRefinements?: boolean;
   hasSearchRefinementSuggestions?: boolean;
+  hasConstraintDiffCandidateFeedback?: boolean;
+  hasCandidateFeedbackSignals?: boolean;
   hasHeaderBrief?: boolean;
   hasSearchConsoleBrief?: boolean;
   hasCandidateStatusTabs?: boolean;
