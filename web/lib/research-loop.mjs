@@ -1443,9 +1443,9 @@ export function buildProjectControlRoom({ project = {}, runs = [], items = [], c
 }
 
 /**
- * @param {{ hasCandidates?: boolean; hasControlRoom?: boolean; hasProjectEvidenceMatrix?: boolean; hasStatusFunnel?: boolean; hasResearchRounds?: boolean; hasSearchConsolePriorities?: boolean; hasResearchRoundFeedback?: boolean; hasSearchConsoleFeedback?: boolean; locale?: string }} input
+ * @param {{ hasCandidates?: boolean; hasControlRoom?: boolean; hasProjectEvidenceMatrix?: boolean; hasStatusFunnel?: boolean; hasResearchRounds?: boolean; hasSearchConsolePriorities?: boolean; hasResearchRoundFeedback?: boolean; hasSearchConsoleFeedback?: boolean; hasConstraintDiffRefinements?: boolean; hasSearchRefinementSuggestions?: boolean; locale?: string }} input
  */
-export function buildProjectDetailHierarchy({ hasCandidates = false, hasControlRoom = true, hasProjectEvidenceMatrix = false, hasStatusFunnel = false, hasResearchRounds = false, hasSearchConsolePriorities = false, hasResearchRoundFeedback = false, hasSearchConsoleFeedback = false, locale = "zh" } = {}) {
+export function buildProjectDetailHierarchy({ hasCandidates = false, hasControlRoom = true, hasProjectEvidenceMatrix = false, hasStatusFunnel = false, hasResearchRounds = false, hasSearchConsolePriorities = false, hasResearchRoundFeedback = false, hasSearchConsoleFeedback = false, hasConstraintDiffRefinements = false, hasSearchRefinementSuggestions = false, locale = "zh" } = {}) {
   const normalizedLocale = normalizeLocale(locale);
   const hidden = [
     ...(hasControlRoom ? ["action_brief", "candidate_feedback_summary"] : []),
@@ -1454,6 +1454,7 @@ export function buildProjectDetailHierarchy({ hasCandidates = false, hasControlR
     ...(hasResearchRounds ? ["latest_round_summary"] : []),
     ...(hasControlRoom && hasSearchConsolePriorities ? ["search_console_priorities"] : []),
     ...(hasResearchRoundFeedback && hasSearchConsoleFeedback ? ["search_console_feedback"] : []),
+    ...(hasConstraintDiffRefinements && hasSearchRefinementSuggestions ? ["search_refinement_suggestions"] : []),
   ];
   const notes = normalizedLocale === "en"
     ? {
@@ -1465,6 +1466,7 @@ export function buildProjectDetailHierarchy({ hasCandidates = false, hasControlR
         latest_round_summary: "The research rounds list already shows the latest round and history; the search console keeps the next-search constraints.",
         search_console_priorities: "The project control room already carries priority actions; search console priorities are a fallback when there is no control room.",
         search_console_feedback: "The research rounds list already shows search feedback summaries; the search console feedback card is a fallback when rounds have no feedback.",
+        search_refinement_suggestions: "The next-search constraint diff already shows candidate-status refinements; the detailed suggestions block is a fallback when the diff does not cover them.",
       }
     : {
         action_brief: "控制台已承接今日优先动作，避免重复显示。",
@@ -1475,6 +1477,7 @@ export function buildProjectDetailHierarchy({ hasCandidates = false, hasControlR
         latest_round_summary: "研究轮次列表已展示最新轮次和历史记录，搜索控制台只保留下一轮搜索约束。",
         search_console_priorities: "项目控制台已承接优先动作，搜索控制台优先级作为无控制台时的回退。",
         search_console_feedback: "研究轮次列表已展示搜索反馈摘要，搜索控制台反馈卡作为无轮次反馈时的回退。",
+        search_refinement_suggestions: "下一轮搜索约束 diff 已展示候选人状态优化，详情建议块作为无 diff 覆盖时的回退。",
       };
   const candidateEvidenceSection = hasProjectEvidenceMatrix ? "candidate_evidence_matrix" : "candidate_evidence";
   const summarySections = hasStatusFunnel ? ["search_console", "status_funnel"] : ["search_console", "kpi_strip", "status_funnel"];

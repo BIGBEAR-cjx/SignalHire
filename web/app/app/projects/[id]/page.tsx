@@ -399,6 +399,8 @@ export default function ProjectDetailPage() {
     hasSearchConsolePriorities: projectConsole.priorities.items.length > 0,
     hasResearchRoundFeedback: projectRounds.items.some((round) => Boolean(round.feedbackSummary)),
     hasSearchConsoleFeedback: Boolean(projectConsole.feedback && projectConsole.feedback.items.length > 0),
+    hasConstraintDiffRefinements: projectConsole.constraintDiff.changes.some((change) => change.sourceLabel === projectConsole.refinementSuggestions.title),
+    hasSearchRefinementSuggestions: projectConsole.refinementSuggestions.items.length > 0,
     locale,
   }) as ProjectDetailHierarchyView;
   const hiddenPanels = new Set(projectHierarchy.hidden);
@@ -410,6 +412,7 @@ export default function ProjectDetailPage() {
   const showLatestRoundSummary = !hiddenPanels.has("latest_round_summary");
   const showSearchConsolePriorities = !hiddenPanels.has("search_console_priorities");
   const showSearchConsoleFeedback = !hiddenPanels.has("search_console_feedback");
+  const showSearchRefinementSuggestions = !hiddenPanels.has("search_refinement_suggestions");
   const decisionQueue = buildProjectCandidateDecisionQueue({ items: items ?? [], locale });
   const actionBrief = showActionBrief ? buildProjectActionBrief({ items: items ?? [], locale }) as ProjectActionBriefView : null;
   const candidateFeedbackSummary = showCandidateFeedbackSummary ? buildProjectCandidateFeedbackSummary({ items: items ?? [], locale }) as ProjectCandidateFeedbackSummaryView : null;
@@ -452,6 +455,7 @@ export default function ProjectDetailPage() {
         showLatestRoundSummary={showLatestRoundSummary}
         showPriorities={showSearchConsolePriorities}
         showFeedback={showSearchConsoleFeedback}
+        showRefinementSuggestions={showSearchRefinementSuggestions}
       />
 
       {showKpiStrip && (
@@ -581,6 +585,7 @@ function ProjectSearchConsolePanel({
   showLatestRoundSummary,
   showPriorities,
   showFeedback,
+  showRefinementSuggestions,
 }: {
   consoleView: ProjectSearchConsoleView;
   searchHref: string;
@@ -588,6 +593,7 @@ function ProjectSearchConsolePanel({
   showLatestRoundSummary: boolean;
   showPriorities: boolean;
   showFeedback: boolean;
+  showRefinementSuggestions: boolean;
 }) {
   const { t } = useI18n();
   const showFeedbackPanel = showFeedback || !consoleView.candidateFeedbackSignals.empty;
@@ -650,7 +656,7 @@ function ProjectSearchConsolePanel({
               </div>
             )}
           </div>
-          {consoleView.refinementSuggestions.items.length > 0 && (
+          {showRefinementSuggestions && consoleView.refinementSuggestions.items.length > 0 && (
             <div className="mt-3 rounded-2xl border border-black/10 bg-white/70 px-3 py-3">
               <p className="text-xs font-semibold text-[var(--sh-muted)]">{consoleView.refinementSuggestions.title}</p>
               <div className="mt-2 space-y-2">

@@ -916,6 +916,19 @@ test("builds a project detail hierarchy that avoids duplicate search feedback su
   assert.equal(hierarchy.notes.search_console_feedback, "研究轮次列表已展示搜索反馈摘要，搜索控制台反馈卡作为无轮次反馈时的回退。");
 });
 
+test("builds a project detail hierarchy that avoids duplicate search refinement suggestions", () => {
+  assert.equal(typeof researchLoop.buildProjectDetailHierarchy, "function");
+
+  const hierarchy = researchLoop.buildProjectDetailHierarchy({
+    hasConstraintDiffRefinements: true,
+    hasSearchRefinementSuggestions: true,
+    locale: "zh",
+  });
+
+  assert.ok(hierarchy.hidden.includes("search_refinement_suggestions"));
+  assert.equal(hierarchy.notes.search_refinement_suggestions, "下一轮搜索约束 diff 已展示候选人状态优化，详情建议块作为无 diff 覆盖时的回退。");
+});
+
 test("parses project next-search text into editable constraint sections", () => {
   assert.equal(typeof researchLoop.buildSearchConstraintEditor, "function");
   assert.equal(typeof researchLoop.buildSearchInputFromConstraintEditor, "function");
