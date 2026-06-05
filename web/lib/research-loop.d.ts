@@ -85,6 +85,8 @@ export type ProjectCandidateDecisionQueueItem = {
   subtitle: string;
   matchScore: number | null;
   reason: string;
+  canBackfill: boolean;
+  backfillInput: string;
 };
 export type ProjectCandidateDecisionQueueColumn = {
   key: string;

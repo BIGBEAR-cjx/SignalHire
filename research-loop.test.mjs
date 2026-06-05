@@ -209,6 +209,12 @@ test("builds project candidate decision queues from status and evidence risk", (
     ["rejected"],
   ]);
   assert.match(zh.columns[2].items[0].reason, /证据/);
+  assert.equal(zh.columns[2].items[0].canBackfill, true);
+  assert.match(zh.columns[2].items[0].backfillInput, /Candidate evidence backfill search for SignalHire/);
+  assert.match(zh.columns[2].items[0].backfillInput, /Grace/);
+  assert.match(zh.columns[2].items[0].backfillInput, /Built agent infra/);
+  assert.equal(zh.columns[0].items[0].canBackfill, false);
+  assert.equal(zh.columns[0].items[0].backfillInput, "");
 
   const en = researchLoop.buildProjectCandidateDecisionQueue({ items, locale: "en" });
   assert.equal(en.columns[0].title, "To review");

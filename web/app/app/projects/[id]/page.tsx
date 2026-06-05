@@ -279,6 +279,7 @@ export default function ProjectDetailPage() {
         <ProjectCandidateDecisionQueuePanel
           queue={decisionQueue}
           locale={locale}
+          projectId={id}
           selectedItemId={selectedItemId}
           onOpenCandidate={(itemId) => setSelectedItemId(itemId)}
         />
@@ -603,6 +604,7 @@ function StatusFunnel({
 function ProjectCandidateDecisionQueuePanel({
   queue,
   locale,
+  projectId,
   selectedItemId,
   onOpenCandidate,
 }: {
@@ -617,10 +619,13 @@ function ProjectCandidateDecisionQueuePanel({
         subtitle: string;
         matchScore: number | null;
         reason: string;
+        canBackfill?: boolean;
+        backfillInput?: string;
       }>;
     }>;
   };
   locale: "zh" | "en";
+  projectId: string;
   selectedItemId: string | null;
   onOpenCandidate: (itemId: string) => void;
 }) {
@@ -629,6 +634,7 @@ function ProjectCandidateDecisionQueuePanel({
         eyebrow: "Decision queue",
         title: "Candidate decision queue",
         description: "Grouped by review, active progress, evidence gaps, and not-a-fit so teams can handle the highest-risk candidates first.",
+        backfill: "Backfill evidence",
         overflow: "more candidates. Use the list below to keep reviewing.",
         empty: "No candidates",
       }
@@ -636,6 +642,7 @@ function ProjectCandidateDecisionQueuePanel({
         eyebrow: "Decision queue",
         title: "候选人决策队列",
         description: "按待看、推进中、需补证据和不合适分组，先处理证据风险和高意向候选人。",
+        backfill: "补搜证据",
         overflow: "位，切换下方列表继续查看。",
         empty: "暂无候选人",
       };
@@ -660,25 +667,33 @@ function ProjectCandidateDecisionQueuePanel({
             </div>
             <div className="mt-3 space-y-2">
               {column.items.slice(0, 6).map((item) => (
-                <button
+                <div
                   key={item.id}
-                  type="button"
-                  onClick={() => onOpenCandidate(item.id)}
-                  className={`w-full rounded-2xl border p-3 text-left transition ${
+                  className={`rounded-2xl border p-3 transition ${
                     selectedItemId === item.id ? "border-[var(--sh-ink)] bg-white shadow-sm" : "border-black/10 bg-white/78 hover:border-black/20"
                   }`}
                 >
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="min-w-0">
-                      <p className="truncate text-sm font-semibold text-gray-900">{item.name}</p>
-                      {item.subtitle && <p className="mt-0.5 truncate text-xs text-gray-500">{item.subtitle}</p>}
+                  <button type="button" onClick={() => onOpenCandidate(item.id)} className="w-full text-left">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-semibold text-gray-900">{item.name}</p>
+                        {item.subtitle && <p className="mt-0.5 truncate text-xs text-gray-500">{item.subtitle}</p>}
+                      </div>
+                      {typeof item.matchScore === "number" && (
+                        <span className="rounded-md bg-gray-100 px-1.5 py-0.5 text-[11px] font-semibold tabular-nums text-gray-700">{item.matchScore}</span>
+                      )}
                     </div>
-                    {typeof item.matchScore === "number" && (
-                      <span className="rounded-md bg-gray-100 px-1.5 py-0.5 text-[11px] font-semibold tabular-nums text-gray-700">{item.matchScore}</span>
-                    )}
-                  </div>
-                  <p className="mt-2 line-clamp-2 text-xs leading-5 text-gray-500">{item.reason}</p>
-                </button>
+                    <p className="mt-2 line-clamp-2 text-xs leading-5 text-gray-500">{item.reason}</p>
+                  </button>
+                  {item.canBackfill && item.backfillInput && (
+                    <Link
+                      href={`/app/search?project=${projectId}&q=${encodeURIComponent(item.backfillInput)}`}
+                      className="mt-2 inline-flex rounded-full bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-700 ring-1 ring-blue-100 transition hover:bg-blue-100"
+                    >
+                      {copy.backfill}
+                    </Link>
+                  )}
+                </div>
               ))}
               {column.items.length > 6 && (
                 <p className="px-1 text-xs text-gray-400">

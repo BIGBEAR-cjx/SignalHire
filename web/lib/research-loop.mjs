@@ -145,6 +145,51 @@ function candidateEvidenceRisk(candidate) {
   });
 }
 
+function candidateEvidenceGapClaims(candidate) {
+  const claims = Array.isArray(candidate?.claims) ? candidate.claims : [];
+  return claims
+    .filter((claim) => {
+      const verdict = cleanString(claim?.verdict).toLowerCase();
+      return verdict === "unverified" || verdict === "contradicted";
+    })
+    .map((claim) => cleanString(claim?.claim))
+    .filter(Boolean)
+    .slice(0, 5);
+}
+
+function candidateBackfillSourceTypes(candidate) {
+  const types = new Set();
+  const links = isPlainObject(candidate?.links) ? candidate.links : {};
+  if (!cleanString(links.github)) types.add("code");
+  if (!cleanString(links.scholar)) types.add("paper");
+  if (!cleanString(links.linkedin)) types.add("profile");
+  if (!cleanString(links.website)) types.add("company");
+  types.add("blog");
+  return Array.from(types).slice(0, 5);
+}
+
+function buildCandidateEvidenceBackfillInput(item) {
+  const candidate = isPlainObject(item?.candidate) ? item.candidate : {};
+  const name = candidateName(candidate);
+  const subtitle = candidateSubtitle(candidate) || "role unknown";
+  const quality = cleanString(candidate?.evidence_audit?.overall_evidence_quality) || "unknown";
+  const directions = Array.isArray(candidate?.ai_directions) ? candidate.ai_directions.map(cleanString).filter(Boolean).join(", ") : "";
+  const gapClaims = candidateEvidenceGapClaims(candidate);
+  const sourceTypes = candidateBackfillSourceTypes(candidate);
+  return [
+    "Candidate evidence backfill search for SignalHire.",
+    `Candidate: ${name}`,
+    `Role/context: ${subtitle}`,
+    `AI directions: ${directions || "not specified"}`,
+    `Current evidence quality: ${quality}`,
+    `Evidence gaps: ${gapClaims.length ? gapClaims.join("; ") : "overall evidence is weak or insufficiently cross-validated"}`,
+    `Source types to check: ${sourceTypes.join(", ")}`,
+    "Search goal: find concrete public sources that confirm, contradict, or update this candidate's fit.",
+    "Prioritize independent URLs across research, code, company/work history, public writing, talks, and profile sources.",
+    "Return the normal SignalHire talent shortlist payload focused on this candidate evidence backfill. Do not cite search-result URLs.",
+  ].join("\n");
+}
+
 function decisionQueueReason(locale, key, item) {
   const name = candidateName(item?.candidate);
   const copy = {
@@ -197,6 +242,8 @@ export function buildProjectCandidateDecisionQueue({ items = [], locale = "zh" }
       subtitle: candidateSubtitle(item.candidate),
       matchScore: Number.isFinite(Number(item.candidate?.match_score)) ? Math.round(Number(item.candidate.match_score)) : null,
       reason: decisionQueueReason(normalizedLocale, key, item),
+      canBackfill: key === "needs_evidence",
+      backfillInput: key === "needs_evidence" ? buildCandidateEvidenceBackfillInput(item) : "",
     });
   }
 
