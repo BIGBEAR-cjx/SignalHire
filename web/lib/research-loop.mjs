@@ -659,6 +659,77 @@ function appendCandidateFeedbackInstructions(input, feedbackSignals) {
   return `${base}\n\n${msg(feedbackSignals.locale, "projects.candidateFeedbackSignals.searchSection")}\n- ${instructions.join("\n- ")}`;
 }
 
+function constraintChangeType(key) {
+  if (key === "avoid_rejected_patterns" || key === "adjust_candidate_pool") return "reduce";
+  if (key === "expand_sources" || key === "find_similar_to_active") return "add";
+  return "strengthen";
+}
+
+function constraintChangeTypeLabel(locale, type) {
+  return msg(locale, `projects.constraintDiff.type.${type}`);
+}
+
+function buildConstraintChange({ item, sourceLabel, locale }) {
+  const key = cleanString(item?.key) || "constraint";
+  const type = constraintChangeType(key);
+  return {
+    key,
+    type,
+    typeLabel: constraintChangeTypeLabel(locale, type),
+    sourceLabel,
+    label: cleanString(item?.label),
+    detail: cleanString(item?.detail),
+  };
+}
+
+function buildFeedbackPreferenceConstraintChanges({ feedbackPreference, locale }) {
+  if (!feedbackPreference?.canApply || !Array.isArray(feedbackPreference.items)) return [];
+  return feedbackPreference.items.map((item) => ({
+    key: `feedback_${cleanString(item?.key) || "preference"}`,
+    type: "strengthen",
+    typeLabel: constraintChangeTypeLabel(locale, "strengthen"),
+    sourceLabel: msg(locale, "projects.console.feedbackTitle"),
+    label: `${cleanString(item?.label)}: ${cleanString(item?.value)}`,
+    detail: cleanString(feedbackPreference.detail) || msg(locale, "projects.constraintDiff.savedFeedbackDetail"),
+  }));
+}
+
+function buildNextSearchConstraintDiff({ baseInput = "", optimizedInput = "", refinements = {}, candidateFeedbackSignals = {}, feedbackPreference = {}, locale = "zh" } = {}) {
+  const normalizedLocale = normalizeLocale(locale);
+  const originalInput = cleanString(baseInput);
+  const finalInput = cleanString(optimizedInput) || originalInput;
+  const changes = feedbackPreference?.canApply
+    ? buildFeedbackPreferenceConstraintChanges({ feedbackPreference, locale: normalizedLocale })
+    : [
+        ...(Array.isArray(refinements?.items)
+          ? refinements.items.map((item) => buildConstraintChange({
+              item,
+              sourceLabel: cleanString(refinements?.title) || msg(normalizedLocale, "projects.refinements.title"),
+              locale: normalizedLocale,
+            }))
+          : []),
+        ...(Array.isArray(candidateFeedbackSignals?.items)
+          ? candidateFeedbackSignals.items.map((item) => buildConstraintChange({
+              item,
+              sourceLabel: cleanString(candidateFeedbackSignals?.title) || msg(normalizedLocale, "projects.candidateFeedbackSignals.title"),
+              locale: normalizedLocale,
+            }))
+          : []),
+      ];
+
+  return {
+    locale: normalizedLocale,
+    title: msg(normalizedLocale, "projects.constraintDiff.title"),
+    originalTitle: msg(normalizedLocale, "projects.constraintDiff.originalTitle"),
+    optimizedTitle: msg(normalizedLocale, "projects.constraintDiff.optimizedTitle"),
+    originalInput,
+    optimizedInput: finalInput,
+    editableHint: msg(normalizedLocale, "projects.constraintDiff.editableHint"),
+    changes,
+    empty: changes.length === 0 && originalInput === finalInput,
+  };
+}
+
 function timestampMs(value) {
   const time = Date.parse(cleanString(value));
   return Number.isFinite(time) ? time : 0;
@@ -1115,6 +1186,14 @@ export function buildProjectSearchConsole({ project = {}, runs = [], items = [],
     candidateCount,
     locale: normalizedLocale,
   });
+  const constraintDiff = buildNextSearchConstraintDiff({
+    baseInput: nextSearchBase,
+    optimizedInput: nextSearchInput,
+    refinements: refinementSuggestions,
+    candidateFeedbackSignals,
+    feedbackPreference,
+    locale: normalizedLocale,
+  });
 
   return {
     locale: normalizedLocale,
@@ -1129,6 +1208,7 @@ export function buildProjectSearchConsole({ project = {}, runs = [], items = [],
     nextSearchInput,
     refinementSuggestions,
     candidateFeedbackSignals,
+    constraintDiff,
     nextSteps,
     priorities,
   };

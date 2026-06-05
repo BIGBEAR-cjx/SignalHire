@@ -639,6 +639,76 @@ test("turns reviewed candidate feedback into project search signals", () => {
   assert.match(consoleView.nextSearchInput, /补强证据要求/);
 });
 
+test("builds an editable next-search constraint diff from project signals", () => {
+  const consoleView = buildProjectSearchConsole({
+    locale: "zh",
+    project: {
+      name: "AI Agent 产品工程师",
+      brief: "找做过 AI Agent 产品落地和开源工具的资深工程师",
+    },
+    candidateCount: 3,
+    items: [
+      {
+        id: "rejected-1",
+        status: "rejected",
+        candidate: {
+          name: "Wrong Direction",
+          ai_directions: ["通用 Chatbot"],
+          feedback: {
+            precision: "off",
+            satisfaction: "unsatisfied",
+            issue: "wrong_direction",
+            focus: "adjacent_pools",
+          },
+          evidence_audit: { overall_evidence_quality: "high" },
+          claims: [],
+        },
+      },
+      {
+        id: "weak-1",
+        status: "new",
+        candidate: {
+          name: "Weak Evidence",
+          feedback: {
+            precision: "partial",
+            satisfaction: "mixed",
+            issue: "weak_evidence",
+            focus: "stronger_evidence",
+          },
+          evidence_audit: { overall_evidence_quality: "low" },
+          claims: [{ claim: "Agent 产品落地", verdict: "unverified" }],
+        },
+      },
+    ],
+    runs: [
+      {
+        id: "run-1",
+        kind: "search",
+        label: "AI Agent 产品工程师",
+        query_text: "找做过 AI Agent 产品落地和开源工具的资深工程师",
+        status: "done",
+        updated_at: "2026-06-05T10:00:00.000Z",
+      },
+    ],
+  });
+
+  assert.equal(consoleView.constraintDiff.title, "下一轮搜索约束 diff");
+  assert.equal(consoleView.constraintDiff.originalInput, "找做过 AI Agent 产品落地和开源工具的资深工程师");
+  assert.match(consoleView.constraintDiff.optimizedInput, /候选人反馈优化建议/);
+  assert.equal(consoleView.constraintDiff.empty, false);
+  assert.match(consoleView.constraintDiff.editableHint, /开始搜索前/);
+  assert.deepEqual(
+    consoleView.constraintDiff.changes.map((item) => [item.key, item.type, item.typeLabel, item.sourceLabel]),
+    [
+      ["avoid_rejected_patterns", "reduce", "降低权重", "候选人状态优化"],
+      ["strengthen_evidence", "strengthen", "强化约束", "候选人状态优化"],
+      ["tighten_profile", "strengthen", "强化约束", "候选人反馈信号"],
+      ["strengthen_evidence", "strengthen", "强化约束", "候选人反馈信号"],
+      ["expand_sources", "add", "新增条件", "候选人反馈信号"],
+    ],
+  );
+});
+
 test("summarizes reviewed candidate feedback at project level", () => {
   assert.equal(typeof researchLoop.buildProjectCandidateFeedbackSummary, "function");
 

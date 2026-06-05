@@ -66,6 +66,23 @@ type ProjectSearchConsoleView = {
     items: Array<{ key: string; label: string; detail: string }>;
     empty: boolean;
   };
+  constraintDiff: {
+    title: string;
+    originalTitle: string;
+    optimizedTitle: string;
+    originalInput: string;
+    optimizedInput: string;
+    editableHint: string;
+    empty: boolean;
+    changes: Array<{
+      key: string;
+      type: "add" | "strengthen" | "reduce" | string;
+      typeLabel: string;
+      sourceLabel: string;
+      label: string;
+      detail: string;
+    }>;
+  };
   nextSteps: ProjectNextStepsView;
   priorities: {
     title: string;
@@ -527,6 +544,32 @@ function ProjectSearchConsolePanel({
           <div className="mt-4 rounded-2xl bg-[var(--sh-canvas)] px-3 py-3">
             <p className="text-xs font-semibold text-[var(--sh-muted)]">{t("projects.console.nextSearchTitle")}</p>
             <p className="mt-1 line-clamp-3 whitespace-pre-line text-xs leading-5 text-[var(--sh-ink)]">{consoleView.nextSearchInput}</p>
+          </div>
+          <div className="mt-3 rounded-2xl border border-black/10 bg-white/70 px-3 py-3">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <p className="text-xs font-semibold text-[var(--sh-muted)]">{consoleView.constraintDiff.title}</p>
+              <p className="text-[11px] text-[var(--sh-faint)]">{consoleView.constraintDiff.editableHint}</p>
+            </div>
+            <div className="mt-3 grid gap-2 sm:grid-cols-2">
+              <div className="rounded-xl bg-[var(--sh-canvas)] px-3 py-2">
+                <p className="text-[11px] font-semibold text-[var(--sh-muted)]">{consoleView.constraintDiff.originalTitle}</p>
+                <p className="mt-1 line-clamp-2 whitespace-pre-line text-xs leading-5 text-[var(--sh-ink)]">{consoleView.constraintDiff.originalInput}</p>
+              </div>
+              <div className="rounded-xl bg-[var(--sh-canvas)] px-3 py-2">
+                <p className="text-[11px] font-semibold text-[var(--sh-muted)]">{consoleView.constraintDiff.optimizedTitle}</p>
+                <p className="mt-1 line-clamp-2 whitespace-pre-line text-xs leading-5 text-[var(--sh-ink)]">{consoleView.constraintDiff.optimizedInput}</p>
+              </div>
+            </div>
+            {consoleView.constraintDiff.changes.length > 0 && (
+              <div className="mt-3 flex flex-wrap gap-2">
+                {consoleView.constraintDiff.changes.map((change, index) => (
+                  <span key={`${change.sourceLabel}:${change.key}:${index}`} className="inline-flex max-w-full items-center gap-1.5 rounded-full bg-white px-2.5 py-1 text-xs font-medium text-[var(--sh-ink)] ring-1 ring-black/10">
+                    <span className="text-[var(--sh-muted)]">{change.typeLabel}</span>
+                    <span className="truncate">{change.label}</span>
+                  </span>
+                ))}
+              </div>
+            )}
           </div>
           {consoleView.refinementSuggestions.items.length > 0 && (
             <div className="mt-3 rounded-2xl border border-black/10 bg-white/70 px-3 py-3">
