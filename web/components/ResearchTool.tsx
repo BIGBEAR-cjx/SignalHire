@@ -40,7 +40,7 @@ import {
 } from "@/components/research-workspace";
 import { buildBackfillMergeSummary, buildEditableSearchPlanDraft, buildFeedbackOptimizedSearchInput, buildSearchInputFromEditablePlan } from "@/lib/talent-profile.mjs";
 import type { BackfillMergeSummary, CoverageBackfillJob, TalentCandidate, TalentSearchResult } from "@/lib/talent-profile.mjs";
-import { buildFeedbackOptimizationPreview, buildResearchLoopView } from "@/lib/research-loop.mjs";
+import { buildCandidateFeedbackPanel, buildFeedbackOptimizationPreview, buildResearchLoopView } from "@/lib/research-loop.mjs";
 import { buildEvidencePriorityView } from "@/lib/evidence-priority.mjs";
 
 type FeedItem = { id: number; kind: "search" | "fetch"; info: string };
@@ -81,6 +81,15 @@ type SearchFeedbackState = {
 type SearchFeedbackField = keyof SearchFeedbackState;
 type SearchFeedbackOption = { value: SearchFeedbackState[SearchFeedbackField]; labelKey: string };
 type SearchFeedbackGroup = { key: SearchFeedbackField; labelKey: string; options: SearchFeedbackOption[] };
+type CandidateFeedbackPanelView = {
+  title: string;
+  description: string;
+  groups: Array<{
+    key: string;
+    label: string;
+    options: Array<{ value: string; label: string; selected: boolean }>;
+  }>;
+};
 
 const WORKER_DELAY_MS = 2 * 60 * 1000;
 const JOB_TIMEOUT_MS = 15 * 60 * 1000;
@@ -141,6 +150,45 @@ function isVerifyReport(result: AppResult): result is VerifyReport {
 }
 function isTalentSearchResult(result: AppResult | null): result is TalentSearchResult {
   return Boolean(result && "talent_map" in result && "search_brief" in result && Array.isArray((result as TalentSearchResult).candidates));
+}
+
+function CandidateFeedbackControls({
+  view,
+  onSelect,
+}: {
+  view: CandidateFeedbackPanelView;
+  onSelect: (key: string, value: string) => void;
+}) {
+  return (
+    <section className="rounded-3xl border border-black/10 bg-white/86 p-4 shadow-[0_16px_42px_rgba(0,0,0,0.05)]">
+      <p className="text-sm font-semibold text-[var(--sh-ink)]">{view.title}</p>
+      <p className="mt-1 text-xs leading-5 text-[var(--sh-muted)]">{view.description}</p>
+      <div className="mt-3 space-y-3">
+        {view.groups.map((group) => (
+          <div key={group.key}>
+            <p className="text-xs font-semibold text-[var(--sh-muted)]">{group.label}</p>
+            <div className="mt-1.5 flex flex-wrap gap-1.5">
+              {group.options.map((option) => (
+                <button
+                  key={option.value}
+                  type="button"
+                  aria-pressed={option.selected}
+                  onClick={() => onSelect(group.key, option.value)}
+                  className={`rounded-full px-3 py-1.5 text-xs font-semibold ring-1 transition ${
+                    option.selected
+                      ? "bg-[var(--sh-ink)] text-white ring-[var(--sh-ink)]"
+                      : "bg-white text-[var(--sh-muted)] ring-black/10 hover:bg-[var(--sh-faint)] hover:text-[var(--sh-ink)]"
+                  }`}
+                >
+                  {option.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
 }
 
 function userFacingStatus(view: JobStatusView, elapsedMs: number, t: (key: string, params?: Record<string, string | number>) => string): JobStatusView {
@@ -598,6 +646,12 @@ export default function ResearchTool({
   const progressView = buildResearchLoopView({ feed, live, jobStatus, locale });
   const feedbackPreview = buildFeedbackOptimizationPreview({ feedback: searchFeedback, locale });
   const evidencePriorityView = isTalentSearchResult(result) ? buildEvidencePriorityView({ result, locale }) : null;
+  const selectedTalentCandidate = isTalentSearchResult(result) && selectedCandidateIndex !== null
+    ? result.candidates[selectedCandidateIndex] ?? null
+    : null;
+  const candidateFeedbackPanel = selectedTalentCandidate
+    ? buildCandidateFeedbackPanel({ candidate: selectedTalentCandidate, feedback: searchFeedback, locale })
+    : null;
   const feedbackGroups = SEARCH_FEEDBACK_GROUPS.map((group) => ({
     key: group.key,
     label: t(group.labelKey),
@@ -819,6 +873,12 @@ export default function ResearchTool({
                           <FiMail className="h-4 w-4" aria-hidden="true" />
                           {t("result.outreachTo", { name: result.candidates[selectedCandidateIndex]?.name?.split(" ")[0] ?? "" })}
                         </button>
+                        {candidateFeedbackPanel && (
+                          <CandidateFeedbackControls
+                            view={candidateFeedbackPanel}
+                            onSelect={(key, value) => updateSearchFeedback(key as SearchFeedbackField, value as SearchFeedbackState[SearchFeedbackField])}
+                          />
+                        )}
                         <EvidenceGraphView result={result} candidate={result.candidates[selectedCandidateIndex]} locale={locale} />
                         <CandidateProfileView candidate={result.candidates[selectedCandidateIndex]} result={result} locale={locale} />
                       </>

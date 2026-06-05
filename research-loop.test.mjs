@@ -1,5 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import * as researchLoop from "./web/lib/research-loop.mjs";
 
 import {
   buildFeedbackOptimizationPreview,
@@ -132,6 +133,35 @@ test("previews stricter evidence and broader sourcing for weak feedback", () => 
   );
   assert.match(preview.actions[0].label, /收紧/);
   assert.match(preview.actions[2].detail, /GitHub|论文|公司页/);
+});
+
+test("builds localized candidate feedback choices next to reviewed candidate", () => {
+  assert.equal(typeof researchLoop.buildCandidateFeedbackPanel, "function");
+
+  const zh = researchLoop.buildCandidateFeedbackPanel({
+    candidate: { name: "Ada Lovelace" },
+    feedback: { precision: "partial", satisfaction: "mixed", issue: "weak_evidence" },
+    locale: "zh",
+  });
+
+  assert.equal(zh.title, "这位候选人是否合适？");
+  assert.match(zh.description, /Ada Lovelace/);
+  assert.deepEqual(zh.groups.map((group) => group.key), ["precision", "satisfaction", "issue", "focus"]);
+  assert.equal(zh.groups[0].options.find((option) => option.value === "partial")?.selected, true);
+  assert.equal(zh.groups[1].options.find((option) => option.value === "mixed")?.selected, true);
+  assert.equal(zh.groups[2].options.find((option) => option.value === "weak_evidence")?.selected, true);
+  assert.equal(zh.groups[3].options.find((option) => option.value === "stronger_evidence")?.label, "强化证据");
+
+  const en = researchLoop.buildCandidateFeedbackPanel({
+    candidate: { name: "Ada Lovelace" },
+    feedback: { precision: "off", satisfaction: "unsatisfied", focus: "adjacent_pools" },
+    locale: "en",
+  });
+
+  assert.equal(en.title, "Is this candidate a fit?");
+  assert.match(en.description, /Ada Lovelace/);
+  assert.equal(en.groups[0].options.find((option) => option.value === "off")?.selected, true);
+  assert.equal(en.groups[3].options.find((option) => option.value === "adjacent_pools")?.selected, true);
 });
 
 test("builds project next steps for empty and filtered projects", () => {

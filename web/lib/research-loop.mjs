@@ -73,6 +73,52 @@ function pushUniqueAction(actions, locale, key) {
   }
 }
 
+const CANDIDATE_FEEDBACK_GROUPS = [
+  {
+    key: "precision",
+    labelKey: "feedback.precision",
+    options: ["accurate", "partial", "off"],
+  },
+  {
+    key: "satisfaction",
+    labelKey: "feedback.satisfaction",
+    options: ["satisfied", "mixed", "unsatisfied"],
+  },
+  {
+    key: "issue",
+    labelKey: "feedback.issue",
+    options: ["weak_evidence", "wrong_direction", "wrong_seniority", "wrong_location"],
+  },
+  {
+    key: "focus",
+    labelKey: "feedback.focus",
+    options: ["stronger_evidence", "stricter_match", "expand_sources", "adjacent_pools"],
+  },
+];
+
+/**
+ * @param {{ candidate?: unknown; feedback?: Record<string, string | undefined>; locale?: string }} input
+ */
+export function buildCandidateFeedbackPanel({ candidate = {}, feedback = {}, locale = "zh" } = {}) {
+  const normalizedLocale = normalizeLocale(locale);
+  const candidateName = cleanString(candidate?.name) || msg(normalizedLocale, "candidateFeedback.thisCandidate");
+  return {
+    locale: normalizedLocale,
+    candidateName,
+    title: msg(normalizedLocale, "candidateFeedback.title"),
+    description: msg(normalizedLocale, "candidateFeedback.description", { name: candidateName }),
+    groups: CANDIDATE_FEEDBACK_GROUPS.map((group) => ({
+      key: group.key,
+      label: msg(normalizedLocale, group.labelKey),
+      options: group.options.map((value) => ({
+        value,
+        label: msg(normalizedLocale, `candidateFeedback.${group.key}.${value}`) || msg(normalizedLocale, `feedback.${group.key}.${value}`),
+        selected: cleanString(feedback?.[group.key]) === value,
+      })),
+    })),
+  };
+}
+
 function projectAction(locale, key, params) {
   return {
     key,

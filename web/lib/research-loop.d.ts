@@ -61,6 +61,23 @@ export type FeedbackOptimizationPreview = {
   statusText: string;
   actions: FeedbackOptimizationAction[];
 };
+export type CandidateFeedbackOption = {
+  value: string;
+  label: string;
+  selected: boolean;
+};
+export type CandidateFeedbackGroup = {
+  key: string;
+  label: string;
+  options: CandidateFeedbackOption[];
+};
+export type CandidateFeedbackPanel = {
+  locale: ResearchLoopLocale;
+  candidateName: string;
+  title: string;
+  description: string;
+  groups: CandidateFeedbackGroup[];
+};
 export type PersistedSearchFeedback = {
   version: 1;
   precision: string;
@@ -166,6 +183,11 @@ export function buildFeedbackOptimizationPreview(input?: {
   feedback?: SearchFeedback;
   locale?: ResearchLoopLocale | string;
 }): FeedbackOptimizationPreview;
+export function buildCandidateFeedbackPanel(input?: {
+  candidate?: unknown;
+  feedback?: SearchFeedback;
+  locale?: ResearchLoopLocale | string;
+}): CandidateFeedbackPanel;
 export function buildPersistedSearchFeedback(input?: {
   feedback?: SearchFeedback;
   optimizedInput?: string;
