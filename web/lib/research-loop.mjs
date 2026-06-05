@@ -259,6 +259,18 @@ function projectAction(locale, key, params) {
   };
 }
 
+function projectPriority(locale, key, params) {
+  return {
+    key,
+    label: msg(locale, `projects.priorities.${key}.label`, params),
+    detail: msg(locale, `projects.priorities.${key}.detail`, params),
+  };
+}
+
+function queueCount(queue, key) {
+  return queue.columns.find((column) => column.key === key)?.count ?? 0;
+}
+
 function timestampMs(value) {
   const time = Date.parse(cleanString(value));
   return Number.isFinite(time) ? time : 0;
@@ -634,9 +646,43 @@ export function buildProjectNextSteps({ candidateCount = 0, runCount = 0, hasFil
 }
 
 /**
- * @param {{ project?: { name?: string; brief?: string | null }; runs?: Array<{ id?: string; kind?: string; label?: string; summary?: string | null; status?: string; query_text?: string; updated_at?: string; result?: unknown }>; candidateCount?: number; hasFilter?: boolean; locale?: string }} input
+ * @param {{ items?: unknown[]; feedbackPreference?: { canApply?: boolean }; candidateCount?: number; locale?: string }} input
  */
-export function buildProjectSearchConsole({ project = {}, runs = [], candidateCount = 0, hasFilter = false, locale = "zh" } = {}) {
+function buildProjectCommandPriorities({ items = [], feedbackPreference = {}, candidateCount = 0, locale = "zh" } = {}) {
+  const normalizedLocale = normalizeLocale(locale);
+  const queue = buildProjectCandidateDecisionQueue({ items, locale: normalizedLocale });
+  const needsEvidenceCount = queueCount(queue, "needs_evidence");
+  const reviewCount = queueCount(queue, "review");
+  const interestedCount = queueCount(queue, "interested");
+  const totalCandidates = Math.max(0, Number(candidateCount) || 0);
+  const actions = [];
+
+  if (needsEvidenceCount > 0) {
+    actions.push(projectPriority(normalizedLocale, "backfill_evidence", { count: needsEvidenceCount }));
+  }
+  if (feedbackPreference?.canApply) {
+    actions.push(projectPriority(normalizedLocale, "apply_feedback"));
+  }
+  if (reviewCount > 0) {
+    actions.push(projectPriority(normalizedLocale, "review_candidates", { count: reviewCount }));
+  }
+  if (actions.length < 3 && interestedCount > 0) {
+    actions.push(projectPriority(normalizedLocale, "progress_candidates", { count: interestedCount }));
+  }
+  if (!actions.length && totalCandidates === 0) {
+    actions.push(projectPriority(normalizedLocale, "start_search"));
+  }
+
+  return {
+    title: msg(normalizedLocale, "projects.priorities.title"),
+    items: actions.slice(0, 3),
+  };
+}
+
+/**
+ * @param {{ project?: { name?: string; brief?: string | null }; runs?: Array<{ id?: string; kind?: string; label?: string; summary?: string | null; status?: string; query_text?: string; updated_at?: string; result?: unknown }>; items?: unknown[]; candidateCount?: number; hasFilter?: boolean; locale?: string }} input
+ */
+export function buildProjectSearchConsole({ project = {}, runs = [], items = [], candidateCount = 0, hasFilter = false, locale = "zh" } = {}) {
   const normalizedLocale = normalizeLocale(locale);
   const briefText = cleanString(project?.brief) || cleanString(project?.name) || msg(normalizedLocale, "projects.noBrief");
   const rounds = buildProjectResearchRounds({ runs, locale: normalizedLocale });
@@ -664,6 +710,12 @@ export function buildProjectSearchConsole({ project = {}, runs = [], candidateCo
     latestRunLabel: latestRound?.label ?? "",
     locale: normalizedLocale,
   });
+  const priorities = buildProjectCommandPriorities({
+    items,
+    feedbackPreference,
+    candidateCount,
+    locale: normalizedLocale,
+  });
 
   return {
     locale: normalizedLocale,
@@ -677,5 +729,6 @@ export function buildProjectSearchConsole({ project = {}, runs = [], candidateCo
     feedback: latestFeedback,
     nextSearchInput,
     nextSteps,
+    priorities,
   };
 }

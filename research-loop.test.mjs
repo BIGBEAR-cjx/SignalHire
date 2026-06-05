@@ -312,6 +312,70 @@ test("builds a project search console from brief, latest round, feedback, and ne
   );
 });
 
+test("builds project command priorities from candidate evidence gaps and feedback", () => {
+  const consoleView = buildProjectSearchConsole({
+    locale: "zh",
+    project: {
+      name: "AI Agent 工程师",
+      brief: "找做过 AI Agent 产品落地的工程师",
+    },
+    candidateCount: 2,
+    items: [
+      {
+        id: "item-1",
+        status: "new",
+        candidate: {
+          name: "Chen Wei",
+          match_score: 86,
+          evidence_audit: { overall_evidence_quality: "low" },
+          claims: [{ claim: "做过多 Agent 编排平台", verdict: "unverified" }],
+        },
+      },
+      {
+        id: "item-2",
+        status: "contacted",
+        candidate: {
+          name: "Alex Kim",
+          match_score: 82,
+          evidence_audit: { overall_evidence_quality: "high" },
+          claims: [{ claim: "开源过 Agent eval 框架", verdict: "verified" }],
+        },
+      },
+    ],
+    runs: [
+      {
+        id: "run-2",
+        kind: "search",
+        label: "Feedback-optimized SignalHire search.",
+        query_text: "Feedback-optimized SignalHire search.\nExpand practice evidence.",
+        status: "done",
+        updated_at: "2026-06-05T12:00:00.000Z",
+        result: {
+          search_feedback: {
+            precision: "partial",
+            satisfaction: "mixed",
+            issue: "weak_evidence",
+            focus: "stronger_evidence",
+            optimized_query: "补充产品实践和代码证据",
+          },
+        },
+      },
+    ],
+  });
+
+  assert.equal(consoleView.priorities.title, "作战台优先级");
+  assert.deepEqual(
+    consoleView.priorities.items.map((item) => [item.key, item.label]),
+    [
+      ["backfill_evidence", "先补证据"],
+      ["apply_feedback", "按反馈开启下一轮"],
+      ["progress_candidates", "推进沟通"],
+    ],
+  );
+  assert.match(consoleView.priorities.items[0].detail, /1 位候选人存在证据缺口/);
+  assert.match(consoleView.priorities.items[1].detail, /最近反馈已经转成下一轮搜索条件/);
+});
+
 test("builds project research rounds from newest-first project runs", () => {
   const rounds = buildProjectResearchRounds({
     runs: [

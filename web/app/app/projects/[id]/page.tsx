@@ -58,6 +58,14 @@ type ProjectSearchConsoleView = {
   };
   nextSearchInput: string;
   nextSteps: ProjectNextStepsView;
+  priorities: {
+    title: string;
+    items: Array<{
+      key: string;
+      label: string;
+      detail: string;
+    }>;
+  };
 };
 type ProjectResearchRoundsView = {
   title: string;
@@ -236,6 +244,7 @@ export default function ProjectDetailPage() {
   const projectConsole = buildProjectSearchConsole({
     project: p,
     runs: detail.runs,
+    items: items ?? [],
     candidateCount: p.candidates_total,
     hasFilter: statusFilter !== "all",
     locale,
@@ -445,14 +454,19 @@ function ProjectSearchConsolePanel({
         </div>
       </div>
 
-      <div className="mt-4 grid gap-3 md:grid-cols-3">
-        {consoleView.nextSteps.actions.map((action) => (
-          <div key={action.key} className="rounded-2xl border border-black/10 bg-white/72 p-4">
-            <p className="text-sm font-semibold text-[var(--sh-ink)]">{action.label}</p>
-            <p className="mt-1 text-xs leading-5 text-[var(--sh-muted)]">{action.detail}</p>
+      {consoleView.priorities.items.length > 0 && (
+        <div className="mt-4">
+          <p className="text-xs font-semibold text-[var(--sh-muted)]">{consoleView.priorities.title}</p>
+          <div className="mt-2 grid gap-3 md:grid-cols-3">
+            {consoleView.priorities.items.map((action) => (
+              <div key={action.key} className="rounded-2xl border border-black/10 bg-white/72 p-4">
+                <p className="text-sm font-semibold text-[var(--sh-ink)]">{action.label}</p>
+                <p className="mt-1 text-xs leading-5 text-[var(--sh-muted)]">{action.detail}</p>
+              </div>
+            ))}
           </div>
-        ))}
-      </div>
+        </div>
+      )}
     </Surface>
   );
 }

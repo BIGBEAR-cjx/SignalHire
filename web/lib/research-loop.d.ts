@@ -120,6 +120,15 @@ export type ProjectNextSteps = {
   latestRunLabel: string;
   actions: ProjectNextStepAction[];
 };
+export type ProjectCommandPriority = {
+  key: string;
+  label: string;
+  detail: string;
+};
+export type ProjectCommandPriorities = {
+  title: string;
+  items: ProjectCommandPriority[];
+};
 export type ProjectSearchConsole = {
   locale: ResearchLoopLocale;
   title: string;
@@ -148,6 +157,7 @@ export type ProjectSearchConsole = {
   };
   nextSearchInput: string;
   nextSteps: ProjectNextSteps;
+  priorities: ProjectCommandPriorities;
 };
 export type ProjectResearchRoundItem = {
   id: string;
@@ -247,6 +257,7 @@ export function buildProjectSearchConsole(input?: {
     updated_at?: string;
     result?: unknown;
   }>;
+  items?: unknown[];
   candidateCount?: number;
   hasFilter?: boolean;
   locale?: ResearchLoopLocale | string;
