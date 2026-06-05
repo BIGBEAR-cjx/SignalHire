@@ -824,6 +824,8 @@ export default function ResearchTool({
           sourceGroups={progressView.sourceGroups}
           recentItems={progressView.recentItems}
           observability={progressView.observability}
+          evidenceTimeline={progressView.evidenceTimeline}
+          evidenceTimelineSummary={progressView.evidenceTimelineSummary}
           statusDetail={jobStatus?.detail ?? undefined}
           onStop={stopCurrentRun}
         />

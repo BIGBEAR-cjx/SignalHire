@@ -160,6 +160,35 @@ test("adds source labels and verification intent to live research items", () => 
   );
 });
 
+test("builds an evidence timeline from live research events", () => {
+  const view = buildResearchLoopView({
+    feed: [
+      { id: 1, kind: "search", info: "agent evaluation benchmark site:github.com" },
+      { id: 2, kind: "fetch", info: "https://github.com/example/agent-eval" },
+      { id: 3, kind: "fetch", info: "https://example.ai/team/ada" },
+      { id: 4, kind: "search", info: "Ada Lovelace agent eval benchmark site:arxiv.org" },
+    ],
+    live: { searches: 2, fetches: 2 },
+    jobStatus: { phase: "running" },
+    locale: "zh",
+  });
+
+  assert.ok(Array.isArray(view.evidenceTimeline));
+  assert.deepEqual(
+    view.evidenceTimeline.map((item) => [item.stage, item.label, item.sourceLabel, item.state]),
+    [
+      ["search", "扩展搜索", "论文", "active"],
+      ["read", "读取来源", "公司页", "done"],
+      ["read", "读取来源", "GitHub", "done"],
+      ["search", "扩展搜索", "GitHub", "done"],
+    ],
+  );
+  assert.match(view.evidenceTimeline[0].detail, /site:arxiv/);
+  assert.match(view.evidenceTimeline[0].nextStep, /论文/);
+  assert.equal(view.evidenceTimelineSummary.label, "证据时间线");
+  assert.equal(view.evidenceTimelineSummary.detail, "2 次搜索 · 2 次来源读取 · 覆盖 GitHub、论文、公司页");
+});
+
 test("summarizes observable running search work for the foreground console", () => {
   const view = buildResearchLoopView({
     feed: [

@@ -133,6 +133,52 @@ function buildResearchObservability({ feed = [], coverage = [], phaseKey = "plan
   };
 }
 
+function researchTimelineStage(kind) {
+  return kind === "fetch" ? "read" : "search";
+}
+
+function buildEvidenceTimeline({ feed = [], coverage = [], searches = 0, fetches = 0, phaseKey = "planning", locale = "zh" } = {}) {
+  const normalizedLocale = normalizeLocale(locale);
+  const terminal = ["done", "error", "canceled"].includes(phaseKey);
+  const items = cleanFeed(feed)
+    .filter((item) => item?.kind === "search" || item?.kind === "fetch")
+    .map((item) => {
+      const detail = eventDetail(item, normalizedLocale);
+      const stage = researchTimelineStage(item.kind);
+      const sourceType = sourceTypeForText(detail);
+      return {
+        id: Number.isFinite(Number(item?.id)) ? Number(item.id) : 0,
+        stage,
+        label: msg(normalizedLocale, `research.evidenceTimeline.${stage}`),
+        sourceType,
+        sourceLabel: msg(normalizedLocale, `research.loop.source.${sourceType}`),
+        detail,
+        nextStep: msg(normalizedLocale, `research.evidenceTimeline.next.${stage}.${sourceType}`),
+        state: "done",
+      };
+    })
+    .reverse();
+
+  if (items.length > 0 && !terminal) items[0].state = "active";
+
+  const coverageLabels = coverage.map((item) => msg(normalizedLocale, `research.loop.source.${item.key}`));
+  const detail = coverageLabels.length
+    ? msg(normalizedLocale, "research.evidenceTimeline.summary", {
+        searches,
+        fetches,
+        coverage: localizedJoin(normalizedLocale, coverageLabels),
+      })
+    : msg(normalizedLocale, "research.evidenceTimeline.summaryWaiting", { searches, fetches });
+
+  return {
+    summary: {
+      label: msg(normalizedLocale, "research.evidenceTimeline.title"),
+      detail,
+    },
+    items,
+  };
+}
+
 function pushUniqueAction(actions, locale, key) {
   if (!actions.some((item) => item.key === key)) {
     actions.push(buildAction(locale, key));
@@ -1054,6 +1100,14 @@ export function buildResearchLoopView({ feed = [], live = null, jobStatus = null
   const phaseDetail = latest && (phaseKey === "searching" || phaseKey === "fetching")
     ? latest.detail
     : cleanString(jobStatus?.detail) || msg(normalizedLocale, `research.loop.phase.${phaseKey}.detail`);
+  const evidenceTimeline = buildEvidenceTimeline({
+    feed,
+    coverage,
+    searches,
+    fetches,
+    phaseKey,
+    locale: normalizedLocale,
+  });
 
   return {
     locale: normalizedLocale,
@@ -1070,6 +1124,8 @@ export function buildResearchLoopView({ feed = [], live = null, jobStatus = null
     coverage,
     sourceGroups,
     observability: buildResearchObservability({ feed, coverage, phaseKey, locale: normalizedLocale }),
+    evidenceTimeline: evidenceTimeline.items,
+    evidenceTimelineSummary: evidenceTimeline.summary,
   };
 }
 

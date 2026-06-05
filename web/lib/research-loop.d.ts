@@ -50,6 +50,20 @@ export type ResearchObservability = {
   currentFetch: ResearchObservableCard;
   coverage: ResearchObservableCard;
 };
+export type ResearchEvidenceTimelineItem = {
+  id: number;
+  stage: "search" | "read" | string;
+  label: string;
+  sourceType: ResearchSourceType;
+  sourceLabel: string;
+  detail: string;
+  nextStep: string;
+  state: "active" | "done" | string;
+};
+export type ResearchEvidenceTimelineSummary = {
+  label: string;
+  detail: string;
+};
 export type ResearchLoopView = {
   locale: ResearchLoopLocale;
   phase: ResearchLoopPhase;
@@ -61,6 +75,8 @@ export type ResearchLoopView = {
   coverage: ResearchCoverageItem[];
   sourceGroups: ResearchSourceGroup[];
   observability: ResearchObservability;
+  evidenceTimeline: ResearchEvidenceTimelineItem[];
+  evidenceTimelineSummary: ResearchEvidenceTimelineSummary;
 };
 
 export type SearchFeedback = {

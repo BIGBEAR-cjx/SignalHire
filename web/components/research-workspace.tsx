@@ -65,6 +65,19 @@ type ResearchObservabilityView = {
   currentFetch: ResearchObservableCard;
   coverage: ResearchObservableCard;
 };
+type ResearchEvidenceTimelineItem = {
+  id: number;
+  stage: string;
+  label: string;
+  sourceLabel: string;
+  detail: string;
+  nextStep: string;
+  state: string;
+};
+type ResearchEvidenceTimelineSummary = {
+  label: string;
+  detail: string;
+};
 type FeedbackOptimizationAction = {
   key: string;
   label: string;
@@ -320,6 +333,8 @@ export function ResearchProcessPanel({
   sourceGroups,
   recentItems,
   observability,
+  evidenceTimeline,
+  evidenceTimelineSummary,
   statusDetail,
   onStop,
 }: {
@@ -330,6 +345,8 @@ export function ResearchProcessPanel({
   sourceGroups: ResearchSourceGroupViewItem[];
   recentItems: ResearchRecentViewItem[];
   observability: ResearchObservabilityView;
+  evidenceTimeline: ResearchEvidenceTimelineItem[];
+  evidenceTimelineSummary: ResearchEvidenceTimelineSummary;
   statusDetail?: string;
   onStop: () => void;
 }) {
@@ -379,6 +396,38 @@ export function ResearchProcessPanel({
             </li>
           ))}
         </ol>
+      )}
+
+      {evidenceTimeline.length > 0 && (
+        <div className="mt-5 rounded-2xl bg-white/72 p-4 ring-1 ring-black/5">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <p className="text-xs font-semibold text-[var(--sh-muted)]">{evidenceTimelineSummary.label}</p>
+              <p className="mt-1 text-sm leading-6 text-[var(--sh-ink)]">{evidenceTimelineSummary.detail}</p>
+            </div>
+          </div>
+          <ol className="mt-4 grid gap-2 lg:grid-cols-2">
+            {evidenceTimeline.slice(0, 6).map((item) => (
+              <li key={`${item.id}-${item.stage}-${item.detail}`} className={`rounded-2xl border px-3 py-3 ${item.state === "active" ? "border-blue-100 bg-blue-50/70" : "border-black/5 bg-[var(--sh-canvas)]/70"}`}>
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <span className="inline-flex items-center gap-2 text-xs font-semibold text-[var(--sh-ink)]">
+                    {item.stage === "read" ? (
+                      <FiGlobe className={`h-3.5 w-3.5 ${item.state === "active" ? "animate-pulse text-blue-600" : "text-[var(--sh-muted)]"}`} aria-hidden="true" />
+                    ) : (
+                      <FiSearch className={`h-3.5 w-3.5 ${item.state === "active" ? "animate-pulse text-blue-600" : "text-[var(--sh-muted)]"}`} aria-hidden="true" />
+                    )}
+                    {item.label}
+                  </span>
+                  <span className="rounded-full bg-white px-2 py-0.5 text-[11px] font-semibold text-[var(--sh-muted)] ring-1 ring-black/5">
+                    {item.sourceLabel}
+                  </span>
+                </div>
+                <p className="mt-2 line-clamp-2 break-all font-mono text-xs leading-5 text-[var(--sh-ink)]">{item.detail}</p>
+                <p className="mt-2 text-xs leading-5 text-[var(--sh-muted)]">{item.nextStep}</p>
+              </li>
+            ))}
+          </ol>
+        </div>
       )}
 
       <div className="mt-5 grid gap-3 lg:grid-cols-[minmax(0,1fr)_220px]">
