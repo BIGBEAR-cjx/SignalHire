@@ -19,7 +19,7 @@ import {
   StatusBadge,
   Surface,
 } from "@/components/ui/signal-ui";
-import { buildCandidateFeedbackPanel, buildProjectActionBrief, buildProjectCandidateDecisionQueue, buildProjectResearchRounds, buildProjectSearchConsole } from "@/lib/research-loop.mjs";
+import { buildCandidateFeedbackPanel, buildProjectActionBrief, buildProjectCandidateDecisionQueue, buildProjectCandidateFeedbackSummary, buildProjectResearchRounds, buildProjectSearchConsole } from "@/lib/research-loop.mjs";
 import { buildEvidencePriorityView, buildProjectEvidenceMatrix } from "@/lib/evidence-priority.mjs";
 import type { TalentCandidate } from "@/lib/talent-profile.mjs";
 
@@ -94,6 +94,14 @@ type ProjectActionBriefView = {
     targetItemId: string;
     backfillInput: string;
   }>;
+};
+type ProjectCandidateFeedbackSummaryView = {
+  title: string;
+  empty: boolean;
+  reviewedCount: number;
+  summary: string;
+  nextSearchHint: string;
+  items: Array<{ key: string; label: string; detail: string }>;
 };
 type ProjectResearchRoundsView = {
   title: string;
@@ -337,6 +345,7 @@ export default function ProjectDetailPage() {
   }) as ProjectResearchRoundsView;
   const decisionQueue = buildProjectCandidateDecisionQueue({ items: items ?? [], locale });
   const actionBrief = buildProjectActionBrief({ items: items ?? [], locale }) as ProjectActionBriefView;
+  const candidateFeedbackSummary = buildProjectCandidateFeedbackSummary({ items: items ?? [], locale }) as ProjectCandidateFeedbackSummaryView;
 
   return (
     <div className="space-y-6">
@@ -355,6 +364,10 @@ export default function ProjectDetailPage() {
         locale={locale}
         onOpenCandidate={(itemId) => setSelectedItemId(itemId)}
       />
+
+      {items && items.length > 0 && (
+        <ProjectCandidateFeedbackSummaryPanel summary={candidateFeedbackSummary} />
+      )}
 
       <ProjectSearchConsolePanel consoleView={projectConsole} searchHref={searchHref} verifyHref={verifyHref} />
 
@@ -818,6 +831,44 @@ function ProjectActionBriefPanel({
           </div>
         )}
       </div>
+    </Surface>
+  );
+}
+
+function ProjectCandidateFeedbackSummaryPanel({
+  summary,
+}: {
+  summary: ProjectCandidateFeedbackSummaryView;
+}) {
+  return (
+    <Surface className="p-5">
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-2">
+            <h2 className="text-lg font-semibold text-[var(--sh-ink)]">{summary.title}</h2>
+            {!summary.empty && (
+              <span className="rounded-full bg-neutral-950 px-2.5 py-1 text-xs font-semibold text-white">
+                {summary.reviewedCount}
+              </span>
+            )}
+          </div>
+          <p className="mt-2 max-w-3xl text-sm leading-6 text-[var(--sh-muted)]">{summary.summary}</p>
+        </div>
+        <p className="max-w-sm rounded-2xl bg-[var(--sh-canvas)] px-3 py-3 text-xs leading-5 text-[var(--sh-muted)]">
+          {summary.nextSearchHint}
+        </p>
+      </div>
+
+      {summary.items.length > 0 && (
+        <div className="mt-4 grid gap-3 md:grid-cols-3">
+          {summary.items.map((item) => (
+            <div key={item.key} className="rounded-2xl border border-black/10 bg-white/76 p-4">
+              <p className="text-sm font-semibold text-[var(--sh-ink)]">{item.label}</p>
+              <p className="mt-1 text-xs leading-5 text-[var(--sh-muted)]">{item.detail}</p>
+            </div>
+          ))}
+        </div>
+      )}
     </Surface>
   );
 }

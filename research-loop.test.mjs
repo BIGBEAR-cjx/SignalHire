@@ -639,6 +639,63 @@ test("turns reviewed candidate feedback into project search signals", () => {
   assert.match(consoleView.nextSearchInput, /补强证据要求/);
 });
 
+test("summarizes reviewed candidate feedback at project level", () => {
+  assert.equal(typeof researchLoop.buildProjectCandidateFeedbackSummary, "function");
+
+  const summary = researchLoop.buildProjectCandidateFeedbackSummary({
+    locale: "zh",
+    items: [
+      {
+        id: "candidate-1",
+        candidate: {
+          name: "Wrong Direction",
+          feedback: {
+            precision: "off",
+            satisfaction: "unsatisfied",
+            issue: "wrong_direction",
+            focus: "adjacent_pools",
+          },
+        },
+      },
+      {
+        id: "candidate-2",
+        candidate: {
+          name: "Weak Evidence",
+          feedback: {
+            precision: "partial",
+            satisfaction: "mixed",
+            issue: "weak_evidence",
+            focus: "stronger_evidence",
+          },
+        },
+      },
+      {
+        id: "candidate-3",
+        candidate: {
+          name: "Unread Candidate",
+          feedback: { precision: "partial" },
+        },
+      },
+    ],
+  });
+
+  assert.equal(summary.title, "反馈学习");
+  assert.equal(summary.empty, false);
+  assert.equal(summary.reviewedCount, 2);
+  assert.match(summary.summary, /已学习 2 位候选人的反馈/);
+  assert.match(summary.nextSearchHint, /下一轮搜索会优先应用这些约束/);
+  assert.deepEqual(
+    summary.items.map((item) => item.key),
+    ["tighten_profile", "strengthen_evidence", "expand_sources"],
+  );
+  assert.match(summary.items[0].detail, /Wrong Direction、Weak Evidence/);
+  assert.match(summary.items[1].detail, /Weak Evidence/);
+
+  const en = researchLoop.buildProjectCandidateFeedbackSummary({ locale: "en", items: [] });
+  assert.equal(en.title, "Feedback learning");
+  assert.equal(en.empty, true);
+});
+
 test("builds project research rounds from newest-first project runs", () => {
   const rounds = buildProjectResearchRounds({
     runs: [

@@ -615,6 +615,41 @@ export function buildProjectCandidateFeedbackSignals({ items = [], locale = "zh"
   };
 }
 
+/**
+ * @param {{ items?: unknown[]; locale?: string }} input
+ */
+export function buildProjectCandidateFeedbackSummary({ items = [], locale = "zh" } = {}) {
+  const normalizedLocale = normalizeLocale(locale);
+  const normalizedItems = Array.isArray(items) ? items.filter(isPlainObject) : [];
+  const reviewedNames = [];
+
+  for (const item of normalizedItems) {
+    const candidate = isPlainObject(item?.candidate) ? item.candidate : {};
+    const feedback = feedbackFromCandidate(candidate);
+    if (!feedback) continue;
+    const preview = buildFeedbackOptimizationPreview({ feedback, locale: normalizedLocale });
+    if (!preview.canRun) continue;
+    const name = candidateName(candidate);
+    if (!reviewedNames.some((existing) => existing.toLowerCase() === name.toLowerCase())) reviewedNames.push(name);
+  }
+
+  const signals = buildProjectCandidateFeedbackSignals({ items: normalizedItems, locale: normalizedLocale });
+  const reviewedCount = reviewedNames.length;
+  return {
+    locale: normalizedLocale,
+    title: msg(normalizedLocale, "projects.candidateFeedbackSummary.title"),
+    empty: reviewedCount === 0,
+    reviewedCount,
+    summary: reviewedCount > 0
+      ? msg(normalizedLocale, "projects.candidateFeedbackSummary.summary", { count: reviewedCount })
+      : msg(normalizedLocale, "projects.candidateFeedbackSummary.emptySummary"),
+    nextSearchHint: reviewedCount > 0
+      ? msg(normalizedLocale, "projects.candidateFeedbackSummary.nextSearchHint")
+      : msg(normalizedLocale, "projects.candidateFeedbackSummary.emptyHint"),
+    items: signals.items,
+  };
+}
+
 function appendCandidateFeedbackInstructions(input, feedbackSignals) {
   const base = cleanString(input);
   const instructions = Array.isArray(feedbackSignals?.items)
