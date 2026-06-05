@@ -140,6 +140,11 @@ type ProjectEvidenceMatrixView = {
     priority: string;
     priority_label: string;
     decision_hint: string;
+    action: {
+      key: string;
+      label: string;
+      search_input: string;
+    };
   }>;
   empty: boolean;
 };
@@ -420,6 +425,7 @@ export default function ProjectDetailPage() {
               <ProjectEvidenceMatrixPanel
                 matrix={projectEvidenceMatrix}
                 locale={locale}
+                projectId={id}
                 selectedItemId={selectedItemId}
                 onOpenCandidate={(itemId) => setSelectedItemId(itemId)}
               />
@@ -941,11 +947,13 @@ function priorityClass(value: string) {
 function ProjectEvidenceMatrixPanel({
   matrix,
   locale,
+  projectId,
   selectedItemId,
   onOpenCandidate,
 }: {
   matrix: ProjectEvidenceMatrixView;
   locale: "zh" | "en";
+  projectId: string;
   selectedItemId: string | null;
   onOpenCandidate: (itemId: string) => void;
 }) {
@@ -1045,6 +1053,22 @@ function ProjectEvidenceMatrixPanel({
                 </td>
                 <td className="border-b border-gray-100 px-3 py-3">
                   <p className="max-w-[280px] text-xs leading-5 text-gray-500">{row.decision_hint}</p>
+                  {row.action.search_input ? (
+                    <Link
+                      href={`/app/search?project=${projectId}&q=${encodeURIComponent(row.action.search_input)}`}
+                      className="mt-2 inline-flex rounded-full bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-700 ring-1 ring-blue-100 transition hover:bg-blue-100"
+                    >
+                      {row.action.label}
+                    </Link>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => onOpenCandidate(row.id)}
+                      className="mt-2 inline-flex rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-gray-700 ring-1 ring-black/10 transition hover:bg-gray-50"
+                    >
+                      {row.action.label}
+                    </button>
+                  )}
                 </td>
               </tr>
             ))}

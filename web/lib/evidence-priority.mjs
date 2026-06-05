@@ -131,6 +131,56 @@ function priorityText({ priority, row, audit, locale }) {
   };
 }
 
+function matrixActionLabel(priority, locale) {
+  const normalizedLocale = normalizeLocale(locale);
+  const copy = {
+    zh: {
+      risk_review: "复核风险",
+      needs_backfill: "补搜证据",
+      ready_to_review: "打开候选人",
+    },
+    en: {
+      risk_review: "Review risk",
+      needs_backfill: "Backfill evidence",
+      ready_to_review: "Open candidate",
+    },
+  }[normalizedLocale];
+  return copy[normalizePriority(priority)] || copy.needs_backfill;
+}
+
+function matrixBackfillInput(candidate, priority) {
+  if (normalizePriority(priority) !== "needs_backfill") return "";
+  const role = [candidate?.current_role, candidate?.current_company].map(cleanString).filter(Boolean).join(" / ")
+    || cleanString(candidate?.headline)
+    || "role unknown";
+  const directions = Array.isArray(candidate?.ai_directions) ? candidate.ai_directions.map(cleanString).filter(Boolean).join(", ") : "";
+  const audit = candidate?.evidence_audit || {};
+  const gaps = [
+    ...(Array.isArray(audit?.unverified_claims) ? audit.unverified_claims : []),
+    ...(Array.isArray(audit?.single_source_claims) ? audit.single_source_claims : []),
+    ...(Array.isArray(candidate?.claims) ? candidate.claims.filter((claim) => claim?.verdict === "unverified").map((claim) => claim?.claim) : []),
+  ].map(cleanString).filter(Boolean);
+  return [
+    "Candidate evidence backfill search for SignalHire.",
+    `Candidate: ${cleanString(candidate?.name) || "Unknown candidate"}`,
+    `Role/context: ${role}`,
+    `AI directions: ${directions || "not specified"}`,
+    `Current evidence quality: ${cleanString(audit?.overall_evidence_quality) || "unknown"}`,
+    `Evidence gaps: ${gaps.length ? Array.from(new Set(gaps)).slice(0, 6).join("; ") : "overall evidence is weak or insufficiently cross-validated"}`,
+    "Search goal: find concrete public sources that confirm, contradict, or update this candidate's fit.",
+    "Prioritize independent URLs across research, code, company/work history, public writing, talks, and profile sources.",
+  ].join("\n");
+}
+
+function matrixRowAction(candidate, priority, locale) {
+  const normalizedPriority = normalizePriority(priority);
+  return {
+    key: normalizedPriority === "risk_review" ? "review_risk" : normalizedPriority === "needs_backfill" ? "backfill_evidence" : "open_candidate",
+    label: matrixActionLabel(normalizedPriority, locale),
+    search_input: matrixBackfillInput(candidate, normalizedPriority),
+  };
+}
+
 export function buildEvidencePriorityItem({ candidate, result, locale, candidateIndex = 0 } = {}) {
   const normalizedLocale = normalizeLocale(locale);
   const safeIndex = Number.isInteger(candidateIndex) && candidateIndex >= 0 ? candidateIndex : 0;
@@ -222,6 +272,7 @@ export function buildProjectEvidenceMatrix({ items = [], locale } = {}) {
       priority_reason: priority.priority_reason,
       recommended_action: priority.recommended_action,
       decision_hint: decisionHint(status, priority.priority, normalizedLocale),
+      action: matrixRowAction(candidate, priority.priority, normalizedLocale),
     };
   }).sort((a, b) => {
     const priorityDelta = PRIORITY_SORT[normalizePriority(a.priority)] - PRIORITY_SORT[normalizePriority(b.priority)];

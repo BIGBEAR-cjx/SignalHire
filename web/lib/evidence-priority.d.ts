@@ -35,11 +35,17 @@ export type ProjectEvidenceMatrixSummary = EvidencePrioritySummary & {
   active: number;
   rejected: number;
 };
+export type ProjectEvidenceMatrixAction = {
+  key: "open_candidate" | "backfill_evidence" | "review_risk" | string;
+  label: string;
+  search_input: string;
+};
 export type ProjectEvidenceMatrixRow = EvidencePriorityItem & {
   id: string;
   status: string;
   status_label: string;
   decision_hint: string;
+  action: ProjectEvidenceMatrixAction;
 };
 export type ProjectEvidenceMatrix = {
   title: string;

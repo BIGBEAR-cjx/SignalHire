@@ -312,6 +312,17 @@ test("builds a project evidence matrix from shortlist status and evidence priori
     ],
   );
   assert.equal(matrix.rows[0].decision_hint, "保留为负向样本，避免下一轮重复推荐。");
+  assert.deepEqual(
+    matrix.rows.map((row) => [row.id, row.action.key, row.action.label, Boolean(row.action.search_input)]),
+    [
+      ["risk-id", "review_risk", "复核风险", false],
+      ["backfill-id", "backfill_evidence", "补搜证据", true],
+      ["ready-id", "open_candidate", "打开候选人", false],
+    ],
+  );
+  assert.match(matrix.rows[1].action.search_input, /Candidate evidence backfill search for SignalHire/);
+  assert.match(matrix.rows[1].action.search_input, /Backfill Candidate/);
+  assert.match(matrix.rows[1].action.search_input, /Single-source product launch/);
   assert.match(matrix.rows[1].recommended_action, /补搜/);
   assert.equal(matrix.rows[2].decision_hint, "已进入推进中，优先补备注、外联或安排面试。");
 });
