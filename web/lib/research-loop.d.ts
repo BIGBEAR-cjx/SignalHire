@@ -450,6 +450,7 @@ export function buildProjectDetailHierarchy(input?: {
   hasProjectEvidenceMatrix?: boolean;
   hasStatusFunnel?: boolean;
   hasResearchRounds?: boolean;
+  hasSearchConsolePriorities?: boolean;
   locale?: ResearchLoopLocale | string;
 }): ProjectDetailHierarchy;
 export function buildProjectResearchRounds(input?: {

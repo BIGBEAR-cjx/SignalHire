@@ -396,6 +396,7 @@ export default function ProjectDetailPage() {
     hasProjectEvidenceMatrix: Boolean(projectEvidenceMatrix),
     hasStatusFunnel: p.candidates_total > 0,
     hasResearchRounds: projectRounds.items.length > 0,
+    hasSearchConsolePriorities: projectConsole.priorities.items.length > 0,
     locale,
   }) as ProjectDetailHierarchyView;
   const hiddenPanels = new Set(projectHierarchy.hidden);
@@ -405,6 +406,7 @@ export default function ProjectDetailPage() {
   const showCandidateEvidencePriority = !hiddenPanels.has("candidate_evidence_priority");
   const showCandidateComparison = !hiddenPanels.has("candidate_comparison");
   const showLatestRoundSummary = !hiddenPanels.has("latest_round_summary");
+  const showSearchConsolePriorities = !hiddenPanels.has("search_console_priorities");
   const decisionQueue = buildProjectCandidateDecisionQueue({ items: items ?? [], locale });
   const actionBrief = showActionBrief ? buildProjectActionBrief({ items: items ?? [], locale }) as ProjectActionBriefView : null;
   const candidateFeedbackSummary = showCandidateFeedbackSummary ? buildProjectCandidateFeedbackSummary({ items: items ?? [], locale }) as ProjectCandidateFeedbackSummaryView : null;
@@ -445,6 +447,7 @@ export default function ProjectDetailPage() {
         searchHref={searchHref}
         verifyHref={verifyHref}
         showLatestRoundSummary={showLatestRoundSummary}
+        showPriorities={showSearchConsolePriorities}
       />
 
       {showKpiStrip && (
@@ -572,11 +575,13 @@ function ProjectSearchConsolePanel({
   searchHref,
   verifyHref,
   showLatestRoundSummary,
+  showPriorities,
 }: {
   consoleView: ProjectSearchConsoleView;
   searchHref: string;
   verifyHref: string;
   showLatestRoundSummary: boolean;
+  showPriorities: boolean;
 }) {
   const { t } = useI18n();
   const gridClassName = showLatestRoundSummary
@@ -702,7 +707,7 @@ function ProjectSearchConsolePanel({
         </div>
       </div>
 
-      {consoleView.priorities.items.length > 0 && (
+      {showPriorities && consoleView.priorities.items.length > 0 && (
         <div className="mt-4">
           <p className="text-xs font-semibold text-[var(--sh-muted)]">{consoleView.priorities.title}</p>
           <div className="mt-2 grid gap-3 md:grid-cols-3">
