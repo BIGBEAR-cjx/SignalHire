@@ -116,3 +116,36 @@ test("translates project detail shell labels", () => {
     assert.equal(t("en", key), en);
   }
 });
+
+test("translates project detail interaction labels", () => {
+  const keys = [
+    ["projects.detail.header.eyebrow", "项目工作台", "Project workbench"],
+    ["projects.detail.header.editTitle", "点击编辑", "Click to edit"],
+    ["projects.detail.header.deleteProject", "删除项目", "Delete project"],
+    ["projects.detail.header.deleteConfirm", "删除这个项目?\n关联候选人和历史会回到「候选池(全部)」, 不会丢失。", "Delete this project?\nRelated candidates and history will return to Shortlist (all). Nothing will be lost."],
+    ["projects.detail.header.deleteFailed", "删除失败", "Delete failed"],
+    ["projects.detail.brief.label", "招聘需求 / brief", "Hiring brief"],
+    ["projects.detail.brief.edit", "编辑", "Edit"],
+    ["projects.detail.brief.add", "添加", "Add"],
+    ["projects.detail.brief.placeholder", "粘贴 JD, 或一句话描述要找什么样的人。", "Paste a JD, or describe the person you need in one sentence."],
+    ["projects.detail.brief.empty", "暂无 brief — 加上之后, 在本项目下搜人会预填它", "No brief yet - add one and searches in this project will prefill it."],
+    ["projects.detail.candidate.unknownName", "(无名)", "(Unnamed)"],
+    ["projects.detail.candidate.notesPrefix", "备注：第一轮已沟通", "Notes: First round completed", { notes: "第一轮已沟通" }, { notes: "First round completed" }],
+    ["projects.detail.candidate.updateFailed", "更新失败", "Update failed"],
+    ["projects.detail.candidate.removeConfirm", "把这个候选人移出候选池?", "Remove this candidate from the shortlist?"],
+    ["projects.detail.candidate.unassign", "移出项目", "Remove from project"],
+    ["projects.detail.candidate.delete", "删除候选人", "Delete candidate"],
+    ["projects.detail.candidate.feedbackSaved", "会同步到下一轮搜索优化。", "Saved into next-round search signals."],
+    ["projects.detail.candidate.outreach", "AI 起草外联邮件", "Draft outreach with AI"],
+    ["projects.detail.candidate.notes", "备注", "Notes"],
+    ["projects.detail.candidate.saved", "已保存", "Saved"],
+    ["projects.detail.candidate.autosave", "自动保存", "Autosaving"],
+    ["projects.detail.candidate.notesPlaceholder", "第一次约见印象 / 你想问的问题 / 候选人对项目的反应…", "First-call impression / questions to ask / candidate reaction..."],
+    ["projects.detail.candidate.addedAt", "添加于 2026/6/5 12:00", "Added at 6/5/2026, 12:00 PM", { date: "2026/6/5 12:00" }, { date: "6/5/2026, 12:00 PM" }],
+  ];
+
+  for (const [key, zh, en, zhParams, enParams] of keys) {
+    assert.equal(t("zh", key, zhParams), zh);
+    assert.equal(t("en", key, enParams), en);
+  }
+});

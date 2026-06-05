@@ -345,10 +345,10 @@ export default function ProjectDetailPage() {
   }, [filteredItems, items, locale]);
 
   async function deleteProject() {
-    if (!confirm("删除这个项目?\n关联候选人和历史会回到「候选池(全部)」, 不会丢失。")) return;
+    if (!confirm(t("projects.detail.header.deleteConfirm"))) return;
     const r = await fetch(`/api/projects/${id}`, { method: "DELETE" });
     if (r.ok) router.push("/app/projects");
-    else alert("删除失败");
+    else alert(t("projects.detail.header.deleteFailed"));
   }
 
   if (!detail) {
@@ -1382,7 +1382,7 @@ function ProjectHeader({ detail, onChanged, onDelete }: { detail: ProjectDetail;
     <Surface className="space-y-5 p-5 md:p-7">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-neutral-500">项目工作台</p>
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-neutral-500">{t("projects.detail.header.eyebrow")}</p>
           {editingName ? (
             <input
               value={name}
@@ -1397,7 +1397,7 @@ function ProjectHeader({ detail, onChanged, onDelete }: { detail: ProjectDetail;
             <h1
               onClick={() => setEditingName(true)}
               className="mt-2 cursor-text rounded-2xl text-3xl font-semibold tracking-tight text-[var(--sh-ink)] hover:bg-neutral-100 md:text-5xl"
-              title="点击编辑"
+              title={t("projects.detail.header.editTitle")}
             >
               {p.name}
             </h1>
@@ -1413,14 +1413,14 @@ function ProjectHeader({ detail, onChanged, onDelete }: { detail: ProjectDetail;
             <option value="paused">{t(PROJ_STATUS_META.paused.labelKey)}</option>
             <option value="closed">{t(PROJ_STATUS_META.closed.labelKey)}</option>
           </select>
-          <IconButton label="删除项目" onClick={onDelete} Icon={FiTrash2} tone="danger" />
+          <IconButton label={t("projects.detail.header.deleteProject")} onClick={onDelete} Icon={FiTrash2} tone="danger" />
         </div>
       </div>
 
       <div className="rounded-3xl border border-black/10 bg-white/70 p-4">
         <div className="mb-1 flex items-center justify-between">
-          <span className="text-xs font-semibold uppercase tracking-[0.18em] text-neutral-500">招聘需求 / brief</span>
-          {!editingBrief && <button onClick={() => setEditingBrief(true)} className="text-xs font-semibold text-[var(--sh-muted)] hover:text-[var(--sh-ink)]">{p.brief ? "编辑" : "添加"}</button>}
+          <span className="text-xs font-semibold uppercase tracking-[0.18em] text-neutral-500">{t("projects.detail.brief.label")}</span>
+          {!editingBrief && <button onClick={() => setEditingBrief(true)} className="text-xs font-semibold text-[var(--sh-muted)] hover:text-[var(--sh-ink)]">{p.brief ? t("projects.detail.brief.edit") : t("projects.detail.brief.add")}</button>}
         </div>
         {editingBrief ? (
           <textarea
@@ -1429,12 +1429,12 @@ function ProjectHeader({ detail, onChanged, onDelete }: { detail: ProjectDetail;
             onBlur={saveBrief}
             autoFocus
             rows={4}
-            placeholder="粘贴 JD, 或一句话描述要找什么样的人。"
+            placeholder={t("projects.detail.brief.placeholder")}
             className="block w-full resize-y rounded-2xl border border-black/10 bg-white px-4 py-3 text-sm text-[var(--sh-ink)] outline-none focus:border-black/20"
           />
         ) : (
           <p className={`whitespace-pre-line text-sm leading-6 ${p.brief ? "text-[var(--sh-muted)]" : "italic text-[var(--sh-faint)]"}`}>
-            {p.brief || "暂无 brief — 加上之后, 在本项目下搜人会预填它"}
+            {p.brief || t("projects.detail.brief.empty")}
           </p>
         )}
       </div>
@@ -1458,7 +1458,7 @@ function CandidateItem({ item, locale, selected, onClick }: { item: ShortlistIte
       >
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
-            <p className="truncate text-sm font-semibold text-gray-900">{c.name || "(无名)"}</p>
+            <p className="truncate text-sm font-semibold text-gray-900">{c.name || t("projects.detail.candidate.unknownName")}</p>
             {subtitle && <p className="mt-0.5 truncate text-xs text-gray-500">{subtitle}</p>}
           </div>
           <div className="flex shrink-0 items-center gap-2">
@@ -1474,7 +1474,7 @@ function CandidateItem({ item, locale, selected, onClick }: { item: ShortlistIte
           ))}
         </div>
         <p className="line-clamp-2 text-xs leading-5 text-gray-500">{signal.hint}</p>
-        {item.notes && <p className="line-clamp-2 text-xs text-gray-600">备注：{item.notes}</p>}
+        {item.notes && <p className="line-clamp-2 text-xs text-gray-600">{t("projects.detail.candidate.notesPrefix", { notes: item.notes })}</p>}
       </button>
     </li>
   );
@@ -1503,7 +1503,7 @@ function CandidateDetailPanel({
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
     });
-    if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || "更新失败");
+    if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || t("projects.detail.candidate.updateFailed"));
   }
 
   async function setStatus(next: ShortlistStatus) {
@@ -1540,7 +1540,7 @@ function CandidateDetailPanel({
   }
 
   async function handleDelete() {
-    if (!confirm("把这个候选人移出候选池?")) return;
+    if (!confirm(t("projects.detail.candidate.removeConfirm"))) return;
     const r = await fetch(`/api/shortlist/${item.id}`, { method: "DELETE" });
     if (r.ok) onDeleted();
   }
@@ -1557,13 +1557,6 @@ function CandidateDetailPanel({
   const candidate = item.candidate;
   const isTalent = isTalentShape(candidate);
   const feedbackPanel = buildCandidateFeedbackPanel({ candidate, feedback: candidateFeedback(candidate), locale });
-  const feedbackCopy = locale === "en"
-    ? {
-        saved: "Saved into next-round search signals.",
-      }
-    : {
-        saved: "会同步到下一轮搜索优化。",
-      };
 
   return (
     <Surface className="space-y-4 p-5">
@@ -1582,8 +1575,8 @@ function CandidateDetailPanel({
           </button>
         ))}
         <span className="flex-1" />
-        <button onClick={unassignFromProject} className="rounded-full px-2.5 py-1 text-xs font-semibold text-gray-600 hover:bg-gray-50">移出项目</button>
-        <IconButton label="删除候选人" onClick={handleDelete} Icon={FiTrash2} tone="danger" />
+        <button onClick={unassignFromProject} className="rounded-full px-2.5 py-1 text-xs font-semibold text-gray-600 hover:bg-gray-50">{t("projects.detail.candidate.unassign")}</button>
+        <IconButton label={t("projects.detail.candidate.delete")} onClick={handleDelete} Icon={FiTrash2} tone="danger" />
       </div>
 
       <div className="rounded-2xl border border-black/10 bg-white/78 p-4">
@@ -1592,7 +1585,7 @@ function CandidateDetailPanel({
             <h3 className="text-sm font-semibold text-gray-900">{feedbackPanel.title}</h3>
             <p className="mt-1 text-xs leading-5 text-gray-500">{feedbackPanel.description}</p>
           </div>
-          <span className="rounded-full bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-700 ring-1 ring-blue-100">{feedbackCopy.saved}</span>
+          <span className="rounded-full bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-700 ring-1 ring-blue-100">{t("projects.detail.candidate.feedbackSaved")}</span>
         </div>
         <div className="mt-4 space-y-3">
           {feedbackPanel.groups.map((group) => (
@@ -1628,7 +1621,7 @@ function CandidateDetailPanel({
         className="inline-flex w-full items-center justify-center gap-2 rounded-full bg-[var(--sh-ink)] px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-black"
       >
         <FiMail className="h-4 w-4" aria-hidden="true" />
-        AI 起草外联邮件
+        {t("projects.detail.candidate.outreach")}
       </button>
       <OutreachModal
         open={outreachOpen}
@@ -1640,19 +1633,19 @@ function CandidateDetailPanel({
       {/* 备注 */}
       <div>
         <div className="mb-1 flex items-center justify-between">
-          <label className="text-xs font-medium text-gray-600">备注</label>
-          <span className="text-[11px] text-gray-400">{savedHint ? "已保存" : "自动保存"}</span>
+          <label className="text-xs font-medium text-gray-600">{t("projects.detail.candidate.notes")}</label>
+          <span className="text-[11px] text-gray-400">{savedHint ? t("projects.detail.candidate.saved") : t("projects.detail.candidate.autosave")}</span>
         </div>
         <textarea
           value={notes}
           onChange={(e) => onNotesChange(e.target.value)}
           rows={3}
-          placeholder="第一次约见印象 / 你想问的问题 / 候选人对项目的反应…"
+          placeholder={t("projects.detail.candidate.notesPlaceholder")}
           className="block w-full resize-y rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-900 outline-none focus:border-gray-900 focus:bg-white"
         />
       </div>
 
-      <div className="text-xs text-gray-500">添加于 {new Date(item.created_at).toLocaleString("zh-CN")}</div>
+      <div className="text-xs text-gray-500">{t("projects.detail.candidate.addedAt", { date: new Date(item.created_at).toLocaleString(locale === "en" ? "en-US" : "zh-CN") })}</div>
 
       <div className="border-t border-gray-100 pt-4">
         {isTalent ? (
@@ -1666,10 +1659,11 @@ function CandidateDetailPanel({
 }
 
 function LegacyCandidateView({ candidate }: { candidate: unknown }) {
+  const { t } = useI18n();
   const c = asCandidate(candidate);
   return (
     <div className="space-y-3 text-sm">
-      <h2 className="text-lg font-semibold text-gray-900">{c.name || "(无名)"}</h2>
+      <h2 className="text-lg font-semibold text-gray-900">{c.name || t("projects.detail.candidate.unknownName")}</h2>
       {c.headline && <p className="text-gray-600">{c.headline}</p>}
     </div>
   );
