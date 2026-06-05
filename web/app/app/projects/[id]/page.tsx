@@ -541,7 +541,6 @@ export default function ProjectDetailPage() {
             {projectEvidenceMatrix && (
               <ProjectEvidenceMatrixPanel
                 matrix={projectEvidenceMatrix}
-                locale={locale}
                 projectId={id}
                 selectedItemId={selectedItemId}
                 onOpenCandidate={(itemId) => setSelectedItemId(itemId)}
@@ -1235,58 +1234,24 @@ function priorityClass(value: string) {
 
 function ProjectEvidenceMatrixPanel({
   matrix,
-  locale,
   projectId,
   selectedItemId,
   onOpenCandidate,
 }: {
   matrix: ProjectEvidenceMatrixView;
-  locale: "zh" | "en";
   projectId: string;
   selectedItemId: string | null;
   onOpenCandidate: (itemId: string) => void;
 }) {
   if (matrix.empty) return null;
-  const copy = locale === "en"
-    ? {
-        total: "Total",
-        active: "Active",
-        risk: "Risk",
-        needsBackfill: "Needs evidence",
-        ready: "Ready",
-        rejected: "Rejected",
-        candidate: "Candidate",
-        status: "Status",
-        match: "Match",
-        evidence: "Evidence",
-        sources: "Sources",
-        checks: "Checks",
-        priority: "Priority",
-        next: "Next step",
-      }
-    : {
-        total: "总数",
-        active: "推进中",
-        risk: "风险",
-        needsBackfill: "需补证据",
-        ready: "可审阅",
-        rejected: "已拒",
-        candidate: "候选人",
-        status: "状态",
-        match: "匹配",
-        evidence: "证据",
-        sources: "信源",
-        checks: "核验",
-        priority: "优先级",
-        next: "下一步",
-      };
+  const { t } = useI18n();
   const summary = [
-    { label: copy.total, value: matrix.summary.total },
-    { label: copy.active, value: matrix.summary.active },
-    { label: copy.risk, value: matrix.summary.risk_review },
-    { label: copy.needsBackfill, value: matrix.summary.needs_backfill },
-    { label: copy.ready, value: matrix.summary.ready_to_review },
-    { label: copy.rejected, value: matrix.summary.rejected },
+    { label: t("projects.evidenceMatrix.summary.total"), value: matrix.summary.total },
+    { label: t("projects.evidenceMatrix.summary.active"), value: matrix.summary.active },
+    { label: t("projects.evidenceMatrix.summary.risk"), value: matrix.summary.risk_review },
+    { label: t("projects.evidenceMatrix.summary.needsBackfill"), value: matrix.summary.needs_backfill },
+    { label: t("projects.evidenceMatrix.summary.ready"), value: matrix.summary.ready_to_review },
+    { label: t("projects.evidenceMatrix.summary.rejected"), value: matrix.summary.rejected },
   ];
   return (
     <Surface className="p-5 md:p-6">
@@ -1307,14 +1272,14 @@ function ProjectEvidenceMatrixPanel({
         <table className="w-full min-w-[980px] border-separate border-spacing-0 text-left text-sm">
           <thead>
             <tr className="text-xs font-semibold text-gray-400">
-              <th className="border-b border-gray-100 px-3 py-2">{copy.candidate}</th>
-              <th className="border-b border-gray-100 px-3 py-2">{copy.status}</th>
-              <th className="border-b border-gray-100 px-3 py-2 text-right">{copy.match}</th>
-              <th className="border-b border-gray-100 px-3 py-2">{copy.evidence}</th>
-              <th className="border-b border-gray-100 px-3 py-2 text-right">{copy.sources}</th>
-              <th className="border-b border-gray-100 px-3 py-2 text-right">{copy.checks}</th>
-              <th className="border-b border-gray-100 px-3 py-2">{copy.priority}</th>
-              <th className="border-b border-gray-100 px-3 py-2">{copy.next}</th>
+              <th className="border-b border-gray-100 px-3 py-2">{t("projects.evidenceMatrix.column.candidate")}</th>
+              <th className="border-b border-gray-100 px-3 py-2">{t("projects.evidenceMatrix.column.status")}</th>
+              <th className="border-b border-gray-100 px-3 py-2 text-right">{t("projects.evidenceMatrix.column.match")}</th>
+              <th className="border-b border-gray-100 px-3 py-2">{t("projects.evidenceMatrix.column.evidence")}</th>
+              <th className="border-b border-gray-100 px-3 py-2 text-right">{t("projects.evidenceMatrix.column.sources")}</th>
+              <th className="border-b border-gray-100 px-3 py-2 text-right">{t("projects.evidenceMatrix.column.checks")}</th>
+              <th className="border-b border-gray-100 px-3 py-2">{t("projects.evidenceMatrix.column.priority")}</th>
+              <th className="border-b border-gray-100 px-3 py-2">{t("projects.evidenceMatrix.column.next")}</th>
             </tr>
           </thead>
           <tbody>

@@ -22,3 +22,27 @@ test("translates known keys and falls back to Chinese or key", () => {
   assert.equal(t("fr", "nav.search"), "智能搜人");
   assert.equal(t("en", "missing.key"), "missing.key");
 });
+
+test("translates project evidence matrix labels", () => {
+  const keys = [
+    ["projects.evidenceMatrix.summary.total", "总数", "Total"],
+    ["projects.evidenceMatrix.summary.active", "推进中", "Active"],
+    ["projects.evidenceMatrix.summary.risk", "风险", "Risk"],
+    ["projects.evidenceMatrix.summary.needsBackfill", "需补证据", "Needs evidence"],
+    ["projects.evidenceMatrix.summary.ready", "可审阅", "Ready"],
+    ["projects.evidenceMatrix.summary.rejected", "已拒", "Rejected"],
+    ["projects.evidenceMatrix.column.candidate", "候选人", "Candidate"],
+    ["projects.evidenceMatrix.column.status", "状态", "Status"],
+    ["projects.evidenceMatrix.column.match", "匹配", "Match"],
+    ["projects.evidenceMatrix.column.evidence", "证据", "Evidence"],
+    ["projects.evidenceMatrix.column.sources", "信源", "Sources"],
+    ["projects.evidenceMatrix.column.checks", "核验", "Checks"],
+    ["projects.evidenceMatrix.column.priority", "优先级", "Priority"],
+    ["projects.evidenceMatrix.column.next", "下一步", "Next step"],
+  ];
+
+  for (const [key, zh, en] of keys) {
+    assert.equal(t("zh", key), zh);
+    assert.equal(t("en", key), en);
+  }
+});
