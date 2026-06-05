@@ -883,6 +883,21 @@ test("builds a project control room that avoids duplicate next-search constraint
   assert.ok(!room.cards.some((card) => card.key === "next_search"));
 });
 
+test("builds a project control room that avoids duplicate project brief summaries", () => {
+  assert.equal(typeof researchLoop.buildProjectControlRoom, "function");
+
+  const room = buildProjectControlRoom({
+    locale: "zh",
+    hasProjectHeaderBrief: true,
+    project: {
+      name: "AI Agent 产品工程师",
+      brief: "找做过 AI Agent 产品落地和开源工具的资深工程师",
+    },
+  });
+
+  assert.ok(!room.cards.some((card) => card.key === "brief"));
+});
+
 test("builds a project detail hierarchy that avoids duplicate summary panels", () => {
   assert.equal(typeof researchLoop.buildProjectDetailHierarchy, "function");
 

@@ -391,6 +391,7 @@ export default function ProjectDetailPage() {
     hasCandidateDecisionQueuePanel: Boolean(items && items.length > 0),
     hasResearchRoundsPanel: projectRounds.items.length > 0,
     hasSearchConstraintDiffPanel: true,
+    hasProjectHeaderBrief: Boolean((p.brief ?? "").trim()),
     locale,
   }) as ProjectControlRoomView;
   const projectHierarchy = buildProjectDetailHierarchy({
