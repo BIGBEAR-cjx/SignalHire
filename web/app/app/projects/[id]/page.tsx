@@ -390,6 +390,7 @@ export default function ProjectDetailPage() {
     hasFilter: statusFilter !== "all",
     hasCandidateDecisionQueuePanel: Boolean(items && items.length > 0),
     hasResearchRoundsPanel: projectRounds.items.length > 0,
+    hasSearchConstraintDiffPanel: true,
     locale,
   }) as ProjectControlRoomView;
   const projectHierarchy = buildProjectDetailHierarchy({

@@ -444,6 +444,7 @@ export function buildProjectControlRoom(input?: {
   hasFilter?: boolean;
   hasCandidateDecisionQueuePanel?: boolean;
   hasResearchRoundsPanel?: boolean;
+  hasSearchConstraintDiffPanel?: boolean;
   locale?: ResearchLoopLocale | string;
 }): ProjectControlRoom;
 export function buildProjectDetailHierarchy(input?: {

@@ -855,6 +855,34 @@ test("builds a project control room that avoids duplicate research round summari
   assert.ok(!room.cards.some((card) => card.key === "rounds"));
 });
 
+test("builds a project control room that avoids duplicate next-search constraint summaries", () => {
+  assert.equal(typeof researchLoop.buildProjectControlRoom, "function");
+
+  const room = buildProjectControlRoom({
+    locale: "zh",
+    hasSearchConstraintDiffPanel: true,
+    project: {
+      name: "AI Agent 产品工程师",
+      brief: "找做过 AI Agent 产品落地和开源工具的资深工程师",
+    },
+    candidateCount: 1,
+    items: [
+      {
+        id: "candidate-1",
+        status: "rejected",
+        candidate: {
+          name: "Wrong Direction",
+          ai_directions: ["通用 Chatbot"],
+          evidence_audit: { overall_evidence_quality: "high" },
+          claims: [],
+        },
+      },
+    ],
+  });
+
+  assert.ok(!room.cards.some((card) => card.key === "next_search"));
+});
+
 test("builds a project detail hierarchy that avoids duplicate summary panels", () => {
   assert.equal(typeof researchLoop.buildProjectDetailHierarchy, "function");
 
