@@ -389,11 +389,13 @@ export default function ProjectDetailPage() {
   const projectHierarchy = buildProjectDetailHierarchy({
     hasCandidates: Boolean(items && items.length > 0),
     hasControlRoom: true,
+    hasProjectEvidenceMatrix: Boolean(projectEvidenceMatrix),
     locale,
   }) as ProjectDetailHierarchyView;
   const hiddenPanels = new Set(projectHierarchy.hidden);
   const showActionBrief = !hiddenPanels.has("action_brief");
   const showCandidateFeedbackSummary = !hiddenPanels.has("candidate_feedback_summary");
+  const showCandidateComparison = !hiddenPanels.has("candidate_comparison");
   const projectRounds = buildProjectResearchRounds({
     runs: detail.runs,
     locale,
@@ -507,7 +509,7 @@ export default function ProjectDetailPage() {
                 onOpenCandidate={(itemId) => setSelectedItemId(itemId)}
               />
             )}
-            <CandidateComparisonView result={projectComparisonResult} locale={locale} />
+            {showCandidateComparison && <CandidateComparisonView result={projectComparisonResult} locale={locale} />}
             <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(360px,0.85fr)]">
               <ul className="space-y-2">
                 {filteredItems.map((it) => (

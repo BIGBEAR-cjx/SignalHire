@@ -827,6 +827,24 @@ test("builds a project detail hierarchy that avoids duplicate summary panels", (
   assert.equal(hierarchy.notes.candidate_feedback_summary, "控制台已承接反馈学习摘要，保留候选人反馈信号在搜索控制台中。");
 });
 
+test("builds a project detail hierarchy that avoids duplicate candidate review panels", () => {
+  assert.equal(typeof researchLoop.buildProjectDetailHierarchy, "function");
+
+  const hierarchy = researchLoop.buildProjectDetailHierarchy({
+    hasCandidates: true,
+    hasControlRoom: true,
+    hasProjectEvidenceMatrix: true,
+    locale: "zh",
+  });
+
+  assert.deepEqual(
+    hierarchy.secondary.filter((section) => section.startsWith("candidate_")),
+    ["candidate_decision_queue", "candidate_evidence_matrix", "candidate_list"],
+  );
+  assert.ok(hierarchy.hidden.includes("candidate_comparison"));
+  assert.equal(hierarchy.notes.candidate_comparison, "项目证据矩阵已承接候选人对比指标，通用对比面板作为无矩阵时的回退。");
+});
+
 test("parses project next-search text into editable constraint sections", () => {
   assert.equal(typeof researchLoop.buildSearchConstraintEditor, "function");
   assert.equal(typeof researchLoop.buildSearchInputFromConstraintEditor, "function");

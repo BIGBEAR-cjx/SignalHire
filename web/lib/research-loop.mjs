@@ -1443,20 +1443,26 @@ export function buildProjectControlRoom({ project = {}, runs = [], items = [], c
 }
 
 /**
- * @param {{ hasCandidates?: boolean; hasControlRoom?: boolean; locale?: string }} input
+ * @param {{ hasCandidates?: boolean; hasControlRoom?: boolean; hasProjectEvidenceMatrix?: boolean; locale?: string }} input
  */
-export function buildProjectDetailHierarchy({ hasCandidates = false, hasControlRoom = true, locale = "zh" } = {}) {
+export function buildProjectDetailHierarchy({ hasCandidates = false, hasControlRoom = true, hasProjectEvidenceMatrix = false, locale = "zh" } = {}) {
   const normalizedLocale = normalizeLocale(locale);
-  const hidden = hasControlRoom ? ["action_brief", "candidate_feedback_summary"] : [];
+  const hidden = [
+    ...(hasControlRoom ? ["action_brief", "candidate_feedback_summary"] : []),
+    ...(hasProjectEvidenceMatrix ? ["candidate_comparison"] : []),
+  ];
   const notes = normalizedLocale === "en"
     ? {
         action_brief: "The control room already carries today's priority action, so the standalone summary is hidden.",
         candidate_feedback_summary: "The control room already carries feedback learning; candidate feedback signals stay in the search console.",
+        candidate_comparison: "The project evidence matrix already carries candidate comparison metrics; the generic comparison panel is a fallback when no matrix is available.",
       }
     : {
         action_brief: "控制台已承接今日优先动作，避免重复显示。",
         candidate_feedback_summary: "控制台已承接反馈学习摘要，保留候选人反馈信号在搜索控制台中。",
+        candidate_comparison: "项目证据矩阵已承接候选人对比指标，通用对比面板作为无矩阵时的回退。",
       };
+  const candidateEvidenceSection = hasProjectEvidenceMatrix ? "candidate_evidence_matrix" : "candidate_evidence";
   return {
     locale: normalizedLocale,
     primary: hasControlRoom ? ["header", "control_room"] : ["header", "action_brief"],
@@ -1464,7 +1470,7 @@ export function buildProjectDetailHierarchy({ hasCandidates = false, hasControlR
       "search_console",
       "kpi_strip",
       "status_funnel",
-      ...(hasCandidates ? ["candidate_decision_queue", "candidate_evidence", "candidate_list"] : ["empty_candidates"]),
+      ...(hasCandidates ? ["candidate_decision_queue", candidateEvidenceSection, "candidate_list"] : ["empty_candidates"]),
       "research_rounds",
     ],
     hidden,
