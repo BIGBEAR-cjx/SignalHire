@@ -301,6 +301,55 @@ test("builds project candidate decision queues from status and evidence risk", (
   assert.equal(en.columns[2].title, "Needs evidence");
 });
 
+test("builds a project action brief from candidate queues", () => {
+  assert.equal(typeof researchLoop.buildProjectActionBrief, "function");
+
+  const items = [
+    {
+      id: "weak-evidence",
+      status: "new",
+      candidate: {
+        name: "Grace",
+        match_score: 88,
+        evidence_audit: { overall_evidence_quality: "low" },
+        claims: [{ claim: "Built agent infra", verdict: "unverified", evidence: [] }],
+      },
+    },
+    {
+      id: "review",
+      status: "new",
+      candidate: { name: "Ada", match_score: 91, evidence_audit: { overall_evidence_quality: "high" }, claims: [] },
+    },
+    {
+      id: "contacted",
+      status: "contacted",
+      candidate: { name: "Lin", match_score: 82, evidence_audit: { overall_evidence_quality: "medium" }, claims: [] },
+    },
+  ];
+
+  const zh = researchLoop.buildProjectActionBrief({ items, locale: "zh" });
+  assert.equal(zh.title, "今日待处理");
+  assert.equal(zh.summary, "3 位候选人中，1 位需补证据、1 位待评估、1 位推进中。");
+  assert.equal(zh.primaryAction.key, "needs_evidence");
+  assert.equal(zh.primaryAction.label, "先补证据");
+  assert.match(zh.primaryAction.detail, /Grace/);
+  assert.deepEqual(
+    zh.actions.map((action) => [action.key, action.count, action.label]),
+    [
+      ["needs_evidence", 1, "补证据"],
+      ["review", 1, "评估候选人"],
+      ["interested", 1, "推进沟通"],
+    ],
+  );
+  assert.equal(zh.actions[0].targetItemId, "weak-evidence");
+
+  const en = researchLoop.buildProjectActionBrief({ items, locale: "en" });
+  assert.equal(en.title, "Today");
+  assert.equal(en.summary, "Across 3 candidates: 1 need evidence, 1 need review, and 1 are in progress.");
+  assert.equal(en.primaryAction.label, "Backfill evidence first");
+  assert.equal(en.actions[1].label, "Review candidates");
+});
+
 test("builds project next steps for empty and filtered projects", () => {
   assert.deepEqual(buildProjectNextSteps({ candidateCount: 0, runCount: 0 }), {
     locale: "zh",

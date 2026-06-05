@@ -317,6 +317,114 @@ export function buildProjectCandidateDecisionQueue({ items = [], locale = "zh" }
   return { locale: normalizedLocale, columns };
 }
 
+const ACTION_BRIEF_COPY = {
+  zh: {
+    title: "今日待处理",
+    emptySummary: "本项目还没有候选人。先启动一轮项目搜人，建立第一版候选池。",
+    summary: "{total} 位候选人中，{needsEvidence} 位需补证据、{review} 位待评估、{interested} 位推进中。",
+    primaryEmptyLabel: "启动本项目搜人",
+    primaryEmptyDetail: "候选池为空，先用项目画像启动第一轮搜索。",
+    primaryNeedsEvidenceLabel: "先补证据",
+    primaryNeedsEvidenceDetail: "{name} 的公开证据仍偏弱，先补齐可交叉验证来源再判断。",
+    primaryReviewLabel: "先评估候选人",
+    primaryReviewDetail: "{name} 还未处理，建议先查看候选人阅读摘要和证据档案。",
+    primaryInterestedLabel: "推进沟通",
+    primaryInterestedDetail: "{name} 已进入沟通或面试流程，继续推进下一步动作。",
+    needsEvidenceLabel: "补证据",
+    reviewLabel: "评估候选人",
+    interestedLabel: "推进沟通",
+    rejectedLabel: "已排除",
+  },
+  en: {
+    title: "Today",
+    emptySummary: "This project has no candidates yet. Start a project search to build the first shortlist.",
+    summary: "Across {total} candidates: {needsEvidence} need evidence, {review} need review, and {interested} are in progress.",
+    primaryEmptyLabel: "Start project search",
+    primaryEmptyDetail: "The candidate pool is empty. Start the first search from the project brief.",
+    primaryNeedsEvidenceLabel: "Backfill evidence first",
+    primaryNeedsEvidenceDetail: "{name} still has weak public evidence. Fill cross-checkable sources before deciding.",
+    primaryReviewLabel: "Review candidates first",
+    primaryReviewDetail: "{name} has not been handled yet. Read the candidate summary and evidence dossier first.",
+    primaryInterestedLabel: "Progress outreach",
+    primaryInterestedDetail: "{name} is already in outreach or interview flow. Continue the next action.",
+    needsEvidenceLabel: "Backfill evidence",
+    reviewLabel: "Review candidates",
+    interestedLabel: "Progress outreach",
+    rejectedLabel: "Excluded",
+  },
+};
+
+function actionBriefCopy(locale, key, params = {}) {
+  let text = ACTION_BRIEF_COPY[locale === "en" ? "en" : "zh"][key] ?? ACTION_BRIEF_COPY.zh[key];
+  for (const [name, value] of Object.entries(params)) text = text.replace(`{${name}}`, String(value));
+  return text;
+}
+
+function columnFromQueue(queue, key) {
+  return queue.columns.find((column) => column.key === key) ?? { key, count: 0, items: [] };
+}
+
+function actionBriefAction(locale, key, column, labelKey) {
+  const first = column.items[0] ?? {};
+  return {
+    key,
+    count: column.count,
+    label: actionBriefCopy(locale, labelKey),
+    detail: first.reason || "",
+    targetItemId: first.id || "",
+  };
+}
+
+/**
+ * @param {{ items?: unknown[]; locale?: string }} input
+ */
+export function buildProjectActionBrief({ items = [], locale = "zh" } = {}) {
+  const normalizedLocale = normalizeLocale(locale);
+  const queue = buildProjectCandidateDecisionQueue({ items, locale: normalizedLocale });
+  const needsEvidence = columnFromQueue(queue, "needs_evidence");
+  const review = columnFromQueue(queue, "review");
+  const interested = columnFromQueue(queue, "interested");
+  const rejected = columnFromQueue(queue, "rejected");
+  const total = queue.columns.reduce((sum, column) => sum + column.count, 0);
+  const primaryColumn = needsEvidence.count > 0 ? needsEvidence : review.count > 0 ? review : interested.count > 0 ? interested : null;
+  const primaryKey = primaryColumn?.key ?? "start_search";
+  const primaryItem = primaryColumn?.items?.[0] ?? {};
+  const primaryCopyKey = {
+    needs_evidence: "primaryNeedsEvidence",
+    review: "primaryReview",
+    interested: "primaryInterested",
+    start_search: "primaryEmpty",
+  }[primaryKey] ?? "primaryEmpty";
+  const actions = [
+    needsEvidence.count > 0 ? actionBriefAction(normalizedLocale, "needs_evidence", needsEvidence, "needsEvidenceLabel") : null,
+    review.count > 0 ? actionBriefAction(normalizedLocale, "review", review, "reviewLabel") : null,
+    interested.count > 0 ? actionBriefAction(normalizedLocale, "interested", interested, "interestedLabel") : null,
+    rejected.count > 0 ? actionBriefAction(normalizedLocale, "rejected", rejected, "rejectedLabel") : null,
+  ].filter(Boolean);
+
+  return {
+    locale: normalizedLocale,
+    title: actionBriefCopy(normalizedLocale, "title"),
+    summary: total > 0
+      ? actionBriefCopy(normalizedLocale, "summary", {
+          total,
+          needsEvidence: needsEvidence.count,
+          review: review.count,
+          interested: interested.count,
+        })
+      : actionBriefCopy(normalizedLocale, "emptySummary"),
+    primaryAction: {
+      key: primaryKey,
+      label: actionBriefCopy(normalizedLocale, `${primaryCopyKey}Label`),
+      detail: actionBriefCopy(normalizedLocale, `${primaryCopyKey}Detail`, {
+        name: primaryItem.name || (normalizedLocale === "en" ? "This candidate" : "这位候选人"),
+      }),
+      targetItemId: primaryItem.id || "",
+    },
+    actions,
+  };
+}
+
 function projectAction(locale, key, params) {
   return {
     key,

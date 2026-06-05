@@ -5,7 +5,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { FiArrowLeft, FiCheckCircle, FiMail, FiRefreshCw, FiSearch, FiTrash2 } from "react-icons/fi";
+import { FiAlertTriangle, FiArrowLeft, FiCheckCircle, FiMail, FiRefreshCw, FiSearch, FiTrash2 } from "react-icons/fi";
 import { CandidateComparisonView, CandidateProfileView, EvidencePriorityPanel } from "@/components/result";
 import { useI18n } from "@/components/LanguageProvider";
 import OutreachModal from "@/components/OutreachModal";
@@ -19,7 +19,7 @@ import {
   StatusBadge,
   Surface,
 } from "@/components/ui/signal-ui";
-import { buildCandidateFeedbackPanel, buildProjectCandidateDecisionQueue, buildProjectResearchRounds, buildProjectSearchConsole } from "@/lib/research-loop.mjs";
+import { buildCandidateFeedbackPanel, buildProjectActionBrief, buildProjectCandidateDecisionQueue, buildProjectResearchRounds, buildProjectSearchConsole } from "@/lib/research-loop.mjs";
 import { buildEvidencePriorityView, buildProjectEvidenceMatrix } from "@/lib/evidence-priority.mjs";
 import type { TalentCandidate } from "@/lib/talent-profile.mjs";
 
@@ -75,6 +75,23 @@ type ProjectSearchConsoleView = {
       detail: string;
     }>;
   };
+};
+type ProjectActionBriefView = {
+  title: string;
+  summary: string;
+  primaryAction: {
+    key: string;
+    label: string;
+    detail: string;
+    targetItemId: string;
+  };
+  actions: Array<{
+    key: string;
+    count?: number;
+    label: string;
+    detail: string;
+    targetItemId: string;
+  }>;
 };
 type ProjectResearchRoundsView = {
   title: string;
@@ -312,6 +329,7 @@ export default function ProjectDetailPage() {
     locale,
   }) as ProjectResearchRoundsView;
   const decisionQueue = buildProjectCandidateDecisionQueue({ items: items ?? [], locale });
+  const actionBrief = buildProjectActionBrief({ items: items ?? [], locale }) as ProjectActionBriefView;
 
   return (
     <div className="space-y-6">
@@ -322,6 +340,13 @@ export default function ProjectDetailPage() {
 
       {/* 头部: name + brief 编辑 + 状态 + 删除 */}
       <ProjectHeader key={`${p.id}:${p.name}:${p.brief ?? ""}`} detail={detail} onChanged={reloadDetail} onDelete={deleteProject} />
+
+      <ProjectActionBriefPanel
+        brief={actionBrief}
+        searchHref={searchHref}
+        locale={locale}
+        onOpenCandidate={(itemId) => setSelectedItemId(itemId)}
+      />
 
       <ProjectSearchConsolePanel consoleView={projectConsole} searchHref={searchHref} verifyHref={verifyHref} />
 
@@ -701,6 +726,78 @@ function StatusFunnel({
             </button>
           );
         })}
+      </div>
+    </Surface>
+  );
+}
+
+function ProjectActionBriefPanel({
+  brief,
+  searchHref,
+  locale,
+  onOpenCandidate,
+}: {
+  brief: ProjectActionBriefView;
+  searchHref: string;
+  locale: "zh" | "en";
+  onOpenCandidate: (itemId: string) => void;
+}) {
+  const primary = brief.primaryAction;
+  const canOpenPrimary = Boolean(primary.targetItemId);
+  const secondaryActions = brief.actions.filter((action) => action.key !== primary.key).slice(0, 3);
+  const copy = locale === "en"
+    ? { eyebrow: "Workbench", start: "Start search" }
+    : { eyebrow: "Workbench", start: "启动搜人" };
+
+  return (
+    <Surface className="p-5">
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+        <div className="min-w-0">
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-neutral-500">{copy.eyebrow}</p>
+          <h2 className="mt-1 text-2xl font-semibold tracking-tight text-[var(--sh-ink)]">{brief.title}</h2>
+          <p className="mt-2 max-w-3xl text-sm leading-6 text-[var(--sh-muted)]">{brief.summary}</p>
+        </div>
+        <div className="shrink-0">
+          {canOpenPrimary ? (
+            <PrimaryAction onClick={() => onOpenCandidate(primary.targetItemId)}>
+              <FiAlertTriangle className="h-4 w-4" aria-hidden="true" />
+              {primary.label}
+            </PrimaryAction>
+          ) : (
+            <PrimaryAction href={searchHref}>
+              <FiSearch className="h-4 w-4" aria-hidden="true" />
+              {primary.label || copy.start}
+            </PrimaryAction>
+          )}
+        </div>
+      </div>
+
+      <div className="mt-4 grid gap-3 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)]">
+        <div className="rounded-2xl bg-white/80 p-4 ring-1 ring-black/5">
+          <p className="text-sm font-semibold text-gray-900">{primary.label}</p>
+          <p className="mt-1 text-sm leading-6 text-gray-600">{primary.detail}</p>
+        </div>
+        {secondaryActions.length > 0 && (
+          <div className="grid gap-2 sm:grid-cols-3 lg:grid-cols-1">
+            {secondaryActions.map((action) => (
+              <button
+                key={action.key}
+                type="button"
+                onClick={() => action.targetItemId && onOpenCandidate(action.targetItemId)}
+                disabled={!action.targetItemId}
+                className="flex items-center justify-between gap-3 rounded-2xl bg-white/70 px-3 py-2.5 text-left ring-1 ring-black/5 transition hover:bg-white disabled:cursor-default disabled:opacity-70"
+              >
+                <span className="min-w-0">
+                  <span className="block truncate text-sm font-semibold text-gray-900">{action.label}</span>
+                  <span className="block truncate text-xs text-gray-500">{action.detail}</span>
+                </span>
+                {typeof action.count === "number" && (
+                  <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs font-semibold tabular-nums text-gray-600">{action.count}</span>
+                )}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
     </Surface>
   );

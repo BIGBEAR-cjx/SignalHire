@@ -118,6 +118,20 @@ export type ProjectCandidateDecisionQueue = {
   locale: ResearchLoopLocale;
   columns: ProjectCandidateDecisionQueueColumn[];
 };
+export type ProjectActionBriefAction = {
+  key: string;
+  count?: number;
+  label: string;
+  detail: string;
+  targetItemId: string;
+};
+export type ProjectActionBrief = {
+  locale: ResearchLoopLocale;
+  title: string;
+  summary: string;
+  primaryAction: ProjectActionBriefAction;
+  actions: ProjectActionBriefAction[];
+};
 export type PersistedSearchFeedback = {
   version: 1;
   precision: string;
@@ -267,6 +281,10 @@ export function buildProjectCandidateDecisionQueue(input?: {
   items?: unknown[];
   locale?: ResearchLoopLocale | string;
 }): ProjectCandidateDecisionQueue;
+export function buildProjectActionBrief(input?: {
+  items?: unknown[];
+  locale?: ResearchLoopLocale | string;
+}): ProjectActionBrief;
 export function buildProjectSearchRefinementSuggestions(input?: {
   items?: unknown[];
   locale?: ResearchLoopLocale | string;
