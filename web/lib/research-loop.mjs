@@ -372,6 +372,7 @@ function actionBriefAction(locale, key, column, labelKey) {
     label: actionBriefCopy(locale, labelKey),
     detail: first.reason || "",
     targetItemId: first.id || "",
+    backfillInput: first.backfillInput || "",
   };
 }
 
@@ -420,6 +421,7 @@ export function buildProjectActionBrief({ items = [], locale = "zh" } = {}) {
         name: primaryItem.name || (normalizedLocale === "en" ? "This candidate" : "这位候选人"),
       }),
       targetItemId: primaryItem.id || "",
+      backfillInput: primaryItem.backfillInput || "",
     },
     actions,
   };

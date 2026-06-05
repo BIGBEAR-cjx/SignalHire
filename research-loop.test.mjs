@@ -333,12 +333,14 @@ test("builds a project action brief from candidate queues", () => {
   assert.equal(zh.primaryAction.key, "needs_evidence");
   assert.equal(zh.primaryAction.label, "先补证据");
   assert.match(zh.primaryAction.detail, /Grace/);
+  assert.match(zh.primaryAction.backfillInput, /Candidate evidence backfill search for SignalHire/);
+  assert.match(zh.primaryAction.backfillInput, /Grace/);
   assert.deepEqual(
-    zh.actions.map((action) => [action.key, action.count, action.label]),
+    zh.actions.map((action) => [action.key, action.count, action.label, Boolean(action.backfillInput)]),
     [
-      ["needs_evidence", 1, "补证据"],
-      ["review", 1, "评估候选人"],
-      ["interested", 1, "推进沟通"],
+      ["needs_evidence", 1, "补证据", true],
+      ["review", 1, "评估候选人", false],
+      ["interested", 1, "推进沟通", false],
     ],
   );
   assert.equal(zh.actions[0].targetItemId, "weak-evidence");

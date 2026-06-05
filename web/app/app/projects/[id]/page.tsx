@@ -84,6 +84,7 @@ type ProjectActionBriefView = {
     label: string;
     detail: string;
     targetItemId: string;
+    backfillInput: string;
   };
   actions: Array<{
     key: string;
@@ -91,6 +92,7 @@ type ProjectActionBriefView = {
     label: string;
     detail: string;
     targetItemId: string;
+    backfillInput: string;
   }>;
 };
 type ProjectResearchRoundsView = {
@@ -344,6 +346,7 @@ export default function ProjectDetailPage() {
       <ProjectActionBriefPanel
         brief={actionBrief}
         searchHref={searchHref}
+        projectId={id}
         locale={locale}
         onOpenCandidate={(itemId) => setSelectedItemId(itemId)}
       />
@@ -734,15 +737,20 @@ function StatusFunnel({
 function ProjectActionBriefPanel({
   brief,
   searchHref,
+  projectId,
   locale,
   onOpenCandidate,
 }: {
   brief: ProjectActionBriefView;
   searchHref: string;
+  projectId: string;
   locale: "zh" | "en";
   onOpenCandidate: (itemId: string) => void;
 }) {
   const primary = brief.primaryAction;
+  const primaryBackfillHref = primary.backfillInput
+    ? `/app/search?project=${projectId}&q=${encodeURIComponent(primary.backfillInput)}`
+    : "";
   const canOpenPrimary = Boolean(primary.targetItemId);
   const secondaryActions = brief.actions.filter((action) => action.key !== primary.key).slice(0, 3);
   const copy = locale === "en"
@@ -758,7 +766,12 @@ function ProjectActionBriefPanel({
           <p className="mt-2 max-w-3xl text-sm leading-6 text-[var(--sh-muted)]">{brief.summary}</p>
         </div>
         <div className="shrink-0">
-          {canOpenPrimary ? (
+          {primaryBackfillHref ? (
+            <PrimaryAction href={primaryBackfillHref}>
+              <FiAlertTriangle className="h-4 w-4" aria-hidden="true" />
+              {primary.label}
+            </PrimaryAction>
+          ) : canOpenPrimary ? (
             <PrimaryAction onClick={() => onOpenCandidate(primary.targetItemId)}>
               <FiAlertTriangle className="h-4 w-4" aria-hidden="true" />
               {primary.label}

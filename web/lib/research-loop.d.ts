@@ -124,6 +124,7 @@ export type ProjectActionBriefAction = {
   label: string;
   detail: string;
   targetItemId: string;
+  backfillInput: string;
 };
 export type ProjectActionBrief = {
   locale: ResearchLoopLocale;
