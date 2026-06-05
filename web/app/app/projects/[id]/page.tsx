@@ -57,6 +57,10 @@ type ProjectSearchConsoleView = {
     items: Array<{ key: string; label: string; value: string }>;
   };
   nextSearchInput: string;
+  refinementSuggestions: {
+    title: string;
+    items: Array<{ key: string; label: string; detail: string }>;
+  };
   nextSteps: ProjectNextStepsView;
   priorities: {
     title: string;
@@ -416,6 +420,19 @@ function ProjectSearchConsolePanel({
             <p className="text-xs font-semibold text-[var(--sh-muted)]">{t("projects.console.nextSearchTitle")}</p>
             <p className="mt-1 line-clamp-3 whitespace-pre-line text-xs leading-5 text-[var(--sh-ink)]">{consoleView.nextSearchInput}</p>
           </div>
+          {consoleView.refinementSuggestions.items.length > 0 && (
+            <div className="mt-3 rounded-2xl border border-black/10 bg-white/70 px-3 py-3">
+              <p className="text-xs font-semibold text-[var(--sh-muted)]">{consoleView.refinementSuggestions.title}</p>
+              <div className="mt-2 space-y-2">
+                {consoleView.refinementSuggestions.items.map((item) => (
+                  <div key={item.key} className="rounded-xl bg-[var(--sh-canvas)] px-3 py-2">
+                    <p className="text-xs font-semibold text-[var(--sh-ink)]">{item.label}</p>
+                    <p className="mt-1 text-xs leading-5 text-[var(--sh-muted)]">{item.detail}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
 
         <div className="rounded-2xl border border-black/10 bg-white/72 p-4">

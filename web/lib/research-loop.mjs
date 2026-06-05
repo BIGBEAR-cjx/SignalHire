@@ -295,6 +295,116 @@ function queueCount(queue, key) {
   return queue.columns.find((column) => column.key === key)?.count ?? 0;
 }
 
+function uniqueCleanStrings(values, limit = 5) {
+  const seen = new Set();
+  const results = [];
+  for (const value of values) {
+    const text = cleanString(value);
+    const key = text.toLowerCase();
+    if (!text || seen.has(key)) continue;
+    seen.add(key);
+    results.push(text);
+    if (results.length >= limit) break;
+  }
+  return results;
+}
+
+function localizedList(locale, values) {
+  const items = uniqueCleanStrings(values, 4);
+  if (!items.length) return "";
+  return items.join(locale === "en" ? ", " : "、");
+}
+
+function candidateDirectionSignals(candidate) {
+  const directions = Array.isArray(candidate?.ai_directions) ? candidate.ai_directions : [];
+  const skills = Array.isArray(candidate?.skills) ? candidate.skills : [];
+  return uniqueCleanStrings([
+    ...directions,
+    ...skills,
+    candidate?.headline,
+    candidateSubtitle(candidate),
+  ], 4);
+}
+
+function projectRefinementCopy(locale, key, params = {}) {
+  const copies = {
+    zh: {
+      avoid_rejected_patterns: {
+        label: "避开已拒绝画像",
+        detail: `已有 ${params.count} 位候选人被标记为不合适，下一轮降低这些方向权重：${params.patterns || "上一轮不合适画像"}。`,
+        instruction: `避开已拒绝画像：降低 ${params.patterns || "上一轮不合适画像"} 的权重，寻找更贴近项目画像的人选。`,
+      },
+      strengthen_evidence: {
+        label: "强化证据核验",
+        detail: `${params.count} 位候选人证据不足，下一轮优先补论文、代码、项目、任职和公开资料的交叉验证。`,
+        instruction: "优先交叉核验：要求候选人具备可公开验证的论文、代码、项目、任职或技术写作证据。",
+      },
+      find_similar_to_active: {
+        label: "扩展相似强信号",
+        detail: `${params.names || "已推进候选人"} 已进入推进中，下一轮寻找相似方向但来源更丰富的人选。`,
+        instruction: `参考已推进候选人：围绕 ${params.names || "已联系或面试候选人"} 的强匹配方向，扩展相似人才池。`,
+      },
+    },
+    en: {
+      avoid_rejected_patterns: {
+        label: "Avoid rejected patterns",
+        detail: `${params.count} candidates are marked as not a fit. Lower weight for these directions: ${params.patterns || "the rejected profile patterns"}.`,
+        instruction: `Avoid rejected patterns: lower weight for ${params.patterns || "the rejected profile patterns"} and search closer-fit profiles.`,
+      },
+      strengthen_evidence: {
+        label: "Strengthen evidence checks",
+        detail: `${params.count} candidates have weak evidence. Prioritize cross-checkable papers, code, projects, role history, and public sources next round.`,
+        instruction: "Prioritize cross-validation: require public evidence across papers, code, projects, role history, or technical writing.",
+      },
+      find_similar_to_active: {
+        label: "Expand similar strong signals",
+        detail: `${params.names || "Active candidates"} are already moving forward. Search similar directions with richer source coverage next round.`,
+        instruction: `Use active candidates as positive signals: expand similar talent pools around ${params.names || "contacted or interviewing candidates"}.`,
+      },
+    },
+  };
+  return (locale === "en" ? copies.en : copies.zh)[key];
+}
+
+/**
+ * @param {{ items?: unknown[]; locale?: string }} input
+ */
+export function buildProjectSearchRefinementSuggestions({ items = [], locale = "zh" } = {}) {
+  const normalizedLocale = normalizeLocale(locale);
+  const normalizedItems = Array.isArray(items) ? items.filter(isPlainObject) : [];
+  const rejected = normalizedItems.filter((item) => cleanString(item?.status) === "rejected");
+  const needsEvidence = normalizedItems.filter((item) => cleanString(item?.status) !== "hired" && candidateEvidenceRisk(item?.candidate));
+  const active = normalizedItems.filter((item) => ["contacted", "interviewing", "hired"].includes(cleanString(item?.status)));
+  const suggestions = [];
+
+  if (rejected.length) {
+    const patterns = localizedList(normalizedLocale, rejected.flatMap((item) => candidateDirectionSignals(item?.candidate)));
+    suggestions.push({ key: "avoid_rejected_patterns", ...projectRefinementCopy(normalizedLocale, "avoid_rejected_patterns", { count: rejected.length, patterns }) });
+  }
+  if (needsEvidence.length) {
+    suggestions.push({ key: "strengthen_evidence", ...projectRefinementCopy(normalizedLocale, "strengthen_evidence", { count: needsEvidence.length }) });
+  }
+  if (active.length) {
+    const names = localizedList(normalizedLocale, active.map((item) => candidateName(item?.candidate)));
+    suggestions.push({ key: "find_similar_to_active", ...projectRefinementCopy(normalizedLocale, "find_similar_to_active", { names }) });
+  }
+
+  return {
+    locale: normalizedLocale,
+    title: msg(normalizedLocale, "projects.refinements.title"),
+    items: suggestions.slice(0, 3),
+  };
+}
+
+function appendSearchRefinementInstructions(input, refinements) {
+  const base = cleanString(input);
+  const instructions = Array.isArray(refinements?.items)
+    ? refinements.items.map((item) => cleanString(item.instruction)).filter(Boolean)
+    : [];
+  if (!base || !instructions.length) return base;
+  return `${base}\n\n${msg(refinements.locale, "projects.refinements.searchSection")}\n- ${instructions.join("\n- ")}`;
+}
+
 function timestampMs(value) {
   const time = Date.parse(cleanString(value));
   return Number.isFinite(time) ? time : 0;
@@ -729,9 +839,13 @@ export function buildProjectSearchConsole({ project = {}, runs = [], items = [],
   const latestFeedback = feedbackPreference.canApply
     ? { title: msg(normalizedLocale, "projects.console.feedbackTitle"), items: feedbackPreference.items }
     : rounds.items.find((item) => item.feedbackSummary)?.feedbackSummary ?? null;
-  const nextSearchInput = feedbackPreference.canApply
+  const refinementSuggestions = buildProjectSearchRefinementSuggestions({ items, locale: normalizedLocale });
+  const nextSearchBase = feedbackPreference.canApply
     ? feedbackPreference.optimizedInput
     : cleanString(rounds.items.find((item) => item.kind === "search" && item.nextSearchInput)?.nextSearchInput) || briefText;
+  const nextSearchInput = feedbackPreference.canApply
+    ? nextSearchBase
+    : appendSearchRefinementInstructions(nextSearchBase, refinementSuggestions);
   const nextSteps = buildProjectNextSteps({
     candidateCount,
     runCount: Array.isArray(runs) ? runs.length : 0,
@@ -757,6 +871,7 @@ export function buildProjectSearchConsole({ project = {}, runs = [], items = [],
     latestRound,
     feedback: latestFeedback,
     nextSearchInput,
+    refinementSuggestions,
     nextSteps,
     priorities,
   };

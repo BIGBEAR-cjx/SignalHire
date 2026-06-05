@@ -138,6 +138,17 @@ export type ProjectCommandPriorities = {
   title: string;
   items: ProjectCommandPriority[];
 };
+export type ProjectSearchRefinementSuggestion = {
+  key: string;
+  label: string;
+  detail: string;
+  instruction: string;
+};
+export type ProjectSearchRefinementSuggestions = {
+  locale: ResearchLoopLocale;
+  title: string;
+  items: ProjectSearchRefinementSuggestion[];
+};
 export type ProjectSearchConsole = {
   locale: ResearchLoopLocale;
   title: string;
@@ -165,6 +176,7 @@ export type ProjectSearchConsole = {
     }>;
   };
   nextSearchInput: string;
+  refinementSuggestions: ProjectSearchRefinementSuggestions;
   nextSteps: ProjectNextSteps;
   priorities: ProjectCommandPriorities;
 };
@@ -231,6 +243,10 @@ export function buildProjectCandidateDecisionQueue(input?: {
   items?: unknown[];
   locale?: ResearchLoopLocale | string;
 }): ProjectCandidateDecisionQueue;
+export function buildProjectSearchRefinementSuggestions(input?: {
+  items?: unknown[];
+  locale?: ResearchLoopLocale | string;
+}): ProjectSearchRefinementSuggestions;
 export function buildPersistedSearchFeedback(input?: {
   feedback?: SearchFeedback;
   optimizedInput?: string;

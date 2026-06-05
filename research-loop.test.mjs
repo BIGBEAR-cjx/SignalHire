@@ -434,6 +434,72 @@ test("builds project command priorities from candidate evidence gaps and feedbac
   assert.match(consoleView.priorities.items[1].detail, /最近反馈已经转成下一轮搜索条件/);
 });
 
+test("turns candidate status signals into next-round project search refinements", () => {
+  const consoleView = buildProjectSearchConsole({
+    locale: "zh",
+    project: {
+      name: "多模态 Agent 工程师",
+      brief: "找做过多模态 Agent 产品落地和开源工具的资深工程师",
+    },
+    candidateCount: 4,
+    items: [
+      {
+        id: "rejected-1",
+        status: "rejected",
+        candidate: {
+          name: "Bad Fit",
+          ai_directions: ["通用 Chatbot", "Prompt 运营"],
+          evidence_audit: { overall_evidence_quality: "high" },
+          claims: [],
+        },
+      },
+      {
+        id: "weak-1",
+        status: "new",
+        candidate: {
+          name: "Weak Evidence",
+          ai_directions: ["多模态 Agent"],
+          evidence_audit: { overall_evidence_quality: "low" },
+          claims: [{ claim: "落地过多模态 Agent 产品", verdict: "unverified" }],
+        },
+      },
+      {
+        id: "active-1",
+        status: "interviewing",
+        candidate: {
+          name: "Strong Match",
+          current_role: "AI Engineer",
+          current_company: "Acme AI",
+          ai_directions: ["多模态 Agent", "开源工具"],
+          evidence_audit: { overall_evidence_quality: "high" },
+          claims: [{ claim: "维护多模态 Agent 工具", verdict: "verified" }],
+        },
+      },
+    ],
+    runs: [
+      {
+        id: "run-1",
+        kind: "search",
+        label: "多模态 Agent 工程师",
+        query_text: "找做过多模态 Agent 产品落地和开源工具的资深工程师",
+        status: "done",
+        updated_at: "2026-06-05T10:00:00.000Z",
+      },
+    ],
+  });
+
+  assert.deepEqual(
+    consoleView.refinementSuggestions.items.map((item) => item.key),
+    ["avoid_rejected_patterns", "strengthen_evidence", "find_similar_to_active"],
+  );
+  assert.match(consoleView.refinementSuggestions.items[0].detail, /通用 Chatbot、Prompt 运营/);
+  assert.match(consoleView.refinementSuggestions.items[1].detail, /1 位候选人证据不足/);
+  assert.match(consoleView.refinementSuggestions.items[2].detail, /Strong Match/);
+  assert.match(consoleView.nextSearchInput, /避开已拒绝画像/);
+  assert.match(consoleView.nextSearchInput, /优先交叉核验/);
+  assert.match(consoleView.nextSearchInput, /参考已推进候选人/);
+});
+
 test("builds project research rounds from newest-first project runs", () => {
   const rounds = buildProjectResearchRounds({
     runs: [
