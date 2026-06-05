@@ -430,6 +430,14 @@ test("builds localized candidate evidence dossier for result review", () => {
   assert.deepEqual(zh.evidence_groups[0].primary_claims, ["Maintains public vLLM serving code"]);
   assert.deepEqual(zh.evidence_groups[3].missing_source_types, ["talk", "blog", "podcast", "interview"]);
   assert.ok(zh.verification_gaps.some((gap) => /缺少公开表达证据/.test(gap)));
+  assert.equal(zh.backfill_jobs.length, 1);
+  assert.deepEqual(zh.backfill_jobs[0].candidate_names, ["Ada Lovelace"]);
+  assert.equal(zh.backfill_jobs[0].coverage_group, "public_voice");
+  assert.equal(zh.backfill_jobs[0].missing_source_type, "talk");
+  assert.deepEqual(zh.backfill_jobs[0].source_types_to_check, ["talk", "blog", "podcast", "interview"]);
+  assert.equal(zh.backfill_jobs[0].status, "planned");
+  assert.match(zh.backfill_jobs[0].query, /Ada Lovelace/);
+  assert.match(zh.backfill_jobs[0].reason, /缺少公开表达证据/);
 
   const en = talentProfile.buildCandidateEvidenceDossier({ result, candidate: result.candidates[0], locale: "en" });
   assert.equal(en.title, "Candidate evidence dossier");
@@ -439,6 +447,7 @@ test("builds localized candidate evidence dossier for result review", () => {
   assert.match(en.verdict_summary, /1 verified/);
   assert.equal(en.evidence_groups[0].label, "Research");
   assert.ok(en.verification_gaps.some((gap) => /Public voice evidence is missing/.test(gap)));
+  assert.match(en.backfill_jobs[0].reason, /Public voice evidence is missing/);
 });
 
 test("builds shortlist delivery report for hiring manager handoff", () => {

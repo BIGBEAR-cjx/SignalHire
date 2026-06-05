@@ -881,7 +881,13 @@ export default function ResearchTool({
                           />
                         )}
                         <EvidenceGraphView result={result} candidate={result.candidates[selectedCandidateIndex]} locale={locale} />
-                        <CandidateProfileView candidate={result.candidates[selectedCandidateIndex]} result={result} locale={locale} />
+                        <CandidateProfileView
+                          candidate={result.candidates[selectedCandidateIndex]}
+                          result={result}
+                          onBackfillJob={enqueueBackfillJob}
+                          backfillDisabled={loading}
+                          locale={locale}
+                        />
                       </>
                     )}
                   </div>

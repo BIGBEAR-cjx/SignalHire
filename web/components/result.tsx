@@ -1387,7 +1387,16 @@ export function EvidenceGraphView({ result, candidate, locale }: { result: Talen
   );
 }
 
-function CandidateEvidenceDossierView({ dossier, locale }: { dossier: CandidateEvidenceDossier } & ResultLocaleProps) {
+function CandidateEvidenceDossierView({
+  dossier,
+  onBackfillJob,
+  backfillDisabled = false,
+  locale,
+}: {
+  dossier: CandidateEvidenceDossier;
+  onBackfillJob?: (job: CoverageBackfillJob) => void;
+  backfillDisabled?: boolean;
+} & ResultLocaleProps) {
   return (
     <section className="mt-5 rounded-2xl border border-black/10 bg-[var(--sh-faint)]/70 p-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
@@ -1460,11 +1469,28 @@ function CandidateEvidenceDossierView({ dossier, locale }: { dossier: CandidateE
         </ul>
       )}
 
-      {dossier.verification_gaps.length > 0 && (
+      {(dossier.backfill_jobs.length > 0 || dossier.verification_gaps.length > 0) && (
         <div className="mt-3 rounded-xl bg-amber-50/80 px-3 py-2 ring-1 ring-amber-100">
           <p className="text-xs font-semibold text-amber-800">{resultCopy(locale, "verificationGaps")}</p>
           <ul className="mt-1 space-y-1">
-            {dossier.verification_gaps.map((gap) => (
+            {dossier.backfill_jobs.length > 0 ? dossier.backfill_jobs.map((job) => (
+              <li key={job.gap_id} className="flex flex-wrap items-center justify-between gap-2 text-sm leading-relaxed text-amber-900">
+                <span className="flex min-w-0 flex-1 gap-2">
+                  <FiFlag className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" aria-hidden="true" />
+                  <span>{job.reason}</span>
+                </span>
+                {onBackfillJob && (
+                  <button
+                    type="button"
+                    onClick={() => onBackfillJob(job)}
+                    disabled={backfillDisabled || job.status !== "planned"}
+                    className="rounded-lg bg-gray-900 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    {backfillDisabled ? resultCopy(locale, "enqueueingBackfill") : resultCopy(locale, "backfillGap")}
+                  </button>
+                )}
+              </li>
+            )) : dossier.verification_gaps.map((gap) => (
               <li key={gap} className="flex gap-2 text-sm leading-relaxed text-amber-900">
                 <FiFlag className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" aria-hidden="true" />
                 {gap}
@@ -1477,7 +1503,18 @@ function CandidateEvidenceDossierView({ dossier, locale }: { dossier: CandidateE
   );
 }
 
-export function CandidateProfileView({ candidate, result, locale }: { candidate: TalentCandidate; result?: TalentSearchResult } & ResultLocaleProps) {
+export function CandidateProfileView({
+  candidate,
+  result,
+  onBackfillJob,
+  backfillDisabled = false,
+  locale,
+}: {
+  candidate: TalentCandidate;
+  result?: TalentSearchResult;
+  onBackfillJob?: (job: CoverageBackfillJob) => void;
+  backfillDisabled?: boolean;
+} & ResultLocaleProps) {
   const dossier = buildCandidateEvidenceDossier({ result, candidate, locale: locale ?? "zh" }) as CandidateEvidenceDossier;
 
   return (
@@ -1495,7 +1532,7 @@ export function CandidateProfileView({ candidate, result, locale }: { candidate:
         </div>
       </div>
 
-      <CandidateEvidenceDossierView dossier={dossier} locale={locale} />
+      <CandidateEvidenceDossierView dossier={dossier} onBackfillJob={onBackfillJob} backfillDisabled={backfillDisabled} locale={locale} />
 
       {candidate.outreach_angle && (
         <div className="mt-4 rounded-xl border border-blue-100 bg-blue-50/70 p-4">

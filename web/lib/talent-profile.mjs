@@ -797,6 +797,39 @@ function buildDossierEvidenceGroups({ audit, claims, locale }) {
   });
 }
 
+function buildDossierBackfillJobs({ evidenceGroups, candidate, result, locale }) {
+  const name = cleanString(candidate?.name);
+  const role = candidateRole(candidate) || cleanString(candidate?.headline);
+  const originalQuery = cleanString(result?.search_brief?.original_query);
+  const directionTerms = cleanStringArray(candidate?.ai_directions, 4).join(" ");
+  const signalTerms = cleanStringArray(candidate?.strongest_signals, 2).join(" ");
+  const baseQuery = [name, role, directionTerms, signalTerms, originalQuery].filter(Boolean).join(" ");
+  return evidenceGroups
+    .filter((group) => group.status === "missing" && group.missing_source_types.length > 0)
+    .map((group, index) => {
+      const missingSourceType = group.missing_source_types[0];
+      return {
+        gap_id: `${cleanString(name).toLowerCase().replace(/[^a-z0-9]+/gi, "-").replace(/^-|-$/g, "") || "candidate"}-${group.key}-${missingSourceType}`,
+        coverage_group: group.key,
+        missing_source_type: missingSourceType,
+        query: fallbackSourceQuery(missingSourceType, {
+          original_query: baseQuery,
+          required_skills: cleanStringArray(result?.search_brief?.required_skills, 6),
+          target_directions: cleanStringArray(candidate?.ai_directions, 4),
+        }),
+        reason: dossierCopy(locale, "gapSummary", {
+          label: group.label,
+          sources: group.missing_source_types.join(", "),
+        }),
+        priority: index + 1,
+        status: "planned",
+        candidate_names: name ? [name] : [],
+        source_types_to_check: group.missing_source_types,
+      };
+    })
+    .slice(0, 4);
+}
+
 /**
  * @param {{ result?: unknown; candidate?: unknown; locale?: "zh" | "en" }} input
  */
@@ -824,6 +857,7 @@ export function buildCandidateEvidenceDossier({ result, candidate, locale = "zh"
       label: group.label,
       sources: group.missing_source_types.join(", "),
     }));
+  const backfillJobs = buildDossierBackfillJobs({ evidenceGroups, candidate: selected, result: normalizedResult, locale });
 
   return {
     title: dossierCopy(locale, "title"),
@@ -851,6 +885,7 @@ export function buildCandidateEvidenceDossier({ result, candidate, locale = "zh"
     weak_evidence: audit.weakest_evidence.slice(0, 2),
     evidence_groups: evidenceGroups,
     verification_gaps: verificationGaps,
+    backfill_jobs: backfillJobs,
   };
 }
 
