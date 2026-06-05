@@ -20,7 +20,8 @@ import {
   describeJobStatus,
   isStaleRunningJob,
 } from "./job-state.mjs";
-import { mergeBackfillResult } from "./talent-profile.mjs";
+import { buildFeedbackOptimizedSearchInput, mergeBackfillResult } from "./talent-profile.mjs";
+import { mergeSearchFeedbackIntoResult } from "./research-loop.mjs";
 
 const BASE = process.env.INSFORGE_API_BASE_URL;
 const KEY = process.env.INSFORGE_API_KEY; // 服务端 access key, 绝不进 NEXT_PUBLIC
@@ -118,6 +119,12 @@ function ageMs(row: { created_at?: string | null; updated_at?: string | null }, 
 }
 
 export type RunKind = "search" | "verify";
+type SearchFeedbackInput = {
+  precision?: string;
+  satisfaction?: string;
+  issue?: string;
+  focus?: string;
+};
 
 export interface SaveRunInput {
   kind: RunKind;
@@ -196,6 +203,14 @@ export interface MergeBackfillRunsResult {
   runId: string;
   result: unknown;
   mergeSummary: unknown;
+  updated_at: string | null;
+}
+
+export interface SaveSearchFeedbackResult {
+  runId: string;
+  result: unknown;
+  feedback: unknown;
+  optimizedInput: string;
   updated_at: string | null;
 }
 
@@ -445,6 +460,60 @@ export async function mergeBackfillRuns(input: {
       runId: row.id,
       result: row.result ?? merged,
       mergeSummary,
+      updated_at: row.updated_at ?? updatedAt,
+    };
+  } catch {
+    return null;
+  }
+}
+
+// 将用户对某一轮 shortlist 的选择题反馈写回该 search run 的 result。
+// 不新增 DB 列，避免迁移阻塞；后续如需分析可从 result.search_feedback 迁移到独立表。
+export async function saveSearchFeedback(input: {
+  runId: string;
+  userId: string;
+  feedback: SearchFeedbackInput;
+}): Promise<SaveSearchFeedbackResult | null> {
+  if (!client) return null;
+  try {
+    const current = await getDoneSearchRunForUser(input.runId, input.userId);
+    if (!current) return null;
+
+    const optimizedInput = buildFeedbackOptimizedSearchInput({
+      result: current.result,
+      feedback: input.feedback,
+    });
+    const updatedAt = new Date().toISOString();
+    const merged = mergeSearchFeedbackIntoResult({
+      result: current.result,
+      feedback: input.feedback,
+      optimizedInput,
+      createdAt: updatedAt,
+    });
+
+    const { data, error } = await client.database
+      .from(TABLE)
+      .update({
+        result: merged,
+        updated_at: updatedAt,
+      })
+      .eq("id", input.runId)
+      .eq("user_id", input.userId)
+      .eq("kind", "search")
+      .eq("status", "done")
+      .select("id,result,updated_at")
+      .limit(1);
+    if (error || !data || data.length === 0) return null;
+    const row = data[0] as { id: string; result?: unknown; updated_at?: string | null };
+    const result = row.result ?? merged;
+    const feedback = result && typeof result === "object" && !Array.isArray(result)
+      ? (result as { search_feedback?: unknown }).search_feedback
+      : merged.search_feedback;
+    return {
+      runId: row.id,
+      result,
+      feedback,
+      optimizedInput,
       updated_at: row.updated_at ?? updatedAt,
     };
   } catch {

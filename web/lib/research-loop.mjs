@@ -15,6 +15,10 @@ function cleanString(value) {
   return typeof value === "string" ? value.trim() : "";
 }
 
+function isPlainObject(value) {
+  return Boolean(value && typeof value === "object" && !Array.isArray(value));
+}
+
 function cleanFeed(feed) {
   return Array.isArray(feed) ? feed.filter(Boolean) : [];
 }
@@ -285,6 +289,45 @@ export function buildFeedbackOptimizationPreview({ feedback = {}, locale = "zh" 
     required: [],
     statusText: msg(normalizedLocale, "feedback.preview.ready"),
     actions,
+  };
+}
+
+function normalizedFeedbackValue(value) {
+  return cleanString(value);
+}
+
+/**
+ * @param {{ feedback?: Record<string, string | undefined>; optimizedInput?: string; createdAt?: string; locale?: string }} input
+ */
+export function buildPersistedSearchFeedback({ feedback = {}, optimizedInput = "", createdAt = "", locale = "zh" } = {}) {
+  const normalizedLocale = normalizeLocale(locale);
+  const preview = buildFeedbackOptimizationPreview({ feedback, locale: normalizedLocale });
+  const created = cleanString(createdAt) || new Date().toISOString();
+  return {
+    version: 1,
+    precision: normalizedFeedbackValue(feedback.precision),
+    satisfaction: normalizedFeedbackValue(feedback.satisfaction),
+    issue: normalizedFeedbackValue(feedback.issue),
+    focus: normalizedFeedbackValue(feedback.focus),
+    optimization_actions: preview.actions.map((action) => action.key),
+    optimized_query: cleanString(optimizedInput),
+    created_at: created,
+  };
+}
+
+/**
+ * @param {{ result?: unknown; feedback?: Record<string, string | undefined>; optimizedInput?: string; createdAt?: string; locale?: string }} input
+ */
+export function mergeSearchFeedbackIntoResult({ result, feedback = {}, optimizedInput = "", createdAt = "", locale = "zh" } = {}) {
+  const source = isPlainObject(result) ? result : {};
+  return {
+    ...source,
+    search_feedback: buildPersistedSearchFeedback({
+      feedback,
+      optimizedInput,
+      createdAt,
+      locale,
+    }),
   };
 }
 

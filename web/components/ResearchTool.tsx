@@ -67,6 +67,7 @@ type StatusResponse = {
 };
 type BackfillContext = { originalResult: TalentSearchResult; originalRunId: string | null; job: CoverageBackfillJob };
 type MergeBackfillResponse = { merged?: boolean; runId?: string; result?: AppResult; mergeSummary?: BackfillMergeSummary; error?: string };
+type SaveFeedbackResponse = { saved?: boolean; optimizedInput?: string; result?: AppResult; error?: string };
 type EditableSearchPlanDraft = TalentSearchResult;
 type EditableSourceStrategy = TalentSearchResult["search_plan"]["source_strategy"][number];
 type SearchFeedbackState = {
@@ -390,9 +391,25 @@ export default function ResearchTool({
     }));
   }
 
-  function runFeedbackOptimizedSearch() {
+  async function runFeedbackOptimizedSearch() {
     if (!isTalentSearchResult(result)) return;
-    const optimizedInput = buildFeedbackOptimizedSearchInput({ result, feedback: searchFeedback });
+    let optimizedInput = buildFeedbackOptimizedSearchInput({ result, feedback: searchFeedback });
+    if (runId) {
+      try {
+        const res = await fetch("/api/feedback", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ run_id: runId, feedback: searchFeedback }),
+        });
+        const saved: SaveFeedbackResponse = await res.json().catch(() => ({}));
+        if (res.ok && saved.saved) {
+          if (typeof saved.optimizedInput === "string" && saved.optimizedInput.trim()) {
+            optimizedInput = saved.optimizedInput;
+          }
+          if (saved.result) setResult(saved.result);
+        }
+      } catch {}
+    }
     setInput(optimizedInput);
     run(optimizedInput, { preserveInput: true });
   }

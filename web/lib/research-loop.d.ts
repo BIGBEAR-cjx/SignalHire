@@ -56,6 +56,16 @@ export type FeedbackOptimizationPreview = {
   statusText: string;
   actions: FeedbackOptimizationAction[];
 };
+export type PersistedSearchFeedback = {
+  version: 1;
+  precision: string;
+  satisfaction: string;
+  issue: string;
+  focus: string;
+  optimization_actions: string[];
+  optimized_query: string;
+  created_at: string;
+};
 export type ProjectNextStepAction = {
   key: string;
   label: string;
@@ -101,6 +111,19 @@ export function buildFeedbackOptimizationPreview(input?: {
   feedback?: SearchFeedback;
   locale?: ResearchLoopLocale | string;
 }): FeedbackOptimizationPreview;
+export function buildPersistedSearchFeedback(input?: {
+  feedback?: SearchFeedback;
+  optimizedInput?: string;
+  createdAt?: string;
+  locale?: ResearchLoopLocale | string;
+}): PersistedSearchFeedback;
+export function mergeSearchFeedbackIntoResult(input?: {
+  result?: unknown;
+  feedback?: SearchFeedback;
+  optimizedInput?: string;
+  createdAt?: string;
+  locale?: ResearchLoopLocale | string;
+}): Record<string, unknown> & { search_feedback: PersistedSearchFeedback };
 export function buildProjectNextSteps(input?: {
   candidateCount?: number;
   runCount?: number;

@@ -3,11 +3,13 @@ import assert from "node:assert/strict";
 
 import {
   buildFeedbackOptimizationPreview,
+  buildPersistedSearchFeedback,
   buildProjectResearchRounds,
   buildProjectNextSteps,
   buildResearchLoopView,
   extractRecentResearchItems,
   inferResearchCoverage,
+  mergeSearchFeedbackIntoResult,
 } from "./web/lib/research-loop.mjs";
 
 const mixedFeed = [
@@ -206,4 +208,46 @@ test("builds English empty project research rounds", () => {
   assert.equal(rounds.title, "Project search rounds");
   assert.equal(rounds.emptyText, "No project search rounds yet.");
   assert.deepEqual(rounds.items, []);
+});
+
+test("builds a persisted search feedback payload with optimization actions", () => {
+  const persisted = buildPersistedSearchFeedback({
+    feedback: {
+      precision: "off",
+      satisfaction: "unsatisfied",
+      issue: "weak_evidence",
+      focus: "expand_sources",
+    },
+    optimizedInput: "Feedback-optimized SignalHire search.\nExpand GitHub and paper sources.",
+    createdAt: "2026-06-05T12:34:56.000Z",
+  });
+
+  assert.equal(persisted.version, 1);
+  assert.equal(persisted.precision, "off");
+  assert.equal(persisted.satisfaction, "unsatisfied");
+  assert.equal(persisted.issue, "weak_evidence");
+  assert.equal(persisted.focus, "expand_sources");
+  assert.equal(persisted.created_at, "2026-06-05T12:34:56.000Z");
+  assert.equal(persisted.optimized_query, "Feedback-optimized SignalHire search.\nExpand GitHub and paper sources.");
+  assert.deepEqual(persisted.optimization_actions, ["tighten_profile", "strengthen_evidence", "expand_sources", "adjust_candidate_pool"]);
+});
+
+test("merges persisted feedback into a talent result without dropping existing result fields", () => {
+  const result = {
+    search_brief: { original_query: "Find LLM infra engineers" },
+    candidates: [{ name: "Ada Lovelace" }],
+  };
+
+  const merged = mergeSearchFeedbackIntoResult({
+    result,
+    feedback: { precision: "partial", satisfaction: "mixed", issue: "wrong_seniority" },
+    optimizedInput: "Feedback-optimized SignalHire search.",
+    createdAt: "2026-06-05T13:00:00.000Z",
+  });
+
+  assert.equal(merged.search_brief.original_query, "Find LLM infra engineers");
+  assert.equal(merged.candidates[0].name, "Ada Lovelace");
+  assert.equal(merged.search_feedback.precision, "partial");
+  assert.equal(merged.search_feedback.satisfaction, "mixed");
+  assert.deepEqual(merged.search_feedback.optimization_actions, ["tighten_profile", "expand_sources", "adjust_seniority"]);
 });
