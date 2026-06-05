@@ -149,3 +149,23 @@ test("translates project detail interaction labels", () => {
     assert.equal(t("en", key, enParams), en);
   }
 });
+
+test("translates project detail queue and fallback labels", () => {
+  const keys = [
+    ["projects.detail.error.loadProject", "加载失败", "Failed to load project"],
+    ["projects.detail.error.loadCandidates", "候选人加载失败", "Failed to load candidates"],
+    ["projects.actionBrief.eyebrow", "工作台", "Workbench"],
+    ["projects.actionBrief.startSearch", "启动搜人", "Start search"],
+    ["projects.decisionQueue.eyebrow", "决策队列", "Decision queue"],
+    ["projects.decisionQueue.title", "候选人决策队列", "Candidate decision queue"],
+    ["projects.decisionQueue.description", "按待看、推进中、需补证据和不合适分组，先处理证据风险和高意向候选人。", "Grouped by review, active progress, evidence gaps, and not-a-fit so teams can handle the highest-risk candidates first."],
+    ["projects.decisionQueue.backfill", "补搜证据", "Backfill evidence"],
+    ["projects.decisionQueue.overflow", "还有 3 位，切换下方列表继续查看。", "3 more candidates. Use the list below to keep reviewing.", { count: 3 }, { count: 3 }],
+    ["projects.decisionQueue.empty", "暂无候选人", "No candidates"],
+  ];
+
+  for (const [key, zh, en, zhParams, enParams] of keys) {
+    assert.equal(t("zh", key, zhParams), zh);
+    assert.equal(t("en", key, enParams), en);
+  }
+});

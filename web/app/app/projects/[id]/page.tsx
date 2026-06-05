@@ -292,11 +292,11 @@ export default function ProjectDetailPage() {
     try {
       const r = await fetch(`/api/projects/${id}`);
       const j = await r.json();
-      if (!r.ok) throw new Error(j.error || "加载失败");
+      if (!r.ok) throw new Error(j.error || t("projects.detail.error.loadProject"));
       setDetail(j as ProjectDetail);
       setError("");
     } catch (e) { setError((e as Error).message); }
-  }, [id]);
+  }, [id, t]);
 
   useEffect(() => {
     if (!id) return;
@@ -309,8 +309,8 @@ export default function ProjectDetailPage() {
         ]);
         const [detailJson, itemsJson] = await Promise.all([detailRes.json(), itemsRes.json()]);
         if (cancelled) return;
-        if (!detailRes.ok) throw new Error(detailJson.error || "加载失败");
-        if (!itemsRes.ok) throw new Error(itemsJson.error || "候选人加载失败");
+        if (!detailRes.ok) throw new Error(detailJson.error || t("projects.detail.error.loadProject"));
+        if (!itemsRes.ok) throw new Error(itemsJson.error || t("projects.detail.error.loadCandidates"));
         setDetail(detailJson as ProjectDetail);
         setItems((itemsJson.items ?? []) as ShortlistItem[]);
         setError("");
@@ -320,7 +320,7 @@ export default function ProjectDetailPage() {
     }
     void load();
     return () => { cancelled = true; };
-  }, [id]);
+  }, [id, t]);
 
   const filteredItems = useMemo(() => {
     if (!items) return [];
@@ -453,7 +453,6 @@ export default function ProjectDetailPage() {
           brief={actionBrief}
           searchHref={searchHref}
           projectId={id}
-          locale={locale}
           onOpenCandidate={(itemId) => setSelectedItemId(itemId)}
         />
       )}
@@ -494,7 +493,6 @@ export default function ProjectDetailPage() {
       {items && items.length > 0 && (
         <ProjectCandidateDecisionQueuePanel
           queue={decisionQueue}
-          locale={locale}
           projectId={id}
           selectedItemId={selectedItemId}
           onOpenCandidate={(itemId) => setSelectedItemId(itemId)}
@@ -995,30 +993,26 @@ function ProjectActionBriefPanel({
   brief,
   searchHref,
   projectId,
-  locale,
   onOpenCandidate,
 }: {
   brief: ProjectActionBriefView;
   searchHref: string;
   projectId: string;
-  locale: "zh" | "en";
   onOpenCandidate: (itemId: string) => void;
 }) {
+  const { t } = useI18n();
   const primary = brief.primaryAction;
   const primaryBackfillHref = primary.backfillInput
     ? `/app/search?project=${projectId}&q=${encodeURIComponent(primary.backfillInput)}`
     : "";
   const canOpenPrimary = Boolean(primary.targetItemId);
   const secondaryActions = brief.actions.filter((action) => action.key !== primary.key).slice(0, 3);
-  const copy = locale === "en"
-    ? { eyebrow: "Workbench", start: "Start search" }
-    : { eyebrow: "Workbench", start: "启动搜人" };
 
   return (
     <Surface className="p-5">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
         <div className="min-w-0">
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-neutral-500">{copy.eyebrow}</p>
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-neutral-500">{t("projects.actionBrief.eyebrow")}</p>
           <h2 className="mt-1 text-2xl font-semibold tracking-tight text-[var(--sh-ink)]">{brief.title}</h2>
           <p className="mt-2 max-w-3xl text-sm leading-6 text-[var(--sh-muted)]">{brief.summary}</p>
         </div>
@@ -1036,7 +1030,7 @@ function ProjectActionBriefPanel({
           ) : (
             <PrimaryAction href={searchHref}>
               <FiSearch className="h-4 w-4" aria-hidden="true" />
-              {primary.label || copy.start}
+              {primary.label || t("projects.actionBrief.startSearch")}
             </PrimaryAction>
           )}
         </div>
@@ -1113,7 +1107,6 @@ function ProjectCandidateFeedbackSummaryPanel({
 
 function ProjectCandidateDecisionQueuePanel({
   queue,
-  locale,
   projectId,
   selectedItemId,
   onOpenCandidate,
@@ -1134,37 +1127,20 @@ function ProjectCandidateDecisionQueuePanel({
       }>;
     }>;
   };
-  locale: "zh" | "en";
   projectId: string;
   selectedItemId: string | null;
   onOpenCandidate: (itemId: string) => void;
 }) {
-  const copy = locale === "en"
-    ? {
-        eyebrow: "Decision queue",
-        title: "Candidate decision queue",
-        description: "Grouped by review, active progress, evidence gaps, and not-a-fit so teams can handle the highest-risk candidates first.",
-        backfill: "Backfill evidence",
-        overflow: "more candidates. Use the list below to keep reviewing.",
-        empty: "No candidates",
-      }
-    : {
-        eyebrow: "Decision queue",
-        title: "候选人决策队列",
-        description: "按待看、推进中、需补证据和不合适分组，先处理证据风险和高意向候选人。",
-        backfill: "补搜证据",
-        overflow: "位，切换下方列表继续查看。",
-        empty: "暂无候选人",
-      };
+  const { t } = useI18n();
   return (
     <Surface className="p-5">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-neutral-500">{copy.eyebrow}</p>
-          <h2 className="mt-1 text-xl font-semibold text-[var(--sh-ink)]">{copy.title}</h2>
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-neutral-500">{t("projects.decisionQueue.eyebrow")}</p>
+          <h2 className="mt-1 text-xl font-semibold text-[var(--sh-ink)]">{t("projects.decisionQueue.title")}</h2>
         </div>
         <p className="max-w-xl text-sm leading-6 text-[var(--sh-muted)]">
-          {copy.description}
+          {t("projects.decisionQueue.description")}
         </p>
       </div>
 
@@ -1200,18 +1176,18 @@ function ProjectCandidateDecisionQueuePanel({
                       href={`/app/search?project=${projectId}&q=${encodeURIComponent(item.backfillInput)}`}
                       className="mt-2 inline-flex rounded-full bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-700 ring-1 ring-blue-100 transition hover:bg-blue-100"
                     >
-                      {copy.backfill}
+                      {t("projects.decisionQueue.backfill")}
                     </Link>
                   )}
                 </div>
               ))}
               {column.items.length > 6 && (
                 <p className="px-1 text-xs text-gray-400">
-                  {locale === "en" ? `${column.items.length - 6} ${copy.overflow}` : `还有 ${column.items.length - 6} ${copy.overflow}`}
+                  {t("projects.decisionQueue.overflow", { count: column.items.length - 6 })}
                 </p>
               )}
               {column.items.length === 0 && (
-                <p className="rounded-2xl border border-dashed border-black/10 bg-white/50 p-3 text-xs leading-5 text-gray-400">{copy.empty}</p>
+                <p className="rounded-2xl border border-dashed border-black/10 bg-white/50 p-3 text-xs leading-5 text-gray-400">{t("projects.decisionQueue.empty")}</p>
               )}
             </div>
           </section>
