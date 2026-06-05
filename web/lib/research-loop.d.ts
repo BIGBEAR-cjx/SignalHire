@@ -292,6 +292,13 @@ export type ProjectControlRoom = {
   };
   cards: ProjectControlRoomCard[];
 };
+export type ProjectDetailHierarchy = {
+  locale: ResearchLoopLocale;
+  primary: string[];
+  secondary: string[];
+  hidden: string[];
+  notes: Record<string, string>;
+};
 export type ProjectResearchRoundItem = {
   id: string;
   roundNumber: number;
@@ -437,6 +444,11 @@ export function buildProjectControlRoom(input?: {
   hasFilter?: boolean;
   locale?: ResearchLoopLocale | string;
 }): ProjectControlRoom;
+export function buildProjectDetailHierarchy(input?: {
+  hasCandidates?: boolean;
+  hasControlRoom?: boolean;
+  locale?: ResearchLoopLocale | string;
+}): ProjectDetailHierarchy;
 export function buildProjectResearchRounds(input?: {
   runs?: Array<{
     id?: string;

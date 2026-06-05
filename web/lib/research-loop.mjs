@@ -1441,3 +1441,33 @@ export function buildProjectControlRoom({ project = {}, runs = [], items = [], c
     ],
   };
 }
+
+/**
+ * @param {{ hasCandidates?: boolean; hasControlRoom?: boolean; locale?: string }} input
+ */
+export function buildProjectDetailHierarchy({ hasCandidates = false, hasControlRoom = true, locale = "zh" } = {}) {
+  const normalizedLocale = normalizeLocale(locale);
+  const hidden = hasControlRoom ? ["action_brief", "candidate_feedback_summary"] : [];
+  const notes = normalizedLocale === "en"
+    ? {
+        action_brief: "The control room already carries today's priority action, so the standalone summary is hidden.",
+        candidate_feedback_summary: "The control room already carries feedback learning; candidate feedback signals stay in the search console.",
+      }
+    : {
+        action_brief: "控制台已承接今日优先动作，避免重复显示。",
+        candidate_feedback_summary: "控制台已承接反馈学习摘要，保留候选人反馈信号在搜索控制台中。",
+      };
+  return {
+    locale: normalizedLocale,
+    primary: hasControlRoom ? ["header", "control_room"] : ["header", "action_brief"],
+    secondary: [
+      "search_console",
+      "kpi_strip",
+      "status_funnel",
+      ...(hasCandidates ? ["candidate_decision_queue", "candidate_evidence", "candidate_list"] : ["empty_candidates"]),
+      "research_rounds",
+    ],
+    hidden,
+    notes,
+  };
+}

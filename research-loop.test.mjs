@@ -811,6 +811,22 @@ test("builds a project control room from brief, feedback, rounds, and candidate 
   assert.match(room.cards[4].detail, /需要补证据/);
 });
 
+test("builds a project detail hierarchy that avoids duplicate summary panels", () => {
+  assert.equal(typeof researchLoop.buildProjectDetailHierarchy, "function");
+
+  const hierarchy = researchLoop.buildProjectDetailHierarchy({
+    hasCandidates: true,
+    hasControlRoom: true,
+    locale: "zh",
+  });
+
+  assert.deepEqual(hierarchy.primary, ["header", "control_room"]);
+  assert.deepEqual(hierarchy.secondary.slice(0, 3), ["search_console", "kpi_strip", "status_funnel"]);
+  assert.deepEqual(hierarchy.hidden, ["action_brief", "candidate_feedback_summary"]);
+  assert.equal(hierarchy.notes.action_brief, "控制台已承接今日优先动作，避免重复显示。");
+  assert.equal(hierarchy.notes.candidate_feedback_summary, "控制台已承接反馈学习摘要，保留候选人反馈信号在搜索控制台中。");
+});
+
 test("parses project next-search text into editable constraint sections", () => {
   assert.equal(typeof researchLoop.buildSearchConstraintEditor, "function");
   assert.equal(typeof researchLoop.buildSearchInputFromConstraintEditor, "function");

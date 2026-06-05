@@ -19,7 +19,7 @@ import {
   StatusBadge,
   Surface,
 } from "@/components/ui/signal-ui";
-import { buildCandidateFeedbackPanel, buildProjectActionBrief, buildProjectCandidateDecisionQueue, buildProjectCandidateFeedbackSummary, buildProjectControlRoom, buildProjectResearchRounds, buildProjectSearchConsole } from "@/lib/research-loop.mjs";
+import { buildCandidateFeedbackPanel, buildProjectActionBrief, buildProjectCandidateDecisionQueue, buildProjectCandidateFeedbackSummary, buildProjectControlRoom, buildProjectDetailHierarchy, buildProjectResearchRounds, buildProjectSearchConsole } from "@/lib/research-loop.mjs";
 import { buildCandidateDecisionSignal, buildEvidencePriorityView, buildProjectEvidenceMatrix } from "@/lib/evidence-priority.mjs";
 import type { TalentCandidate } from "@/lib/talent-profile.mjs";
 
@@ -130,6 +130,9 @@ type ProjectControlRoomView = {
     value: string;
     detail: string;
   }>;
+};
+type ProjectDetailHierarchyView = {
+  hidden: string[];
 };
 type ProjectCandidateFeedbackSummaryView = {
   title: string;
@@ -383,13 +386,21 @@ export default function ProjectDetailPage() {
     hasFilter: statusFilter !== "all",
     locale,
   }) as ProjectControlRoomView;
+  const projectHierarchy = buildProjectDetailHierarchy({
+    hasCandidates: Boolean(items && items.length > 0),
+    hasControlRoom: true,
+    locale,
+  }) as ProjectDetailHierarchyView;
+  const hiddenPanels = new Set(projectHierarchy.hidden);
+  const showActionBrief = !hiddenPanels.has("action_brief");
+  const showCandidateFeedbackSummary = !hiddenPanels.has("candidate_feedback_summary");
   const projectRounds = buildProjectResearchRounds({
     runs: detail.runs,
     locale,
   }) as ProjectResearchRoundsView;
   const decisionQueue = buildProjectCandidateDecisionQueue({ items: items ?? [], locale });
-  const actionBrief = buildProjectActionBrief({ items: items ?? [], locale }) as ProjectActionBriefView;
-  const candidateFeedbackSummary = buildProjectCandidateFeedbackSummary({ items: items ?? [], locale }) as ProjectCandidateFeedbackSummaryView;
+  const actionBrief = showActionBrief ? buildProjectActionBrief({ items: items ?? [], locale }) as ProjectActionBriefView : null;
+  const candidateFeedbackSummary = showCandidateFeedbackSummary ? buildProjectCandidateFeedbackSummary({ items: items ?? [], locale }) as ProjectCandidateFeedbackSummaryView : null;
 
   return (
     <div className="space-y-6">
@@ -408,15 +419,17 @@ export default function ProjectDetailPage() {
         onOpenCandidate={(itemId) => setSelectedItemId(itemId)}
       />
 
-      <ProjectActionBriefPanel
-        brief={actionBrief}
-        searchHref={searchHref}
-        projectId={id}
-        locale={locale}
-        onOpenCandidate={(itemId) => setSelectedItemId(itemId)}
-      />
+      {actionBrief && (
+        <ProjectActionBriefPanel
+          brief={actionBrief}
+          searchHref={searchHref}
+          projectId={id}
+          locale={locale}
+          onOpenCandidate={(itemId) => setSelectedItemId(itemId)}
+        />
+      )}
 
-      {items && items.length > 0 && (
+      {items && items.length > 0 && candidateFeedbackSummary && (
         <ProjectCandidateFeedbackSummaryPanel summary={candidateFeedbackSummary} />
       )}
 
