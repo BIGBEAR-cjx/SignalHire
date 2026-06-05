@@ -77,13 +77,13 @@ export default function ShortlistPage() {
     try {
       const r = await fetch("/api/shortlist");
       const j = await r.json();
-      if (!r.ok) throw new Error(j.error || "加载失败");
+      if (!r.ok) throw new Error(j.error || t("shortlist.loadFailed"));
       setItems((j.items ?? []) as Item[]);
       setError("");
     } catch (e) {
       setError((e as Error).message);
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => { void reload(); }, [reload]); // eslint-disable-line react-hooks/set-state-in-effect
 

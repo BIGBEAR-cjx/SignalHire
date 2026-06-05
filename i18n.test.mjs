@@ -169,3 +169,8 @@ test("translates project detail queue and fallback labels", () => {
     assert.equal(t("en", key, enParams), en);
   }
 });
+
+test("translates shortlist fallback labels", () => {
+  assert.equal(t("zh", "shortlist.loadFailed"), "加载失败");
+  assert.equal(t("en", "shortlist.loadFailed"), "Failed to load shortlist");
+});
