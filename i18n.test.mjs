@@ -73,3 +73,21 @@ test("translates research fallback error labels", () => {
     assert.equal(t("en", key), en);
   }
 });
+
+test("translates project detail status labels", () => {
+  const keys = [
+    ["projects.detail.status.open", "进行中", "Open"],
+    ["projects.detail.status.paused", "暂停", "Paused"],
+    ["projects.detail.status.closed", "已关闭", "Closed"],
+    ["projects.detail.candidateStatus.new", "待联系", "New"],
+    ["projects.detail.candidateStatus.contacted", "已联系", "Contacted"],
+    ["projects.detail.candidateStatus.interviewing", "面试中", "Interviewing"],
+    ["projects.detail.candidateStatus.hired", "已 hire", "Hired"],
+    ["projects.detail.candidateStatus.rejected", "已拒", "Rejected"],
+  ];
+
+  for (const [key, zh, en] of keys) {
+    assert.equal(t("zh", key), zh);
+    assert.equal(t("en", key), en);
+  }
+});

@@ -197,18 +197,18 @@ type ProjectEvidenceMatrixView = {
   empty: boolean;
 };
 
-const PROJ_STATUS_META: Record<ProjectStatus, { label: string; chip: string; dot: string }> = {
-  open:   { label: "进行中", chip: "bg-emerald-50 text-emerald-700 ring-emerald-200", dot: "bg-emerald-500" },
-  paused: { label: "暂停",   chip: "bg-amber-50 text-amber-800 ring-amber-200",       dot: "bg-amber-500" },
-  closed: { label: "已关闭", chip: "bg-gray-100 text-gray-600 ring-gray-200",         dot: "bg-gray-400" },
+const PROJ_STATUS_META: Record<ProjectStatus, { labelKey: string; chip: string; dot: string }> = {
+  open:   { labelKey: "projects.detail.status.open", chip: "bg-emerald-50 text-emerald-700 ring-emerald-200", dot: "bg-emerald-500" },
+  paused: { labelKey: "projects.detail.status.paused", chip: "bg-amber-50 text-amber-800 ring-amber-200",     dot: "bg-amber-500" },
+  closed: { labelKey: "projects.detail.status.closed", chip: "bg-gray-100 text-gray-600 ring-gray-200",       dot: "bg-gray-400" },
 };
 
-const SHORT_STATUS: { value: ShortlistStatus; label: string; chip: string; dot: string }[] = [
-  { value: "new",          label: "待联系",   chip: "bg-gray-100 text-gray-700 ring-gray-200",        dot: "bg-gray-400" },
-  { value: "contacted",    label: "已联系",   chip: "bg-blue-50 text-blue-700 ring-blue-200",         dot: "bg-blue-500" },
-  { value: "interviewing", label: "面试中",   chip: "bg-amber-50 text-amber-800 ring-amber-200",      dot: "bg-amber-500" },
-  { value: "hired",        label: "已 hire", chip: "bg-emerald-50 text-emerald-700 ring-emerald-200", dot: "bg-emerald-500" },
-  { value: "rejected",     label: "已拒",     chip: "bg-rose-50 text-rose-700 ring-rose-200",         dot: "bg-rose-400" },
+const SHORT_STATUS: { value: ShortlistStatus; labelKey: string; chip: string; dot: string }[] = [
+  { value: "new",          labelKey: "projects.detail.candidateStatus.new",          chip: "bg-gray-100 text-gray-700 ring-gray-200",        dot: "bg-gray-400" },
+  { value: "contacted",    labelKey: "projects.detail.candidateStatus.contacted",    chip: "bg-blue-50 text-blue-700 ring-blue-200",         dot: "bg-blue-500" },
+  { value: "interviewing", labelKey: "projects.detail.candidateStatus.interviewing", chip: "bg-amber-50 text-amber-800 ring-amber-200",      dot: "bg-amber-500" },
+  { value: "hired",        labelKey: "projects.detail.candidateStatus.hired",        chip: "bg-emerald-50 text-emerald-700 ring-emerald-200", dot: "bg-emerald-500" },
+  { value: "rejected",     labelKey: "projects.detail.candidateStatus.rejected",     chip: "bg-rose-50 text-rose-700 ring-rose-200",         dot: "bg-rose-400" },
 ];
 
 interface ProjectDetail {
@@ -279,7 +279,7 @@ function isTalentShape(x: unknown): x is TalentCandidate {
 export default function ProjectDetailPage() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
-  const { locale } = useI18n();
+  const { locale, t } = useI18n();
   const id = String(params?.id ?? "");
 
   const [detail, setDetail] = useState<ProjectDetail | null>(null);
@@ -480,7 +480,7 @@ export default function ProjectDetailPage() {
           {SHORT_STATUS.map((s) => (
             <KpiCard
               key={s.value}
-              label={s.label}
+              label={t(s.labelKey)}
               value={detail.breakdown[s.value] ?? 0}
               sub="人"
               accentDot={s.dot}
@@ -510,10 +510,10 @@ export default function ProjectDetailPage() {
               value={statusFilter}
               onChange={setStatusFilter}
               items={[
-                { value: "all", label: "全部", count: items.length },
+                { value: "all", label: t("common.all"), count: items.length },
                 ...SHORT_STATUS
                   .filter((s) => (detail.breakdown[s.value] ?? 0) > 0 || statusFilter === s.value)
-                  .map((s) => ({ value: s.value, label: s.label, count: detail.breakdown[s.value] ?? 0 })),
+                  .map((s) => ({ value: s.value, label: t(s.labelKey), count: detail.breakdown[s.value] ?? 0 })),
               ]}
             />
           )}
@@ -939,6 +939,7 @@ function StatusFunnel({
   current: ShortlistStatus | "all";
   onClick: (v: ShortlistStatus | "all") => void;
 }) {
+  const { t } = useI18n();
   if (total === 0) return null;
   return (
     <Surface className="p-5">
@@ -954,7 +955,7 @@ function StatusFunnel({
             current === "all" ? "bg-gray-900 text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"
           }`}
         >
-          全部 {total}
+          {t("common.all")} {total}
         </button>
       </div>
       <div className="mt-4 grid gap-2 md:grid-cols-5">
@@ -974,7 +975,7 @@ function StatusFunnel({
               <div className="flex items-center justify-between gap-2">
                 <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-gray-700">
                   <span className={`h-1.5 w-1.5 rounded-full ${status.dot}`} />
-                  {status.label}
+                  {t(status.labelKey)}
                 </span>
                 <span className="text-xs tabular-nums text-gray-400">{pct}%</span>
               </div>
@@ -1350,6 +1351,7 @@ function KpiCard({ label, value, sub, accentDot, onClick }: { label: string; val
 
 function ProjectHeader({ detail, onChanged, onDelete }: { detail: ProjectDetail; onChanged: () => void; onDelete: () => void }) {
   const p = detail.project;
+  const { t } = useI18n();
   const [editingName, setEditingName] = useState(false);
   const [editingBrief, setEditingBrief] = useState(false);
   const [name, setName] = useState(p.name);
@@ -1407,9 +1409,9 @@ function ProjectHeader({ detail, onChanged, onDelete }: { detail: ProjectDetail;
             onChange={(e) => patch({ status: e.target.value })}
             className={`appearance-none rounded-full px-3 py-1.5 text-xs font-semibold ring-1 outline-none ${meta.chip}`}
           >
-            <option value="open">进行中</option>
-            <option value="paused">暂停</option>
-            <option value="closed">已关闭</option>
+            <option value="open">{t(PROJ_STATUS_META.open.labelKey)}</option>
+            <option value="paused">{t(PROJ_STATUS_META.paused.labelKey)}</option>
+            <option value="closed">{t(PROJ_STATUS_META.closed.labelKey)}</option>
           </select>
           <IconButton label="删除项目" onClick={onDelete} Icon={FiTrash2} tone="danger" />
         </div>
@@ -1441,6 +1443,7 @@ function ProjectHeader({ detail, onChanged, onDelete }: { detail: ProjectDetail;
 }
 
 function CandidateItem({ item, locale, selected, onClick }: { item: ShortlistItem; locale: "zh" | "en"; selected: boolean; onClick: () => void }) {
+  const { t } = useI18n();
   const c = asCandidate(item.candidate);
   const subtitle = [c.current_role, c.current_company].filter(Boolean).join(" · ") || c.headline || "";
   const status = SHORT_STATUS.find((s) => s.value === item.status) ?? SHORT_STATUS[0];
@@ -1459,7 +1462,7 @@ function CandidateItem({ item, locale, selected, onClick }: { item: ShortlistIte
             {subtitle && <p className="mt-0.5 truncate text-xs text-gray-500">{subtitle}</p>}
           </div>
           <div className="flex shrink-0 items-center gap-2">
-            <StatusBadge label={status.label} dotClassName={status.dot} className={status.chip} />
+            <StatusBadge label={t(status.labelKey)} dotClassName={status.dot} className={status.chip} />
           </div>
         </div>
         <div className="grid gap-2 sm:grid-cols-3">
@@ -1486,6 +1489,7 @@ function CandidateDetailPanel({
   onUnassigned: () => void;
   locale: "zh" | "en";
 }) {
+  const { t } = useI18n();
   const [savingStatus, setSavingStatus] = useState(false);
   const [notes, setNotes] = useState(item.notes ?? "");
   const [savedHint, setSavedHint] = useState(false);
@@ -1574,7 +1578,7 @@ function CandidateDetailPanel({
               item.status === s.value ? "bg-gray-900 text-white" : "bg-white text-gray-600 ring-1 ring-gray-200 hover:ring-gray-900"
             }`}
           >
-            {s.label}
+            {t(s.labelKey)}
           </button>
         ))}
         <span className="flex-1" />
