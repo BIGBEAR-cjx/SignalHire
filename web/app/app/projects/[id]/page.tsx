@@ -403,6 +403,7 @@ export default function ProjectDetailPage() {
     hasSearchRefinementSuggestions: projectConsole.refinementSuggestions.items.length > 0,
     hasHeaderBrief: Boolean((p.brief ?? "").trim()),
     hasSearchConsoleBrief: Boolean(projectConsole.briefText.trim()),
+    hasCandidateStatusTabs: Boolean(items && items.length > 0),
     locale,
   }) as ProjectDetailHierarchyView;
   const hiddenPanels = new Set(projectHierarchy.hidden);
@@ -416,6 +417,7 @@ export default function ProjectDetailPage() {
   const showSearchConsoleFeedback = !hiddenPanels.has("search_console_feedback");
   const showSearchRefinementSuggestions = !hiddenPanels.has("search_refinement_suggestions");
   const showSearchConsoleBrief = !hiddenPanels.has("search_console_brief");
+  const showCandidateStatusTabs = !hiddenPanels.has("candidate_status_tabs");
   const decisionQueue = buildProjectCandidateDecisionQueue({ items: items ?? [], locale });
   const actionBrief = showActionBrief ? buildProjectActionBrief({ items: items ?? [], locale }) as ProjectActionBriefView : null;
   const candidateFeedbackSummary = showCandidateFeedbackSummary ? buildProjectCandidateFeedbackSummary({ items: items ?? [], locale }) as ProjectCandidateFeedbackSummaryView : null;
@@ -493,7 +495,7 @@ export default function ProjectDetailPage() {
       <section className="space-y-3">
         <div className="flex items-end justify-between">
           <h2 className="text-sm font-semibold text-gray-700">候选人</h2>
-          {items && items.length > 0 && (
+          {items && items.length > 0 && showCandidateStatusTabs && (
             <SegmentedControl
               value={statusFilter}
               onChange={setStatusFilter}

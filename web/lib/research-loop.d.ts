@@ -457,6 +457,7 @@ export function buildProjectDetailHierarchy(input?: {
   hasSearchRefinementSuggestions?: boolean;
   hasHeaderBrief?: boolean;
   hasSearchConsoleBrief?: boolean;
+  hasCandidateStatusTabs?: boolean;
   locale?: ResearchLoopLocale | string;
 }): ProjectDetailHierarchy;
 export function buildProjectResearchRounds(input?: {

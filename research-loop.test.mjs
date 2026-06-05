@@ -942,6 +942,19 @@ test("builds a project detail hierarchy that avoids duplicate project brief summ
   assert.equal(hierarchy.notes.search_console_brief, "项目头部已展示并可编辑 brief，搜索控制台只保留下一轮搜索约束。");
 });
 
+test("builds a project detail hierarchy that avoids duplicate candidate status filters", () => {
+  assert.equal(typeof researchLoop.buildProjectDetailHierarchy, "function");
+
+  const hierarchy = researchLoop.buildProjectDetailHierarchy({
+    hasStatusFunnel: true,
+    hasCandidateStatusTabs: true,
+    locale: "zh",
+  });
+
+  assert.ok(hierarchy.hidden.includes("candidate_status_tabs"));
+  assert.equal(hierarchy.notes.candidate_status_tabs, "状态漏斗已承接候选人状态计数和筛选，列表分段控件作为无漏斗时的回退。");
+});
+
 test("parses project next-search text into editable constraint sections", () => {
   assert.equal(typeof researchLoop.buildSearchConstraintEditor, "function");
   assert.equal(typeof researchLoop.buildSearchInputFromConstraintEditor, "function");
