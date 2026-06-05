@@ -59,3 +59,17 @@ test("translates editable search plan labels", () => {
     assert.equal(t("en", key), en);
   }
 });
+
+test("translates research fallback error labels", () => {
+  const keys = [
+    ["research.error.emptyResult", "研究完成但结果为空，请重新研究", "Research completed but returned no result. Run it again."],
+    ["research.error.failed", "研究失败，请重试", "Research failed. Try again."],
+    ["research.error.generic", "出错了", "Something went wrong."],
+    ["research.error.backfillQueued", "补搜入队失败", "Failed to queue evidence backfill."],
+  ];
+
+  for (const [key, zh, en] of keys) {
+    assert.equal(t("zh", key), zh);
+    assert.equal(t("en", key), en);
+  }
+});

@@ -296,7 +296,7 @@ export default function ResearchTool({
         }
         if (j.status === "done") {
           stopPolling();
-          if (!j.result) { setError("研究完成但结果为空，请重新研究"); setLoading(false); return; }
+          if (!j.result) { setError(t("research.error.emptyResult")); setLoading(false); return; }
           const mergeContext = context ?? backfillContext;
           if (mergeContext && isTalentSearchResult(j.result)) {
             setBackfillMergeSummary(buildBackfillMergeSummary({
@@ -314,7 +314,7 @@ export default function ResearchTool({
           setLoading(false);
         } else if (j.status === "error") {
           stopPolling();
-          setError(j.error || "研究失败，请重试");
+          setError(j.error || t("research.error.failed"));
           setLoading(false);
         }
       } catch {
@@ -387,7 +387,7 @@ export default function ResearchTool({
               setBackfillMergeSummary(null);
               setMergedOriginalRunId(null);
             } else if (ev.type === "error") {
-              setError(ev.error || "出错了");
+              setError(ev.error || t("research.error.generic"));
             }
           }
         }
@@ -401,7 +401,7 @@ export default function ResearchTool({
           setJobStatus({ phase: "queued", label: t("research.status.queued.label"), detail: t("research.status.queued.detail"), canRetry: false });
           beginPolling(j.jobId, undefined, token);
         } else {
-          setError(j.error ?? "出错了"); setLoading(false);
+          setError(j.error ?? t("research.error.generic")); setLoading(false);
         }
       }
     } catch (e) {
@@ -573,7 +573,7 @@ export default function ResearchTool({
         setCurrentJobId(j.jobId);
         beginPolling(j.jobId, context);
       } else {
-        setError(j.error ?? "补搜入队失败"); setLoading(false);
+        setError(j.error ?? t("research.error.backfillQueued")); setLoading(false);
       }
     } catch (e) {
       setError((e as Error).message);
