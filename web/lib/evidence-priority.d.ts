@@ -30,12 +30,35 @@ export type EvidencePriorityView = {
   items: EvidencePriorityItem[];
   empty: boolean;
 };
+export type ProjectEvidenceMatrixSummary = EvidencePrioritySummary & {
+  total: number;
+  active: number;
+  rejected: number;
+};
+export type ProjectEvidenceMatrixRow = EvidencePriorityItem & {
+  id: string;
+  status: string;
+  status_label: string;
+  decision_hint: string;
+};
+export type ProjectEvidenceMatrix = {
+  title: string;
+  description: string;
+  summary: ProjectEvidenceMatrixSummary;
+  rows: ProjectEvidenceMatrixRow[];
+  empty: boolean;
+};
 
 export function buildEvidencePriorityView(input?: {
   result?: unknown;
   candidates?: unknown[];
   locale?: string;
 }): EvidencePriorityView;
+
+export function buildProjectEvidenceMatrix(input?: {
+  items?: unknown[];
+  locale?: string;
+}): ProjectEvidenceMatrix;
 
 export function buildEvidencePriorityItem(input?: {
   candidate?: unknown;

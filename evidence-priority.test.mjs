@@ -1,5 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import * as evidencePriority from "./web/lib/evidence-priority.mjs";
 import {
   buildEvidencePriorityItem,
   buildEvidencePriorityView,
@@ -245,4 +246,72 @@ test("keeps duplicate-name candidates distinct by candidate index", () => {
   assert.equal(view.items[0].priority, "risk_review");
   assert.equal(view.items[1].candidate_index, 0);
   assert.equal(view.items[1].priority, "ready_to_review");
+});
+
+test("builds a project evidence matrix from shortlist status and evidence priority", () => {
+  const ready = candidateFixture({ name: "Ready Candidate", match_score: 91 });
+  const backfill = candidateFixture({
+    name: "Backfill Candidate",
+    match_score: 84,
+    evidence_audit: {
+      verified_claims: [],
+      unverified_claims: [],
+      contradicted_claims: [],
+      single_source_claims: ["Single-source product launch"],
+      identity_risks: [],
+      recency_notes: [],
+      overall_evidence_quality: "low",
+    },
+    claims: [{ claim: "Single-source product launch", verdict: "unverified", evidence: [] }],
+    independent_sources: 1,
+    source_types: ["profile"],
+  });
+  const risk = candidateFixture({
+    name: "Risk Candidate",
+    match_score: 79,
+    claims: [{ claim: "Led Example AI research", verdict: "contradicted", evidence: [] }],
+    evidence_audit: {
+      verified_claims: [],
+      unverified_claims: [],
+      contradicted_claims: ["Led Example AI research"],
+      single_source_claims: [],
+      identity_risks: [],
+      recency_notes: [],
+      overall_evidence_quality: "medium",
+    },
+    risk_flags: ["Role history conflicts across public profiles."],
+  });
+
+  assert.equal(typeof evidencePriority.buildProjectEvidenceMatrix, "function");
+
+  const matrix = evidencePriority.buildProjectEvidenceMatrix({
+    locale: "zh",
+    items: [
+      { id: "ready-id", status: "interviewing", candidate: ready },
+      { id: "backfill-id", status: "new", candidate: backfill },
+      { id: "risk-id", status: "rejected", candidate: risk },
+    ],
+  });
+
+  assert.equal(matrix.title, "项目证据矩阵");
+  assert.equal(matrix.empty, false);
+  assert.deepEqual(matrix.summary, {
+    total: 3,
+    active: 1,
+    rejected: 1,
+    ready_to_review: 1,
+    needs_backfill: 1,
+    risk_review: 1,
+  });
+  assert.deepEqual(
+    matrix.rows.map((row) => [row.id, row.status, row.status_label, row.priority, row.priority_label]),
+    [
+      ["risk-id", "rejected", "已拒", "risk_review", "风险复核"],
+      ["backfill-id", "new", "待联系", "needs_backfill", "需要补证据"],
+      ["ready-id", "interviewing", "面试中", "ready_to_review", "可优先审阅"],
+    ],
+  );
+  assert.equal(matrix.rows[0].decision_hint, "保留为负向样本，避免下一轮重复推荐。");
+  assert.match(matrix.rows[1].recommended_action, /补搜/);
+  assert.equal(matrix.rows[2].decision_hint, "已进入推进中，优先补备注、外联或安排面试。");
 });

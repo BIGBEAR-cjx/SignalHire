@@ -11,6 +11,14 @@ const PRIORITY_SORT = {
   needs_backfill: 1,
   ready_to_review: 2,
 };
+const ACTIVE_STATUSES = ["contacted", "interviewing", "hired"];
+const STATUS_SORT = {
+  rejected: 0,
+  new: 1,
+  contacted: 2,
+  interviewing: 3,
+  hired: 4,
+};
 
 function normalizeLocale(locale) {
   return locale === "en" ? "en" : "zh";
@@ -26,6 +34,39 @@ function cleanString(value) {
 
 function normalizePriority(value) {
   return PRIORITIES.includes(value) ? value : "needs_backfill";
+}
+
+function normalizeStatus(value) {
+  const status = cleanString(value);
+  return ["new", "contacted", "interviewing", "hired", "rejected"].includes(status) ? status : "new";
+}
+
+function statusLabel(status, locale) {
+  return msg(locale, `shortlist.status.${normalizeStatus(status)}`);
+}
+
+function decisionHint(status, priority, locale) {
+  const normalizedLocale = normalizeLocale(locale);
+  const normalizedStatus = normalizeStatus(status);
+  const copy = {
+    zh: {
+      rejected: "保留为负向样本，避免下一轮重复推荐。",
+      active: "已进入推进中，优先补备注、外联或安排面试。",
+      risk_review: "先复核冲突证据和身份风险，再决定是否外联。",
+      needs_backfill: "先补齐公开来源，再决定是否推进。",
+      ready_to_review: "证据基础较完整，可以进入人工审阅。",
+    },
+    en: {
+      rejected: "Keep as a negative signal so the next round avoids repeated recommendations.",
+      active: "Already in progress. Prioritize notes, outreach, or interview scheduling.",
+      risk_review: "Review conflicting evidence and identity risk before outreach.",
+      needs_backfill: "Backfill public sources before deciding whether to proceed.",
+      ready_to_review: "Evidence is strong enough for human review.",
+    },
+  }[normalizedLocale];
+  if (normalizedStatus === "rejected") return copy.rejected;
+  if (ACTIVE_STATUSES.includes(normalizedStatus)) return copy.active;
+  return copy[normalizePriority(priority)] || copy.needs_backfill;
 }
 
 function resultWithCandidate(result, candidate, candidateIndex = 0) {
@@ -147,5 +188,65 @@ export function buildEvidencePriorityView({ result, candidates, locale } = {}) {
     summary,
     items,
     empty: items.length === 0,
+  };
+}
+
+/**
+ * @param {{ items?: unknown[]; locale?: string }} input
+ */
+export function buildProjectEvidenceMatrix({ items = [], locale } = {}) {
+  const normalizedLocale = normalizeLocale(locale);
+  const sourceItems = Array.isArray(items) ? items.filter(Boolean) : [];
+  const candidates = sourceItems.map((item) => item?.candidate).filter(Boolean);
+  const result = normalizeTalentSearchResult({ candidates });
+  const rows = sourceItems.map((item, index) => {
+    const status = normalizeStatus(item?.status);
+    const candidate = result.candidates[index];
+    const priority = buildEvidencePriorityItem({ candidate, result, locale: normalizedLocale, candidateIndex: index });
+    return {
+      id: cleanString(item?.id) || String(index),
+      candidate_index: index,
+      name: priority.name,
+      role: priority.role,
+      status,
+      status_label: statusLabel(status, normalizedLocale),
+      match_score: priority.match_score,
+      evidence_quality: priority.evidence_quality,
+      independent_sources: priority.independent_sources,
+      verified_count: priority.verified_count,
+      unverified_count: priority.unverified_count,
+      contradicted_count: priority.contradicted_count,
+      risk_count: priority.risk_count,
+      priority: priority.priority,
+      priority_label: priority.priority_label,
+      priority_reason: priority.priority_reason,
+      recommended_action: priority.recommended_action,
+      decision_hint: decisionHint(status, priority.priority, normalizedLocale),
+    };
+  }).sort((a, b) => {
+    const priorityDelta = PRIORITY_SORT[normalizePriority(a.priority)] - PRIORITY_SORT[normalizePriority(b.priority)];
+    if (priorityDelta !== 0) return priorityDelta;
+    const statusDelta = (STATUS_SORT[a.status] ?? 1) - (STATUS_SORT[b.status] ?? 1);
+    if (statusDelta !== 0) return statusDelta;
+    if (b.match_score !== a.match_score) return b.match_score - a.match_score;
+    return a.name.localeCompare(b.name);
+  });
+
+  const summary = {
+    total: rows.length,
+    active: rows.filter((row) => ACTIVE_STATUSES.includes(row.status)).length,
+    rejected: rows.filter((row) => row.status === "rejected").length,
+    ready_to_review: 0,
+    needs_backfill: 0,
+    risk_review: 0,
+  };
+  for (const row of rows) summary[normalizePriority(row.priority)] += 1;
+
+  return {
+    title: msg(normalizedLocale, "projects.evidenceMatrix.title"),
+    description: msg(normalizedLocale, "projects.evidenceMatrix.desc"),
+    summary,
+    rows,
+    empty: rows.length === 0,
   };
 }

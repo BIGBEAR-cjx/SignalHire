@@ -20,7 +20,7 @@ import {
   Surface,
 } from "@/components/ui/signal-ui";
 import { buildProjectCandidateDecisionQueue, buildProjectResearchRounds, buildProjectSearchConsole } from "@/lib/research-loop.mjs";
-import { buildEvidencePriorityView } from "@/lib/evidence-priority.mjs";
+import { buildEvidencePriorityView, buildProjectEvidenceMatrix } from "@/lib/evidence-priority.mjs";
 import type { TalentCandidate } from "@/lib/talent-profile.mjs";
 
 type ProjectStatus = "open" | "paused" | "closed";
@@ -90,6 +90,34 @@ type ProjectResearchRoundsView = {
       items: Array<{ key: string; label: string; value: string }>;
     };
   }>;
+};
+type ProjectEvidenceMatrixView = {
+  title: string;
+  description: string;
+  summary: {
+    total: number;
+    active: number;
+    rejected: number;
+    ready_to_review: number;
+    needs_backfill: number;
+    risk_review: number;
+  };
+  rows: Array<{
+    id: string;
+    name: string;
+    role: string;
+    status_label: string;
+    match_score: number;
+    evidence_quality: string;
+    independent_sources: number;
+    verified_count: number;
+    unverified_count: number;
+    contradicted_count: number;
+    priority: string;
+    priority_label: string;
+    decision_hint: string;
+  }>;
+  empty: boolean;
 };
 
 const PROJ_STATUS_META: Record<ProjectStatus, { label: string; chip: string; dot: string }> = {
@@ -218,6 +246,10 @@ export default function ProjectDetailPage() {
       locale,
     });
   }, [filteredItems, items, locale]);
+  const projectEvidenceMatrix = useMemo(() => {
+    if (!items || filteredItems.length === 0) return null;
+    return buildProjectEvidenceMatrix({ items: filteredItems, locale }) as ProjectEvidenceMatrixView;
+  }, [filteredItems, items, locale]);
 
   async function deleteProject() {
     if (!confirm("删除这个项目?\n关联候选人和历史会回到「候选池(全部)」, 不会丢失。")) return;
@@ -333,6 +365,14 @@ export default function ProjectDetailPage() {
                   const item = filteredItems[priorityItem.candidate_index];
                   if (item) setSelectedItemId(item.id);
                 }}
+              />
+            )}
+            {projectEvidenceMatrix && (
+              <ProjectEvidenceMatrixPanel
+                matrix={projectEvidenceMatrix}
+                locale={locale}
+                selectedItemId={selectedItemId}
+                onOpenCandidate={(itemId) => setSelectedItemId(itemId)}
               />
             )}
             <CandidateComparisonView result={projectComparisonResult} locale={locale} />
@@ -737,6 +777,135 @@ function ProjectCandidateDecisionQueuePanel({
             </div>
           </section>
         ))}
+      </div>
+    </Surface>
+  );
+}
+
+function evidenceQualityClass(value: string) {
+  if (value === "high") return "bg-emerald-50 text-emerald-700 ring-emerald-100";
+  if (value === "low") return "bg-red-50 text-red-700 ring-red-100";
+  return "bg-amber-50 text-amber-800 ring-amber-100";
+}
+
+function priorityClass(value: string) {
+  if (value === "risk_review") return "bg-red-50 text-red-700 ring-red-100";
+  if (value === "ready_to_review") return "bg-emerald-50 text-emerald-700 ring-emerald-100";
+  return "bg-amber-50 text-amber-800 ring-amber-100";
+}
+
+function ProjectEvidenceMatrixPanel({
+  matrix,
+  locale,
+  selectedItemId,
+  onOpenCandidate,
+}: {
+  matrix: ProjectEvidenceMatrixView;
+  locale: "zh" | "en";
+  selectedItemId: string | null;
+  onOpenCandidate: (itemId: string) => void;
+}) {
+  if (matrix.empty) return null;
+  const copy = locale === "en"
+    ? {
+        total: "Total",
+        active: "Active",
+        risk: "Risk",
+        needsBackfill: "Needs evidence",
+        ready: "Ready",
+        rejected: "Rejected",
+        candidate: "Candidate",
+        status: "Status",
+        match: "Match",
+        evidence: "Evidence",
+        sources: "Sources",
+        checks: "Checks",
+        priority: "Priority",
+        next: "Next step",
+      }
+    : {
+        total: "总数",
+        active: "推进中",
+        risk: "风险",
+        needsBackfill: "需补证据",
+        ready: "可审阅",
+        rejected: "已拒",
+        candidate: "候选人",
+        status: "状态",
+        match: "匹配",
+        evidence: "证据",
+        sources: "信源",
+        checks: "核验",
+        priority: "优先级",
+        next: "下一步",
+      };
+  const summary = [
+    { label: copy.total, value: matrix.summary.total },
+    { label: copy.active, value: matrix.summary.active },
+    { label: copy.risk, value: matrix.summary.risk_review },
+    { label: copy.needsBackfill, value: matrix.summary.needs_backfill },
+    { label: copy.ready, value: matrix.summary.ready_to_review },
+    { label: copy.rejected, value: matrix.summary.rejected },
+  ];
+  return (
+    <Surface className="p-5 md:p-6">
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <h2 className="text-xl font-semibold text-[var(--sh-ink)]">{matrix.title}</h2>
+          <p className="mt-1 max-w-3xl text-sm leading-6 text-[var(--sh-muted)]">{matrix.description}</p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          {summary.map((item) => (
+            <span key={item.label} className="rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-gray-600 ring-1 ring-black/10">
+              {item.label} {item.value}
+            </span>
+          ))}
+        </div>
+      </div>
+      <div className="mt-4 overflow-x-auto">
+        <table className="w-full min-w-[980px] border-separate border-spacing-0 text-left text-sm">
+          <thead>
+            <tr className="text-xs font-semibold text-gray-400">
+              <th className="border-b border-gray-100 px-3 py-2">{copy.candidate}</th>
+              <th className="border-b border-gray-100 px-3 py-2">{copy.status}</th>
+              <th className="border-b border-gray-100 px-3 py-2 text-right">{copy.match}</th>
+              <th className="border-b border-gray-100 px-3 py-2">{copy.evidence}</th>
+              <th className="border-b border-gray-100 px-3 py-2 text-right">{copy.sources}</th>
+              <th className="border-b border-gray-100 px-3 py-2 text-right">{copy.checks}</th>
+              <th className="border-b border-gray-100 px-3 py-2">{copy.priority}</th>
+              <th className="border-b border-gray-100 px-3 py-2">{copy.next}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {matrix.rows.map((row) => (
+              <tr key={row.id} className={`align-top ${selectedItemId === row.id ? "bg-blue-50/40" : ""}`}>
+                <td className="border-b border-gray-100 px-3 py-3">
+                  <button type="button" onClick={() => onOpenCandidate(row.id)} className="max-w-[220px] text-left">
+                    <p className="truncate font-semibold text-gray-900">{row.name}</p>
+                    {row.role && <p className="mt-0.5 truncate text-xs text-gray-500">{row.role}</p>}
+                  </button>
+                </td>
+                <td className="border-b border-gray-100 px-3 py-3">
+                  <span className="rounded-full bg-gray-100 px-2.5 py-1 text-xs font-semibold text-gray-700">{row.status_label}</span>
+                </td>
+                <td className="border-b border-gray-100 px-3 py-3 text-right font-semibold tabular-nums text-gray-900">{row.match_score}</td>
+                <td className="border-b border-gray-100 px-3 py-3">
+                  <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ring-1 ${evidenceQualityClass(row.evidence_quality)}`}>{row.evidence_quality}</span>
+                </td>
+                <td className="border-b border-gray-100 px-3 py-3 text-right tabular-nums text-gray-700">{row.independent_sources}</td>
+                <td className="border-b border-gray-100 px-3 py-3 text-right text-xs tabular-nums text-gray-600">
+                  {row.verified_count} / {row.unverified_count} / {row.contradicted_count}
+                </td>
+                <td className="border-b border-gray-100 px-3 py-3">
+                  <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ring-1 ${priorityClass(row.priority)}`}>{row.priority_label}</span>
+                </td>
+                <td className="border-b border-gray-100 px-3 py-3">
+                  <p className="max-w-[280px] text-xs leading-5 text-gray-500">{row.decision_hint}</p>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </div>
     </Surface>
   );
