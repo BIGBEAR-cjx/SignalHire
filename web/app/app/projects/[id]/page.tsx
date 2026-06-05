@@ -6,7 +6,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { FiArrowLeft, FiCheckCircle, FiMail, FiSearch, FiTrash2 } from "react-icons/fi";
-import { CandidateComparisonView, CandidateProfileView } from "@/components/result";
+import { CandidateComparisonView, CandidateProfileView, EvidencePriorityPanel } from "@/components/result";
 import { useI18n } from "@/components/LanguageProvider";
 import OutreachModal from "@/components/OutreachModal";
 import {
@@ -20,6 +20,7 @@ import {
   Surface,
 } from "@/components/ui/signal-ui";
 import { buildProjectNextSteps } from "@/lib/research-loop.mjs";
+import { buildEvidencePriorityView } from "@/lib/evidence-priority.mjs";
 import type { TalentCandidate } from "@/lib/talent-profile.mjs";
 
 type ProjectStatus = "open" | "paused" | "closed";
@@ -153,6 +154,13 @@ export default function ProjectDetailPage() {
   const projectComparisonResult = useMemo(() => ({
     candidates: (items ?? []).map((it) => it.candidate),
   }), [items]);
+  const projectEvidencePriorityView = useMemo(() => {
+    if (!items || filteredItems.length === 0) return null;
+    return buildEvidencePriorityView({
+      candidates: filteredItems.map((item) => item.candidate),
+      locale,
+    });
+  }, [filteredItems, items, locale]);
 
   async function deleteProject() {
     if (!confirm("删除这个项目?\n关联候选人和历史会回到「候选池(全部)」, 不会丢失。")) return;
@@ -260,6 +268,17 @@ export default function ProjectDetailPage() {
         )}
         {items && items.length > 0 && (
           <div className="space-y-4">
+            {projectEvidencePriorityView && (
+              <EvidencePriorityPanel
+                view={projectEvidencePriorityView}
+                compact
+                locale={locale}
+                onOpenCandidate={(priorityItem) => {
+                  const item = filteredItems[priorityItem.candidate_index];
+                  if (item) setSelectedItemId(item.id);
+                }}
+              />
+            )}
             <CandidateComparisonView result={projectComparisonResult} locale={locale} />
             <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(360px,0.85fr)]">
               <ul className="space-y-2">

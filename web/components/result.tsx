@@ -18,6 +18,7 @@ import type { BackfillMergeSummary, CandidateComparisonRow, CandidateEvidenceAud
 import { buildCandidateComparisonRows, buildCandidateEvidenceAudit, buildCoverageBackfillPlan, buildEvidenceCoverage, buildShortlistDeliveryReport, buildSourceExecution, buildSourceQueryPlan } from "@/lib/talent-profile.mjs";
 import type { IconType } from "react-icons";
 import { FiCheckCircle, FiExternalLink, FiFlag, FiHelpCircle, FiInfo, FiLink2, FiXCircle } from "react-icons/fi";
+import { t as translate } from "@/lib/i18n.mjs";
 import {
   reportUniqueSources,
   sourceCountChip,
@@ -47,6 +48,34 @@ export type VerifyReport = {
 };
 
 type ResultLocaleProps = { locale?: Locale };
+type EvidencePriorityItemView = {
+  candidate_index: number;
+  name: string;
+  role: string;
+  match_score: number;
+  evidence_quality: string;
+  independent_sources: number;
+  verified_count: number;
+  unverified_count: number;
+  contradicted_count: number;
+  priority: string;
+  priority_label: string;
+  priority_reason: string;
+  recommended_action: string;
+};
+type EvidencePriorityViewModel = {
+  summary: {
+    ready_to_review: number;
+    needs_backfill: number;
+    risk_review: number;
+  };
+  items: EvidencePriorityItemView[];
+  empty: boolean;
+};
+
+function uiCopy(locale: Locale | undefined, key: string, params?: Record<string, string | number>) {
+  return translate(locale ?? "zh", key, params);
+}
 
 const RESULT_COPY = {
   zh: {
@@ -994,6 +1023,133 @@ export function CandidateComparisonView({ result, locale }: { result: unknown } 
           </tbody>
         </table>
       </div>
+    </ResultSurface>
+  );
+}
+
+function evidencePriorityTone(priority: string) {
+  if (priority === "risk_review") {
+    return {
+      chip: "bg-red-50 text-red-700 ring-red-200",
+      card: "border-red-100 bg-red-50/45",
+      dot: "bg-red-500",
+    };
+  }
+  if (priority === "needs_backfill") {
+    return {
+      chip: "bg-amber-50 text-amber-700 ring-amber-200",
+      card: "border-amber-100 bg-amber-50/45",
+      dot: "bg-amber-500",
+    };
+  }
+  return {
+    chip: "bg-emerald-50 text-emerald-700 ring-emerald-200",
+    card: "border-emerald-100 bg-emerald-50/45",
+    dot: "bg-emerald-500",
+  };
+}
+
+function EvidencePrioritySummaryCard({
+  label,
+  value,
+  priority,
+}: {
+  label: string;
+  value: number;
+  priority: string;
+}) {
+  const tone = evidencePriorityTone(priority);
+  return (
+    <div className={`rounded-2xl border px-3 py-3 ${tone.card}`}>
+      <div className="flex items-center gap-2">
+        <span className={`h-2 w-2 rounded-full ${tone.dot}`} />
+        <p className="text-xs font-semibold text-gray-700">{label}</p>
+      </div>
+      <p className="mt-2 text-2xl font-semibold tabular-nums text-gray-900">{value}</p>
+    </div>
+  );
+}
+
+function EvidencePriorityRow({
+  item,
+  onOpenCandidate,
+  locale,
+}: {
+  item: EvidencePriorityItemView;
+  onOpenCandidate?: (item: EvidencePriorityItemView) => void;
+} & ResultLocaleProps) {
+  const tone = evidencePriorityTone(item.priority);
+  return (
+    <li className={`rounded-2xl border p-4 ${tone.card}`}>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-2">
+            <p className="font-semibold text-gray-900">{item.name}</p>
+            <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ring-1 ${tone.chip}`}>
+              {item.priority_label}
+            </span>
+          </div>
+          {item.role && <p className="mt-1 text-xs leading-5 text-gray-500">{item.role}</p>}
+        </div>
+        <div className="flex shrink-0 items-center gap-2">
+          <span className="rounded-full bg-white px-2 py-0.5 text-xs font-semibold text-gray-700 ring-1 ring-black/10">
+            {uiCopy(locale, "evidencePriority.match")} {item.match_score}
+          </span>
+          <QualityPill value={item.evidence_quality} locale={locale} />
+        </div>
+      </div>
+      <div className="mt-3 grid gap-2 text-xs text-gray-600 sm:grid-cols-[160px_minmax(0,1fr)]">
+        <p className="font-semibold text-gray-800">{item.independent_sources} {uiCopy(locale, "evidencePriority.sources")}</p>
+        <p>{uiCopy(locale, "evidencePriority.claims", { verified: item.verified_count, unverified: item.unverified_count, contradicted: item.contradicted_count })}</p>
+      </div>
+      <p className="mt-3 text-sm leading-6 text-gray-700">{item.priority_reason}</p>
+      <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
+        <p className="text-xs leading-5 text-gray-600">{item.recommended_action}</p>
+        {onOpenCandidate && (
+          <button
+            type="button"
+            onClick={() => onOpenCandidate(item)}
+            aria-label={uiCopy(locale, "evidencePriority.openCandidate", { name: item.name })}
+            className="rounded-full bg-white px-3 py-1.5 text-xs font-semibold text-gray-800 ring-1 ring-black/10 transition hover:bg-gray-50"
+          >
+            {uiCopy(locale, "evidencePriority.open")}
+          </button>
+        )}
+      </div>
+    </li>
+  );
+}
+
+export function EvidencePriorityPanel({
+  view,
+  onOpenCandidate,
+  compact = false,
+  locale,
+}: {
+  view: EvidencePriorityViewModel;
+  onOpenCandidate?: (item: EvidencePriorityItemView) => void;
+  compact?: boolean;
+} & ResultLocaleProps) {
+  if (!view || view.empty) return null;
+  const visibleItems = view.items.slice(0, compact ? 4 : 6);
+  return (
+    <ResultSurface>
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <h2 className="text-lg font-semibold text-gray-900">{uiCopy(locale, "evidencePriority.title")}</h2>
+          <p className="mt-1 text-sm text-gray-500">{uiCopy(locale, compact ? "evidencePriority.compactDesc" : "evidencePriority.desc")}</p>
+        </div>
+      </div>
+      <div className="mt-4 grid gap-3 md:grid-cols-3">
+        <EvidencePrioritySummaryCard label={uiCopy(locale, "evidencePriority.ready_to_review.label")} value={view.summary.ready_to_review} priority="ready_to_review" />
+        <EvidencePrioritySummaryCard label={uiCopy(locale, "evidencePriority.needs_backfill.label")} value={view.summary.needs_backfill} priority="needs_backfill" />
+        <EvidencePrioritySummaryCard label={uiCopy(locale, "evidencePriority.risk_review.label")} value={view.summary.risk_review} priority="risk_review" />
+      </div>
+      <ul className="mt-4 grid gap-3">
+        {visibleItems.map((item) => (
+          <EvidencePriorityRow key={`${item.priority}-${item.candidate_index}-${item.name}`} item={item} onOpenCandidate={onOpenCandidate} locale={locale} />
+        ))}
+      </ul>
     </ResultSurface>
   );
 }

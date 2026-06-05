@@ -15,6 +15,7 @@ import {
   CoverageBackfillView,
   EvidenceCoverageView,
   EvidenceGraphView,
+  EvidencePriorityPanel,
   SearchPlanView,
   ShortlistDeliveryReportView,
   ShortlistCard,
@@ -38,6 +39,7 @@ import {
 import { buildBackfillMergeSummary, buildEditableSearchPlanDraft, buildFeedbackOptimizedSearchInput, buildSearchInputFromEditablePlan } from "@/lib/talent-profile.mjs";
 import type { BackfillMergeSummary, CoverageBackfillJob, TalentCandidate, TalentSearchResult } from "@/lib/talent-profile.mjs";
 import { buildFeedbackOptimizationPreview, buildResearchLoopView } from "@/lib/research-loop.mjs";
+import { buildEvidencePriorityView } from "@/lib/evidence-priority.mjs";
 
 type FeedItem = { id: number; kind: "search" | "fetch"; info: string };
 type SearchResult = { candidates?: Candidate[] } | TalentSearchResult;
@@ -559,6 +561,7 @@ export default function ResearchTool({
   const isSearch = mode === "search";
   const progressView = buildResearchLoopView({ feed, live, jobStatus, locale });
   const feedbackPreview = buildFeedbackOptimizationPreview({ feedback: searchFeedback, locale });
+  const evidencePriorityView = isTalentSearchResult(result) ? buildEvidencePriorityView({ result, locale }) : null;
   const feedbackGroups = SEARCH_FEEDBACK_GROUPS.map((group) => ({
     key: group.key,
     label: t(group.labelKey),
@@ -713,6 +716,17 @@ export default function ResearchTool({
               <EvidenceCoverageView result={result} locale={locale} />
               <TalentMapView result={result} locale={locale} />
               <CandidateComparisonView result={result} locale={locale} />
+              {evidencePriorityView && (
+                <EvidencePriorityPanel
+                  view={evidencePriorityView}
+                  onOpenCandidate={(item) => {
+                    if (item.candidate_index >= 0 && item.candidate_index < result.candidates.length) {
+                      setSelectedCandidateIndex(item.candidate_index);
+                    }
+                  }}
+                  locale={locale}
+                />
+              )}
               <FeedbackOptimizationPreview
                 groups={feedbackGroups}
                 preview={feedbackPreview}
