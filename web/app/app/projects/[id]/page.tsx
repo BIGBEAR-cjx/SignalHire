@@ -19,7 +19,7 @@ import {
   StatusBadge,
   Surface,
 } from "@/components/ui/signal-ui";
-import { buildProjectNextSteps, buildProjectResearchRounds } from "@/lib/research-loop.mjs";
+import { buildProjectResearchRounds, buildProjectSearchConsole } from "@/lib/research-loop.mjs";
 import { buildEvidencePriorityView } from "@/lib/evidence-priority.mjs";
 import type { TalentCandidate } from "@/lib/talent-profile.mjs";
 
@@ -34,6 +34,30 @@ type ProjectNextStepsView = {
     label: string;
     detail: string;
   }>;
+};
+type ProjectSearchConsoleView = {
+  title: string;
+  description: string;
+  briefTitle: string;
+  briefText: string;
+  latestRoundTitle: string;
+  latestRoundEmpty: string;
+  latestRound: null | {
+    id: string;
+    roundNumber: number;
+    kind: "search" | "verify";
+    badge: string;
+    label: string;
+    description: string;
+    summary: string;
+    status: string;
+  };
+  feedback: null | {
+    title: string;
+    items: Array<{ key: string; label: string; value: string }>;
+  };
+  nextSearchInput: string;
+  nextSteps: ProjectNextStepsView;
 };
 type ProjectResearchRoundsView = {
   title: string;
@@ -208,15 +232,15 @@ export default function ProjectDetailPage() {
 
   const p = detail.project;
   const briefForSearch = (p.brief ?? "").trim() || p.name;
-  const searchHref = `/app/search?project=${id}&q=${encodeURIComponent(briefForSearch)}`;
   const verifyHref = `/app/verify?project=${id}`;
-  const projectNextSteps = buildProjectNextSteps({
+  const projectConsole = buildProjectSearchConsole({
+    project: p,
+    runs: detail.runs,
     candidateCount: p.candidates_total,
-    runCount: detail.runs.length,
     hasFilter: statusFilter !== "all",
-    latestRunLabel: detail.runs[0]?.label ?? "",
     locale,
-  });
+  }) as ProjectSearchConsoleView;
+  const searchHref = `/app/search?project=${id}&q=${encodeURIComponent(projectConsole.nextSearchInput || briefForSearch)}`;
   const projectRounds = buildProjectResearchRounds({
     runs: detail.runs,
     locale,
@@ -231,6 +255,8 @@ export default function ProjectDetailPage() {
 
       {/* 头部: name + brief 编辑 + 状态 + 删除 */}
       <ProjectHeader key={`${p.id}:${p.name}:${p.brief ?? ""}`} detail={detail} onChanged={reloadDetail} onDelete={deleteProject} />
+
+      <ProjectSearchConsolePanel consoleView={projectConsole} searchHref={searchHref} verifyHref={verifyHref} />
 
       {/* KPI strip */}
       <section className="grid grid-cols-2 gap-3 sm:grid-cols-5">
@@ -248,24 +274,6 @@ export default function ProjectDetailPage() {
       </section>
 
       <StatusFunnel breakdown={detail.breakdown} total={p.candidates_total} current={statusFilter} onClick={setStatusFilter} />
-
-      {/* 动作 */}
-      <div className="flex flex-wrap gap-2">
-        <PrimaryAction
-          href={searchHref}
-        >
-          <FiSearch className="h-4 w-4" aria-hidden="true" />
-          在本项目下搜人
-        </PrimaryAction>
-        <SecondaryAction
-          href={verifyHref}
-        >
-          <FiCheckCircle className="h-4 w-4" aria-hidden="true" />
-          在本项目下核验
-        </SecondaryAction>
-      </div>
-
-      <ProjectNextStepPanel steps={projectNextSteps} searchHref={searchHref} verifyHref={verifyHref} />
 
       {/* 候选人列表 + 详情面板 */}
       <section className="space-y-3">
@@ -351,12 +359,12 @@ export default function ProjectDetailPage() {
   );
 }
 
-function ProjectNextStepPanel({
-  steps,
+function ProjectSearchConsolePanel({
+  consoleView,
   searchHref,
   verifyHref,
 }: {
-  steps: ProjectNextStepsView;
+  consoleView: ProjectSearchConsoleView;
   searchHref: string;
   verifyHref: string;
 }) {
@@ -365,15 +373,9 @@ function ProjectNextStepPanel({
     <Surface className="p-5 md:p-6">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div className="max-w-2xl">
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-neutral-500">{steps.title}</p>
-          <div className="mt-3 grid gap-3 md:grid-cols-3">
-            {steps.actions.map((action) => (
-              <div key={action.key} className="rounded-2xl border border-black/10 bg-white/72 p-4">
-                <p className="text-sm font-semibold text-[var(--sh-ink)]">{action.label}</p>
-                <p className="mt-1 text-xs leading-5 text-[var(--sh-muted)]">{action.detail}</p>
-              </div>
-            ))}
-          </div>
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-neutral-500">{consoleView.title}</p>
+          <h2 className="mt-1 text-xl font-semibold text-[var(--sh-ink)]">{consoleView.briefTitle}</h2>
+          <p className="mt-2 text-sm leading-6 text-[var(--sh-muted)]">{consoleView.description}</p>
         </div>
         <div className="flex shrink-0 flex-wrap gap-2">
           <PrimaryAction href={searchHref}>
@@ -385,6 +387,61 @@ function ProjectNextStepPanel({
             {t("projects.verifyInProject")}
           </SecondaryAction>
         </div>
+      </div>
+
+      <div className="mt-5 grid gap-3 lg:grid-cols-[minmax(0,1.15fr)_minmax(260px,0.85fr)_minmax(260px,0.85fr)]">
+        <div className="rounded-2xl border border-black/10 bg-white/72 p-4">
+          <p className="text-xs font-semibold text-[var(--sh-muted)]">{consoleView.briefTitle}</p>
+          <p className="mt-2 whitespace-pre-line text-sm leading-6 text-[var(--sh-ink)]">{consoleView.briefText}</p>
+          <div className="mt-4 rounded-2xl bg-[var(--sh-canvas)] px-3 py-3">
+            <p className="text-xs font-semibold text-[var(--sh-muted)]">{t("projects.console.nextSearchTitle")}</p>
+            <p className="mt-1 line-clamp-3 whitespace-pre-line text-xs leading-5 text-[var(--sh-ink)]">{consoleView.nextSearchInput}</p>
+          </div>
+        </div>
+
+        <div className="rounded-2xl border border-black/10 bg-white/72 p-4">
+          <p className="text-xs font-semibold text-[var(--sh-muted)]">{consoleView.latestRoundTitle}</p>
+          {consoleView.latestRound ? (
+            <>
+              <div className="mt-2 flex flex-wrap items-center gap-2">
+                <span className="rounded-full bg-neutral-950 px-2.5 py-1 text-xs font-semibold text-white">#{consoleView.latestRound.roundNumber}</span>
+                <KindBadge kind={consoleView.latestRound.kind} />
+                <span className="rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-[var(--sh-muted)] ring-1 ring-black/10">{consoleView.latestRound.badge}</span>
+              </div>
+              <p className="mt-3 line-clamp-2 text-sm font-semibold text-[var(--sh-ink)]">{consoleView.latestRound.label}</p>
+              <p className="mt-1 text-xs leading-5 text-[var(--sh-muted)]">{consoleView.latestRound.description}</p>
+              {(consoleView.latestRound.summary || consoleView.latestRound.status) && (
+                <p className="mt-2 text-xs text-[var(--sh-faint)]">{consoleView.latestRound.summary || consoleView.latestRound.status}</p>
+              )}
+            </>
+          ) : (
+            <p className="mt-3 rounded-2xl border border-dashed border-black/10 bg-white/60 px-3 py-3 text-xs leading-5 text-[var(--sh-faint)]">{consoleView.latestRoundEmpty}</p>
+          )}
+        </div>
+
+        <div className="rounded-2xl border border-black/10 bg-white/72 p-4">
+          <p className="text-xs font-semibold text-[var(--sh-muted)]">{consoleView.feedback?.title ?? t("projects.console.feedbackTitle")}</p>
+          {consoleView.feedback && consoleView.feedback.items.length > 0 ? (
+            <div className="mt-3 flex flex-wrap gap-2">
+              {consoleView.feedback.items.map((item) => (
+                <span key={item.key} className="rounded-full bg-blue-50 px-2.5 py-1 text-xs font-medium text-blue-700 ring-1 ring-blue-100">
+                  {item.label}: {item.value}
+                </span>
+              ))}
+            </div>
+          ) : (
+            <p className="mt-3 rounded-2xl border border-dashed border-black/10 bg-white/60 px-3 py-3 text-xs leading-5 text-[var(--sh-faint)]">{t("projects.console.feedbackEmpty")}</p>
+          )}
+        </div>
+      </div>
+
+      <div className="mt-4 grid gap-3 md:grid-cols-3">
+        {consoleView.nextSteps.actions.map((action) => (
+          <div key={action.key} className="rounded-2xl border border-black/10 bg-white/72 p-4">
+            <p className="text-sm font-semibold text-[var(--sh-ink)]">{action.label}</p>
+            <p className="mt-1 text-xs leading-5 text-[var(--sh-muted)]">{action.detail}</p>
+          </div>
+        ))}
       </div>
     </Surface>
   );

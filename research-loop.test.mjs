@@ -7,6 +7,7 @@ import {
   buildPersistedSearchFeedback,
   buildProjectResearchRounds,
   buildProjectNextSteps,
+  buildProjectSearchConsole,
   buildResearchLoopView,
   extractRecentResearchItems,
   inferResearchCoverage,
@@ -163,6 +164,65 @@ test("builds project next steps for empty and filtered projects", () => {
     ["review_candidates", "review_latest_run", "clear_filter"],
   );
   assert.match(filtered.actions[1].detail, /LLM infra search/);
+});
+
+test("builds a project search console from brief, latest round, feedback, and next steps", () => {
+  const consoleView = buildProjectSearchConsole({
+    project: {
+      name: "Senior AI Infra",
+      brief: "找做过 vLLM 推理服务的资深工程师",
+    },
+    candidateCount: 6,
+    hasFilter: false,
+    runs: [
+      {
+        id: "run-2",
+        kind: "search",
+        label: "Feedback-optimized SignalHire search.",
+        query_text: "Feedback-optimized SignalHire search.\nExpand GitHub and paper sources.",
+        status: "done",
+        summary: "Expanded source coverage",
+        updated_at: "2026-06-05T12:00:00.000Z",
+        result: {
+          search_feedback: {
+            precision: "partial",
+            satisfaction: "mixed",
+            issue: "weak_evidence",
+            focus: "expand_sources",
+            optimized_query: "下一轮优化画像",
+          },
+        },
+      },
+      {
+        id: "run-1",
+        kind: "search",
+        label: "Senior AI Infra",
+        query_text: "Senior AI Infra",
+        status: "done",
+        updated_at: "2026-06-05T11:00:00.000Z",
+      },
+    ],
+  });
+
+  assert.equal(consoleView.locale, "zh");
+  assert.equal(consoleView.title, "项目搜索控制台");
+  assert.equal(consoleView.briefText, "找做过 vLLM 推理服务的资深工程师");
+  assert.equal(consoleView.latestRound?.badge, "反馈优化");
+  assert.equal(consoleView.latestRound?.label, "Feedback-optimized SignalHire search.");
+  assert.equal(consoleView.nextSearchInput, "下一轮优化画像");
+  assert.deepEqual(
+    consoleView.feedback?.items.map((item) => [item.label, item.value]),
+    [
+      ["精准度", "部分精准"],
+      ["满意度", "一般"],
+      ["主要问题", "证据不足"],
+      ["下一轮方向", "扩来源"],
+    ],
+  );
+  assert.deepEqual(
+    consoleView.nextSteps.actions.map((item) => item.key),
+    ["review_candidates", "review_latest_run"],
+  );
 });
 
 test("builds project research rounds from newest-first project runs", () => {

@@ -454,3 +454,50 @@ export function buildProjectNextSteps({ candidateCount = 0, runCount = 0, hasFil
     actions: actions.slice(0, 3),
   };
 }
+
+/**
+ * @param {{ project?: { name?: string; brief?: string | null }; runs?: Array<{ id?: string; kind?: string; label?: string; summary?: string | null; status?: string; query_text?: string; updated_at?: string; result?: unknown }>; candidateCount?: number; hasFilter?: boolean; locale?: string }} input
+ */
+export function buildProjectSearchConsole({ project = {}, runs = [], candidateCount = 0, hasFilter = false, locale = "zh" } = {}) {
+  const normalizedLocale = normalizeLocale(locale);
+  const briefText = cleanString(project?.brief) || cleanString(project?.name) || msg(normalizedLocale, "projects.noBrief");
+  const rounds = buildProjectResearchRounds({ runs, locale: normalizedLocale });
+  const latestRound = rounds.items[0] ? {
+    id: rounds.items[0].id,
+    roundNumber: rounds.items[0].roundNumber,
+    kind: rounds.items[0].kind,
+    badge: rounds.items[0].badge,
+    label: rounds.items[0].label,
+    description: rounds.items[0].description,
+    summary: rounds.items[0].summary,
+    status: rounds.items[0].status,
+  } : null;
+  const feedbackPreference = buildLatestProjectFeedbackPreference({ runs, baseInput: briefText, locale: normalizedLocale });
+  const latestFeedback = feedbackPreference.canApply
+    ? { title: msg(normalizedLocale, "projects.console.feedbackTitle"), items: feedbackPreference.items }
+    : rounds.items.find((item) => item.feedbackSummary)?.feedbackSummary ?? null;
+  const nextSearchInput = feedbackPreference.canApply
+    ? feedbackPreference.optimizedInput
+    : cleanString(rounds.items.find((item) => item.kind === "search" && item.nextSearchInput)?.nextSearchInput) || briefText;
+  const nextSteps = buildProjectNextSteps({
+    candidateCount,
+    runCount: Array.isArray(runs) ? runs.length : 0,
+    hasFilter,
+    latestRunLabel: latestRound?.label ?? "",
+    locale: normalizedLocale,
+  });
+
+  return {
+    locale: normalizedLocale,
+    title: msg(normalizedLocale, "projects.console.title"),
+    description: msg(normalizedLocale, "projects.console.desc"),
+    briefTitle: msg(normalizedLocale, "projects.console.briefTitle"),
+    briefText,
+    latestRoundTitle: msg(normalizedLocale, "projects.console.latestRoundTitle"),
+    latestRoundEmpty: msg(normalizedLocale, "projects.console.latestRoundEmpty"),
+    latestRound,
+    feedback: latestFeedback,
+    nextSearchInput,
+    nextSteps,
+  };
+}

@@ -83,6 +83,35 @@ export type ProjectNextSteps = {
   latestRunLabel: string;
   actions: ProjectNextStepAction[];
 };
+export type ProjectSearchConsole = {
+  locale: ResearchLoopLocale;
+  title: string;
+  description: string;
+  briefTitle: string;
+  briefText: string;
+  latestRoundTitle: string;
+  latestRoundEmpty: string;
+  latestRound: null | {
+    id: string;
+    roundNumber: number;
+    kind: "search" | "verify";
+    badge: string;
+    label: string;
+    description: string;
+    summary: string;
+    status: string;
+  };
+  feedback: null | {
+    title: string;
+    items: Array<{
+      key: string;
+      label: string;
+      value: string;
+    }>;
+  };
+  nextSearchInput: string;
+  nextSteps: ProjectNextSteps;
+};
 export type ProjectResearchRoundItem = {
   id: string;
   roundNumber: number;
@@ -157,6 +186,25 @@ export function buildProjectNextSteps(input?: {
   latestRunLabel?: string;
   locale?: ResearchLoopLocale | string;
 }): ProjectNextSteps;
+export function buildProjectSearchConsole(input?: {
+  project?: {
+    name?: string;
+    brief?: string | null;
+  };
+  runs?: Array<{
+    id?: string;
+    kind?: string;
+    label?: string;
+    summary?: string | null;
+    status?: string;
+    query_text?: string;
+    updated_at?: string;
+    result?: unknown;
+  }>;
+  candidateCount?: number;
+  hasFilter?: boolean;
+  locale?: ResearchLoopLocale | string;
+}): ProjectSearchConsole;
 export function buildProjectResearchRounds(input?: {
   runs?: Array<{
     id?: string;
