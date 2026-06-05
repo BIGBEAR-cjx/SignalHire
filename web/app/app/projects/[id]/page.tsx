@@ -390,9 +390,11 @@ export default function ProjectDetailPage() {
     hasCandidates: Boolean(items && items.length > 0),
     hasControlRoom: true,
     hasProjectEvidenceMatrix: Boolean(projectEvidenceMatrix),
+    hasStatusFunnel: p.candidates_total > 0,
     locale,
   }) as ProjectDetailHierarchyView;
   const hiddenPanels = new Set(projectHierarchy.hidden);
+  const showKpiStrip = !hiddenPanels.has("kpi_strip");
   const showActionBrief = !hiddenPanels.has("action_brief");
   const showCandidateFeedbackSummary = !hiddenPanels.has("candidate_feedback_summary");
   const showCandidateEvidencePriority = !hiddenPanels.has("candidate_evidence_priority");
@@ -438,20 +440,21 @@ export default function ProjectDetailPage() {
 
       <ProjectSearchConsolePanel consoleView={projectConsole} searchHref={searchHref} verifyHref={verifyHref} />
 
-      {/* KPI strip */}
-      <section className="grid grid-cols-2 gap-3 sm:grid-cols-5">
-        <KpiCard label="候选人" value={p.candidates_total} sub="人" />
-        {SHORT_STATUS.map((s) => (
-          <KpiCard
-            key={s.value}
-            label={s.label}
-            value={detail.breakdown[s.value] ?? 0}
-            sub="人"
-            accentDot={s.dot}
-            onClick={() => setStatusFilter(s.value)}
-          />
-        ))}
-      </section>
+      {showKpiStrip && (
+        <section className="grid grid-cols-2 gap-3 sm:grid-cols-5">
+          <KpiCard label="候选人" value={p.candidates_total} sub="人" />
+          {SHORT_STATUS.map((s) => (
+            <KpiCard
+              key={s.value}
+              label={s.label}
+              value={detail.breakdown[s.value] ?? 0}
+              sub="人"
+              accentDot={s.dot}
+              onClick={() => setStatusFilter(s.value)}
+            />
+          ))}
+        </section>
+      )}
 
       <StatusFunnel breakdown={detail.breakdown} total={p.candidates_total} current={statusFilter} onClick={setStatusFilter} />
       {items && items.length > 0 && (
