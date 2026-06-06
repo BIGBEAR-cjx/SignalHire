@@ -1,6 +1,7 @@
 // lib/auth.ts —— 客户端认证封装 (Insforge Auth)。
 // 认证端点无需 key, 仅需 baseUrl (公开)。拿到 accessToken 后 POST 给 /api/auth/session 写 httpOnly cookie。
 import { createClient } from "@insforge/sdk";
+import { authErrorMessage } from "./auth-copy.mjs";
 import { syncSessionCookieFromTokenManager } from "@/lib/auth-session-sync.mjs";
 
 const BASE = process.env.NEXT_PUBLIC_INSFORGE_API_BASE_URL;
@@ -19,42 +20,48 @@ export type AuthResult =
   | { ok: true }
   | { ok: false; needVerify?: boolean; error: string };
 
-export async function register(email: string, password: string, name?: string): Promise<AuthResult> {
+export async function register(email: string, password: string, name?: string, locale = "zh"): Promise<AuthResult> {
   try {
     const { data, error } = await client.auth.signUp({ email, password, name });
-    if (error) return { ok: false, error: error.message || "注册失败" };
+    if (error) return { ok: false, error: authErrorMessage(locale, "registerFailed", error.message) };
     if (data?.accessToken) { await setSession(data.accessToken); return { ok: true }; }
     // 开了邮箱验证: 没拿到 token, 需要验证码
-    if (data?.requireEmailVerification) return { ok: false, needVerify: true, error: "请输入邮箱收到的验证码" };
-    return { ok: false, error: "注册未返回令牌" };
+    if (data?.requireEmailVerification) return { ok: false, needVerify: true, error: authErrorMessage(locale, "needCode") };
+    return { ok: false, error: authErrorMessage(locale, "registerNoToken") };
   } catch (e) {
-    return { ok: false, error: (e as Error).message };
+    return { ok: false, error: authErrorMessage(locale, "registerFailed", (e as Error).message) };
   }
 }
 
-export async function verify(email: string, otp: string): Promise<AuthResult> {
+export async function verify(email: string, otp: string, locale = "zh"): Promise<AuthResult> {
   try {
     const { data, error } = await client.auth.verifyEmail({ email, otp });
-    if (error) return { ok: false, error: error.message || "验证失败" };
+    if (error) return { ok: false, error: authErrorMessage(locale, "verifyFailed", error.message) };
     if (data?.accessToken) { await setSession(data.accessToken); return { ok: true }; }
-    return { ok: false, error: "验证未返回令牌" };
+    return { ok: false, error: authErrorMessage(locale, "verifyNoToken") };
   } catch (e) {
-    return { ok: false, error: (e as Error).message };
+    return { ok: false, error: authErrorMessage(locale, "verifyFailed", (e as Error).message) };
   }
 }
 
-export async function login(email: string, password: string): Promise<AuthResult> {
+export async function login(email: string, password: string, locale = "zh"): Promise<AuthResult> {
   try {
     const { data, error } = await client.auth.signInWithPassword({ email, password });
     if (error) {
       // 403 = 邮箱未验证
       const verifyHint = error.statusCode === 403 || /verify/i.test(error.message || "");
-      return { ok: false, needVerify: verifyHint, error: verifyHint ? "请先验证邮箱" : (error.message || "登录失败") };
+      return {
+        ok: false,
+        needVerify: verifyHint,
+        error: verifyHint
+          ? authErrorMessage(locale, "loginVerifyFirst")
+          : authErrorMessage(locale, "loginFailed", error.message),
+      };
     }
     if (data?.accessToken) { await setSession(data.accessToken); return { ok: true }; }
-    return { ok: false, error: "登录未返回令牌" };
+    return { ok: false, error: authErrorMessage(locale, "loginNoToken") };
   } catch (e) {
-    return { ok: false, error: (e as Error).message };
+    return { ok: false, error: authErrorMessage(locale, "loginFailed", (e as Error).message) };
   }
 }
 

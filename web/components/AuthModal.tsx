@@ -21,7 +21,7 @@ export default function AuthModal({
   onClose: () => void;
   onAuthed: (user: { email: string }) => void;
 }) {
-  const { t } = useI18n();
+  const { locale, t } = useI18n();
   const [tab, setTab] = useState<Tab>("login");
   const [stage, setStage] = useState<Stage>("form");
   const [email, setEmail] = useState("");
@@ -53,7 +53,7 @@ export default function AuthModal({
 
   async function submitLogin(e: React.FormEvent) {
     e.preventDefault(); setErr(""); setBusy(true);
-    const r = await login(email.trim(), password);
+    const r = await login(email.trim(), password, locale);
     setBusy(false);
     if (r.ok) return done();
     if (r.needVerify) { setStage("verify"); setErr(t("auth.modalNeedVerify")); return; }
@@ -62,7 +62,7 @@ export default function AuthModal({
 
   async function submitRegister(e: React.FormEvent) {
     e.preventDefault(); setErr(""); setBusy(true);
-    const r = await register(email.trim(), password, name.trim() || undefined);
+    const r = await register(email.trim(), password, name.trim() || undefined, locale);
     setBusy(false);
     if (r.ok) return done();
     if (r.needVerify) { setStage("verify"); setErr(""); return; }
@@ -71,7 +71,7 @@ export default function AuthModal({
 
   async function submitVerify(e: React.FormEvent) {
     e.preventDefault(); setErr(""); setBusy(true);
-    const r = await verify(email.trim(), otp.trim());
+    const r = await verify(email.trim(), otp.trim(), locale);
     setBusy(false);
     if (r.ok) return done();
     setErr(r.error);

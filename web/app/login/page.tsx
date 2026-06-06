@@ -9,7 +9,7 @@ import { login } from "@/lib/auth";
 import { LogoMark } from "@/components/ui/signal-ui";
 
 export default function LoginPage() {
-  const { t } = useI18n();
+  const { locale, t } = useI18n();
   const [email, setEmail] = useState("");
   const [pw, setPw] = useState("");
   const [err, setErr] = useState("");
@@ -19,7 +19,7 @@ export default function LoginPage() {
     e.preventDefault();
     if (!email.trim() || !pw) return;
     setLoading(true); setErr("");
-    const r = await login(email.trim(), pw);
+    const r = await login(email.trim(), pw, locale);
     if (r.ok) {
       const next = new URLSearchParams(location.search).get("next") || "/";
       location.href = next; // 整页跳转, 让页面和服务端请求读取新 cookie

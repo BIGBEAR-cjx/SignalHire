@@ -14,7 +14,7 @@ function go() {
 }
 
 export default function RegisterPage() {
-  const { t } = useI18n();
+  const { locale, t } = useI18n();
   const [email, setEmail] = useState("");
   const [pw, setPw] = useState("");
   const [name, setName] = useState("");
@@ -27,7 +27,7 @@ export default function RegisterPage() {
     e.preventDefault();
     if (!email.trim() || pw.length < 6) { setErr(t("auth.invalidRegister")); return; }
     setLoading(true); setErr("");
-    const r = await register(email.trim(), pw, name.trim() || undefined);
+    const r = await register(email.trim(), pw, name.trim() || undefined, locale);
     setLoading(false);
     if (r.ok) return go();
     if (r.needVerify) { setStage("verify"); setErr(""); return; }
@@ -38,7 +38,7 @@ export default function RegisterPage() {
     e.preventDefault();
     if (!otp.trim()) return;
     setLoading(true); setErr("");
-    const r = await verify(email.trim(), otp.trim());
+    const r = await verify(email.trim(), otp.trim(), locale);
     setLoading(false);
     if (r.ok) return go();
     setErr(r.error);

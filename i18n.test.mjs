@@ -495,6 +495,24 @@ test("translates auth modal labels", () => {
   }
 });
 
+test("translates auth fallback error labels", () => {
+  const keys = [
+    ["auth.error.registerFailed", "注册失败", "Registration failed"],
+    ["auth.error.needCode", "请输入邮箱收到的验证码", "Enter the verification code sent to your email"],
+    ["auth.error.registerNoToken", "注册未返回令牌", "Registration did not return a token"],
+    ["auth.error.verifyFailed", "验证失败", "Verification failed"],
+    ["auth.error.verifyNoToken", "验证未返回令牌", "Verification did not return a token"],
+    ["auth.error.loginVerifyFirst", "请先验证邮箱", "Verify your email first"],
+    ["auth.error.loginFailed", "登录失败", "Login failed"],
+    ["auth.error.loginNoToken", "登录未返回令牌", "Login did not return a token"],
+  ];
+
+  for (const [key, zh, en] of keys) {
+    assert.equal(t("zh", key), zh);
+    assert.equal(t("en", key), en);
+  }
+});
+
 test("translates outreach modal labels", () => {
   const keys = [
     ["outreach.tone.professional", "专业", "Professional"],
