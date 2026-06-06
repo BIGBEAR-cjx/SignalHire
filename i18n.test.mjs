@@ -79,6 +79,8 @@ test("translates research fallback error labels", () => {
     ["api.error.jobUnavailable", "任务不存在或队列暂不可用", "Job was not found or the queue is unavailable."],
     ["api.error.jobNotRetryable", "任务当前不可重试", "This job cannot be retried right now."],
     ["api.error.jobNotCancelable", "任务当前不可停止", "This job cannot be stopped right now."],
+    ["api.error.missingCandidate", "缺少 candidate", "Missing candidate."],
+    ["api.error.outreachFailed", "生成失败", "Failed to generate outreach draft."],
     ["run.label.backfill", "补搜 practice/code", "Backfill practice/code", { coverage: "practice", source: "code" }, { coverage: "practice", source: "code" }],
   ];
 

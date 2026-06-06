@@ -2,6 +2,7 @@
 //   → { subject, body }
 // 需登录, 不写库 (邮件草稿生成是无状态的)。
 import { generateOutreach, TONES, type Tone } from "@/lib/outreach";
+import { normalizeLocale, t } from "@/lib/i18n.mjs";
 import { getUser } from "@/lib/session";
 
 export const runtime = "nodejs";
@@ -10,19 +11,21 @@ export const maxDuration = 30; // gpt-4o-mini 应该 < 10s, 留 buffer
 const VALID_TONES = new Set<string>(TONES.map((t) => t.value));
 
 export async function POST(req: Request) {
-  const user = await getUser();
-  if (!user) return Response.json({ error: "请先登录" }, { status: 401 });
-
   let body: {
     candidate?: unknown;
     tone?: unknown;
     role_brief?: unknown;
     sender_name?: unknown;
+    locale?: unknown;
   } = {};
   try { body = await req.json(); } catch {}
+  const locale = normalizeLocale(body.locale);
+
+  const user = await getUser();
+  if (!user) return Response.json({ error: t(locale, "api.error.loginRequired") }, { status: 401 });
 
   if (!body.candidate || typeof body.candidate !== "object") {
-    return Response.json({ error: "缺少 candidate" }, { status: 400 });
+    return Response.json({ error: t(locale, "api.error.missingCandidate") }, { status: 400 });
   }
   const tone = typeof body.tone === "string" && VALID_TONES.has(body.tone) ? (body.tone as Tone) : "professional";
 
@@ -35,6 +38,7 @@ export async function POST(req: Request) {
     });
     return Response.json(draft);
   } catch (e) {
-    return Response.json({ error: (e as Error).message || "生成失败" }, { status: 500 });
+    const message = (e as Error).message;
+    return Response.json({ error: message && !/[\u4e00-\u9fff]/.test(message) ? message : t(locale, "api.error.outreachFailed") }, { status: 500 });
   }
 }

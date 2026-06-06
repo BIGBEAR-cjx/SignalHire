@@ -34,7 +34,7 @@ export interface OutreachModalProps {
 }
 
 export default function OutreachModal({ open, onClose, candidate, candidateName, candidateEmail, roleBrief }: OutreachModalProps) {
-  const { t } = useI18n();
+  const { locale, t } = useI18n();
   const [tone, setTone] = useState<Tone>("professional");
   const [sender, setSender] = useState(() => {
     if (typeof window === "undefined") return "";
@@ -81,6 +81,7 @@ export default function OutreachModal({ open, onClose, candidate, candidateName,
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           candidate,
+          locale,
           tone: nextTone,
           role_brief: roleBrief,
           sender_name: sender.trim() || undefined,

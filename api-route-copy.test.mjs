@@ -50,3 +50,18 @@ test("cancel requests include the active locale", () => {
 
   assert.match(source, /fetch\("\/api\/cancel"[\s\S]{0,180}JSON\.stringify\(\{ id: jobId, locale \}\)/);
 });
+
+test("outreach API error responses stay locale-keyed", () => {
+  const source = readFileSync("web/app/api/outreach/route.ts", "utf8");
+  const hardcodedResponses = source
+    .split("\n")
+    .filter((line) => /Response\.json\(\{ error: "[^"]*[\u4e00-\u9fff]/.test(line));
+
+  assert.deepEqual(hardcodedResponses, []);
+});
+
+test("outreach requests include the active locale", () => {
+  const source = readFileSync("web/components/OutreachModal.tsx", "utf8");
+
+  assert.match(source, /candidate,[\s\S]{0,220}locale,[\s\S]{0,220}tone: nextTone/);
+});
