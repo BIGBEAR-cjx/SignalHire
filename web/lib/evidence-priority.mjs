@@ -46,27 +46,10 @@ function statusLabel(status, locale) {
 }
 
 function decisionHint(status, priority, locale) {
-  const normalizedLocale = normalizeLocale(locale);
   const normalizedStatus = normalizeStatus(status);
-  const copy = {
-    zh: {
-      rejected: "保留为负向样本，避免下一轮重复推荐。",
-      active: "已进入推进中，优先补备注、外联或安排面试。",
-      risk_review: "先复核冲突证据和身份风险，再决定是否外联。",
-      needs_backfill: "先补齐公开来源，再决定是否推进。",
-      ready_to_review: "证据基础较完整，可以进入人工审阅。",
-    },
-    en: {
-      rejected: "Keep as a negative signal so the next round avoids repeated recommendations.",
-      active: "Already in progress. Prioritize notes, outreach, or interview scheduling.",
-      risk_review: "Review conflicting evidence and identity risk before outreach.",
-      needs_backfill: "Backfill public sources before deciding whether to proceed.",
-      ready_to_review: "Evidence is strong enough for human review.",
-    },
-  }[normalizedLocale];
-  if (normalizedStatus === "rejected") return copy.rejected;
-  if (ACTIVE_STATUSES.includes(normalizedStatus)) return copy.active;
-  return copy[normalizePriority(priority)] || copy.needs_backfill;
+  if (normalizedStatus === "rejected") return msg(locale, "evidencePriority.decision.rejected");
+  if (ACTIVE_STATUSES.includes(normalizedStatus)) return msg(locale, "evidencePriority.decision.active");
+  return msg(locale, `evidencePriority.decision.${normalizePriority(priority)}`);
 }
 
 function resultWithCandidate(result, candidate, candidateIndex = 0) {
@@ -132,20 +115,7 @@ function priorityText({ priority, row, audit, locale }) {
 }
 
 function matrixActionLabel(priority, locale) {
-  const normalizedLocale = normalizeLocale(locale);
-  const copy = {
-    zh: {
-      risk_review: "复核风险",
-      needs_backfill: "补搜证据",
-      ready_to_review: "打开候选人",
-    },
-    en: {
-      risk_review: "Review risk",
-      needs_backfill: "Backfill evidence",
-      ready_to_review: "Open candidate",
-    },
-  }[normalizedLocale];
-  return copy[normalizePriority(priority)] || copy.needs_backfill;
+  return msg(locale, `evidencePriority.action.${normalizePriority(priority)}`);
 }
 
 function matrixBackfillInput(candidate, priority) {
@@ -213,30 +183,12 @@ export function buildEvidencePriorityItem({ candidate, result, locale, candidate
 }
 
 function evidenceQualityLabel(value, locale) {
-  const normalizedLocale = normalizeLocale(locale);
   const quality = cleanString(value).toLowerCase();
-  const copy = {
-    zh: { high: "强", medium: "中", low: "弱" },
-    en: { high: "High", medium: "Medium", low: "Low" },
-  }[normalizedLocale];
-  return copy[quality] || (normalizedLocale === "en" ? "Unknown" : "未知");
+  return msg(locale, `evidencePriority.quality.${["high", "medium", "low"].includes(quality) ? quality : "unknown"}`);
 }
 
 function compactPriorityLabel(priority, fallback, locale) {
-  const normalizedLocale = normalizeLocale(locale);
-  const copy = {
-    zh: {
-      ready_to_review: "可优先审阅",
-      needs_backfill: "需要补证据",
-      risk_review: "风险复核",
-    },
-    en: {
-      ready_to_review: "Ready to review",
-      needs_backfill: "Needs evidence",
-      risk_review: "Risk review",
-    },
-  }[normalizedLocale];
-  return copy[normalizePriority(priority)] || fallback;
+  return msg(locale, `evidencePriority.compact.${normalizePriority(priority)}`) || fallback;
 }
 
 /**
@@ -248,18 +200,18 @@ export function buildCandidateDecisionSignal({ candidate, result, locale, candid
   return {
     match: {
       key: "match",
-      label: normalizedLocale === "en" ? "Match" : "匹配",
+      label: msg(normalizedLocale, "evidencePriority.signal.match"),
       value: String(item.match_score),
     },
     evidence: {
       key: "evidence",
-      label: normalizedLocale === "en" ? "Evidence" : "证据",
+      label: msg(normalizedLocale, "evidencePriority.signal.evidence"),
       value: evidenceQualityLabel(item.evidence_quality, normalizedLocale),
       raw: item.evidence_quality,
     },
     sources: {
       key: "sources",
-      label: normalizedLocale === "en" ? "Sources" : "来源",
+      label: msg(normalizedLocale, "evidencePriority.signal.sources"),
       value: String(item.independent_sources),
     },
     priority: item.priority,

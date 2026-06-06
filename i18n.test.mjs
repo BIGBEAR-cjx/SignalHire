@@ -313,6 +313,34 @@ test("shared shell navigation and loading copy stay keyed", () => {
   assert.equal(source.includes('description = "正在同步最新数据。"'), false);
 });
 
+test("translates evidence priority decision labels", () => {
+  const keys = [
+    ["evidencePriority.decision.rejected", "保留为负向样本，避免下一轮重复推荐。", "Keep as a negative signal so the next round avoids repeated recommendations."],
+    ["evidencePriority.decision.active", "已进入推进中，优先补备注、外联或安排面试。", "Already in progress. Prioritize notes, outreach, or interview scheduling."],
+    ["evidencePriority.decision.risk_review", "先复核冲突证据和身份风险，再决定是否外联。", "Review conflicting evidence and identity risk before outreach."],
+    ["evidencePriority.decision.needs_backfill", "先补齐公开来源，再决定是否推进。", "Backfill public sources before deciding whether to proceed."],
+    ["evidencePriority.decision.ready_to_review", "证据基础较完整，可以进入人工审阅。", "Evidence is strong enough for human review."],
+    ["evidencePriority.action.risk_review", "复核风险", "Review risk"],
+    ["evidencePriority.action.needs_backfill", "补搜证据", "Backfill evidence"],
+    ["evidencePriority.action.ready_to_review", "打开候选人", "Open candidate"],
+    ["evidencePriority.quality.high", "强", "High"],
+    ["evidencePriority.quality.medium", "中", "Medium"],
+    ["evidencePriority.quality.low", "弱", "Low"],
+    ["evidencePriority.quality.unknown", "未知", "Unknown"],
+    ["evidencePriority.compact.ready_to_review", "可优先审阅", "Ready to review"],
+    ["evidencePriority.compact.needs_backfill", "需要补证据", "Needs evidence"],
+    ["evidencePriority.compact.risk_review", "风险复核", "Risk review"],
+    ["evidencePriority.signal.match", "匹配", "Match"],
+    ["evidencePriority.signal.evidence", "证据", "Evidence"],
+    ["evidencePriority.signal.sources", "来源", "Sources"],
+  ];
+
+  for (const [key, zh, en] of keys) {
+    assert.equal(t("zh", key), zh);
+    assert.equal(t("en", key), en);
+  }
+});
+
 test("translates project detail status labels", () => {
   const keys = [
     ["projects.detail.status.open", "进行中", "Open"],
