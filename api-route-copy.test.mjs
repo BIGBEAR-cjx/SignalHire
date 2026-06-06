@@ -80,3 +80,19 @@ test("feedback requests include the active locale", () => {
 
   assert.match(source, /run_id: runId,[\s\S]{0,220}locale,[\s\S]{0,220}feedback: searchFeedback/);
 });
+
+test("projects collection API error responses stay locale-keyed", () => {
+  const source = readFileSync("web/app/api/projects/route.ts", "utf8");
+  const hardcodedResponses = source
+    .split("\n")
+    .filter((line) => /Response\.json\(\{ error: "[^"]*[\u4e00-\u9fff]/.test(line));
+
+  assert.deepEqual(hardcodedResponses, []);
+});
+
+test("projects collection requests include the active locale", () => {
+  const source = readFileSync("web/app/app/projects/page.tsx", "utf8");
+
+  assert.match(source, /fetch\(`\/api\/projects\?locale=\$\{locale\}`\)/);
+  assert.match(source, /name: name\.trim\(\),[\s\S]{0,220}brief: brief\.trim\(\) \|\| null,[\s\S]{0,220}locale/);
+});

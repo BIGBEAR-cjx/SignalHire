@@ -84,6 +84,8 @@ test("translates research fallback error labels", () => {
     ["api.error.missingRunId", "缺少 run_id", "Missing run_id."],
     ["api.error.invalidFeedback", "反馈选项无效", "Invalid feedback options."],
     ["api.error.feedbackSaveUnavailable", "反馈保存失败或本轮搜索不存在", "Feedback could not be saved or this search round was not found."],
+    ["api.error.missingProjectName", "项目名称必填", "Project name is required."],
+    ["api.error.projectCreateFailed", "创建失败", "Failed to create project."],
     ["run.label.backfill", "补搜 practice/code", "Backfill practice/code", { coverage: "practice", source: "code" }, { coverage: "practice", source: "code" }],
   ];
 

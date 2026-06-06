@@ -41,7 +41,7 @@ const STATUS_META: Record<Status, { labelKey: string; chip: string; dot: string 
 };
 
 export default function ProjectsPage() {
-  const { t } = useI18n();
+  const { locale, t } = useI18n();
   const router = useRouter();
   const [projects, setProjects] = useState<ProjectKpi[] | null>(null);
   const [error, setError] = useState("");
@@ -50,7 +50,7 @@ export default function ProjectsPage() {
 
   const reload = useCallback(async () => {
     try {
-      const r = await fetch("/api/projects");
+      const r = await fetch(`/api/projects?locale=${locale}`);
       const j = await r.json();
       if (!r.ok) throw new Error(j.error || t("projects.loadFailed"));
       setProjects((j.projects ?? []) as ProjectKpi[]);
@@ -58,7 +58,7 @@ export default function ProjectsPage() {
     } catch (e) {
       setError((e as Error).message);
     }
-  }, [t]);
+  }, [locale, t]);
 
   useEffect(() => { void reload(); }, [reload]); // eslint-disable-line react-hooks/set-state-in-effect
 
@@ -180,7 +180,7 @@ function NewProjectDialog({
 }: {
   open: boolean; onClose: () => void; onCreated: (project: { id: string }) => void;
 }) {
-  const { t } = useI18n();
+  const { locale, t } = useI18n();
   const [name, setName] = useState("");
   const [brief, setBrief] = useState("");
   const [creating, setCreating] = useState(false);
@@ -214,7 +214,7 @@ function NewProjectDialog({
       const r = await fetch("/api/projects", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: name.trim(), brief: brief.trim() || null }),
+        body: JSON.stringify({ name: name.trim(), brief: brief.trim() || null, locale }),
       });
       const j = await r.json();
       if (!r.ok) throw new Error(j.error || t("common.create"));
