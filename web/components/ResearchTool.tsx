@@ -424,7 +424,7 @@ export default function ResearchTool({
 
   function createEditablePlan() {
     if (!input.trim()) return;
-    setEditablePlan(buildEditableSearchPlanDraft(input));
+    setEditablePlan(buildEditableSearchPlanDraft(input, { locale }));
   }
 
   function updateEditablePlanList(key: "must_have" | "nice_to_have" | "exclusions", value: string) {

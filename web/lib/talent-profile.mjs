@@ -292,7 +292,30 @@ function inferredExclusions(query) {
   return uniqueStrings(items, 8);
 }
 
-function defaultEditableSourceStrategy(query) {
+const EDITABLE_PLAN_COPY = {
+  zh: {
+    codeReason: "校验实现能力与工程实践",
+    paperReason: "校验研究深度与论文产出",
+    companyReason: "校验角色、资历与工作经历",
+    blogReason: "校验公开技术判断与影响力",
+    adjacentPool: "相邻的 AI 基础设施与应用 AI 建设者",
+    adjacentReason: "从精确关键词之外发现可迁移的公开证据",
+  },
+  en: {
+    codeReason: "verify implementation and engineering practice",
+    paperReason: "verify research depth and publications",
+    companyReason: "verify role, seniority, and work history",
+    blogReason: "verify public technical judgment and influence",
+    adjacentPool: "adjacent AI infrastructure and applied AI builders",
+    adjacentReason: "surface transferable public evidence beyond exact keyword matches",
+  },
+};
+
+function editablePlanCopy(locale, key) {
+  return EDITABLE_PLAN_COPY[locale === "en" ? "en" : "zh"][key] ?? EDITABLE_PLAN_COPY.zh[key];
+}
+
+function defaultEditableSourceStrategy(query, locale = "zh") {
   const brief = { original_query: query, required_skills: inferredMustHave(query) };
   return [
     {
@@ -300,28 +323,28 @@ function defaultEditableSourceStrategy(query) {
       coverage_group: "practice",
       target: "GitHub, Hugging Face, Papers with Code",
       query: fallbackSourceQuery("code", brief),
-      reason: "verify implementation and engineering practice",
+      reason: editablePlanCopy(locale, "codeReason"),
     },
     {
       source_type: "paper",
       coverage_group: "research",
       target: "arXiv, OpenReview, Semantic Scholar",
       query: fallbackSourceQuery("paper", brief),
-      reason: "verify research depth and publications",
+      reason: editablePlanCopy(locale, "paperReason"),
     },
     {
       source_type: "company",
       coverage_group: "work_history",
       target: "company team pages, public profiles, speaker bios",
       query: fallbackSourceQuery("company", brief),
-      reason: "verify role, seniority, and work history",
+      reason: editablePlanCopy(locale, "companyReason"),
     },
     {
       source_type: "blog",
       coverage_group: "public_voice",
       target: "technical blogs, talks, podcasts, interviews",
       query: fallbackSourceQuery("blog", brief),
-      reason: "verify public technical judgment and influence",
+      reason: editablePlanCopy(locale, "blogReason"),
     },
   ];
 }
@@ -1265,7 +1288,8 @@ export function buildSourceQueryPlan(result) {
   }).filter((item) => item.query || item.target || item.reason).slice(0, 12);
 }
 
-export function buildEditableSearchPlanDraft(query) {
+export function buildEditableSearchPlanDraft(query, { locale = "zh" } = {}) {
+  const normalizedLocale = locale === "en" ? "en" : "zh";
   const originalQuery = cleanString(query);
   return normalizeTalentSearchResult({
     search_brief: {
@@ -1277,11 +1301,11 @@ export function buildEditableSearchPlanDraft(query) {
       must_have: inferredMustHave(originalQuery),
       nice_to_have: [],
       exclusions: inferredExclusions(originalQuery),
-      source_strategy: defaultEditableSourceStrategy(originalQuery),
+      source_strategy: defaultEditableSourceStrategy(originalQuery, normalizedLocale),
       adjacent_pools: [
         {
-          pool: "adjacent AI infrastructure and applied AI builders",
-          reason: "surface transferable public evidence beyond exact keyword matches",
+          pool: editablePlanCopy(normalizedLocale, "adjacentPool"),
+          reason: editablePlanCopy(normalizedLocale, "adjacentReason"),
         },
       ],
     },

@@ -228,6 +228,16 @@ test("builds editable search plan draft and compiles it into search input", () =
   assert.match(input, /Return the normal SignalHire talent shortlist payload/);
 });
 
+test("builds localized editable search plan draft copy", () => {
+  const zh = talentProfile.buildEditableSearchPlanDraft("Find senior LLM inference engineers with vLLM");
+  assert.equal(zh.search_plan.source_strategy[0].reason, "校验实现能力与工程实践");
+  assert.equal(zh.search_plan.adjacent_pools[0].reason, "从精确关键词之外发现可迁移的公开证据");
+
+  const en = talentProfile.buildEditableSearchPlanDraft("Find senior LLM inference engineers with vLLM", { locale: "en" });
+  assert.equal(en.search_plan.source_strategy[0].reason, "verify implementation and engineering practice");
+  assert.equal(en.search_plan.adjacent_pools[0].reason, "surface transferable public evidence beyond exact keyword matches");
+});
+
 test("builds feedback-optimized search input for the next round", () => {
   assert.equal(typeof talentProfile.buildFeedbackOptimizedSearchInput, "function");
 
