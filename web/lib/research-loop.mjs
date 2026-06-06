@@ -238,8 +238,8 @@ const DECISION_QUEUE_COLUMNS = [
   { key: "rejected", zh: "不合适", en: "Not a fit" },
 ];
 
-function candidateName(candidate) {
-  return cleanString(candidate?.name) || "Unknown candidate";
+function candidateName(candidate, locale = "en") {
+  return cleanString(candidate?.name) || (normalizeLocale(locale) === "zh" ? "未知候选人" : "Unknown candidate");
 }
 
 function candidateSubtitle(candidate) {
@@ -348,7 +348,7 @@ function candidateBackfillSourceTypeLabels(sourceTypes, locale) {
 function buildCandidateEvidenceBackfillInput(item, locale = "zh") {
   const normalizedLocale = locale === "en" ? "en" : "zh";
   const candidate = isPlainObject(item?.candidate) ? item.candidate : {};
-  const name = candidateName(candidate);
+  const name = candidateName(candidate, normalizedLocale);
   const subtitle = candidateSubtitle(candidate) || candidateBackfillInputCopy(normalizedLocale, "roleUnknown");
   const quality = cleanString(candidate?.evidence_audit?.overall_evidence_quality) || candidateBackfillInputCopy(normalizedLocale, "qualityUnknown");
   const directions = Array.isArray(candidate?.ai_directions) ? candidate.ai_directions.map(cleanString).filter(Boolean).join(", ") : "";
@@ -370,7 +370,7 @@ function buildCandidateEvidenceBackfillInput(item, locale = "zh") {
 }
 
 function decisionQueueReason(locale, key, item) {
-  const name = candidateName(item?.candidate);
+  const name = candidateName(item?.candidate, locale);
   const copy = {
     zh: {
       review: `${name} 还未处理，建议先查看证据档案并决定是否推进。`,
@@ -417,7 +417,7 @@ export function buildProjectCandidateDecisionQueue({ items = [], locale = "zh" }
     column.items.push({
       id: cleanString(item.id),
       status: cleanString(item.status) || "new",
-      name: candidateName(item.candidate),
+      name: candidateName(item.candidate, normalizedLocale),
       subtitle: candidateSubtitle(item.candidate),
       matchScore: Number.isFinite(Number(item.candidate?.match_score)) ? Math.round(Number(item.candidate.match_score)) : null,
       reason: decisionQueueReason(normalizedLocale, key, item),

@@ -287,7 +287,6 @@ test("builds project candidate decision queues from status and evidence risk", (
       id: "weak-evidence",
       status: "new",
       candidate: {
-        name: "Grace",
         evidence_audit: { overall_evidence_quality: "low" },
         claims: [{ claim: "Built agent infra", verdict: "unverified", evidence: [] }],
       },
@@ -319,12 +318,13 @@ test("builds project candidate decision queues from status and evidence risk", (
     ["rejected"],
   ]);
   assert.match(zh.columns[2].items[0].reason, /证据/);
+  assert.equal(zh.columns[2].items[0].name, "未知候选人");
   assert.equal(zh.columns[2].items[0].canBackfill, true);
   assert.match(zh.columns[2].items[0].backfillInput, /SignalHire 候选人证据补搜/);
-  assert.match(zh.columns[2].items[0].backfillInput, /候选人：Grace/);
+  assert.match(zh.columns[2].items[0].backfillInput, /候选人：未知候选人/);
   assert.match(zh.columns[2].items[0].backfillInput, /搜索目标：找到具体公开来源/);
   assert.match(zh.columns[2].items[0].backfillInput, /需要检查的来源类型：代码、论文、个人资料、公司页、公开写作/);
-  assert.match(zh.columns[2].items[0].backfillInput, /Grace/);
+  assert.doesNotMatch(zh.columns[2].items[0].backfillInput, /Unknown candidate/);
   assert.match(zh.columns[2].items[0].backfillInput, /Built agent infra/);
   assert.equal(zh.columns[0].items[0].canBackfill, false);
   assert.equal(zh.columns[0].items[0].backfillInput, "");
