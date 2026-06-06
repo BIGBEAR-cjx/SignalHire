@@ -511,6 +511,29 @@ test("builds localized candidate evidence dossier for result review", () => {
   assert.match(en.backfill_jobs[0].reason, /Public voice evidence is missing/);
 });
 
+test("localizes missing candidate name in Chinese evidence dossier", () => {
+  const result = normalizeTalentSearchResult({
+    candidates: [
+      {
+        name: "",
+        current_role: "AI Engineer",
+        current_company: "Example AI",
+        match_score: 73,
+        claims: [],
+      },
+    ],
+  });
+
+  const dossier = talentProfile.buildCandidateEvidenceDossier({
+    result,
+    candidate: result.candidates[0],
+    locale: "zh",
+  });
+
+  assert.match(dossier.conclusion, /未知候选人/);
+  assert.doesNotMatch(dossier.conclusion, /Unknown candidate/);
+});
+
 test("builds a candidate claim-source matrix for evidence dossier review", () => {
   assert.equal(typeof talentProfile.buildCandidateEvidenceMatrix, "function");
 

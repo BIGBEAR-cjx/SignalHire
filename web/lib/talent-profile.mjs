@@ -1138,7 +1138,7 @@ export function buildCandidateEvidenceDossier({ result, candidate, locale = "zh"
   return {
     title: dossierCopy(locale, "title"),
     conclusion: dossierCopy(locale, "conclusion", {
-      name: audit.candidate_name || cleanString(selected?.name) || "Unknown candidate",
+      name: candidateDisplayName(audit.candidate_name || selected?.name, locale),
       fit: candidateFitLabel(score, locale),
       role,
       signal: signalText,
