@@ -296,7 +296,7 @@ test("keeps duplicate-name candidates distinct by candidate index", () => {
 test("builds a project evidence matrix from shortlist status and evidence priority", () => {
   const ready = candidateFixture({ name: "Ready Candidate", match_score: 91 });
   const backfill = candidateFixture({
-    name: "Backfill Candidate",
+    name: "",
     match_score: 84,
     evidence_audit: {
       verified_claims: [],
@@ -366,9 +366,9 @@ test("builds a project evidence matrix from shortlist status and evidence priori
     ],
   );
   assert.match(matrix.rows[1].action.search_input, /SignalHire 候选人证据补搜/);
-  assert.match(matrix.rows[1].action.search_input, /候选人：Backfill Candidate/);
+  assert.match(matrix.rows[1].action.search_input, /候选人：未知候选人/);
   assert.match(matrix.rows[1].action.search_input, /搜索目标：找到具体公开来源/);
-  assert.match(matrix.rows[1].action.search_input, /Backfill Candidate/);
+  assert.doesNotMatch(matrix.rows[1].action.search_input, /Unknown candidate/);
   assert.match(matrix.rows[1].action.search_input, /Single-source product launch/);
   assert.match(matrix.rows[1].recommended_action, /补搜/);
   assert.equal(matrix.rows[2].decision_hint, "已进入推进中，优先补备注、外联或安排面试。");

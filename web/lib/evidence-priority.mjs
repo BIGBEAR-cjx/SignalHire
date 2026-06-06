@@ -122,6 +122,7 @@ const MATRIX_BACKFILL_COPY = {
   zh: {
     title: "SignalHire 候选人证据补搜。",
     candidate: "候选人：{value}",
+    candidateUnknown: "未知候选人",
     role: "角色/背景：{value}",
     roleUnknown: "角色未知",
     directions: "AI 方向：{value}",
@@ -136,6 +137,7 @@ const MATRIX_BACKFILL_COPY = {
   en: {
     title: "Candidate evidence backfill search for SignalHire.",
     candidate: "Candidate: {value}",
+    candidateUnknown: "Unknown candidate",
     role: "Role/context: {value}",
     roleUnknown: "role unknown",
     directions: "AI directions: {value}",
@@ -156,6 +158,15 @@ function matrixBackfillCopy(locale, key, params = {}) {
   return text;
 }
 
+function matrixCandidateName(candidate, locale) {
+  const normalizedLocale = normalizeLocale(locale);
+  const name = cleanString(candidate?.name);
+  if (!name || (normalizedLocale === "zh" && name === MATRIX_BACKFILL_COPY.en.candidateUnknown)) {
+    return matrixBackfillCopy(normalizedLocale, "candidateUnknown");
+  }
+  return name;
+}
+
 function matrixBackfillInput(candidate, priority, locale) {
   if (normalizePriority(priority) !== "needs_backfill") return "";
   const normalizedLocale = normalizeLocale(locale);
@@ -171,7 +182,7 @@ function matrixBackfillInput(candidate, priority, locale) {
   ].map(cleanString).filter(Boolean);
   return [
     matrixBackfillCopy(normalizedLocale, "title"),
-    matrixBackfillCopy(normalizedLocale, "candidate", { value: cleanString(candidate?.name) || "Unknown candidate" }),
+    matrixBackfillCopy(normalizedLocale, "candidate", { value: matrixCandidateName(candidate, normalizedLocale) }),
     matrixBackfillCopy(normalizedLocale, "role", { value: role }),
     matrixBackfillCopy(normalizedLocale, "directions", { value: directions || matrixBackfillCopy(normalizedLocale, "notSpecified") }),
     matrixBackfillCopy(normalizedLocale, "quality", { value: cleanString(audit?.overall_evidence_quality) || matrixBackfillCopy(normalizedLocale, "qualityUnknown") }),
