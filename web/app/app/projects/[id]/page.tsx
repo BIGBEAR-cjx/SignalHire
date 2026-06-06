@@ -290,13 +290,13 @@ export default function ProjectDetailPage() {
 
   const reloadDetail = useCallback(async () => {
     try {
-      const r = await fetch(`/api/projects/${id}`);
+      const r = await fetch(`/api/projects/${id}?locale=${locale}`);
       const j = await r.json();
       if (!r.ok) throw new Error(j.error || t("projects.detail.error.loadProject"));
       setDetail(j as ProjectDetail);
       setError("");
     } catch (e) { setError((e as Error).message); }
-  }, [id, t]);
+  }, [id, locale, t]);
 
   useEffect(() => {
     if (!id) return;
@@ -304,7 +304,7 @@ export default function ProjectDetailPage() {
     async function load() {
       try {
         const [detailRes, itemsRes] = await Promise.all([
-          fetch(`/api/projects/${id}`),
+          fetch(`/api/projects/${id}?locale=${locale}`),
           fetch(`/api/shortlist?project=${encodeURIComponent(id)}&locale=${locale}`),
         ]);
         const [detailJson, itemsJson] = await Promise.all([detailRes.json(), itemsRes.json()]);
@@ -346,7 +346,7 @@ export default function ProjectDetailPage() {
 
   async function deleteProject() {
     if (!confirm(t("projects.detail.header.deleteConfirm"))) return;
-    const r = await fetch(`/api/projects/${id}`, { method: "DELETE" });
+    const r = await fetch(`/api/projects/${id}?locale=${locale}`, { method: "DELETE" });
     if (r.ok) router.push("/app/projects");
     else alert(t("projects.detail.header.deleteFailed"));
   }
@@ -1327,7 +1327,7 @@ function KpiCard({ label, value, sub, accentDot, onClick }: { label: string; val
 
 function ProjectHeader({ detail, onChanged, onDelete }: { detail: ProjectDetail; onChanged: () => void; onDelete: () => void }) {
   const p = detail.project;
-  const { t } = useI18n();
+  const { locale, t } = useI18n();
   const [editingName, setEditingName] = useState(false);
   const [editingBrief, setEditingBrief] = useState(false);
   const [name, setName] = useState(p.name);
@@ -1337,7 +1337,7 @@ function ProjectHeader({ detail, onChanged, onDelete }: { detail: ProjectDetail;
     const r = await fetch(`/api/projects/${p.id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
+      body: JSON.stringify({ ...body, locale }),
     });
     if (r.ok) onChanged();
   }
