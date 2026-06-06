@@ -85,23 +85,6 @@ const RESULT_COPY = {
     evidenceStrong: "证据强",
     evidenceMedium: "证据中等",
     evidenceWeak: "证据弱",
-    viewDetails: "查看详情",
-    removeFromPool: "移出候选池",
-    addToPool: "加入候选池",
-    claim: "声称",
-    auditTitle: "证据审计",
-    dossierCoverage: "证据覆盖",
-    verificationGaps: "待补验证",
-    independentSources: "{count} 个独立信源",
-    singleSourceClaims: "单源声称",
-    identityRisk: "身份风险",
-    recencyNotes: "时效说明",
-    none: "无",
-    strongestEvidence: "最强证据",
-    weakEvidence: "弱证据",
-    riskFlags: "风险提示",
-    evidenceGraph: "证据图",
-    risk: "风险",
     outreachAngle: "外联角度",
     homepage: "主页",
     trust: "可信度",
@@ -121,23 +104,6 @@ const RESULT_COPY = {
     evidenceStrong: "Strong evidence",
     evidenceMedium: "Moderate evidence",
     evidenceWeak: "Weak evidence",
-    viewDetails: "View details",
-    removeFromPool: "Remove from pool",
-    addToPool: "Add to pool",
-    claim: "Claim",
-    auditTitle: "Evidence audit",
-    dossierCoverage: "Evidence coverage",
-    verificationGaps: "Verification gaps",
-    independentSources: "{count} independent sources",
-    singleSourceClaims: "Single-source claims",
-    identityRisk: "Identity risk",
-    recencyNotes: "Recency notes",
-    none: "None",
-    strongestEvidence: "Strongest evidence",
-    weakEvidence: "Weak evidence",
-    riskFlags: "Risk flags",
-    evidenceGraph: "Evidence graph",
-    risk: "Risk",
     outreachAngle: "Outreach angle",
     homepage: "Website",
     trust: "Trust",
@@ -229,7 +195,24 @@ type SharedResultCopyKey =
   | "workHistory"
   | "sourceTypes"
   | "signalRisk"
-  | "gapPrefix";
+  | "gapPrefix"
+  | "viewDetails"
+  | "removeFromPool"
+  | "addToPool"
+  | "claim"
+  | "auditTitle"
+  | "dossierCoverage"
+  | "verificationGaps"
+  | "independentSources"
+  | "singleSourceClaims"
+  | "identityRisk"
+  | "recencyNotes"
+  | "none"
+  | "strongestEvidence"
+  | "weakEvidence"
+  | "riskFlags"
+  | "evidenceGraph"
+  | "risk";
 type ResultCopyKey = keyof typeof RESULT_COPY.zh | SharedResultCopyKey;
 
 function resultCopy(locale: Locale | undefined, key: ResultCopyKey, params: Record<string, string | number> = {}) {

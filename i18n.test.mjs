@@ -242,6 +242,33 @@ test("translates result talent map and comparison labels", () => {
   }
 });
 
+test("translates result evidence audit labels", () => {
+  const keys = [
+    ["result.viewDetails", "查看详情", "View details"],
+    ["result.removeFromPool", "移出候选池", "Remove from pool"],
+    ["result.addToPool", "加入候选池", "Add to pool"],
+    ["result.claim", "声称", "Claim"],
+    ["result.auditTitle", "证据审计", "Evidence audit"],
+    ["result.dossierCoverage", "证据覆盖", "Evidence coverage"],
+    ["result.verificationGaps", "待补验证", "Verification gaps"],
+    ["result.independentSources", "2 个独立信源", "2 independent sources", { count: 2 }, { count: 2 }],
+    ["result.singleSourceClaims", "单源声称", "Single-source claims"],
+    ["result.identityRisk", "身份风险", "Identity risk"],
+    ["result.recencyNotes", "时效说明", "Recency notes"],
+    ["result.none", "无", "None"],
+    ["result.strongestEvidence", "最强证据", "Strongest evidence"],
+    ["result.weakEvidence", "弱证据", "Weak evidence"],
+    ["result.riskFlags", "风险提示", "Risk flags"],
+    ["result.evidenceGraph", "证据图", "Evidence graph"],
+    ["result.risk", "风险", "Risk"],
+  ];
+
+  for (const [key, zh, en, zhParams, enParams] of keys) {
+    assert.equal(t("zh", key, zhParams), zh);
+    assert.equal(t("en", key, enParams), en);
+  }
+});
+
 test("translates project detail status labels", () => {
   const keys = [
     ["projects.detail.status.open", "进行中", "Open"],
