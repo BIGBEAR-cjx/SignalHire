@@ -656,6 +656,29 @@ test("builds localized candidate reading summary before raw evidence", () => {
   assert.match(en.sections[3].body, /Human review/);
 });
 
+test("localizes missing candidate name in Chinese reading summary", () => {
+  const result = normalizeTalentSearchResult({
+    candidates: [
+      {
+        name: "",
+        current_role: "AI Engineer",
+        current_company: "Example AI",
+        match_score: 78,
+        claims: [],
+      },
+    ],
+  });
+
+  const summary = talentProfile.buildCandidateReadingSummary({
+    result,
+    candidate: result.candidates[0],
+    locale: "zh",
+  });
+
+  assert.match(summary.sections[0].body, /未知候选人/);
+  assert.doesNotMatch(summary.sections[0].body, /Unknown candidate/);
+});
+
 test("builds shortlist delivery report for hiring manager handoff", () => {
   assert.equal(typeof talentProfile.buildShortlistDeliveryReport, "function");
 

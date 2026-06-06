@@ -948,6 +948,12 @@ function readingRecommendation(score, locale) {
   return readingCopy(locale, "cautious");
 }
 
+function candidateDisplayName(value, locale) {
+  const name = cleanString(value);
+  if (!name || (locale !== "en" && name === "Unknown candidate")) return locale === "en" ? "Unknown candidate" : "未知候选人";
+  return name;
+}
+
 /**
  * @param {{ result?: unknown; candidate?: unknown; locale?: "zh" | "en" }} input
  */
@@ -959,7 +965,7 @@ export function buildCandidateReadingSummary({ result, candidate, locale = "zh" 
   const selected = normalizedResult.candidates.find((item) => item.name.toLowerCase() === suppliedName.toLowerCase()) || suppliedCandidate;
   const audit = buildCandidateEvidenceAudit({ result: normalizedResult, candidate: selected });
   const score = clampScore(selected?.match_score);
-  const name = audit.candidate_name || cleanString(selected?.name) || "Unknown candidate";
+  const name = candidateDisplayName(audit.candidate_name || selected?.name, normalizedLocale);
   const role = candidateRole(selected) || cleanString(selected?.headline) || readingCopy(normalizedLocale, "noRole");
   const direction = cleanStringArray(selected?.ai_directions, 1)[0];
   const signal = cleanStringArray(selected?.strongest_signals, 1)[0]
