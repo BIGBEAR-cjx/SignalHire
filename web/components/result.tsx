@@ -82,12 +82,6 @@ function uiCopy(locale: Locale | undefined, key: string, params?: Record<string,
 
 const RESULT_COPY = {
   zh: {
-    unknownCandidate: "未知候选人",
-    source: "来源",
-    verified: "已验证",
-    contradicted: "矛盾",
-    unverified: "查无实据",
-    sourceCountTitle: "覆盖该声称的不同域名数 (越多越可靠)",
     evidenceStrong: "证据强",
     evidenceMedium: "证据中等",
     evidenceWeak: "证据弱",
@@ -195,12 +189,6 @@ const RESULT_COPY = {
     caveat5: "未发现红旗不代表候选人完全可信；已发现红旗也不代表候选人不可用，可能是同名或信源错误。",
   },
   en: {
-    unknownCandidate: "Unknown candidate",
-    source: "Source",
-    verified: "Verified",
-    contradicted: "Contradicted",
-    unverified: "No evidence found",
-    sourceCountTitle: "Number of distinct domains covering this claim (more is stronger)",
     evidenceStrong: "Strong evidence",
     evidenceMedium: "Moderate evidence",
     evidenceWeak: "Weak evidence",
@@ -309,8 +297,14 @@ const RESULT_COPY = {
   },
 } as const;
 
-function resultCopy(locale: Locale | undefined, key: keyof typeof RESULT_COPY.zh, params: Record<string, string | number> = {}) {
-  let text: string = RESULT_COPY[locale === "en" ? "en" : "zh"][key] ?? RESULT_COPY.zh[key];
+type SharedResultCopyKey = "unknownCandidate" | "source" | "verified" | "contradicted" | "unverified" | "sourceCountTitle";
+type ResultCopyKey = keyof typeof RESULT_COPY.zh | SharedResultCopyKey;
+
+function resultCopy(locale: Locale | undefined, key: ResultCopyKey, params: Record<string, string | number> = {}) {
+  const copy = RESULT_COPY[locale === "en" ? "en" : "zh"] as Partial<Record<ResultCopyKey, string>>;
+  const fallbackCopy = RESULT_COPY.zh as Partial<Record<ResultCopyKey, string>>;
+  let text = copy[key] ?? fallbackCopy[key];
+  if (!text) return uiCopy(locale, `result.${key}`, params);
   for (const [name, value] of Object.entries(params)) text = text.replace(`{${name}}`, String(value));
   return text;
 }

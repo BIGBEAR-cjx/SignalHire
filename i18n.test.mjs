@@ -108,6 +108,22 @@ test("translates source quality labels", () => {
   }
 });
 
+test("translates result verdict and source labels", () => {
+  const keys = [
+    ["result.unknownCandidate", "未知候选人", "Unknown candidate"],
+    ["result.source", "来源", "Source"],
+    ["result.verified", "已验证", "Verified"],
+    ["result.contradicted", "矛盾", "Contradicted"],
+    ["result.unverified", "查无实据", "No evidence found"],
+    ["result.sourceCountTitle", "覆盖该声称的不同域名数 (越多越可靠)", "Number of distinct domains covering this claim (more is stronger)"],
+  ];
+
+  for (const [key, zh, en] of keys) {
+    assert.equal(t("zh", key), zh);
+    assert.equal(t("en", key), en);
+  }
+});
+
 test("translates project detail status labels", () => {
   const keys = [
     ["projects.detail.status.open", "进行中", "Open"],
