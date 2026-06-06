@@ -16,16 +16,16 @@ type HistoryItem = {
 };
 
 export default function HistoryPage() {
-  const { t } = useI18n();
+  const { locale, t } = useI18n();
   const [items, setItems] = useState<HistoryItem[] | null>(null);
   const [error, setError] = useState("");
 
   useEffect(() => {
-    fetch("/api/history")
+    fetch(`/api/history?locale=${locale}`)
       .then((r) => r.json())
       .then((j) => setItems(j.runs ?? []))
       .catch((e) => setError((e as Error).message));
-  }, []);
+  }, [locale]);
 
   return (
     <div className="space-y-6">

@@ -9,18 +9,18 @@ import { logout } from "@/lib/auth";
 import { PageIntro, SecondaryAction, Surface } from "@/components/ui/signal-ui";
 
 export default function SettingsPage() {
-  const { t } = useI18n();
+  const { locale, t } = useI18n();
   const router = useRouter();
   const [user, setUser] = useState<{ id: string; email: string } | null>(null);
   const [copied, setCopied] = useState(false);
 
   useEffect(() => {
     // 从服务端拿 (含 user.id, 方便 SQL backfill 用)
-    fetch("/api/whoami")
+    fetch(`/api/whoami?locale=${locale}`)
       .then((r) => (r.ok ? r.json() : null))
       .then((j) => j?.user && setUser(j.user))
       .catch(() => {});
-  }, []);
+  }, [locale]);
 
   async function handleLogout() {
     await logout();

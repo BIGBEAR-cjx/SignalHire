@@ -96,3 +96,24 @@ test("projects collection requests include the active locale", () => {
   assert.match(source, /fetch\(`\/api\/projects\?locale=\$\{locale\}`\)/);
   assert.match(source, /name: name\.trim\(\),[\s\S]{0,220}brief: brief\.trim\(\) \|\| null,[\s\S]{0,220}locale/);
 });
+
+test("dashboard account API error responses stay locale-keyed", () => {
+  for (const file of ["web/app/api/overview/route.ts", "web/app/api/history/route.ts", "web/app/api/whoami/route.ts"]) {
+    const source = readFileSync(file, "utf8");
+    const hardcodedResponses = source
+      .split("\n")
+      .filter((line) => /Response\.json\(\{ error: "[^"]*[\u4e00-\u9fff]/.test(line));
+
+    assert.deepEqual(hardcodedResponses, [], file);
+  }
+});
+
+test("dashboard account requests include the active locale", () => {
+  const overview = readFileSync("web/app/app/page.tsx", "utf8");
+  const history = readFileSync("web/app/app/history/page.tsx", "utf8");
+  const settings = readFileSync("web/app/app/settings/page.tsx", "utf8");
+
+  assert.match(overview, /fetch\(`\/api\/overview\?locale=\$\{locale\}`\)/);
+  assert.match(history, /fetch\(`\/api\/history\?locale=\$\{locale\}`\)/);
+  assert.match(settings, /fetch\(`\/api\/whoami\?locale=\$\{locale\}`\)/);
+});

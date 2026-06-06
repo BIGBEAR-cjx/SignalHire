@@ -88,12 +88,12 @@ function StatusDot({ status }: { status: string }) {
 }
 
 export default function Overview() {
-  const { t } = useI18n();
+  const { locale, t } = useI18n();
   const [data, setData] = useState<OverviewData | null>(null);
   const [error, setError] = useState("");
 
   useEffect(() => {
-    fetch("/api/overview")
+    fetch(`/api/overview?locale=${locale}`)
       .then(async (r) => {
         if (r.ok) return r.json();
         if (r.status === 401) throw new Error("__SESSION_EXPIRED__");
@@ -101,16 +101,16 @@ export default function Overview() {
       })
       .then(setData)
       .catch((e) => setError((e as Error).message));
-  }, []);
+  }, [locale]);
 
   // 进行中任务实时性: 有 active jobs 时, 每 5s 轻量重新拉一次 (用户不会一直盯着, 但回来时数字是新的)
   useEffect(() => {
     if (!data?.active_jobs?.length) return;
     const t = setInterval(() => {
-      fetch("/api/overview").then((r) => r.ok ? r.json() : null).then((j) => j && setData(j)).catch(() => {});
+      fetch(`/api/overview?locale=${locale}`).then((r) => r.ok ? r.json() : null).then((j) => j && setData(j)).catch(() => {});
     }, 5000);
     return () => clearInterval(t);
-  }, [data?.active_jobs?.length]);
+  }, [data?.active_jobs?.length, locale]);
 
   const empty = data && data.kpi.searches_this_month === 0 && data.kpi.verifies_total === 0 && data.kpi.shortlist_total === 0;
 
