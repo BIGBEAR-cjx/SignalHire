@@ -322,6 +322,29 @@ function candidateBackfillInputCopy(locale, key, params = {}) {
   return text;
 }
 
+const CANDIDATE_BACKFILL_SOURCE_TYPE_LABELS = {
+  zh: {
+    code: "代码",
+    paper: "论文",
+    profile: "个人资料",
+    company: "公司页",
+    blog: "公开写作",
+  },
+  en: {
+    code: "code",
+    paper: "paper",
+    profile: "profile",
+    company: "company",
+    blog: "blog",
+  },
+};
+
+function candidateBackfillSourceTypeLabels(sourceTypes, locale) {
+  const normalizedLocale = locale === "en" ? "en" : "zh";
+  const labels = CANDIDATE_BACKFILL_SOURCE_TYPE_LABELS[normalizedLocale];
+  return sourceTypes.map((type) => labels[type] ?? type);
+}
+
 function buildCandidateEvidenceBackfillInput(item, locale = "zh") {
   const normalizedLocale = locale === "en" ? "en" : "zh";
   const candidate = isPlainObject(item?.candidate) ? item.candidate : {};
@@ -331,6 +354,7 @@ function buildCandidateEvidenceBackfillInput(item, locale = "zh") {
   const directions = Array.isArray(candidate?.ai_directions) ? candidate.ai_directions.map(cleanString).filter(Boolean).join(", ") : "";
   const gapClaims = candidateEvidenceGapClaims(candidate);
   const sourceTypes = candidateBackfillSourceTypes(candidate);
+  const sourceTypeLabels = candidateBackfillSourceTypeLabels(sourceTypes, normalizedLocale);
   return [
     candidateBackfillInputCopy(normalizedLocale, "title"),
     candidateBackfillInputCopy(normalizedLocale, "candidate", { value: name }),
@@ -338,7 +362,7 @@ function buildCandidateEvidenceBackfillInput(item, locale = "zh") {
     candidateBackfillInputCopy(normalizedLocale, "directions", { value: directions || candidateBackfillInputCopy(normalizedLocale, "notSpecified") }),
     candidateBackfillInputCopy(normalizedLocale, "quality", { value: quality }),
     candidateBackfillInputCopy(normalizedLocale, "gaps", { value: gapClaims.length ? gapClaims.join("; ") : candidateBackfillInputCopy(normalizedLocale, "defaultGap") }),
-    candidateBackfillInputCopy(normalizedLocale, "sourceTypes", { value: sourceTypes.join(", ") }),
+    candidateBackfillInputCopy(normalizedLocale, "sourceTypes", { value: localizedJoin(normalizedLocale, sourceTypeLabels) }),
     candidateBackfillInputCopy(normalizedLocale, "goal"),
     candidateBackfillInputCopy(normalizedLocale, "prioritize"),
     candidateBackfillInputCopy(normalizedLocale, "returnPayload"),
