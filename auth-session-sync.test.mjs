@@ -5,6 +5,7 @@ import { syncSessionCookieFromTokenManager } from "./web/lib/auth-session-sync.m
 
 test("waits for the session cookie write before resolving", async () => {
   let cookieWriteFinished = false;
+  let requestBody = "";
 
   const syncPromise = syncSessionCookieFromTokenManager(
     {
@@ -14,12 +15,14 @@ test("waits for the session cookie write before resolving", async () => {
         },
       },
     },
-    async (_url, _init) => new Promise((resolve) => {
+    async (_url, init) => new Promise((resolve) => {
       setTimeout(() => {
         cookieWriteFinished = true;
+        requestBody = String(init.body);
         resolve({ ok: true });
       }, 10);
     }),
+    "en",
   );
 
   assert.equal(cookieWriteFinished, false);
@@ -28,6 +31,7 @@ test("waits for the session cookie write before resolving", async () => {
 
   assert.equal(didSync, true);
   assert.equal(cookieWriteFinished, true);
+  assert.deepEqual(JSON.parse(requestBody), { accessToken: "fresh-token", locale: "en" });
 });
 
 test("does not call the session endpoint when no access token is available", async () => {

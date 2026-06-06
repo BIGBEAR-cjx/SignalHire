@@ -8,11 +8,11 @@ const BASE = process.env.NEXT_PUBLIC_INSFORGE_API_BASE_URL;
 const client = createClient({ baseUrl: BASE });
 
 // 把 token 写进服务端 httpOnly cookie, 供服务端路由读取登录态。
-async function setSession(accessToken: string) {
+async function setSession(accessToken: string, locale: string) {
   await fetch("/api/auth/session", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ accessToken }),
+    body: JSON.stringify({ accessToken, locale }),
   });
 }
 
@@ -24,7 +24,7 @@ export async function register(email: string, password: string, name?: string, l
   try {
     const { data, error } = await client.auth.signUp({ email, password, name });
     if (error) return { ok: false, error: authErrorMessage(locale, "registerFailed", error.message) };
-    if (data?.accessToken) { await setSession(data.accessToken); return { ok: true }; }
+    if (data?.accessToken) { await setSession(data.accessToken, locale); return { ok: true }; }
     // 开了邮箱验证: 没拿到 token, 需要验证码
     if (data?.requireEmailVerification) return { ok: false, needVerify: true, error: authErrorMessage(locale, "needCode") };
     return { ok: false, error: authErrorMessage(locale, "registerNoToken") };
@@ -37,7 +37,7 @@ export async function verify(email: string, otp: string, locale = "zh"): Promise
   try {
     const { data, error } = await client.auth.verifyEmail({ email, otp });
     if (error) return { ok: false, error: authErrorMessage(locale, "verifyFailed", error.message) };
-    if (data?.accessToken) { await setSession(data.accessToken); return { ok: true }; }
+    if (data?.accessToken) { await setSession(data.accessToken, locale); return { ok: true }; }
     return { ok: false, error: authErrorMessage(locale, "verifyNoToken") };
   } catch (e) {
     return { ok: false, error: authErrorMessage(locale, "verifyFailed", (e as Error).message) };
@@ -58,7 +58,7 @@ export async function login(email: string, password: string, locale = "zh"): Pro
           : authErrorMessage(locale, "loginFailed", error.message),
       };
     }
-    if (data?.accessToken) { await setSession(data.accessToken); return { ok: true }; }
+    if (data?.accessToken) { await setSession(data.accessToken, locale); return { ok: true }; }
     return { ok: false, error: authErrorMessage(locale, "loginNoToken") };
   } catch (e) {
     return { ok: false, error: authErrorMessage(locale, "loginFailed", (e as Error).message) };

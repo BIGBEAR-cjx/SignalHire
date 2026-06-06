@@ -68,6 +68,7 @@ test("translates research fallback error labels", () => {
     ["research.error.generic", "出错了", "Something went wrong."],
     ["research.error.backfillQueued", "补搜入队失败", "Failed to queue evidence backfill."],
     ["api.error.loginRequired", "请先登录", "Please sign in first."],
+    ["api.error.missingAccessToken", "缺少 accessToken", "Missing accessToken."],
     ["api.error.missingQuery", "缺少 query", "Missing query."],
     ["api.error.missingBio", "缺少 bio", "Missing bio."],
     ["api.error.queueUnavailableTrySample", "队列暂不可用 (DB 未配置)，请试试示例查询", "Queue is unavailable (DB is not configured). Try a sample query."],

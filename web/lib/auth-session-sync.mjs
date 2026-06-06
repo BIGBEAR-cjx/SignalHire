@@ -1,4 +1,4 @@
-export async function syncSessionCookieFromTokenManager(authClient, fetchImpl = globalThis.fetch) {
+export async function syncSessionCookieFromTokenManager(authClient, fetchImpl = globalThis.fetch, locale = "zh") {
   try {
     const tm = authClient?.auth?.tokenManager;
     const token = tm?.getAccessToken?.();
@@ -6,7 +6,7 @@ export async function syncSessionCookieFromTokenManager(authClient, fetchImpl = 
     const response = await fetchImpl("/api/auth/session", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ accessToken: token }),
+      body: JSON.stringify({ accessToken: token, locale }),
     });
     return Boolean(response?.ok);
   } catch {
