@@ -1504,10 +1504,33 @@ export function buildBackfillSearchInput({ job, originalQuery = "" } = {}) {
   ].join("\n");
 }
 
+const BACKFILL_MERGE_COPY = {
+  zh: {
+    sourceEvidence: "新增 {sourceTypes} 来源证据。",
+    publicEvidence: "发现新的公开证据链接。",
+    summary: "{candidateCount} 位候选人发现 {evidenceCount} 条新增证据。",
+    empty: "未发现可合并到原报告的新增候选人证据。",
+  },
+  en: {
+    sourceEvidence: "Added {sourceTypes} source evidence.",
+    publicEvidence: "Found new public evidence links.",
+    summary: "{candidateCount} {candidateLabel} {candidateVerb} {evidenceCount} new {evidenceLabel}.",
+    empty: "No new candidate evidence was found to merge into the original report.",
+  },
+};
+
+function backfillMergeCopy(locale, key, params = {}) {
+  const normalizedLocale = locale === "en" ? "en" : "zh";
+  let text = BACKFILL_MERGE_COPY[normalizedLocale][key] ?? BACKFILL_MERGE_COPY.zh[key];
+  for (const [name, value] of Object.entries(params)) text = text.replace(`{${name}}`, String(value));
+  return text;
+}
+
 /**
- * @param {{ originalResult?: unknown; backfillResult?: unknown }} input
+ * @param {{ originalResult?: unknown; backfillResult?: unknown; locale?: string }} input
  */
-export function buildBackfillMergeSummary({ originalResult, backfillResult } = {}) {
+export function buildBackfillMergeSummary({ originalResult, backfillResult, locale = "zh" } = {}) {
+  const normalizedLocale = locale === "en" ? "en" : "zh";
   const original = normalizeTalentSearchResult(originalResult);
   const backfill = normalizeTalentSearchResult(backfillResult);
   const originalCandidates = candidateMapByName(original.candidates);
@@ -1535,8 +1558,8 @@ export function buildBackfillMergeSummary({ originalResult, backfillResult } = {
       new_source_types: newSourceTypes,
       new_evidence_urls: newEvidenceUrls,
       merge_note: newSourceTypes.length
-        ? `新增 ${newSourceTypes.join(", ")} 来源证据。`
-        : "发现新的公开证据链接。",
+        ? backfillMergeCopy(normalizedLocale, "sourceEvidence", { sourceTypes: newSourceTypes.join(", ") })
+        : backfillMergeCopy(normalizedLocale, "publicEvidence"),
     });
   }
 
@@ -1563,8 +1586,14 @@ export function buildBackfillMergeSummary({ originalResult, backfillResult } = {
   const newEvidenceCount = improvedCandidates.reduce((total, candidate) => total + candidate.new_evidence_count, 0);
   return {
     summary: improvedCandidates.length > 0
-      ? `${improvedCandidates.length} 位候选人发现 ${newEvidenceCount} 条新增证据。`
-      : "未发现可合并到原报告的新增候选人证据。",
+      ? backfillMergeCopy(normalizedLocale, "summary", {
+        candidateCount: improvedCandidates.length,
+        candidateLabel: improvedCandidates.length === 1 ? "candidate" : "candidates",
+        candidateVerb: improvedCandidates.length === 1 ? "has" : "have",
+        evidenceCount: newEvidenceCount,
+        evidenceLabel: newEvidenceCount === 1 ? "evidence item" : "evidence items",
+      })
+      : backfillMergeCopy(normalizedLocale, "empty"),
     improved_candidates: improvedCandidates.slice(0, 12),
     new_candidate_names: Array.from(new Set(newCandidateNames)).slice(0, 12),
     coverage_gains: coverageGains,
@@ -1572,12 +1601,12 @@ export function buildBackfillMergeSummary({ originalResult, backfillResult } = {
 }
 
 /**
- * @param {{ originalResult?: unknown; backfillResult?: unknown; mergedAt?: string }} input
+ * @param {{ originalResult?: unknown; backfillResult?: unknown; mergedAt?: string; locale?: string }} input
  */
-export function mergeBackfillResult({ originalResult, backfillResult, mergedAt = new Date().toISOString() } = {}) {
+export function mergeBackfillResult({ originalResult, backfillResult, mergedAt = new Date().toISOString(), locale = "zh" } = {}) {
   const original = normalizeTalentSearchResult(originalResult);
   const backfill = normalizeTalentSearchResult(backfillResult);
-  const summary = buildBackfillMergeSummary({ originalResult: original, backfillResult: backfill });
+  const summary = buildBackfillMergeSummary({ originalResult: original, backfillResult: backfill, locale });
   const backfillCandidates = candidateMapByName(backfill.candidates);
   const existingNames = new Set(original.candidates.map((candidate) => candidate.name.toLowerCase()));
 

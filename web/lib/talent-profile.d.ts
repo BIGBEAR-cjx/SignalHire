@@ -58,8 +58,8 @@ export function buildCandidateEvidenceMatrix(input?: { result?: unknown; candida
 export function buildShortlistDeliveryReport(result: unknown, options?: { locale?: "zh" | "en" | string }): ShortlistDeliveryReport;
 export function buildCoverageBackfillPlan(result: unknown, options?: { locale?: "zh" | "en" | string }): CoverageBackfillPlan;
 export function buildBackfillSearchInput(input?: { job?: unknown; originalQuery?: string }): string;
-export function buildBackfillMergeSummary(input?: { originalResult?: unknown; backfillResult?: unknown }): BackfillMergeSummary;
-export function mergeBackfillResult(input?: { originalResult?: unknown; backfillResult?: unknown; mergedAt?: string }): BackfillMergedTalentSearchResult;
+export function buildBackfillMergeSummary(input?: { originalResult?: unknown; backfillResult?: unknown; locale?: "zh" | "en" | string }): BackfillMergeSummary;
+export function mergeBackfillResult(input?: { originalResult?: unknown; backfillResult?: unknown; mergedAt?: string; locale?: "zh" | "en" | string }): BackfillMergedTalentSearchResult;
 export function buildEditableSearchPlanDraft(query: unknown): EditableSearchPlanDraft;
 export function buildSearchInputFromEditablePlan(input?: { draft?: unknown }): string;
 export function buildFeedbackOptimizedSearchInput(input?: { result?: unknown; feedback?: SearchFeedback }): string;

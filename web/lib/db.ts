@@ -429,6 +429,7 @@ export async function mergeBackfillRuns(input: {
   originalRunId: string;
   backfillRunId: string;
   userId: string;
+  locale?: string;
 }): Promise<MergeBackfillRunsResult | null> {
   if (!client) return null;
   try {
@@ -441,6 +442,7 @@ export async function mergeBackfillRuns(input: {
     const merged = mergeBackfillResult({
       originalResult: original.result,
       backfillResult: backfill.result,
+      locale: input.locale,
     });
     const mergeSummary = merged.backfill_merge.summary;
     const updatedAt = new Date().toISOString();

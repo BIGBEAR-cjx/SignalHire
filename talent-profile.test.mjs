@@ -991,6 +991,45 @@ test("summarizes backfill evidence that can merge into the original report", () 
   assert.match(summary.summary, /1 条新增证据/);
 });
 
+test("builds English backfill merge summary copy", () => {
+  const originalResult = normalizeTalentSearchResult({
+    candidates: [
+      {
+        name: "Ada Lovelace",
+        claims: [
+          {
+            claim: "Maintains public inference code",
+            verdict: "unverified",
+            evidence: [],
+          },
+        ],
+      },
+    ],
+  });
+  const backfillResult = normalizeTalentSearchResult({
+    evidence_graph: {
+      source_mix: [{ source_type: "code", count: 1 }],
+    },
+    candidates: [
+      {
+        name: "Ada Lovelace",
+        claims: [
+          {
+            claim: "Maintains a public vLLM integration",
+            verdict: "verified",
+            evidence: [{ note: "GitHub repo", url: "https://github.com/example/vllm", source_type: "code" }],
+          },
+        ],
+      },
+    ],
+  });
+
+  const summary = talentProfile.buildBackfillMergeSummary({ originalResult, backfillResult, locale: "en" });
+
+  assert.equal(summary.summary, "1 candidate has 1 new evidence item.");
+  assert.equal(summary.improved_candidates[0].merge_note, "Added code source evidence.");
+});
+
 test("merges backfill evidence into the original talent report", () => {
   assert.equal(typeof talentProfile.mergeBackfillResult, "function");
 

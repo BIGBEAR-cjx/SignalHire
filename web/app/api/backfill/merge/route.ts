@@ -35,6 +35,7 @@ export async function POST(req: Request) {
     originalRunId,
     backfillRunId,
     userId: user.id,
+    locale,
   });
   if (!merged) return Response.json({ error: t(locale, "api.error.backfillMergeUnavailable") }, { status: 404 });
   return Response.json({ merged: true, ...merged });

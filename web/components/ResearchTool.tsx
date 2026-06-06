@@ -302,6 +302,7 @@ export default function ResearchTool({
             setBackfillMergeSummary(buildBackfillMergeSummary({
               originalResult: mergeContext.originalResult,
               backfillResult: j.result,
+              locale,
             }));
           }
           setResult(j.result);
