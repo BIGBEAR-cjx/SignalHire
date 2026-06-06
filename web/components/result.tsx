@@ -85,15 +85,6 @@ const RESULT_COPY = {
     evidenceStrong: "证据强",
     evidenceMedium: "证据中等",
     evidenceWeak: "证据弱",
-    searchPlanTitle: "搜索计划",
-    searchPlanDesc: "系统如何拆解岗位画像、选择来源并扩展相邻人才池。",
-    mustHave: "必须条件",
-    niceToHave: "加分条件",
-    exclusions: "排除条件",
-    notIdentified: "未识别",
-    sourceQueryPlan: "来源查询计划",
-    items: "条",
-    adjacentPools: "相邻人才池",
     research: "研究",
     practice: "实践",
     work_history: "工作经历",
@@ -181,15 +172,6 @@ const RESULT_COPY = {
     evidenceStrong: "Strong evidence",
     evidenceMedium: "Moderate evidence",
     evidenceWeak: "Weak evidence",
-    searchPlanTitle: "Search plan",
-    searchPlanDesc: "How the system decomposed the role profile, selected sources, and expanded adjacent talent pools.",
-    mustHave: "Must-have",
-    niceToHave: "Nice-to-have",
-    exclusions: "Exclusions",
-    notIdentified: "Not identified",
-    sourceQueryPlan: "Source query plan",
-    items: "items",
-    adjacentPools: "Adjacent talent pools",
     research: "Research",
     practice: "Practice",
     work_history: "Work history",
@@ -292,7 +274,13 @@ type SharedResultCopyKey =
   | "priorityReview"
   | "sourcesShort"
   | "deliveryRisks"
-  | "nextSteps";
+  | "nextSteps"
+  | "searchPlanTitle"
+  | "searchPlanDesc"
+  | "notIdentified"
+  | "sourceQueryPlan"
+  | "items"
+  | "adjacentPools";
 type ResultCopyKey = keyof typeof RESULT_COPY.zh | SharedResultCopyKey;
 
 function resultCopy(locale: Locale | undefined, key: ResultCopyKey, params: Record<string, string | number> = {}) {
@@ -560,9 +548,9 @@ export function SearchPlanView({ result, locale }: { result: TalentSearchResult 
         <p className="mt-1 text-sm text-gray-500">{resultCopy(locale, "searchPlanDesc")}</p>
       </div>
       <div className="mt-4 grid gap-3 md:grid-cols-3">
-        <PlanList title={resultCopy(locale, "mustHave")} items={plan.must_have} tone="emerald" locale={locale} />
-        <PlanList title={resultCopy(locale, "niceToHave")} items={plan.nice_to_have} tone="blue" locale={locale} />
-        <PlanList title={resultCopy(locale, "exclusions")} items={plan.exclusions} tone="red" locale={locale} />
+        <PlanList title={uiCopy(locale, "research.plan.mustHave")} items={plan.must_have} tone="emerald" locale={locale} />
+        <PlanList title={uiCopy(locale, "research.plan.niceToHave")} items={plan.nice_to_have} tone="blue" locale={locale} />
+        <PlanList title={uiCopy(locale, "research.plan.exclusions")} items={plan.exclusions} tone="red" locale={locale} />
       </div>
       {plan.source_strategy.length > 0 && (
         <div className="mt-4 grid gap-3 md:grid-cols-2">

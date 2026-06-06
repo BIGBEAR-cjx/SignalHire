@@ -145,6 +145,22 @@ test("translates result delivery summary labels", () => {
   }
 });
 
+test("translates result search plan labels", () => {
+  const keys = [
+    ["result.searchPlanTitle", "搜索计划", "Search plan"],
+    ["result.searchPlanDesc", "系统如何拆解岗位画像、选择来源并扩展相邻人才池。", "How the system decomposed the role profile, selected sources, and expanded adjacent talent pools."],
+    ["result.notIdentified", "未识别", "Not identified"],
+    ["result.sourceQueryPlan", "来源查询计划", "Source query plan"],
+    ["result.items", "条", "items"],
+    ["result.adjacentPools", "相邻人才池", "Adjacent talent pools"],
+  ];
+
+  for (const [key, zh, en] of keys) {
+    assert.equal(t("zh", key), zh);
+    assert.equal(t("en", key), en);
+  }
+});
+
 test("translates project detail status labels", () => {
   const keys = [
     ["projects.detail.status.open", "进行中", "Open"],
