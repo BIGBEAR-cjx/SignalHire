@@ -1477,7 +1477,7 @@ function CandidateDetailPanel({
     const r = await fetch(`/api/shortlist/${item.id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
+      body: JSON.stringify({ ...body, locale }),
     });
     if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || t("projects.detail.candidate.updateFailed"));
   }
@@ -1517,7 +1517,7 @@ function CandidateDetailPanel({
 
   async function handleDelete() {
     if (!confirm(t("projects.detail.candidate.removeConfirm"))) return;
-    const r = await fetch(`/api/shortlist/${item.id}`, { method: "DELETE" });
+    const r = await fetch(`/api/shortlist/${item.id}?locale=${locale}`, { method: "DELETE" });
     if (r.ok) onDeleted();
   }
 
@@ -1525,7 +1525,7 @@ function CandidateDetailPanel({
     const r = await fetch(`/api/shortlist/${item.id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ project_id: null }),
+      body: JSON.stringify({ project_id: null, locale }),
     });
     if (r.ok) onUnassigned();
   }

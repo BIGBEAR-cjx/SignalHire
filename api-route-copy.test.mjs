@@ -138,3 +138,23 @@ test("shortlist collection requests include the active locale", () => {
   assert.match(shortlistPage, /fetch\(`\/api\/shortlist\?locale=\$\{locale\}`\)/);
   assert.match(projectPage, /fetch\(`\/api\/shortlist\?project=\$\{encodeURIComponent\(id\)\}&locale=\$\{locale\}`\)/);
 });
+
+test("shortlist item API error responses stay locale-keyed", () => {
+  const source = readFileSync("web/app/api/shortlist/[id]/route.ts", "utf8");
+  const hardcodedResponses = source
+    .split("\n")
+    .filter((line) => /Response\.json\(\{ error: "[^"]*[\u4e00-\u9fff]/.test(line));
+
+  assert.deepEqual(hardcodedResponses, []);
+});
+
+test("shortlist item requests include the active locale", () => {
+  const shortlistPage = readFileSync("web/app/app/shortlist/page.tsx", "utf8");
+  const projectPage = readFileSync("web/app/app/projects/[id]/page.tsx", "utf8");
+
+  assert.match(shortlistPage, /JSON\.stringify\(\{ \.\.\.body, locale \}\)/);
+  assert.match(shortlistPage, /fetch\(`\/api\/shortlist\/\$\{item\.id\}\?locale=\$\{locale\}`,\s*\{ method: "DELETE" \}\)/);
+  assert.match(projectPage, /JSON\.stringify\(\{ \.\.\.body, locale \}\)/);
+  assert.match(projectPage, /fetch\(`\/api\/shortlist\/\$\{item\.id\}\?locale=\$\{locale\}`,\s*\{ method: "DELETE" \}\)/);
+  assert.match(projectPage, /JSON\.stringify\(\{ project_id: null, locale \}\)/);
+});

@@ -91,6 +91,13 @@ test("translates research fallback error labels", () => {
     ["api.error.shortlistSaveFailed", "保存失败", "Failed to save candidate."],
     ["api.error.missingIdx", "缺少有效的 idx", "Missing valid idx."],
     ["api.error.shortlistDeleteUnavailable", "未收藏或已删除", "Candidate was not saved or has already been removed."],
+    ["api.error.invalidStatus", "status 取值非法", "Invalid status value."],
+    ["api.error.invalidNotes", "notes 必须是字符串", "notes must be a string."],
+    ["api.error.invalidProjectId", "project_id 必须是 uuid 或 null", "project_id must be a uuid or null."],
+    ["api.error.invalidCandidateObject", "candidate 必须是对象", "candidate must be an object."],
+    ["api.error.emptyPatch", "没有可更新的字段", "No fields to update."],
+    ["api.error.shortlistUpdateUnavailable", "更新失败或条目不存在", "Update failed or item was not found."],
+    ["api.error.shortlistItemDeleteUnavailable", "删除失败或条目不存在", "Delete failed or item was not found."],
     ["run.label.backfill", "补搜 practice/code", "Backfill practice/code", { coverage: "practice", source: "code" }, { coverage: "practice", source: "code" }],
   ];
 

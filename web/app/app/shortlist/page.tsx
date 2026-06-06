@@ -251,7 +251,7 @@ function DetailPanel({
     const r = await fetch(`/api/shortlist/${item.id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
+      body: JSON.stringify({ ...body, locale }),
     });
     if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || t("common.errorPrefix"));
   }
@@ -290,7 +290,7 @@ function DetailPanel({
 
   async function handleDelete() {
     if (!confirm(t("shortlist.removeConfirm"))) return;
-    const r = await fetch(`/api/shortlist/${item.id}`, { method: "DELETE" });
+    const r = await fetch(`/api/shortlist/${item.id}?locale=${locale}`, { method: "DELETE" });
     if (r.ok) onDeleted();
   }
 
