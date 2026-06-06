@@ -30,8 +30,9 @@ function msg(locale, key, params) {
   return translate(locale, key, params);
 }
 
-export function errorMessage(error) {
-  return String(error?.message || error || "研究失败").slice(0, 500);
+export function errorMessage(error, locale = "zh") {
+  const normalizedLocale = normalizeLocale(locale);
+  return String(error?.message || error || msg(normalizedLocale, "job.error.fallback")).slice(0, 500);
 }
 
 export function attemptCount(row) {
@@ -66,8 +67,9 @@ export function buildRunFailureUpdate({
   maxAttempts = DEFAULT_MAX_ATTEMPTS,
   error,
   now = new Date(),
+  locale = "zh",
 }) {
-  const msg = errorMessage(error);
+  const msg = errorMessage(error, locale);
   const final = attemptCount >= maxAttempts;
   return {
     status: final ? RUN_STATUSES.ERROR : RUN_STATUSES.RETRYING,
@@ -95,8 +97,9 @@ export function buildRetryUpdate(now = new Date()) {
   };
 }
 
-export function buildCancelUpdate(now = new Date()) {
-  const msg = "用户已停止搜索";
+export function buildCancelUpdate(now = new Date(), locale = "zh") {
+  const normalizedLocale = normalizeLocale(locale);
+  const msg = translate(normalizedLocale, "job.cancel.error");
   return {
     status: RUN_STATUSES.CANCELED,
     error: msg,
@@ -107,13 +110,14 @@ export function buildCancelUpdate(now = new Date()) {
   };
 }
 
-export function buildStaleRecoveryUpdate(row, now = new Date()) {
+export function buildStaleRecoveryUpdate(row, now = new Date(), locale = "zh") {
   const nextAttempt = attemptCount(row);
+  const normalizedLocale = normalizeLocale(locale);
   return {
     status: RUN_STATUSES.RETRYING,
     attempt_count: nextAttempt,
     max_attempts: maxAttempts(row),
-    last_error: "任务运行超时，系统已重新排队",
+    last_error: msg(normalizedLocale, "job.stale.requeued"),
     error: null,
     locked_at: null,
     updated_at: iso(now),

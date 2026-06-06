@@ -8,7 +8,9 @@ import {
   buildRetryUpdate,
   buildRunFailureUpdate,
   buildRunStartUpdate,
+  buildStaleRecoveryUpdate,
   describeJobStatus,
+  errorMessage,
   isStaleRunningJob,
 } from "./web/lib/job-state.mjs";
 
@@ -109,6 +111,22 @@ test("canceling a run records a stopped terminal status", () => {
     finished_at: now.toISOString(),
     updated_at: now.toISOString(),
   });
+});
+
+test("builds English job lifecycle fallback messages when requested", () => {
+  assert.equal(errorMessage(null, "en"), "Research failed");
+  assert.deepEqual(buildCancelUpdate(now, "en"), {
+    status: "canceled",
+    error: "User stopped the search",
+    last_error: "User stopped the search",
+    locked_at: null,
+    finished_at: now.toISOString(),
+    updated_at: now.toISOString(),
+  });
+  assert.equal(
+    buildStaleRecoveryUpdate({ attempt_count: 1, max_attempts: 3 }, now, "en").last_error,
+    "The task timed out and was requeued",
+  );
 });
 
 test("describes user-visible status for polling UI", () => {
