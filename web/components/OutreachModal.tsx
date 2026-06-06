@@ -5,6 +5,7 @@
 // 候选人详情面板/收藏夹/搜人结果都挂同一个 Modal。
 import { useEffect, useRef, useState } from "react";
 import { FiCheckCircle, FiCopy, FiRefreshCw, FiSend, FiX } from "react-icons/fi";
+import { useI18n } from "@/components/LanguageProvider";
 import { IconButton, SegmentedControl, StatusBadge } from "@/components/ui/signal-ui";
 import {
   buildEvidenceDrivenOutreachDraft,
@@ -14,11 +15,11 @@ import {
 
 type Tone = "friendly" | "professional" | "short" | "detailed";
 
-const TONES: { value: Tone; label: string }[] = [
-  { value: "professional", label: "专业" },
-  { value: "friendly",     label: "友好" },
-  { value: "short",        label: "短而准" },
-  { value: "detailed",     label: "详细" },
+const TONE_VALUES: Tone[] = [
+  "professional",
+  "friendly",
+  "short",
+  "detailed",
 ];
 
 const SENDER_KEY = "sh_outreach_sender";
@@ -33,6 +34,7 @@ export interface OutreachModalProps {
 }
 
 export default function OutreachModal({ open, onClose, candidate, candidateName, candidateEmail, roleBrief }: OutreachModalProps) {
+  const { t } = useI18n();
   const [tone, setTone] = useState<Tone>("professional");
   const [sender, setSender] = useState(() => {
     if (typeof window === "undefined") return "";
@@ -64,11 +66,11 @@ export default function OutreachModal({ open, onClose, candidate, candidateName,
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, candidate, tone]);
 
-  async function generateDraft(t: Tone) {
+  async function generateDraft(nextTone: Tone) {
     setLoading(true); setError("");
     const localDraft = buildEvidenceDrivenOutreachDraft({
       candidate,
-      tone: t,
+      tone: nextTone,
       senderName: sender.trim() || undefined,
       roleBrief,
     });
@@ -79,7 +81,7 @@ export default function OutreachModal({ open, onClose, candidate, candidateName,
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           candidate,
-          tone: t,
+          tone: nextTone,
           role_brief: roleBrief,
           sender_name: sender.trim() || undefined,
         }),
@@ -89,13 +91,13 @@ export default function OutreachModal({ open, onClose, candidate, candidateName,
       setSubject(j.subject || localDraft.subject);
       setBody(j.body || localDraft.body);
       setEvidenceBrief(j.evidence_brief || localDraft.evidence_brief);
-      generatedFor.current = { tone: t, candidate };
+      generatedFor.current = { tone: nextTone, candidate };
     } catch (e) {
       setSubject(localDraft.subject);
       setBody(localDraft.body);
       setEvidenceBrief(localDraft.evidence_brief);
-      setError(`AI 生成失败，已使用本地证据草稿：${(e as Error).message}`);
-      generatedFor.current = { tone: t, candidate };
+      setError(t("outreach.error.localDraft", { message: (e as Error).message }));
+      generatedFor.current = { tone: nextTone, candidate };
     } finally {
       setLoading(false);
     }
@@ -116,10 +118,10 @@ export default function OutreachModal({ open, onClose, candidate, candidateName,
   function copyEvidence() {
     const brief = evidenceBrief || buildOutreachEvidenceBrief(candidate);
     const text = [
-      brief.contact_angle ? `联系角度: ${brief.contact_angle}` : "",
-      brief.proof_points.length ? `证据点:\n- ${brief.proof_points.join("\n- ")}` : "",
-      brief.evidence_links.length ? `来源:\n- ${brief.evidence_links.join("\n- ")}` : "",
-      brief.risk_note ? `注意: ${brief.risk_note}` : "",
+      brief.contact_angle ? `${t("outreach.clipboard.contactAngle")}: ${brief.contact_angle}` : "",
+      brief.proof_points.length ? `${t("outreach.clipboard.proofPoints")}:\n- ${brief.proof_points.join("\n- ")}` : "",
+      brief.evidence_links.length ? `${t("outreach.clipboard.sources")}:\n- ${brief.evidence_links.join("\n- ")}` : "",
+      brief.risk_note ? `${t("outreach.clipboard.note")}: ${brief.risk_note}` : "",
     ].filter(Boolean).join("\n\n");
     navigator.clipboard?.writeText(text);
     setEvidenceCopied(true);
@@ -150,25 +152,28 @@ export default function OutreachModal({ open, onClose, candidate, candidateName,
         onClick={(e) => e.stopPropagation()}
         style={{ maxHeight: "92vh" }}
       >
-        <IconButton label="关闭" onClick={onClose} Icon={FiX} className="absolute right-4 top-4" />
+        <IconButton label={t("common.close")} onClick={onClose} Icon={FiX} className="absolute right-4 top-4" />
 
         <header className="mb-4">
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-neutral-500">证据外联</p>
-          <h2 className="mt-2 text-2xl font-semibold text-[var(--sh-ink)]">起草外联邮件</h2>
-          {candidateName && <p className="mt-2 text-sm text-[var(--sh-muted)]">写给 {candidateName}</p>}
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-neutral-500">{t("outreach.eyebrow")}</p>
+          <h2 className="mt-2 text-2xl font-semibold text-[var(--sh-ink)]">{t("outreach.title")}</h2>
+          {candidateName && <p className="mt-2 text-sm text-[var(--sh-muted)]">{t("outreach.toCandidate", { name: candidateName })}</p>}
         </header>
 
         <div className="mb-3">
-          <SegmentedControl value={tone} onChange={setTone} items={TONES} />
+          <SegmentedControl value={tone} onChange={setTone} items={TONE_VALUES.map((value) => ({
+            value,
+            label: t(`outreach.tone.${value}`),
+          }))} />
         </div>
 
         <div className="mb-3">
-          <label className="mb-1 block text-xs font-semibold text-[var(--sh-muted)]">你的名字 (用于邮件签名)</label>
+          <label className="mb-1 block text-xs font-semibold text-[var(--sh-muted)]">{t("outreach.senderLabel")}</label>
           <input
             value={sender}
             onChange={(e) => saveSender(e.target.value)}
             onBlur={() => { if (sender) regen(); }}
-            placeholder="例如:王力"
+            placeholder={t("outreach.senderPlaceholder")}
             className="block w-full rounded-2xl border border-black/10 bg-white/72 px-4 py-3 text-sm text-[var(--sh-ink)] outline-none placeholder:text-[var(--sh-faint)] focus:border-black/20 focus:bg-white"
           />
         </div>
@@ -177,14 +182,14 @@ export default function OutreachModal({ open, onClose, candidate, candidateName,
           {loading && (
             <div className="flex items-center gap-2 text-sm text-[var(--sh-muted)]">
               <span className="inline-block h-2 w-2 animate-pulse rounded-full bg-emerald-500" />
-              正在根据证据起草…
+              {t("outreach.loading")}
             </div>
           )}
           {!loading && error && <p className="mb-3 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-700 ring-1 ring-amber-100">{error}</p>}
           {!loading && (
             <div className="space-y-3">
               <div>
-                <label className="mb-1 block text-xs font-semibold text-[var(--sh-muted)]">主题</label>
+                <label className="mb-1 block text-xs font-semibold text-[var(--sh-muted)]">{t("outreach.subject")}</label>
                 <input
                   value={subject}
                   onChange={(e) => setSubject(e.target.value)}
@@ -192,7 +197,7 @@ export default function OutreachModal({ open, onClose, candidate, candidateName,
                 />
               </div>
               <div>
-                <label className="mb-1 block text-xs font-semibold text-[var(--sh-muted)]">正文</label>
+                <label className="mb-1 block text-xs font-semibold text-[var(--sh-muted)]">{t("outreach.body")}</label>
                 <textarea
                   value={body}
                   onChange={(e) => setBody(e.target.value)}
@@ -207,14 +212,14 @@ export default function OutreachModal({ open, onClose, candidate, candidateName,
         {evidenceBrief && (
           <section className="mb-3 rounded-3xl border border-blue-100 bg-blue-50/60 p-4">
             <div className="flex flex-wrap items-center justify-between gap-2">
-              <StatusBadge label="本次外联依据" dotClassName="bg-blue-500" className="bg-white text-blue-800 ring-blue-100" />
+              <StatusBadge label={t("outreach.evidenceTitle")} dotClassName="bg-blue-500" className="bg-white text-blue-800 ring-blue-100" />
               <button
                 type="button"
                 onClick={copyEvidence}
                 className="inline-flex items-center gap-1.5 rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-blue-700 ring-1 ring-blue-100 hover:ring-blue-300"
               >
                 {evidenceCopied ? <FiCheckCircle className="h-3.5 w-3.5" aria-hidden="true" /> : <FiCopy className="h-3.5 w-3.5" aria-hidden="true" />}
-                {evidenceCopied ? "已复制依据" : "复制依据"}
+                {evidenceCopied ? t("outreach.copiedEvidence") : t("outreach.copyEvidence")}
               </button>
             </div>
             {evidenceBrief.contact_angle && (
@@ -233,12 +238,12 @@ export default function OutreachModal({ open, onClose, candidate, candidateName,
               ))}
               {evidenceBrief.evidence_links.length > 0 && (
                 <span className="rounded-full bg-white px-2 py-0.5 text-xs font-medium text-gray-600 ring-1 ring-gray-200">
-                  {evidenceBrief.evidence_links.length} 个证据链接
+                  {t("outreach.evidenceLinks", { count: evidenceBrief.evidence_links.length })}
                 </span>
               )}
             </div>
             {evidenceBrief.risk_note && (
-              <p className="mt-2 text-xs leading-relaxed text-amber-700">注意: {evidenceBrief.risk_note}</p>
+              <p className="mt-2 text-xs leading-relaxed text-amber-700">{t("outreach.riskNote", { note: evidenceBrief.risk_note })}</p>
             )}
           </section>
         )}
@@ -250,7 +255,7 @@ export default function OutreachModal({ open, onClose, candidate, candidateName,
             className="sh-secondary-action min-h-10 px-3 py-2 text-sm disabled:opacity-50"
           >
             <FiRefreshCw className="h-4 w-4" aria-hidden="true" />
-            重新生成
+            {t("outreach.regenerate")}
           </button>
           <button
             onClick={copyAll}
@@ -258,7 +263,7 @@ export default function OutreachModal({ open, onClose, candidate, candidateName,
             className="sh-secondary-action min-h-10 px-3 py-2 text-sm disabled:opacity-50"
           >
             {copied ? <FiCheckCircle className="h-4 w-4" aria-hidden="true" /> : <FiCopy className="h-4 w-4" aria-hidden="true" />}
-            {copied ? "已复制" : "复制全文"}
+            {copied ? t("common.copied") : t("outreach.copyAll")}
           </button>
           <button
             onClick={openMailto}
@@ -266,7 +271,7 @@ export default function OutreachModal({ open, onClose, candidate, candidateName,
             className="sh-primary-action min-h-10 px-4 py-2 text-sm disabled:opacity-50"
           >
             <FiSend className="h-4 w-4" aria-hidden="true" />
-            用邮件 App 发送
+            {t("outreach.sendMail")}
           </button>
         </div>
       </div>

@@ -214,3 +214,38 @@ test("translates auth modal labels", () => {
     assert.equal(t("en", key, enParams), en);
   }
 });
+
+test("translates outreach modal labels", () => {
+  const keys = [
+    ["outreach.tone.professional", "专业", "Professional"],
+    ["outreach.tone.friendly", "友好", "Friendly"],
+    ["outreach.tone.short", "短而准", "Short"],
+    ["outreach.tone.detailed", "详细", "Detailed"],
+    ["outreach.eyebrow", "证据外联", "Evidence outreach"],
+    ["outreach.title", "起草外联邮件", "Draft outreach email"],
+    ["outreach.toCandidate", "写给 Ada", "Writing to Ada", { name: "Ada" }, { name: "Ada" }],
+    ["outreach.senderLabel", "你的名字 (用于邮件签名)", "Your name (for email signature)"],
+    ["outreach.senderPlaceholder", "例如:王力", "Example: Alex Wang"],
+    ["outreach.loading", "正在根据证据起草…", "Drafting from evidence..."],
+    ["outreach.subject", "主题", "Subject"],
+    ["outreach.body", "正文", "Body"],
+    ["outreach.evidenceTitle", "本次外联依据", "Evidence used for this outreach"],
+    ["outreach.copyEvidence", "复制依据", "Copy evidence"],
+    ["outreach.copiedEvidence", "已复制依据", "Evidence copied"],
+    ["outreach.evidenceLinks", "3 个证据链接", "3 evidence links", { count: 3 }, { count: 3 }],
+    ["outreach.riskNote", "注意: 身份需复核", "Note: Review identity", { note: "身份需复核" }, { note: "Review identity" }],
+    ["outreach.regenerate", "重新生成", "Regenerate"],
+    ["outreach.copyAll", "复制全文", "Copy full email"],
+    ["outreach.sendMail", "用邮件 App 发送", "Send with Mail app"],
+    ["outreach.error.localDraft", "AI 生成失败，已使用本地证据草稿：timeout", "AI generation failed. Local evidence draft used: timeout", { message: "timeout" }, { message: "timeout" }],
+    ["outreach.clipboard.contactAngle", "联系角度", "Contact angle"],
+    ["outreach.clipboard.proofPoints", "证据点", "Proof points"],
+    ["outreach.clipboard.sources", "来源", "Sources"],
+    ["outreach.clipboard.note", "注意", "Note"],
+  ];
+
+  for (const [key, zh, en, zhParams, enParams] of keys) {
+    assert.equal(t("zh", key, zhParams), zh);
+    assert.equal(t("en", key, enParams), en);
+  }
+});
