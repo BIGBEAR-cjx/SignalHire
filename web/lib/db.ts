@@ -20,6 +20,7 @@ import {
   describeJobStatus,
   isStaleRunningJob,
 } from "./job-state.mjs";
+import { t as translate } from "./i18n.mjs";
 import { buildFeedbackOptimizedSearchInput, mergeBackfillResult } from "./talent-profile.mjs";
 import { mergeSearchFeedbackIntoResult } from "./research-loop.mjs";
 
@@ -89,11 +90,13 @@ export function buildRunStorageFields(input: {
 }) {
   const flatKey = compactKey(input.flatKey, MAX_FLAT_KEY_LENGTH);
   const userPart = input.userId ? `:${shortHash(input.userId).slice(0, 8)}` : "";
+  const locale = input.platformLanguage === "English" ? "en" : "zh";
   return {
     cacheKey: compactKey(`${input.kind}${userPart}:${input.flatKey}`, MAX_CACHE_KEY_LENGTH),
     flatKey,
     queryText: truncateText(input.queryText, MAX_QUERY_TEXT_LENGTH),
     label: truncateText(input.label, MAX_LABEL_LENGTH),
+    summary: translate(locale, "run.summary.queued"),
     queuedProgress: { original_query: input.queryText, platform_language: input.platformLanguage ?? null },
   };
 }
@@ -347,7 +350,7 @@ export async function enqueue(input: {
     const row: Record<string, unknown> = {
       cache_key: storage.cacheKey, kind: input.kind, flat_key: storage.flatKey,
       query_text: storage.queryText, label: storage.label,
-      summary: "研究中…", result: null, stats: null,
+      summary: storage.summary, result: null, stats: null,
       status: "queued",
       user_id: input.userId,
       error: null, last_error: null, progress: storage.queuedProgress,

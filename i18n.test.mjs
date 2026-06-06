@@ -80,6 +80,7 @@ test("translates job lifecycle fallback labels", () => {
     ["job.error.fallback", "研究失败", "Research failed"],
     ["job.cancel.error", "用户已停止搜索", "User stopped the search"],
     ["job.stale.requeued", "任务运行超时，系统已重新排队", "The task timed out and was requeued"],
+    ["run.summary.queued", "研究中…", "Research in progress…"],
   ];
 
   for (const [key, zh, en] of keys) {

@@ -17,6 +17,7 @@ test("bounds long search text before writing research_runs rows", () => {
   assert.ok(fields.label.length <= 80);
   assert.match(fields.flatKey, /[a-f0-9]{16}$/);
   assert.equal(fields.queuedProgress.original_query, longQuery);
+  assert.equal(fields.summary, "研究中…");
 });
 
 test("keeps distinct hashes for different long run keys", () => {
@@ -35,4 +36,27 @@ test("keeps distinct hashes for different long run keys", () => {
 
   assert.notEqual(a.cacheKey, b.cacheKey);
   assert.notEqual(a.flatKey, b.flatKey);
+});
+
+test("builds localized queued run summaries from platform language", () => {
+  assert.equal(
+    buildRunStorageFields({
+      kind: "search",
+      flatKey: "ai infra",
+      queryText: "ai infra",
+      label: "ai infra",
+      platformLanguage: "English",
+    }).summary,
+    "Research in progress…",
+  );
+  assert.equal(
+    buildRunStorageFields({
+      kind: "search",
+      flatKey: "ai infra",
+      queryText: "ai infra",
+      label: "ai infra",
+      platformLanguage: "Chinese (Simplified)",
+    }).summary,
+    "研究中…",
+  );
 });
