@@ -75,6 +75,10 @@ test("translates research fallback error labels", () => {
     ["api.error.queueUnavailableRetry", "队列暂不可用 (DB 未配置)，请稍后重试", "Queue is unavailable (DB is not configured). Try again later."],
     ["api.error.missingBackfillRunIds", "缺少 original_run_id 或 backfill_run_id", "Missing original_run_id or backfill_run_id."],
     ["api.error.backfillMergeUnavailable", "原报告或补搜结果不存在，或队列暂不可用", "Original report or backfill result was not found, or the queue is unavailable."],
+    ["api.error.missingId", "缺少 id", "Missing id."],
+    ["api.error.jobUnavailable", "任务不存在或队列暂不可用", "Job was not found or the queue is unavailable."],
+    ["api.error.jobNotRetryable", "任务当前不可重试", "This job cannot be retried right now."],
+    ["api.error.jobNotCancelable", "任务当前不可停止", "This job cannot be stopped right now."],
     ["run.label.backfill", "补搜 practice/code", "Backfill practice/code", { coverage: "practice", source: "code" }, { coverage: "practice", source: "code" }],
   ];
 

@@ -520,7 +520,7 @@ export default function ResearchTool({
       fetch("/api/cancel", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id: jobId }),
+        body: JSON.stringify({ id: jobId, locale }),
       }).catch(() => {});
     }
   }
