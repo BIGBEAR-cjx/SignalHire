@@ -192,3 +192,25 @@ test("translates overview empty onboarding labels", () => {
     assert.equal(t("en", key), en);
   }
 });
+
+test("translates auth modal labels", () => {
+  const keys = [
+    ["common.close", "关闭", "Close"],
+    ["auth.modalNeedVerify", "请输入邮箱收到的验证码完成验证", "Enter the verification code sent to your email to finish verification."],
+    ["auth.modalCodeSent", "验证码已发送到 test@example.com，请输入。", "A code has been sent to test@example.com. Enter it below.", { email: "test@example.com" }, { email: "test@example.com" }],
+    ["auth.modalAccount", "账户", "Account"],
+    ["auth.modalLoginTitle", "登录控制台", "Log in to workspace"],
+    ["auth.modalRegisterTitle", "创建 SignalHire 账号", "Create a SignalHire account"],
+    ["auth.nameOptional", "名字（可选）", "Name (optional)"],
+    ["auth.passwordRegisterPlaceholder", "密码（至少 6 位）", "Password (at least 6 characters)"],
+    ["auth.processing", "处理中…", "Processing…"],
+    ["auth.back", "返回", "Back"],
+    ["auth.goRegister", "去注册", "Sign up"],
+    ["auth.goLogin", "去登录", "Log in"],
+  ];
+
+  for (const [key, zh, en, zhParams, enParams] of keys) {
+    assert.equal(t("zh", key, zhParams), zh);
+    assert.equal(t("en", key, enParams), en);
+  }
+});
