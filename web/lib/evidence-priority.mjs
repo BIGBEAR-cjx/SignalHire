@@ -118,11 +118,50 @@ function matrixActionLabel(priority, locale) {
   return msg(locale, `evidencePriority.action.${normalizePriority(priority)}`);
 }
 
-function matrixBackfillInput(candidate, priority) {
+const MATRIX_BACKFILL_COPY = {
+  zh: {
+    title: "SignalHire 候选人证据补搜。",
+    candidate: "候选人：{value}",
+    role: "角色/背景：{value}",
+    roleUnknown: "角色未知",
+    directions: "AI 方向：{value}",
+    notSpecified: "未指定",
+    quality: "当前证据质量：{value}",
+    qualityUnknown: "未知",
+    gaps: "证据缺口：{value}",
+    defaultGap: "整体证据较弱或交叉验证不足",
+    goal: "搜索目标：找到具体公开来源，用来确认、反驳或更新该候选人的匹配判断。",
+    prioritize: "优先查找研究、代码、公司/工作经历、公开写作、演讲和个人资料等独立 URL。",
+  },
+  en: {
+    title: "Candidate evidence backfill search for SignalHire.",
+    candidate: "Candidate: {value}",
+    role: "Role/context: {value}",
+    roleUnknown: "role unknown",
+    directions: "AI directions: {value}",
+    notSpecified: "not specified",
+    quality: "Current evidence quality: {value}",
+    qualityUnknown: "unknown",
+    gaps: "Evidence gaps: {value}",
+    defaultGap: "overall evidence is weak or insufficiently cross-validated",
+    goal: "Search goal: find concrete public sources that confirm, contradict, or update this candidate's fit.",
+    prioritize: "Prioritize independent URLs across research, code, company/work history, public writing, talks, and profile sources.",
+  },
+};
+
+function matrixBackfillCopy(locale, key, params = {}) {
+  const normalizedLocale = normalizeLocale(locale);
+  let text = MATRIX_BACKFILL_COPY[normalizedLocale][key] ?? MATRIX_BACKFILL_COPY.zh[key];
+  for (const [name, value] of Object.entries(params)) text = text.replace(`{${name}}`, String(value));
+  return text;
+}
+
+function matrixBackfillInput(candidate, priority, locale) {
   if (normalizePriority(priority) !== "needs_backfill") return "";
+  const normalizedLocale = normalizeLocale(locale);
   const role = [candidate?.current_role, candidate?.current_company].map(cleanString).filter(Boolean).join(" / ")
     || cleanString(candidate?.headline)
-    || "role unknown";
+    || matrixBackfillCopy(normalizedLocale, "roleUnknown");
   const directions = Array.isArray(candidate?.ai_directions) ? candidate.ai_directions.map(cleanString).filter(Boolean).join(", ") : "";
   const audit = candidate?.evidence_audit || {};
   const gaps = [
@@ -131,14 +170,14 @@ function matrixBackfillInput(candidate, priority) {
     ...(Array.isArray(candidate?.claims) ? candidate.claims.filter((claim) => claim?.verdict === "unverified").map((claim) => claim?.claim) : []),
   ].map(cleanString).filter(Boolean);
   return [
-    "Candidate evidence backfill search for SignalHire.",
-    `Candidate: ${cleanString(candidate?.name) || "Unknown candidate"}`,
-    `Role/context: ${role}`,
-    `AI directions: ${directions || "not specified"}`,
-    `Current evidence quality: ${cleanString(audit?.overall_evidence_quality) || "unknown"}`,
-    `Evidence gaps: ${gaps.length ? Array.from(new Set(gaps)).slice(0, 6).join("; ") : "overall evidence is weak or insufficiently cross-validated"}`,
-    "Search goal: find concrete public sources that confirm, contradict, or update this candidate's fit.",
-    "Prioritize independent URLs across research, code, company/work history, public writing, talks, and profile sources.",
+    matrixBackfillCopy(normalizedLocale, "title"),
+    matrixBackfillCopy(normalizedLocale, "candidate", { value: cleanString(candidate?.name) || "Unknown candidate" }),
+    matrixBackfillCopy(normalizedLocale, "role", { value: role }),
+    matrixBackfillCopy(normalizedLocale, "directions", { value: directions || matrixBackfillCopy(normalizedLocale, "notSpecified") }),
+    matrixBackfillCopy(normalizedLocale, "quality", { value: cleanString(audit?.overall_evidence_quality) || matrixBackfillCopy(normalizedLocale, "qualityUnknown") }),
+    matrixBackfillCopy(normalizedLocale, "gaps", { value: gaps.length ? Array.from(new Set(gaps)).slice(0, 6).join("; ") : matrixBackfillCopy(normalizedLocale, "defaultGap") }),
+    matrixBackfillCopy(normalizedLocale, "goal"),
+    matrixBackfillCopy(normalizedLocale, "prioritize"),
   ].join("\n");
 }
 
@@ -147,7 +186,7 @@ function matrixRowAction(candidate, priority, locale) {
   return {
     key: normalizedPriority === "risk_review" ? "review_risk" : normalizedPriority === "needs_backfill" ? "backfill_evidence" : "open_candidate",
     label: matrixActionLabel(normalizedPriority, locale),
-    search_input: matrixBackfillInput(candidate, normalizedPriority),
+    search_input: matrixBackfillInput(candidate, normalizedPriority, locale),
   };
 }
 

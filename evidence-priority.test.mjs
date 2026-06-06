@@ -365,7 +365,9 @@ test("builds a project evidence matrix from shortlist status and evidence priori
       ["ready-id", "open_candidate", "打开候选人", false],
     ],
   );
-  assert.match(matrix.rows[1].action.search_input, /Candidate evidence backfill search for SignalHire/);
+  assert.match(matrix.rows[1].action.search_input, /SignalHire 候选人证据补搜/);
+  assert.match(matrix.rows[1].action.search_input, /候选人：Backfill Candidate/);
+  assert.match(matrix.rows[1].action.search_input, /搜索目标：找到具体公开来源/);
   assert.match(matrix.rows[1].action.search_input, /Backfill Candidate/);
   assert.match(matrix.rows[1].action.search_input, /Single-source product launch/);
   assert.match(matrix.rows[1].recommended_action, /补搜/);
