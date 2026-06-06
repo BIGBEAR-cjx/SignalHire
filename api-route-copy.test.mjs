@@ -12,3 +12,24 @@ test("search and verify API error responses stay locale-keyed", () => {
     assert.deepEqual(hardcodedErrors, [], file);
   }
 });
+
+test("backfill API user-facing copy stays locale-keyed", () => {
+  for (const file of ["web/app/api/backfill/route.ts", "web/app/api/backfill/merge/route.ts"]) {
+    const source = readFileSync(file, "utf8");
+    const hardcodedResponses = source
+      .split("\n")
+      .filter((line) => /Response\.json\(\{ error: "[^"]*[\u4e00-\u9fff]/.test(line));
+    const hardcodedLabels = source
+      .split("\n")
+      .filter((line) => /label\s*=\s*`[^`]*[\u4e00-\u9fff]/.test(line));
+
+    assert.deepEqual([...hardcodedResponses, ...hardcodedLabels], [], file);
+  }
+});
+
+test("backfill requests include the active locale", () => {
+  const source = readFileSync("web/components/ResearchTool.tsx", "utf8");
+
+  assert.match(source, /job,[\s\S]{0,220}locale,[\s\S]{0,220}original_query/);
+  assert.match(source, /original_run_id:[\s\S]{0,220}locale,[\s\S]{0,220}backfill_run_id:/);
+});

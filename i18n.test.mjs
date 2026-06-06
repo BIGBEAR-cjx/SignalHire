@@ -71,11 +71,16 @@ test("translates research fallback error labels", () => {
     ["api.error.missingQuery", "缺少 query", "Missing query."],
     ["api.error.missingBio", "缺少 bio", "Missing bio."],
     ["api.error.queueUnavailableTrySample", "队列暂不可用 (DB 未配置)，请试试示例查询", "Queue is unavailable (DB is not configured). Try a sample query."],
+    ["api.error.missingBackfillJob", "缺少补搜任务", "Missing backfill job."],
+    ["api.error.queueUnavailableRetry", "队列暂不可用 (DB 未配置)，请稍后重试", "Queue is unavailable (DB is not configured). Try again later."],
+    ["api.error.missingBackfillRunIds", "缺少 original_run_id 或 backfill_run_id", "Missing original_run_id or backfill_run_id."],
+    ["api.error.backfillMergeUnavailable", "原报告或补搜结果不存在，或队列暂不可用", "Original report or backfill result was not found, or the queue is unavailable."],
+    ["run.label.backfill", "补搜 practice/code", "Backfill practice/code", { coverage: "practice", source: "code" }, { coverage: "practice", source: "code" }],
   ];
 
-  for (const [key, zh, en] of keys) {
-    assert.equal(t("zh", key), zh);
-    assert.equal(t("en", key), en);
+  for (const [key, zh, en, zhParams, enParams] of keys) {
+    assert.equal(t("zh", key, zhParams), zh);
+    assert.equal(t("en", key, enParams), en);
   }
 });
 

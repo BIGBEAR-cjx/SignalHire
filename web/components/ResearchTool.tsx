@@ -562,6 +562,7 @@ export default function ResearchTool({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           job,
+          locale,
           original_query: result.search_brief.original_query || input,
           source_run_id: runId,
           ...(projectId ? { project_id: projectId } : {}),
@@ -590,6 +591,7 @@ export default function ResearchTool({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           original_run_id: backfillContext.originalRunId,
+          locale,
           backfill_run_id: runId,
         }),
       });
