@@ -944,6 +944,29 @@ test("builds focused search input for a coverage backfill job", () => {
   assert.match(input, /specific source URLs/);
 });
 
+test("builds Chinese focused search input for a coverage backfill job", () => {
+  const input = talentProfile.buildBackfillSearchInput({
+    job: {
+      gap_id: "practice-code",
+      coverage_group: "practice",
+      missing_source_type: "code",
+      query: "vLLM Triton site:github.com",
+      reason: "",
+      priority: 1,
+      status: "planned",
+      candidate_names: [],
+      source_types_to_check: [],
+    },
+    originalQuery: "",
+    locale: "zh",
+  });
+
+  assert.match(input, /SignalHire 覆盖缺口补搜/);
+  assert.match(input, /原始搜索画像：未提供/);
+  assert.match(input, /受影响候选人：未指定具体候选人/);
+  assert.match(input, /优先补充具体公开证据和明确来源 URL/);
+});
+
 test("summarizes backfill evidence that can merge into the original report", () => {
   assert.equal(typeof talentProfile.buildBackfillMergeSummary, "function");
 

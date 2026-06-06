@@ -33,7 +33,7 @@ export async function POST(req: Request) {
   const originalQuery = cleanString(body.original_query);
   const sourceRunId = cleanString(body.source_run_id);
   const projectId = cleanString(body.project_id) || null;
-  const queryText = buildBackfillSearchInput({ job, originalQuery });
+  const queryText = buildBackfillSearchInput({ job, originalQuery, locale });
   const missingSourceType = cleanString(job.missing_source_type) || "source";
   const coverageGroup = cleanString(job.coverage_group) || "coverage";
   const gapId = cleanString(job.gap_id) || `${coverageGroup}-${missingSourceType}`;

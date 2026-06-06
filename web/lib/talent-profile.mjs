@@ -1501,30 +1501,77 @@ export function buildCoverageBackfillPlan(result, { locale = "zh" } = {}) {
   };
 }
 
+const BACKFILL_SEARCH_INPUT_COPY = {
+  zh: {
+    title: "SignalHire 覆盖缺口补搜。",
+    originalBrief: "原始搜索画像：{value}",
+    notProvided: "未提供",
+    coverageGroup: "覆盖组：{value}",
+    missingSourceType: "缺失来源类型：{value}",
+    unknown: "未知",
+    focusedQuery: "聚焦查询：{value}",
+    reason: "补搜原因：{value}",
+    defaultReason: "补强薄弱证据覆盖，并做交叉验证。",
+    affectedCandidates: "受影响候选人：{value}",
+    noCandidates: "未指定具体候选人",
+    sourceTypes: "需要检查的来源类型：{value}",
+    publicSources: "公开来源",
+    returnPayload: "返回一份聚焦该覆盖缺口的全新 AI 人才 shortlist payload。",
+    sourceUrls: "优先补充具体公开证据和明确来源 URL，不要引用搜索结果页 URL。",
+    explainFit: "说明新增证据是确认、削弱，还是改变原候选人匹配判断。",
+  },
+  en: {
+    title: "Coverage backfill search for SignalHire.",
+    originalBrief: "Original search brief: {value}",
+    notProvided: "Not provided",
+    coverageGroup: "Coverage group: {value}",
+    missingSourceType: "Missing source type: {value}",
+    unknown: "unknown",
+    focusedQuery: "Focused query: {value}",
+    reason: "Reason: {value}",
+    defaultReason: "Improve weak evidence coverage and cross-validation.",
+    affectedCandidates: "Affected candidates: {value}",
+    noCandidates: "No specific candidates supplied",
+    sourceTypes: "Source types to check: {value}",
+    publicSources: "public sources",
+    returnPayload: "Return a fresh AI talent shortlist payload focused on this coverage gap.",
+    sourceUrls: "Prioritize concrete public evidence and specific source URLs. Do not cite search-result URLs.",
+    explainFit: "Explain whether the new evidence confirms, weakens, or changes the original candidate fit.",
+  },
+};
+
+function backfillSearchInputCopy(locale, key, params = {}) {
+  const normalizedLocale = locale === "zh" ? "zh" : "en";
+  let text = BACKFILL_SEARCH_INPUT_COPY[normalizedLocale][key] ?? BACKFILL_SEARCH_INPUT_COPY.en[key];
+  for (const [name, value] of Object.entries(params)) text = text.replace(`{${name}}`, String(value));
+  return text;
+}
+
 /**
- * @param {{ job?: unknown; originalQuery?: string }} input
+ * @param {{ job?: unknown; originalQuery?: string; locale?: string }} input
  */
-export function buildBackfillSearchInput({ job, originalQuery = "" } = {}) {
+export function buildBackfillSearchInput({ job, originalQuery = "", locale = "en" } = {}) {
+  const normalizedLocale = locale === "zh" ? "zh" : "en";
   const backfillJob = normalizeCoverageBackfillJob(job);
   const candidates = backfillJob.candidate_names.length
     ? backfillJob.candidate_names.join(", ")
-    : "No specific candidates supplied";
+    : backfillSearchInputCopy(normalizedLocale, "noCandidates");
   const sourceTypes = backfillJob.source_types_to_check.length
     ? backfillJob.source_types_to_check.join(", ")
-    : backfillJob.missing_source_type || "public sources";
+    : backfillJob.missing_source_type || backfillSearchInputCopy(normalizedLocale, "publicSources");
 
   return [
-    "Coverage backfill search for SignalHire.",
-    `Original search brief: ${cleanString(originalQuery) || "Not provided"}`,
-    `Coverage group: ${backfillJob.coverage_group}`,
-    `Missing source type: ${backfillJob.missing_source_type || "unknown"}`,
-    `Focused query: ${backfillJob.query || fallbackSourceQuery(backfillJob.missing_source_type, { original_query: originalQuery })}`,
-    `Reason: ${backfillJob.reason || "Improve weak evidence coverage and cross-validation."}`,
-    `Affected candidates: ${candidates}`,
-    `Source types to check: ${sourceTypes}`,
-    "Return a fresh AI talent shortlist payload focused on this coverage gap.",
-    "Prioritize concrete public evidence and specific source URLs. Do not cite search-result URLs.",
-    "Explain whether the new evidence confirms, weakens, or changes the original candidate fit.",
+    backfillSearchInputCopy(normalizedLocale, "title"),
+    backfillSearchInputCopy(normalizedLocale, "originalBrief", { value: cleanString(originalQuery) || backfillSearchInputCopy(normalizedLocale, "notProvided") }),
+    backfillSearchInputCopy(normalizedLocale, "coverageGroup", { value: backfillJob.coverage_group }),
+    backfillSearchInputCopy(normalizedLocale, "missingSourceType", { value: backfillJob.missing_source_type || backfillSearchInputCopy(normalizedLocale, "unknown") }),
+    backfillSearchInputCopy(normalizedLocale, "focusedQuery", { value: backfillJob.query || fallbackSourceQuery(backfillJob.missing_source_type, { original_query: originalQuery }) }),
+    backfillSearchInputCopy(normalizedLocale, "reason", { value: backfillJob.reason || backfillSearchInputCopy(normalizedLocale, "defaultReason") }),
+    backfillSearchInputCopy(normalizedLocale, "affectedCandidates", { value: candidates }),
+    backfillSearchInputCopy(normalizedLocale, "sourceTypes", { value: sourceTypes }),
+    backfillSearchInputCopy(normalizedLocale, "returnPayload"),
+    backfillSearchInputCopy(normalizedLocale, "sourceUrls"),
+    backfillSearchInputCopy(normalizedLocale, "explainFit"),
   ].join("\n");
 }
 

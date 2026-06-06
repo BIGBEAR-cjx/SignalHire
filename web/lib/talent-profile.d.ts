@@ -57,7 +57,7 @@ export function buildCandidateEvidenceDossier(input?: { result?: unknown; candid
 export function buildCandidateEvidenceMatrix(input?: { result?: unknown; candidate?: unknown; locale?: "zh" | "en" }): CandidateEvidenceMatrix;
 export function buildShortlistDeliveryReport(result: unknown, options?: { locale?: "zh" | "en" | string }): ShortlistDeliveryReport;
 export function buildCoverageBackfillPlan(result: unknown, options?: { locale?: "zh" | "en" | string }): CoverageBackfillPlan;
-export function buildBackfillSearchInput(input?: { job?: unknown; originalQuery?: string }): string;
+export function buildBackfillSearchInput(input?: { job?: unknown; originalQuery?: string; locale?: "zh" | "en" | string }): string;
 export function buildBackfillMergeSummary(input?: { originalResult?: unknown; backfillResult?: unknown; locale?: "zh" | "en" | string }): BackfillMergeSummary;
 export function mergeBackfillResult(input?: { originalResult?: unknown; backfillResult?: unknown; mergedAt?: string; locale?: "zh" | "en" | string }): BackfillMergedTalentSearchResult;
 export function buildEditableSearchPlanDraft(query: unknown, options?: { locale?: "zh" | "en" | string }): EditableSearchPlanDraft;
