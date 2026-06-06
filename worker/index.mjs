@@ -38,7 +38,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 // 恢复卡在 running 太久的任务, 避免 worker 崩溃后永远转圈。
 async function recoverStaleRunning() {
   const { data } = await db.from(TABLE)
-    .select("id,status,attempt_count,max_attempts,locked_at,started_at,updated_at")
+    .select("id,status,attempt_count,max_attempts,locked_at,started_at,updated_at,progress")
     .eq("status", "running")
     .order("updated_at", { ascending: true })
     .limit(10);
@@ -129,7 +129,7 @@ async function runJob(job) {
         console.error(`[${new Date().toISOString()}] ${job.id} 第${attempt}次失败: ${e?.message || e}${attempt < 3 ? ", 重试" : ""}`);
       }
     }
-    if (!out) throw lastErr ?? new Error("研究失败");
+    if (!out) throw lastErr ?? new Error();
     const data = normalizeResult(parseJson(out.content));
     if (!data) throw new Error("模型输出不是干净 JSON");
     const doneRow = {
@@ -164,6 +164,7 @@ async function runJob(job) {
       attemptCount: Number(job.attempt_count ?? 1),
       maxAttempts: maxAttempts(job),
       error: e,
+      locale: platformLanguage,
     });
     for (let i = 0; i < 3; i++) {
       try {

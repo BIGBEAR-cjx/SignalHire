@@ -10,6 +10,19 @@ export const RUN_STATUSES = {
   CANCELED: "canceled",
 };
 
+const messages = {
+  zh: {
+    errorFallback: "研究失败",
+    cancelError: "用户已停止搜索",
+    staleRequeued: "任务运行超时，系统已重新排队",
+  },
+  en: {
+    errorFallback: "Research failed",
+    cancelError: "User stopped the search",
+    staleRequeued: "The task timed out and was requeued",
+  },
+};
+
 function iso(now = new Date()) {
   return now.toISOString();
 }
@@ -18,6 +31,24 @@ function dateMs(value) {
   if (!value) return null;
   const ms = new Date(value).getTime();
   return Number.isFinite(ms) ? ms : null;
+}
+
+function normalizeLocale(locale) {
+  return locale === "en" ? "en" : "zh";
+}
+
+function localeFromRow(row, fallback = "zh") {
+  return normalizeLocale(row?.progress?.platform_language ?? fallback);
+}
+
+function msg(locale, key) {
+  return messages[normalizeLocale(locale)][key];
+}
+
+function errorText(error, locale) {
+  if (error?.message) return error.message;
+  if (error instanceof Error) return msg(locale, "errorFallback");
+  return error || msg(locale, "errorFallback");
 }
 
 export function attemptCount(row) {
@@ -52,38 +83,39 @@ export function buildRunFailureUpdate({
   maxAttempts = DEFAULT_MAX_ATTEMPTS,
   error,
   now = new Date(),
+  locale = "zh",
 }) {
-  const msg = String(error?.message || error || "研究失败").slice(0, 500);
+  const message = String(errorText(error, locale)).slice(0, 500);
   const final = attemptCount >= maxAttempts;
   return {
     status: final ? RUN_STATUSES.ERROR : RUN_STATUSES.RETRYING,
     attempt_count: attemptCount,
     max_attempts: maxAttempts,
-    last_error: msg,
-    error: final ? msg : null,
+    last_error: message,
+    error: final ? message : null,
     locked_at: null,
     updated_at: iso(now),
   };
 }
 
-export function buildCancelUpdate(now = new Date()) {
-  const msg = "用户已停止搜索";
+export function buildCancelUpdate(now = new Date(), locale = "zh") {
+  const message = msg(locale, "cancelError");
   return {
     status: RUN_STATUSES.CANCELED,
-    error: msg,
-    last_error: msg,
+    error: message,
+    last_error: message,
     locked_at: null,
     finished_at: iso(now),
     updated_at: iso(now),
   };
 }
 
-export function buildStaleRecoveryUpdate(row, now = new Date()) {
+export function buildStaleRecoveryUpdate(row, now = new Date(), locale = "zh") {
   return {
     status: RUN_STATUSES.RETRYING,
     attempt_count: attemptCount(row),
     max_attempts: maxAttempts(row),
-    last_error: "任务运行超时，系统已重新排队",
+    last_error: msg(localeFromRow(row, locale), "staleRequeued"),
     error: null,
     locked_at: null,
     updated_at: iso(now),
