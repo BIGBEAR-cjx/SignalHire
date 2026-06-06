@@ -89,6 +89,25 @@ test("translates research progress labels", () => {
   }
 });
 
+test("translates source quality labels", () => {
+  const keys = [
+    ["sourceQuality.strong.label", "证据较厚", "Strong evidence"],
+    ["sourceQuality.strong.hint", "多数声称有多个独立信源支撑", "Most claims are supported by multiple independent sources"],
+    ["sourceQuality.moderate.label", "证据中等", "Moderate evidence"],
+    ["sourceQuality.moderate.hint", "大部分声称有信源, 但密度不高", "Most claims have sources, but the density is limited"],
+    ["sourceQuality.thin.label", "证据偏薄", "Thin evidence"],
+    ["sourceQuality.thin.hint", "信源稀疏, 谨慎做决策依据", "Sources are sparse; use caution before making decisions"],
+    ["sourceQuality.sourceCount.none", "无来源", "No sources"],
+    ["sourceQuality.sourceCount.one", "1 处独立信源", "1 independent source", { count: 1 }, { count: 1 }],
+    ["sourceQuality.sourceCount.many", "2 处独立信源", "2 independent sources", { count: 2 }, { count: 2 }],
+  ];
+
+  for (const [key, zh, en, zhParams, enParams] of keys) {
+    assert.equal(t("zh", key, zhParams), zh);
+    assert.equal(t("en", key, enParams), en);
+  }
+});
+
 test("translates project detail status labels", () => {
   const keys = [
     ["projects.detail.status.open", "进行中", "Open"],

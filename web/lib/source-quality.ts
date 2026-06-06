@@ -8,6 +8,7 @@
 // 纯函数, 无副作用, 可在 server/client 任意调。
 
 import type { Claim, Evidence, VerifyReport } from "@/components/result";
+import { t as translate } from "@/lib/i18n.mjs";
 
 type Locale = "zh" | "en";
 
@@ -48,14 +49,12 @@ export function trustHeuristic(report: VerifyReport, locale: Locale = "zh"): {
   const total = report.claims?.length ?? 0;
   // 启发式: 每条声称平均 ≥ 1.5 个独立信源 = 强证据; ≥ 1 = 一般; < 1 = 薄
   const ratio = total > 0 ? uniq / total : 0;
-  if (locale === "en") {
-    if (ratio >= 1.5) return { level: "strong", label: "Strong evidence", hint: "Most claims are supported by multiple independent sources" };
-    if (ratio >= 1.0) return { level: "moderate", label: "Moderate evidence", hint: "Most claims have sources, but the density is limited" };
-    return { level: "thin", label: "Thin evidence", hint: "Sources are sparse; use caution before making decisions" };
-  }
-  if (ratio >= 1.5) return { level: "strong", label: "证据较厚", hint: "多数声称有多个独立信源支撑" };
-  if (ratio >= 1.0) return { level: "moderate", label: "证据中等", hint: "大部分声称有信源, 但密度不高" };
-  return { level: "thin", label: "证据偏薄", hint: "信源稀疏, 谨慎做决策依据" };
+  const level = ratio >= 1.5 ? "strong" : ratio >= 1.0 ? "moderate" : "thin";
+  return {
+    level,
+    label: translate(locale, `sourceQuality.${level}.label`),
+    hint: translate(locale, `sourceQuality.${level}.hint`),
+  };
 }
 
 // 用 trust level 选 chip 样式
@@ -75,9 +74,8 @@ export function sourceCountChip(n: number): string {
 
 // "X 处独立信源" 文案
 export function sourceCountLabel(n: number, locale: Locale = "zh"): string {
-  if (locale === "en") return n === 0 ? "No sources" : `${n} independent ${n === 1 ? "source" : "sources"}`;
-  if (n === 0) return "无来源";
-  return `${n} 处独立信源`;
+  if (n === 0) return translate(locale, "sourceQuality.sourceCount.none");
+  return translate(locale, n === 1 ? "sourceQuality.sourceCount.one" : "sourceQuality.sourceCount.many", { count: n });
 }
 
 // 复用 Evidence type
