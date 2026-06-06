@@ -85,26 +85,6 @@ const RESULT_COPY = {
     evidenceStrong: "证据强",
     evidenceMedium: "证据中等",
     evidenceWeak: "证据弱",
-    backfillTitle: "缺口补搜计划",
-    backfillDesc: "把缺失或偏弱的信息源覆盖转成下一轮可执行查询。",
-    gaps: "个缺口",
-    plannedBackfill: "待补搜",
-    completedBackfill: "已补齐",
-    skippedBackfill: "已跳过",
-    affectedCandidates: "影响候选人",
-    prioritySources: "优先来源",
-    enqueueingBackfill: "补搜入队中…",
-    backfillGap: "补搜这个缺口",
-    backfillDeltaTitle: "补搜证据增量",
-    candidateBackfillMerged: "已回流到候选人档案",
-    merged: "已合并",
-    mergeable: "可合并",
-    newSources: "新增来源",
-    newEvidence: "+{count} 证据",
-    backfillNewCandidates: "补搜还发现新候选人：{names}",
-    mergedBack: "已合并回原报告",
-    merging: "正在合并…",
-    mergeBack: "合并回原报告",
     talentMapTitle: "AI 人才方向分布",
     talentMapDesc: "按岗位画像识别主匹配、相邻可迁移和高潜力人才池。",
     people: "人",
@@ -157,26 +137,6 @@ const RESULT_COPY = {
     evidenceStrong: "Strong evidence",
     evidenceMedium: "Moderate evidence",
     evidenceWeak: "Weak evidence",
-    backfillTitle: "Gap backfill plan",
-    backfillDesc: "Turns missing or weak source coverage into executable queries for the next round.",
-    gaps: "gaps",
-    plannedBackfill: "Backfill planned",
-    completedBackfill: "Backfilled",
-    skippedBackfill: "Skipped",
-    affectedCandidates: "Affected candidates",
-    prioritySources: "Priority sources",
-    enqueueingBackfill: "Queueing backfill...",
-    backfillGap: "Backfill this gap",
-    backfillDeltaTitle: "Backfill evidence delta",
-    candidateBackfillMerged: "Merged into this candidate dossier",
-    merged: "Merged",
-    mergeable: "Mergeable",
-    newSources: "New sources",
-    newEvidence: "+{count} evidence",
-    backfillNewCandidates: "Backfill also found new candidates: {names}",
-    mergedBack: "Merged into original report",
-    merging: "Merging...",
-    mergeBack: "Merge into original report",
     talentMapTitle: "AI talent map",
     talentMapDesc: "Groups candidates by primary fit, adjacent transferability, and high-potential talent pools.",
     people: "people",
@@ -265,7 +225,27 @@ type SharedResultCopyKey =
   | "executed"
   | "evidence"
   | "links"
-  | "leads";
+  | "leads"
+  | "backfillTitle"
+  | "backfillDesc"
+  | "gaps"
+  | "plannedBackfill"
+  | "completedBackfill"
+  | "skippedBackfill"
+  | "affectedCandidates"
+  | "prioritySources"
+  | "enqueueingBackfill"
+  | "backfillGap"
+  | "backfillDeltaTitle"
+  | "candidateBackfillMerged"
+  | "merged"
+  | "mergeable"
+  | "newSources"
+  | "newEvidence"
+  | "backfillNewCandidates"
+  | "mergedBack"
+  | "merging"
+  | "mergeBack";
 type ResultCopyKey = keyof typeof RESULT_COPY.zh | SharedResultCopyKey;
 
 function resultCopy(locale: Locale | undefined, key: ResultCopyKey, params: Record<string, string | number> = {}) {

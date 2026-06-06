@@ -186,6 +186,36 @@ test("translates result source execution labels", () => {
   }
 });
 
+test("translates result backfill labels", () => {
+  const keys = [
+    ["result.backfillTitle", "缺口补搜计划", "Gap backfill plan"],
+    ["result.backfillDesc", "把缺失或偏弱的信息源覆盖转成下一轮可执行查询。", "Turns missing or weak source coverage into executable queries for the next round."],
+    ["result.gaps", "个缺口", "gaps"],
+    ["result.plannedBackfill", "待补搜", "Backfill planned"],
+    ["result.completedBackfill", "已补齐", "Backfilled"],
+    ["result.skippedBackfill", "已跳过", "Skipped"],
+    ["result.affectedCandidates", "影响候选人", "Affected candidates"],
+    ["result.prioritySources", "优先来源", "Priority sources"],
+    ["result.enqueueingBackfill", "补搜入队中…", "Queueing backfill..."],
+    ["result.backfillGap", "补搜这个缺口", "Backfill this gap"],
+    ["result.backfillDeltaTitle", "补搜证据增量", "Backfill evidence delta"],
+    ["result.candidateBackfillMerged", "已回流到候选人档案", "Merged into this candidate dossier"],
+    ["result.merged", "已合并", "Merged"],
+    ["result.mergeable", "可合并", "Mergeable"],
+    ["result.newSources", "新增来源", "New sources"],
+    ["result.newEvidence", "+2 证据", "+2 evidence", { count: 2 }, { count: 2 }],
+    ["result.backfillNewCandidates", "补搜还发现新候选人：张三", "Backfill also found new candidates: Alice", { names: "张三" }, { names: "Alice" }],
+    ["result.mergedBack", "已合并回原报告", "Merged into original report"],
+    ["result.merging", "正在合并…", "Merging..."],
+    ["result.mergeBack", "合并回原报告", "Merge into original report"],
+  ];
+
+  for (const [key, zh, en, zhParams, enParams] of keys) {
+    assert.equal(t("zh", key, zhParams), zh);
+    assert.equal(t("en", key, enParams), en);
+  }
+});
+
 test("translates project detail status labels", () => {
   const keys = [
     ["projects.detail.status.open", "进行中", "Open"],
