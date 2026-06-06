@@ -74,6 +74,21 @@ test("translates research fallback error labels", () => {
   }
 });
 
+test("translates research progress labels", () => {
+  const keys = [
+    ["research.progress.fetch.label", "读取来源", "Source read"],
+    ["research.progress.search.label", "搜索关键词", "Search query"],
+    ["research.progress.step.label", "研究步骤", "Research step"],
+    ["research.progress.stats", "搜索 2 次 · 抓取 1 页", "2 searches · 1 pages fetched", { searches: 2, fetches: 1 }, { searches: 2, fetches: 1 }],
+    ["research.progress.statsWaiting", "等待第一批搜索事件", "Waiting for the first search event"],
+  ];
+
+  for (const [key, zh, en, zhParams, enParams] of keys) {
+    assert.equal(t("zh", key, zhParams), zh);
+    assert.equal(t("en", key, enParams), en);
+  }
+});
+
 test("translates project detail status labels", () => {
   const keys = [
     ["projects.detail.status.open", "进行中", "Open"],

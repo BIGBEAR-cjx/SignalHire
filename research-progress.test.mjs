@@ -30,3 +30,26 @@ test("shows a planning state before search events arrive", () => {
   assert.equal(view.active?.detail, "系统正在拆解需求、准备检索关键词和信息源。");
   assert.equal(view.timeline.length, 0);
 });
+
+test("formats research progress labels in English when requested", () => {
+  const active = buildResearchProgressView({
+    feed: [
+      { id: 1, kind: "search", info: "LLM inference vLLM site:github.com" },
+      { id: 2, kind: "fetch" },
+    ],
+    live: { searches: 2, fetches: 1 },
+    locale: "en",
+  });
+
+  assert.equal(active.statsText, "2 searches · 1 pages fetched");
+  assert.equal(active.active?.label, "Reading a source");
+  assert.equal(active.active?.detail, "Waiting for source content.");
+  assert.equal(active.timeline[0].label, "Source read");
+  assert.equal(active.timeline[1].label, "Search query");
+
+  const planning = buildResearchProgressView({ feed: [], live: null, locale: "en" });
+
+  assert.equal(planning.statsText, "Waiting for the first search event");
+  assert.equal(planning.active?.label, "Planning the search");
+  assert.equal(planning.active?.detail, "Breaking down the profile into keywords and source targets.");
+});

@@ -6,4 +6,4 @@ export type ResearchProgressView = {
   active: ResearchProgressEventView | null;
   timeline: ResearchProgressEventView[];
 };
-export function buildResearchProgressView(input?: { feed?: ResearchProgressFeedItem[]; live?: ResearchProgressLive }): ResearchProgressView;
+export function buildResearchProgressView(input?: { feed?: ResearchProgressFeedItem[]; live?: ResearchProgressLive; locale?: "zh" | "en" | string }): ResearchProgressView;
