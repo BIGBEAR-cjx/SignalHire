@@ -1399,11 +1399,19 @@ function feedbackLabel(group, value, fallback) {
   return SEARCH_FEEDBACK_LABELS[group]?.[key] || fallback;
 }
 
-function candidateFeedbackSummary(candidate) {
-  const role = [candidate.current_role, candidate.current_company].filter(Boolean).join(" / ") || candidate.headline || "role unknown";
-  const directions = candidate.ai_directions.length ? candidate.ai_directions.join(", ") : "direction unknown";
-  const signal = candidate.strongest_signals[0] || candidate.summary || "no strong signal captured";
-  const uncertainty = candidate.uncertainties[0] || "no major uncertainty captured";
+function candidateFeedbackSummary(candidate, locale = "en") {
+  const normalizedLocale = locale === "zh" ? "zh" : "en";
+  const roleFallback = normalizedLocale === "zh" ? "角色未知" : "role unknown";
+  const directionFallback = normalizedLocale === "zh" ? "方向未知" : "direction unknown";
+  const signalFallback = normalizedLocale === "zh" ? "暂无强信号" : "no strong signal captured";
+  const uncertaintyFallback = normalizedLocale === "zh" ? "暂无主要不确定性" : "no major uncertainty captured";
+  const role = [candidate.current_role, candidate.current_company].filter(Boolean).join(" / ") || candidate.headline || roleFallback;
+  const directions = candidate.ai_directions.length ? candidate.ai_directions.join(", ") : directionFallback;
+  const signal = candidate.strongest_signals[0] || candidate.summary || signalFallback;
+  const uncertainty = candidate.uncertainties[0] || uncertaintyFallback;
+  if (normalizedLocale === "zh") {
+    return `- ${candidate.name}：匹配分 ${candidate.match_score}；${role}；${directions}；信号：${signal}；风险：${uncertainty}`;
+  }
   return `- ${candidate.name}: score ${candidate.match_score}; ${role}; ${directions}; signal: ${signal}; risk: ${uncertainty}`;
 }
 
@@ -1482,7 +1490,7 @@ export function buildFeedbackOptimizedSearchInput({ result, feedback = {}, local
     feedbackSearchInputCopy(normalizedLocale, "focus", { value: feedbackLabel("focus", feedback.focus, emptySelection) }),
   ];
   const previousCandidates = normalized.candidates.length
-    ? normalized.candidates.slice(0, 12).map(candidateFeedbackSummary)
+    ? normalized.candidates.slice(0, 12).map((candidate) => candidateFeedbackSummary(candidate, normalizedLocale))
     : [feedbackSearchInputCopy(normalizedLocale, "emptyCandidates")];
 
   return [

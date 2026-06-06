@@ -338,6 +338,8 @@ test("builds Chinese feedback-optimized search input copy", () => {
   assert.match(input, /原始搜索画像：Find senior LLM inference engineers in North America/);
   assert.match(input, /用户对上一轮 shortlist 的反馈：/);
   assert.match(input, /上一轮候选名单学习样本：/);
+  assert.match(input, /Ada Lovelace：匹配分 92；/);
+  assert.match(input, /信号：Merged public vLLM serving PRs；风险：暂无主要不确定性/);
   assert.match(input, /不要只重新排序同一批候选人/);
   assert.match(input, /返回标准 SignalHire 人才 shortlist payload/);
 });
