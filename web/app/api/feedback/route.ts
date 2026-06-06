@@ -60,6 +60,7 @@ export async function POST(req: Request) {
     runId,
     userId: user.id,
     feedback,
+    locale,
   });
   if (!saved) return Response.json({ error: t(locale, "api.error.feedbackSaveUnavailable") }, { status: 404 });
 

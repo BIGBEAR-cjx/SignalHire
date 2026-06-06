@@ -478,6 +478,7 @@ export async function saveSearchFeedback(input: {
   runId: string;
   userId: string;
   feedback: SearchFeedbackInput;
+  locale?: string;
 }): Promise<SaveSearchFeedbackResult | null> {
   if (!client) return null;
   try {
@@ -487,6 +488,7 @@ export async function saveSearchFeedback(input: {
     const optimizedInput = buildFeedbackOptimizedSearchInput({
       result: current.result,
       feedback: input.feedback,
+      locale: input.locale,
     });
     const updatedAt = new Date().toISOString();
     const merged = mergeSearchFeedbackIntoResult({

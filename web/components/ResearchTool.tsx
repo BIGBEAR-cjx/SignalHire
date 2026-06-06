@@ -481,7 +481,7 @@ export default function ResearchTool({
 
   async function runFeedbackOptimizedSearch() {
     if (!isTalentSearchResult(result)) return;
-    let optimizedInput = buildFeedbackOptimizedSearchInput({ result, feedback: searchFeedback });
+    let optimizedInput = buildFeedbackOptimizedSearchInput({ result, feedback: searchFeedback, locale });
     if (runId) {
       try {
         const res = await fetch("/api/feedback", {

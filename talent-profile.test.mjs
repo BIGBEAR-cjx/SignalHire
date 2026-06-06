@@ -304,6 +304,44 @@ test("builds feedback-optimized search input for the next round", () => {
   assert.match(input, /Return the normal SignalHire talent shortlist payload/);
 });
 
+test("builds Chinese feedback-optimized search input copy", () => {
+  const result = normalizeTalentSearchResult({
+    search_brief: {
+      original_query: "Find senior LLM inference engineers in North America",
+      required_skills: ["vLLM"],
+    },
+    candidates: [
+      {
+        name: "Ada Lovelace",
+        current_role: "Staff Engineer",
+        current_company: "Example AI",
+        ai_directions: ["AI Infrastructure / LLM Systems"],
+        match_score: 92,
+        strongest_signals: ["Merged public vLLM serving PRs"],
+        uncertainties: [],
+      },
+    ],
+  });
+
+  const input = talentProfile.buildFeedbackOptimizedSearchInput({
+    result,
+    feedback: {
+      precision: "partial",
+      satisfaction: "mixed",
+      issue: "wrong_seniority",
+      focus: "stricter_match",
+    },
+    locale: "zh",
+  });
+
+  assert.match(input, /SignalHire 反馈优化搜索/);
+  assert.match(input, /原始搜索画像：Find senior LLM inference engineers in North America/);
+  assert.match(input, /用户对上一轮 shortlist 的反馈：/);
+  assert.match(input, /上一轮候选名单学习样本：/);
+  assert.match(input, /不要只重新排序同一批候选人/);
+  assert.match(input, /返回标准 SignalHire 人才 shortlist payload/);
+});
+
 test("builds candidate evidence audit summary from claims and evidence graph", () => {
   assert.equal(typeof talentProfile.buildCandidateEvidenceAudit, "function");
 

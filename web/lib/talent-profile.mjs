@@ -1407,41 +1407,102 @@ function candidateFeedbackSummary(candidate) {
   return `- ${candidate.name}: score ${candidate.match_score}; ${role}; ${directions}; signal: ${signal}; risk: ${uncertainty}`;
 }
 
+const FEEDBACK_SEARCH_INPUT_COPY = {
+  zh: {
+    title: "SignalHire 反馈优化搜索。",
+    originalBrief: "原始搜索画像：{value}",
+    requiredSkills: "必备技能：{value}",
+    preferredSkills: "加分技能：{value}",
+    seniority: "资历：{value}",
+    geography: "地域：{value}",
+    exclusions: "排除条件：{value}",
+    notProvided: "未提供",
+    notSpecified: "未指定",
+    feedbackTitle: "用户对上一轮 shortlist 的反馈：",
+    precision: "精准度：{value}",
+    satisfaction: "满意度：{value}",
+    issue: "主要问题：{value}",
+    focus: "下一轮重点：{value}",
+    previousTitle: "上一轮候选名单学习样本：",
+    emptyCandidates: "- 没有可用的上一轮候选人摘要。",
+    instructionsTitle: "优化要求：",
+    sameIntent: "- 将反馈作为同一搜索意图下的排序和来源策略指导。",
+    noRerank: "- 不要只重新排序同一批候选人；当反馈显示匹配薄弱时，搜索更合适的替代候选人。",
+    preserveStrong: "- 保留真正强匹配的人选，同时围绕选定问题和下一轮重点提高筛选门槛。",
+    expandEvidence: "- 扩展并交叉验证研究、实践、工作经历和公开表达等公开证据。",
+    returnPayload: "返回标准 SignalHire 人才 shortlist payload，包含 search_plan、source_execution、coverage_backfill、evidence_graph、talent_map 和 candidates。",
+  },
+  en: {
+    title: "Feedback-optimized SignalHire search.",
+    originalBrief: "Original search brief: {value}",
+    requiredSkills: "Required skills: {value}",
+    preferredSkills: "Preferred skills: {value}",
+    seniority: "Seniority: {value}",
+    geography: "Geography: {value}",
+    exclusions: "Exclusions: {value}",
+    notProvided: "Not provided",
+    notSpecified: "not specified",
+    feedbackTitle: "User feedback from reviewed shortlist:",
+    precision: "Precision: {value}",
+    satisfaction: "Satisfaction: {value}",
+    issue: "Main issue: {value}",
+    focus: "Next-round focus: {value}",
+    previousTitle: "Previous shortlist to learn from:",
+    emptyCandidates: "- No previous candidate summary available.",
+    instructionsTitle: "Optimization instructions:",
+    sameIntent: "- Treat the feedback as ranking and sourcing guidance for the same underlying search intent.",
+    noRerank: "- Do not simply rerank the same shortlist; search for improved or replacement candidates where feedback indicates weak fit.",
+    preserveStrong: "- Preserve genuinely strong matches, but raise the bar on the selected issue and next-round focus.",
+    expandEvidence: "- Expand and cross-validate public evidence across research, practice, work history, and public voice sources.",
+    returnPayload: "Return the normal SignalHire talent shortlist payload with search_plan, source_execution, coverage_backfill, evidence_graph, talent_map, and candidates.",
+  },
+};
+
+function feedbackSearchInputCopy(locale, key, params = {}) {
+  const normalizedLocale = locale === "zh" ? "zh" : "en";
+  let text = FEEDBACK_SEARCH_INPUT_COPY[normalizedLocale][key] ?? FEEDBACK_SEARCH_INPUT_COPY.en[key];
+  for (const [name, value] of Object.entries(params)) text = text.replace(`{${name}}`, String(value));
+  return text;
+}
+
 /**
- * @param {{ result?: unknown; feedback?: { precision?: string; satisfaction?: string; issue?: string; focus?: string } }} input
+ * @param {{ result?: unknown; feedback?: { precision?: string; satisfaction?: string; issue?: string; focus?: string }; locale?: string }} input
  */
-export function buildFeedbackOptimizedSearchInput({ result, feedback = {} } = {}) {
+export function buildFeedbackOptimizedSearchInput({ result, feedback = {}, locale = "en" } = {}) {
+  const normalizedLocale = locale === "zh" ? "zh" : "en";
   const normalized = normalizeTalentSearchResult(result);
   const brief = normalized.search_brief;
   const plan = normalized.search_plan;
+  const emptySelection = normalizedLocale === "zh" ? "未选择" : "not selected";
+  const emptyValue = feedbackSearchInputCopy(normalizedLocale, "notSpecified");
   const feedbackSummary = [
-    `Precision: ${feedbackLabel("precision", feedback.precision, "未选择")}`,
-    `Satisfaction: ${feedbackLabel("satisfaction", feedback.satisfaction, "未选择")}`,
-    `Main issue: ${feedbackLabel("issue", feedback.issue, "未选择")}`,
-    `Next-round focus: ${feedbackLabel("focus", feedback.focus, "未选择")}`,
+    feedbackSearchInputCopy(normalizedLocale, "precision", { value: feedbackLabel("precision", feedback.precision, emptySelection) }),
+    feedbackSearchInputCopy(normalizedLocale, "satisfaction", { value: feedbackLabel("satisfaction", feedback.satisfaction, emptySelection) }),
+    feedbackSearchInputCopy(normalizedLocale, "issue", { value: feedbackLabel("issue", feedback.issue, emptySelection) }),
+    feedbackSearchInputCopy(normalizedLocale, "focus", { value: feedbackLabel("focus", feedback.focus, emptySelection) }),
   ];
   const previousCandidates = normalized.candidates.length
     ? normalized.candidates.slice(0, 12).map(candidateFeedbackSummary)
-    : ["- No previous candidate summary available."];
+    : [feedbackSearchInputCopy(normalizedLocale, "emptyCandidates")];
 
   return [
-    "Feedback-optimized SignalHire search.",
-    `Original search brief: ${brief.original_query || "Not provided"}`,
-    `Required skills: ${brief.required_skills.join("; ") || plan.must_have.join("; ") || "not specified"}`,
-    `Preferred skills: ${brief.preferred_skills.join("; ") || plan.nice_to_have.join("; ") || "not specified"}`,
-    `Seniority: ${brief.seniority || "not specified"}`,
-    `Geography: ${brief.geography || "not specified"}`,
-    `Exclusions: ${brief.exclusions.join("; ") || plan.exclusions.join("; ") || "not specified"}`,
-    "User feedback from reviewed shortlist:",
+    feedbackSearchInputCopy(normalizedLocale, "title"),
+    feedbackSearchInputCopy(normalizedLocale, "originalBrief", { value: brief.original_query || feedbackSearchInputCopy(normalizedLocale, "notProvided") }),
+    feedbackSearchInputCopy(normalizedLocale, "requiredSkills", { value: brief.required_skills.join("; ") || plan.must_have.join("; ") || emptyValue }),
+    feedbackSearchInputCopy(normalizedLocale, "preferredSkills", { value: brief.preferred_skills.join("; ") || plan.nice_to_have.join("; ") || emptyValue }),
+    feedbackSearchInputCopy(normalizedLocale, "seniority", { value: brief.seniority || emptyValue }),
+    feedbackSearchInputCopy(normalizedLocale, "geography", { value: brief.geography || emptyValue }),
+    feedbackSearchInputCopy(normalizedLocale, "exclusions", { value: brief.exclusions.join("; ") || plan.exclusions.join("; ") || emptyValue }),
+    feedbackSearchInputCopy(normalizedLocale, "feedbackTitle"),
     ...feedbackSummary,
-    "Previous shortlist to learn from:",
+    feedbackSearchInputCopy(normalizedLocale, "previousTitle"),
     ...previousCandidates,
-    "Optimization instructions:",
-    "- Treat the feedback as ranking and sourcing guidance for the same underlying search intent.",
-    "- Do not simply rerank the same shortlist; search for improved or replacement candidates where feedback indicates weak fit.",
-    "- Preserve genuinely strong matches, but raise the bar on the selected issue and next-round focus.",
-    "- Expand and cross-validate public evidence across research, practice, work history, and public voice sources.",
-    "Return the normal SignalHire talent shortlist payload with search_plan, source_execution, coverage_backfill, evidence_graph, talent_map, and candidates.",
+    feedbackSearchInputCopy(normalizedLocale, "instructionsTitle"),
+    feedbackSearchInputCopy(normalizedLocale, "sameIntent"),
+    feedbackSearchInputCopy(normalizedLocale, "noRerank"),
+    feedbackSearchInputCopy(normalizedLocale, "preserveStrong"),
+    feedbackSearchInputCopy(normalizedLocale, "expandEvidence"),
+    feedbackSearchInputCopy(normalizedLocale, "returnPayload"),
   ].join("\n");
 }
 
