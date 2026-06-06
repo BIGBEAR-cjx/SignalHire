@@ -1060,7 +1060,7 @@ test("builds Chinese focused search input for a coverage backfill job", () => {
       priority: 1,
       status: "planned",
       candidate_names: [],
-      source_types_to_check: [],
+      source_types_to_check: ["code", "huggingface"],
     },
     originalQuery: "",
     locale: "zh",
@@ -1068,7 +1068,13 @@ test("builds Chinese focused search input for a coverage backfill job", () => {
 
   assert.match(input, /SignalHire 覆盖缺口补搜/);
   assert.match(input, /原始搜索画像：未提供/);
+  assert.match(input, /覆盖组：实践/);
+  assert.doesNotMatch(input, /覆盖组：practice/);
+  assert.match(input, /缺失来源类型：代码/);
+  assert.doesNotMatch(input, /缺失来源类型：code/);
   assert.match(input, /受影响候选人：未指定具体候选人/);
+  assert.match(input, /需要检查的来源类型：代码、Hugging Face/);
+  assert.doesNotMatch(input, /需要检查的来源类型：code, huggingface/);
   assert.match(input, /优先补充具体公开证据和明确来源 URL/);
 });
 

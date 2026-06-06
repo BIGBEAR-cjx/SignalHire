@@ -1664,6 +1664,38 @@ function backfillSearchInputCopy(locale, key, params = {}) {
   return text;
 }
 
+const BACKFILL_SOURCE_TYPE_LABELS = {
+  zh: {
+    benchmark: "基准",
+    blog: "公开写作",
+    code: "代码",
+    community: "社区",
+    company: "公司页",
+    dataset: "数据集",
+    huggingface: "Hugging Face",
+    interview: "访谈",
+    paper: "论文",
+    patent: "专利",
+    podcast: "播客",
+    profile: "个人资料",
+    project: "项目",
+    talk: "演讲",
+  },
+  en: {},
+};
+
+function backfillSourceTypeLabel(value, locale) {
+  const sourceType = cleanString(value).toLowerCase();
+  if (!sourceType) return "";
+  return BACKFILL_SOURCE_TYPE_LABELS[locale === "zh" ? "zh" : "en"][sourceType] || sourceType;
+}
+
+function backfillCoverageGroupLabel(value, locale) {
+  const coverageGroup = cleanString(value);
+  if (!coverageGroup) return "";
+  return locale === "zh" ? dossierGroupLabel(locale, coverageGroup) : coverageGroup;
+}
+
 /**
  * @param {{ job?: unknown; originalQuery?: string; locale?: string }} input
  */
@@ -1674,14 +1706,14 @@ export function buildBackfillSearchInput({ job, originalQuery = "", locale = "en
     ? backfillJob.candidate_names.join(", ")
     : backfillSearchInputCopy(normalizedLocale, "noCandidates");
   const sourceTypes = backfillJob.source_types_to_check.length
-    ? backfillJob.source_types_to_check.join(", ")
-    : backfillJob.missing_source_type || backfillSearchInputCopy(normalizedLocale, "publicSources");
+    ? backfillJob.source_types_to_check.map((sourceType) => backfillSourceTypeLabel(sourceType, normalizedLocale)).join(normalizedLocale === "zh" ? "、" : ", ")
+    : backfillSourceTypeLabel(backfillJob.missing_source_type, normalizedLocale) || backfillSearchInputCopy(normalizedLocale, "publicSources");
 
   return [
     backfillSearchInputCopy(normalizedLocale, "title"),
     backfillSearchInputCopy(normalizedLocale, "originalBrief", { value: cleanString(originalQuery) || backfillSearchInputCopy(normalizedLocale, "notProvided") }),
-    backfillSearchInputCopy(normalizedLocale, "coverageGroup", { value: backfillJob.coverage_group }),
-    backfillSearchInputCopy(normalizedLocale, "missingSourceType", { value: backfillJob.missing_source_type || backfillSearchInputCopy(normalizedLocale, "unknown") }),
+    backfillSearchInputCopy(normalizedLocale, "coverageGroup", { value: backfillCoverageGroupLabel(backfillJob.coverage_group, normalizedLocale) }),
+    backfillSearchInputCopy(normalizedLocale, "missingSourceType", { value: backfillSourceTypeLabel(backfillJob.missing_source_type, normalizedLocale) || backfillSearchInputCopy(normalizedLocale, "unknown") }),
     backfillSearchInputCopy(normalizedLocale, "focusedQuery", { value: backfillJob.query || fallbackSourceQuery(backfillJob.missing_source_type, { original_query: originalQuery }) }),
     backfillSearchInputCopy(normalizedLocale, "reason", { value: backfillJob.reason || backfillSearchInputCopy(normalizedLocale, "defaultReason") }),
     backfillSearchInputCopy(normalizedLocale, "affectedCandidates", { value: candidates }),
