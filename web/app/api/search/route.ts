@@ -1,7 +1,7 @@
 import { researchStream } from "@/lib/miro";
 import { findCachedSearch, flatten } from "@/lib/cache";
 import { findRun, findRunId, enqueue } from "@/lib/db";
-import { normalizeLocale } from "@/lib/i18n.mjs";
+import { normalizeLocale, t } from "@/lib/i18n.mjs";
 import { getUser } from "@/lib/session";
 
 export const runtime = "nodejs";
@@ -16,9 +16,6 @@ function smokeFlatKey(req: Request, flatKey: string) {
 // 三层: 静态缓存 → DB 缓存 → 实时研究。实时完成时写库 (下次秒出 + 进历史)。
 // 多租户: 需登录, 所有 DB 读写都按当前 user.id 隔离。
 export async function POST(req: Request) {
-  const user = await getUser();
-  if (!user) return Response.json({ error: "请先登录" }, { status: 401 });
-
   let query = "";
   let project_id: string | null | undefined;
   let locale = "zh";
@@ -28,7 +25,10 @@ export async function POST(req: Request) {
     project_id = body.project_id ?? undefined;
     locale = normalizeLocale(body.locale);
   } catch {}
-  if (!query?.trim()) return Response.json({ error: "缺少 query" }, { status: 400 });
+
+  const user = await getUser();
+  if (!user) return Response.json({ error: t(locale, "api.error.loginRequired") }, { status: 401 });
+  if (!query?.trim()) return Response.json({ error: t(locale, "api.error.missingQuery") }, { status: 400 });
 
   const platformLanguage = locale === "en" ? "English" : "Chinese (Simplified)";
   const flatKey = flatten(locale === "zh" ? query : `${query} ${locale}`);
@@ -52,6 +52,6 @@ export async function POST(req: Request) {
     projectId: project_id ?? null,
     platformLanguage,
   });
-  if (!jobId) return Response.json({ error: "队列暂不可用 (DB 未配置)，请试试示例查询" }, { status: 503 });
+  if (!jobId) return Response.json({ error: t(locale, "api.error.queueUnavailableTrySample") }, { status: 503 });
   return Response.json({ queued: true, jobId });
 }
