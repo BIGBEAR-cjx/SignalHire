@@ -627,12 +627,12 @@ export default function ResearchTool({
     if (mode !== "search") return;
     if (!runId) return;
     let cancelled = false;
-    fetch(`/api/shortlist?run=${encodeURIComponent(runId)}`)
+    fetch(`/api/shortlist?run=${encodeURIComponent(runId)}&locale=${locale}`)
       .then((r) => r.ok ? r.json() : { indices: [] })
       .then((j) => { if (!cancelled) setShortlist(Array.isArray(j.indices) ? j.indices : []); })
       .catch(() => { if (!cancelled) setShortlist([]); });
     return () => { cancelled = true; };
-  }, [mode, runId]);
+  }, [locale, mode, runId]);
 
   // 收藏 toggle: 调 API 持久化 + 乐观更新; 失败回滚。
   async function toggleShortlist(idx: number, candidate: unknown) {
@@ -643,7 +643,7 @@ export default function ResearchTool({
     setSavingIdx((s) => { const n = new Set(s); n.add(idx); return n; });
     try {
       if (wasSaved) {
-        const r = await fetch(`/api/shortlist?run=${encodeURIComponent(runId ?? "")}&idx=${idx}`, { method: "DELETE" });
+        const r = await fetch(`/api/shortlist?run=${encodeURIComponent(runId ?? "")}&idx=${idx}&locale=${locale}`, { method: "DELETE" });
         if (!r.ok) throw new Error("delete failed");
       } else {
         const r = await fetch("/api/shortlist", {
@@ -653,6 +653,7 @@ export default function ResearchTool({
             source_run_id: runId,
             candidate_index: idx,
             candidate,
+            locale,
             ...(projectId ? { project_id: projectId } : {}),
           }),
         });

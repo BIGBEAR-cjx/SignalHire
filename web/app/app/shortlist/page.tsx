@@ -75,7 +75,7 @@ export default function ShortlistPage() {
 
   const reload = useCallback(async () => {
     try {
-      const r = await fetch("/api/shortlist");
+      const r = await fetch(`/api/shortlist?locale=${locale}`);
       const j = await r.json();
       if (!r.ok) throw new Error(j.error || t("shortlist.loadFailed"));
       setItems((j.items ?? []) as Item[]);
@@ -83,7 +83,7 @@ export default function ShortlistPage() {
     } catch (e) {
       setError((e as Error).message);
     }
-  }, [t]);
+  }, [locale, t]);
 
   useEffect(() => { void reload(); }, [reload]); // eslint-disable-line react-hooks/set-state-in-effect
 

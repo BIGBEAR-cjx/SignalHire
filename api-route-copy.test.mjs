@@ -117,3 +117,24 @@ test("dashboard account requests include the active locale", () => {
   assert.match(history, /fetch\(`\/api\/history\?locale=\$\{locale\}`\)/);
   assert.match(settings, /fetch\(`\/api\/whoami\?locale=\$\{locale\}`\)/);
 });
+
+test("shortlist collection API error responses stay locale-keyed", () => {
+  const source = readFileSync("web/app/api/shortlist/route.ts", "utf8");
+  const hardcodedResponses = source
+    .split("\n")
+    .filter((line) => /Response\.json\(\{ error: "[^"]*[\u4e00-\u9fff]/.test(line));
+
+  assert.deepEqual(hardcodedResponses, []);
+});
+
+test("shortlist collection requests include the active locale", () => {
+  const researchTool = readFileSync("web/components/ResearchTool.tsx", "utf8");
+  const shortlistPage = readFileSync("web/app/app/shortlist/page.tsx", "utf8");
+  const projectPage = readFileSync("web/app/app/projects/[id]/page.tsx", "utf8");
+
+  assert.match(researchTool, /fetch\(`\/api\/shortlist\?run=\$\{encodeURIComponent\(runId\)\}&locale=\$\{locale\}`\)/);
+  assert.match(researchTool, /fetch\(`\/api\/shortlist\?run=\$\{encodeURIComponent\(runId \?\? ""\)\}&idx=\$\{idx\}&locale=\$\{locale\}`/);
+  assert.match(researchTool, /candidate_index: idx,[\s\S]{0,220}candidate,[\s\S]{0,220}locale/);
+  assert.match(shortlistPage, /fetch\(`\/api\/shortlist\?locale=\$\{locale\}`\)/);
+  assert.match(projectPage, /fetch\(`\/api\/shortlist\?project=\$\{encodeURIComponent\(id\)\}&locale=\$\{locale\}`\)/);
+});

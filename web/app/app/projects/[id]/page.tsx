@@ -305,7 +305,7 @@ export default function ProjectDetailPage() {
       try {
         const [detailRes, itemsRes] = await Promise.all([
           fetch(`/api/projects/${id}`),
-          fetch(`/api/shortlist?project=${encodeURIComponent(id)}`),
+          fetch(`/api/shortlist?project=${encodeURIComponent(id)}&locale=${locale}`),
         ]);
         const [detailJson, itemsJson] = await Promise.all([detailRes.json(), itemsRes.json()]);
         if (cancelled) return;
@@ -320,7 +320,7 @@ export default function ProjectDetailPage() {
     }
     void load();
     return () => { cancelled = true; };
-  }, [id, t]);
+  }, [id, locale, t]);
 
   const filteredItems = useMemo(() => {
     if (!items) return [];

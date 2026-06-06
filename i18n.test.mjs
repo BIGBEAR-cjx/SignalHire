@@ -86,6 +86,11 @@ test("translates research fallback error labels", () => {
     ["api.error.feedbackSaveUnavailable", "反馈保存失败或本轮搜索不存在", "Feedback could not be saved or this search round was not found."],
     ["api.error.missingProjectName", "项目名称必填", "Project name is required."],
     ["api.error.projectCreateFailed", "创建失败", "Failed to create project."],
+    ["api.error.missingCandidateIndex", "缺少有效的 candidate_index", "Missing valid candidate_index."],
+    ["api.error.missingCandidateSnapshot", "缺少 candidate 快照", "Missing candidate snapshot."],
+    ["api.error.shortlistSaveFailed", "保存失败", "Failed to save candidate."],
+    ["api.error.missingIdx", "缺少有效的 idx", "Missing valid idx."],
+    ["api.error.shortlistDeleteUnavailable", "未收藏或已删除", "Candidate was not saved or has already been removed."],
     ["run.label.backfill", "补搜 practice/code", "Backfill practice/code", { coverage: "practice", source: "code" }, { coverage: "practice", source: "code" }],
   ];
 
