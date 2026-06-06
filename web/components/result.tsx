@@ -855,7 +855,7 @@ export function CandidateComparisonView({ result, locale }: { result: unknown } 
           <p className="mt-1 text-sm text-gray-500">{resultCopy(locale, "comparisonDesc")}</p>
         </div>
         <span className="rounded-full bg-gray-100 px-2.5 py-1 text-xs font-semibold text-gray-600">
-          {rows.length} 人
+          {rows.length} {resultCopy(locale, "people")}
         </span>
       </div>
       <div className="mt-4 overflow-x-auto">

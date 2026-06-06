@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { test } from "node:test";
 
 import { isLocale, normalizeLocale, t } from "./web/lib/i18n.mjs";
@@ -294,6 +295,13 @@ test("translates result trust and caveat labels", () => {
     assert.equal(t("zh", key, zhParams), zh);
     assert.equal(t("en", key, enParams), en);
   }
+});
+
+test("result comparison count uses localized people label", () => {
+  const source = readFileSync(new URL("./web/components/result.tsx", import.meta.url), "utf8");
+
+  assert.equal(source.includes("{rows.length} 人"), false);
+  assert.match(source, /\{rows\.length\}\s+\{resultCopy\(locale, "people"\)\}/);
 });
 
 test("translates project detail status labels", () => {
