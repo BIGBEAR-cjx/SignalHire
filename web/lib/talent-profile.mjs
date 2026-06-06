@@ -1358,6 +1358,13 @@ function editableSearchInputCopy(locale, key, params = {}) {
   return text;
 }
 
+function sourcePlanLabel(source, locale) {
+  const normalizedLocale = locale === "zh" ? "zh" : "en";
+  const coverageGroup = backfillCoverageGroupLabel(source.coverage_group, normalizedLocale);
+  const sourceType = backfillSourceTypeLabel(source.source_type, normalizedLocale);
+  return [coverageGroup, sourceType].filter(Boolean).join("/");
+}
+
 /**
  * @param {{ draft?: unknown; locale?: string }} input
  */
@@ -1374,7 +1381,7 @@ export function buildSearchInputFromEditablePlan({ draft, locale = "en" } = {}) 
     editableSearchInputCopy(normalizedLocale, "niceToHave", { value: plan.nice_to_have.join("; ") || emptyValue }),
     editableSearchInputCopy(normalizedLocale, "exclude", { value: plan.exclusions.join("; ") || emptyValue }),
     editableSearchInputCopy(normalizedLocale, "sourcePlan"),
-    ...sources.map((source) => `- ${source.coverage_group}/${source.source_type}: ${source.query} (${source.reason || source.target})`),
+    ...sources.map((source) => `- ${sourcePlanLabel(source, normalizedLocale)}: ${source.query} (${source.reason || source.target})`),
     editableSearchInputCopy(normalizedLocale, "returnPayload"),
   ].join("\n");
 }

@@ -236,6 +236,8 @@ test("builds Chinese editable search plan input copy", () => {
   assert.match(input, /原始搜索画像：Find senior LLM inference engineers with vLLM/);
   assert.match(input, /必备条件：/);
   assert.match(input, /来源计划：/);
+  assert.match(input, /- 实践\/代码:/);
+  assert.doesNotMatch(input, /- practice\/code:/);
   assert.match(input, /返回标准 SignalHire 人才 shortlist payload/);
 });
 
