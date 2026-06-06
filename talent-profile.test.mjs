@@ -886,6 +886,26 @@ test("builds coverage backfill plan from returned jobs or missing coverage", () 
   assert.match(derived.summary, /待补/);
 });
 
+test("builds English coverage backfill fallback copy", () => {
+  const derived = buildCoverageBackfillPlan(normalizeTalentSearchResult({
+    search_brief: {
+      original_query: "Find LLM inference engineers",
+      required_skills: ["vLLM"],
+    },
+    evidence_graph: {
+      source_mix: [{ source_type: "paper", count: 2 }],
+      candidates: [
+        { candidate_name: "Ada Lovelace", source_types: ["paper"], risk_flags: ["No public implementation evidence"] },
+      ],
+    },
+    candidates: [{ name: "Ada Lovelace" }],
+  }), { locale: "en" });
+
+  const practiceJob = derived.jobs.find((job) => job.coverage_group === "practice");
+  assert.equal(practiceJob?.reason, "Practice coverage is missing. Backfill code sources for cross-validation.");
+  assert.equal(derived.summary, "6 coverage gaps need backfill.");
+});
+
 test("builds focused search input for a coverage backfill job", () => {
   assert.equal(typeof talentProfile.buildBackfillSearchInput, "function");
 

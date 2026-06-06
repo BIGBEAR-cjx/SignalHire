@@ -578,11 +578,34 @@ function candidateNamesForCoverageGroup(result, coverageGroup) {
     .slice(0, 8);
 }
 
-function backfillReason(group, sourceType, executionJob) {
-  if (executionJob?.status === "failed") return executionJob.error || `前一轮 ${sourceType} 来源任务失败，需要补搜。`;
-  if (executionJob?.status === "partial") return executionJob.next_action || `前一轮 ${sourceType} 来源证据偏薄，需要补搜。`;
-  if (executionJob && executionJob.evidence_found === 0) return executionJob.next_action || `前一轮 ${sourceType} 未找到可用证据，需要补搜。`;
-  return `缺少${group.label}覆盖，需要补搜 ${sourceType} 来源做交叉验证。`;
+const BACKFILL_PLAN_COPY = {
+  zh: {
+    failed: "前一轮 {sourceType} 来源任务失败，需要补搜。",
+    partial: "前一轮 {sourceType} 来源证据偏薄，需要补搜。",
+    noEvidence: "前一轮 {sourceType} 未找到可用证据，需要补搜。",
+    missing: "缺少{groupLabel}覆盖，需要补搜 {sourceType} 来源做交叉验证。",
+    summary: "{count} 个覆盖缺口待补搜。",
+  },
+  en: {
+    failed: "The previous {sourceType} source task failed. Backfill is needed.",
+    partial: "The previous {sourceType} source evidence was thin. Backfill is needed.",
+    noEvidence: "The previous {sourceType} task found no usable evidence. Backfill is needed.",
+    missing: "{groupLabel} coverage is missing. Backfill {sourceType} sources for cross-validation.",
+    summary: "{count} coverage gaps need backfill.",
+  },
+};
+
+function backfillPlanCopy(locale, key, params = {}) {
+  let text = BACKFILL_PLAN_COPY[locale === "en" ? "en" : "zh"][key] ?? BACKFILL_PLAN_COPY.zh[key];
+  for (const [name, value] of Object.entries(params)) text = text.replace(`{${name}}`, String(value));
+  return text;
+}
+
+function backfillReason(group, sourceType, executionJob, locale = "zh") {
+  if (executionJob?.status === "failed") return executionJob.error || backfillPlanCopy(locale, "failed", { sourceType });
+  if (executionJob?.status === "partial") return executionJob.next_action || backfillPlanCopy(locale, "partial", { sourceType });
+  if (executionJob && executionJob.evidence_found === 0) return executionJob.next_action || backfillPlanCopy(locale, "noEvidence", { sourceType });
+  return backfillPlanCopy(locale, "missing", { groupLabel: dossierGroupLabel(locale, group.key), sourceType });
 }
 
 function normalizeTalentMap(map = []) {
@@ -1388,7 +1411,8 @@ export function buildSourceExecution(result) {
   };
 }
 
-export function buildCoverageBackfillPlan(result) {
+export function buildCoverageBackfillPlan(result, { locale = "zh" } = {}) {
+  const normalizedLocale = locale === "en" ? "en" : "zh";
   const source = isPlainObject(result) ? result : {};
   const returned = normalizeCoverageBackfill(source.coverage_backfill);
   if (returned.jobs.length > 0) return returned;
@@ -1408,7 +1432,10 @@ export function buildCoverageBackfillPlan(result) {
       coverage_group: group.key,
       missing_source_type: normalizedSourceType,
       query: cleanString(query) || fallbackSourceQuery(normalizedSourceType, source.search_brief),
-      reason: cleanString(reason) || `缺少${group.label}覆盖，需要补搜 ${normalizedSourceType} 来源做交叉验证。`,
+      reason: cleanString(reason) || backfillPlanCopy(normalizedLocale, "missing", {
+        groupLabel: dossierGroupLabel(normalizedLocale, group.key),
+        sourceType: normalizedSourceType,
+      }),
       priority: jobs.length + 1,
       status: "planned",
       candidate_names: cleanStringArray(candidateNames, 12),
@@ -1422,7 +1449,10 @@ export function buildCoverageBackfillPlan(result) {
       addJob({
         coverageGroup: group.key,
         sourceType,
-        reason: `缺少${group.label}覆盖，需要补搜 ${sourceType} 来源做交叉验证。`,
+        reason: backfillPlanCopy(normalizedLocale, "missing", {
+          groupLabel: dossierGroupLabel(normalizedLocale, group.key),
+          sourceType,
+        }),
         candidateNames: candidateNamesForCoverageGroup(source, group.key),
         sourceTypesToCheck: group.missing_source_types,
       });
@@ -1434,7 +1464,7 @@ export function buildCoverageBackfillPlan(result) {
     addJob({
       coverageGroup: executionJob.coverage_group,
       sourceType: executionJob.source_type,
-      reason: backfillReason(coverageGroupByKey(executionJob.coverage_group), executionJob.source_type, executionJob),
+      reason: backfillReason(coverageGroupByKey(executionJob.coverage_group), executionJob.source_type, executionJob, normalizedLocale),
       query: executionJob.query,
       candidateNames: executionJob.candidate_leads.length ? executionJob.candidate_leads : candidateNamesForCoverageGroup(source, executionJob.coverage_group),
       sourceTypesToCheck: [executionJob.source_type],
@@ -1442,7 +1472,7 @@ export function buildCoverageBackfillPlan(result) {
   }
 
   return {
-    summary: jobs.length > 0 ? `${jobs.length} 个覆盖缺口待补搜。` : "",
+    summary: jobs.length > 0 ? backfillPlanCopy(normalizedLocale, "summary", { count: jobs.length }) : "",
     jobs: jobs.slice(0, 16),
   };
 }

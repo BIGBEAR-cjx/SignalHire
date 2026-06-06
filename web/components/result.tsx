@@ -626,7 +626,7 @@ export function CoverageBackfillView({
   onBackfillJob?: (job: CoverageBackfillJob) => void;
   backfillDisabled?: boolean;
 } & ResultLocaleProps) {
-  const plan = buildCoverageBackfillPlan(result);
+  const plan = buildCoverageBackfillPlan(result, { locale });
   const jobs: CoverageBackfillJob[] = plan.jobs.filter((job: CoverageBackfillJob) => job.query || job.reason);
   if (jobs.length === 0) return null;
   return (
