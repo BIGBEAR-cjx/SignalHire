@@ -161,6 +161,31 @@ test("translates result search plan labels", () => {
   }
 });
 
+test("translates result source execution labels", () => {
+  const keys = [
+    ["result.research", "研究", "Research"],
+    ["result.practice", "实践", "Practice"],
+    ["result.work_history", "工作经历", "Work history"],
+    ["result.public_voice", "公开表达", "Public voice"],
+    ["result.planned", "待执行", "Planned"],
+    ["result.completed", "已完成", "Completed"],
+    ["result.partial", "部分完成", "Partial"],
+    ["result.failed", "失败", "Failed"],
+    ["result.sourceExecutionTitle", "来源执行记录", "Source execution log"],
+    ["result.sourceExecutionReturned", "记录每类来源任务的实际查询、具体链接、证据数量和后续缺口。", "Shows the actual query, links, evidence count, and remaining gaps for each source task."],
+    ["result.sourceExecutionPlanned", "本次结果未返回执行记录，先展示可执行的来源任务计划。", "This result did not return execution logs, so the executable source plan is shown instead."],
+    ["result.executed", "已执行", "executed"],
+    ["result.evidence", "证据", "evidence"],
+    ["result.links", "链接", "links"],
+    ["result.leads", "线索", "Leads"],
+  ];
+
+  for (const [key, zh, en] of keys) {
+    assert.equal(t("zh", key), zh);
+    assert.equal(t("en", key), en);
+  }
+});
+
 test("translates project detail status labels", () => {
   const keys = [
     ["projects.detail.status.open", "进行中", "Open"],

@@ -85,21 +85,6 @@ const RESULT_COPY = {
     evidenceStrong: "证据强",
     evidenceMedium: "证据中等",
     evidenceWeak: "证据弱",
-    research: "研究",
-    practice: "实践",
-    work_history: "工作经历",
-    public_voice: "公开表达",
-    planned: "待执行",
-    completed: "已完成",
-    partial: "部分完成",
-    failed: "失败",
-    sourceExecutionTitle: "来源执行记录",
-    sourceExecutionReturned: "记录每类来源任务的实际查询、具体链接、证据数量和后续缺口。",
-    sourceExecutionPlanned: "本次结果未返回执行记录，先展示可执行的来源任务计划。",
-    executed: "已执行",
-    evidence: "证据",
-    links: "链接",
-    leads: "线索",
     backfillTitle: "缺口补搜计划",
     backfillDesc: "把缺失或偏弱的信息源覆盖转成下一轮可执行查询。",
     gaps: "个缺口",
@@ -172,21 +157,6 @@ const RESULT_COPY = {
     evidenceStrong: "Strong evidence",
     evidenceMedium: "Moderate evidence",
     evidenceWeak: "Weak evidence",
-    research: "Research",
-    practice: "Practice",
-    work_history: "Work history",
-    public_voice: "Public voice",
-    planned: "Planned",
-    completed: "Completed",
-    partial: "Partial",
-    failed: "Failed",
-    sourceExecutionTitle: "Source execution log",
-    sourceExecutionReturned: "Shows the actual query, links, evidence count, and remaining gaps for each source task.",
-    sourceExecutionPlanned: "This result did not return execution logs, so the executable source plan is shown instead.",
-    executed: "executed",
-    evidence: "evidence",
-    links: "links",
-    leads: "Leads",
     backfillTitle: "Gap backfill plan",
     backfillDesc: "Turns missing or weak source coverage into executable queries for the next round.",
     gaps: "gaps",
@@ -280,7 +250,22 @@ type SharedResultCopyKey =
   | "notIdentified"
   | "sourceQueryPlan"
   | "items"
-  | "adjacentPools";
+  | "adjacentPools"
+  | "research"
+  | "practice"
+  | "work_history"
+  | "public_voice"
+  | "planned"
+  | "completed"
+  | "partial"
+  | "failed"
+  | "sourceExecutionTitle"
+  | "sourceExecutionReturned"
+  | "sourceExecutionPlanned"
+  | "executed"
+  | "evidence"
+  | "links"
+  | "leads";
 type ResultCopyKey = keyof typeof RESULT_COPY.zh | SharedResultCopyKey;
 
 function resultCopy(locale: Locale | undefined, key: ResultCopyKey, params: Record<string, string | number> = {}) {
