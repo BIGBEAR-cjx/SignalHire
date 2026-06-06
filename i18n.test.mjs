@@ -304,6 +304,15 @@ test("result comparison count uses localized people label", () => {
   assert.match(source, /\{rows\.length\}\s+\{resultCopy\(locale, "people"\)\}/);
 });
 
+test("shared shell navigation and loading copy stay keyed", () => {
+  const source = readFileSync(new URL("./web/components/ui/signal-ui.tsx", import.meta.url), "utf8");
+
+  assert.equal(/label:\s*"[^"]*[\u4e00-\u9fff]/.test(source), false);
+  assert.equal(/shortLabel:\s*"[^"]*[\u4e00-\u9fff]/.test(source), false);
+  assert.equal(source.includes('title = "正在加载"'), false);
+  assert.equal(source.includes('description = "正在同步最新数据。"'), false);
+});
+
 test("translates project detail status labels", () => {
   const keys = [
     ["projects.detail.status.open", "进行中", "Open"],

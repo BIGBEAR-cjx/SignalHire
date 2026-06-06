@@ -17,26 +17,22 @@ import {
 
 export type AppNavItem = {
   href: string;
-  label: string;
-  shortLabel: string;
   labelKey: string;
   shortLabelKey: string;
   Icon: IconType;
 };
 
 export const APP_NAV: AppNavItem[] = [
-  { href: "/app", label: "总览", shortLabel: "总览", labelKey: "nav.overview", shortLabelKey: "nav.overview", Icon: FiHome },
-  { href: "/app/projects", label: "招聘项目", shortLabel: "项目", labelKey: "nav.projects", shortLabelKey: "nav.projects", Icon: FiFolder },
-  { href: "/app/search", label: "智能搜人", shortLabel: "搜人", labelKey: "nav.search", shortLabelKey: "nav.search", Icon: FiSearch },
-  { href: "/app/verify", label: "核验台", shortLabel: "核验", labelKey: "nav.verify", shortLabelKey: "nav.verify", Icon: FiCheckCircle },
-  { href: "/app/shortlist", label: "候选池", shortLabel: "候选", labelKey: "nav.shortlist", shortLabelKey: "nav.shortlist", Icon: FiClipboard },
-  { href: "/app/history", label: "历史", shortLabel: "历史", labelKey: "nav.history", shortLabelKey: "nav.history", Icon: FiClock },
+  { href: "/app", labelKey: "nav.overview", shortLabelKey: "nav.overview", Icon: FiHome },
+  { href: "/app/projects", labelKey: "nav.projects", shortLabelKey: "nav.projects", Icon: FiFolder },
+  { href: "/app/search", labelKey: "nav.search", shortLabelKey: "nav.search", Icon: FiSearch },
+  { href: "/app/verify", labelKey: "nav.verify", shortLabelKey: "nav.verify", Icon: FiCheckCircle },
+  { href: "/app/shortlist", labelKey: "nav.shortlist", shortLabelKey: "nav.shortlist", Icon: FiClipboard },
+  { href: "/app/history", labelKey: "nav.history", shortLabelKey: "nav.history", Icon: FiClock },
 ];
 
 export const SETTINGS_NAV: AppNavItem = {
   href: "/app/settings",
-  label: "设置",
-  shortLabel: "设置",
   labelKey: "nav.settings",
   shortLabelKey: "nav.settings",
   Icon: FiSettings,
@@ -217,12 +213,12 @@ export function EmptyState({
 }
 
 export function LoadingState({
-  title = "正在加载",
-  description = "正在同步最新数据。",
+  title,
+  description,
   className = "",
 }: {
-  title?: string;
-  description?: string;
+  title: string;
+  description: string;
   className?: string;
 }) {
   return (
