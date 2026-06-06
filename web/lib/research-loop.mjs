@@ -345,12 +345,21 @@ function candidateBackfillSourceTypeLabels(sourceTypes, locale) {
   return sourceTypes.map((type) => labels[type] ?? type);
 }
 
+function candidateBackfillQualityLabel(value, locale) {
+  const quality = cleanString(value).toLowerCase();
+  const normalizedQuality = ["high", "medium", "low"].includes(quality) ? quality : "unknown";
+  const labels = locale === "en"
+    ? { high: "High", medium: "Medium", low: "Low", unknown: "unknown" }
+    : { high: "强", medium: "中", low: "弱", unknown: "未知" };
+  return labels[normalizedQuality];
+}
+
 function buildCandidateEvidenceBackfillInput(item, locale = "zh") {
   const normalizedLocale = locale === "en" ? "en" : "zh";
   const candidate = isPlainObject(item?.candidate) ? item.candidate : {};
   const name = candidateName(candidate, normalizedLocale);
   const subtitle = candidateSubtitle(candidate) || candidateBackfillInputCopy(normalizedLocale, "roleUnknown");
-  const quality = cleanString(candidate?.evidence_audit?.overall_evidence_quality) || candidateBackfillInputCopy(normalizedLocale, "qualityUnknown");
+  const quality = candidateBackfillQualityLabel(candidate?.evidence_audit?.overall_evidence_quality, normalizedLocale);
   const directions = Array.isArray(candidate?.ai_directions) ? candidate.ai_directions.map(cleanString).filter(Boolean).join(", ") : "";
   const gapClaims = candidateEvidenceGapClaims(candidate);
   const sourceTypes = candidateBackfillSourceTypes(candidate);

@@ -367,6 +367,8 @@ test("builds a project evidence matrix from shortlist status and evidence priori
   );
   assert.match(matrix.rows[1].action.search_input, /SignalHire 候选人证据补搜/);
   assert.match(matrix.rows[1].action.search_input, /候选人：未知候选人/);
+  assert.match(matrix.rows[1].action.search_input, /当前证据质量：弱/);
+  assert.doesNotMatch(matrix.rows[1].action.search_input, /当前证据质量：low/);
   assert.match(matrix.rows[1].action.search_input, /搜索目标：找到具体公开来源/);
   assert.doesNotMatch(matrix.rows[1].action.search_input, /Unknown candidate/);
   assert.match(matrix.rows[1].action.search_input, /Single-source product launch/);

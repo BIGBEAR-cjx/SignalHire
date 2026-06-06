@@ -185,7 +185,7 @@ function matrixBackfillInput(candidate, priority, locale) {
     matrixBackfillCopy(normalizedLocale, "candidate", { value: matrixCandidateName(candidate, normalizedLocale) }),
     matrixBackfillCopy(normalizedLocale, "role", { value: role }),
     matrixBackfillCopy(normalizedLocale, "directions", { value: directions || matrixBackfillCopy(normalizedLocale, "notSpecified") }),
-    matrixBackfillCopy(normalizedLocale, "quality", { value: cleanString(audit?.overall_evidence_quality) || matrixBackfillCopy(normalizedLocale, "qualityUnknown") }),
+    matrixBackfillCopy(normalizedLocale, "quality", { value: evidenceQualityLabel(audit?.overall_evidence_quality, normalizedLocale) }),
     matrixBackfillCopy(normalizedLocale, "gaps", { value: gaps.length ? Array.from(new Set(gaps)).slice(0, 6).join("; ") : matrixBackfillCopy(normalizedLocale, "defaultGap") }),
     matrixBackfillCopy(normalizedLocale, "goal"),
     matrixBackfillCopy(normalizedLocale, "prioritize"),
