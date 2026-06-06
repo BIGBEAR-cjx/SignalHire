@@ -486,7 +486,7 @@ export default function ResearchTool({
         const res = await fetch("/api/feedback", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ run_id: runId, feedback: searchFeedback }),
+          body: JSON.stringify({ run_id: runId, locale, feedback: searchFeedback }),
         });
         const saved: SaveFeedbackResponse = await res.json().catch(() => ({}));
         if (res.ok && saved.saved) {

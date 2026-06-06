@@ -1,4 +1,5 @@
 import { saveSearchFeedback } from "@/lib/db";
+import { normalizeLocale, t } from "@/lib/i18n.mjs";
 import { getUser } from "@/lib/session";
 
 export const runtime = "nodejs";
@@ -39,27 +40,28 @@ function normalizeFeedback(value: unknown) {
 // POST /api/feedback { run_id, feedback }
 // 将本轮 shortlist 选择题反馈持久化到 research_runs.result.search_feedback。
 export async function POST(req: Request) {
-  const user = await getUser();
-  if (!user) return Response.json({ error: "请先登录" }, { status: 401 });
-
   let body: Record<string, unknown> = {};
   try {
     const parsed = await req.json();
     if (isRecord(parsed)) body = parsed;
   } catch {}
+  const locale = normalizeLocale(body.locale);
+
+  const user = await getUser();
+  if (!user) return Response.json({ error: t(locale, "api.error.loginRequired") }, { status: 401 });
 
   const runId = cleanString(body.run_id);
-  if (!runId) return Response.json({ error: "缺少 run_id" }, { status: 400 });
+  if (!runId) return Response.json({ error: t(locale, "api.error.missingRunId") }, { status: 400 });
 
   const feedback = normalizeFeedback(body.feedback);
-  if (!feedback) return Response.json({ error: "反馈选项无效" }, { status: 400 });
+  if (!feedback) return Response.json({ error: t(locale, "api.error.invalidFeedback") }, { status: 400 });
 
   const saved = await saveSearchFeedback({
     runId,
     userId: user.id,
     feedback,
   });
-  if (!saved) return Response.json({ error: "反馈保存失败或本轮搜索不存在" }, { status: 404 });
+  if (!saved) return Response.json({ error: t(locale, "api.error.feedbackSaveUnavailable") }, { status: 404 });
 
   return Response.json({ saved: true, ...saved });
 }

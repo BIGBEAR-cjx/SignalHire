@@ -81,6 +81,9 @@ test("translates research fallback error labels", () => {
     ["api.error.jobNotCancelable", "任务当前不可停止", "This job cannot be stopped right now."],
     ["api.error.missingCandidate", "缺少 candidate", "Missing candidate."],
     ["api.error.outreachFailed", "生成失败", "Failed to generate outreach draft."],
+    ["api.error.missingRunId", "缺少 run_id", "Missing run_id."],
+    ["api.error.invalidFeedback", "反馈选项无效", "Invalid feedback options."],
+    ["api.error.feedbackSaveUnavailable", "反馈保存失败或本轮搜索不存在", "Feedback could not be saved or this search round was not found."],
     ["run.label.backfill", "补搜 practice/code", "Backfill practice/code", { coverage: "practice", source: "code" }, { coverage: "practice", source: "code" }],
   ];
 
