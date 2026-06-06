@@ -693,6 +693,61 @@ test("builds shortlist delivery report for hiring manager handoff", () => {
   assert.deepEqual(report.next_steps.slice(0, 2), ["优先审阅 2 位强推荐候选人的证据详情。", "对 1 个信息源覆盖缺口执行补搜。"]);
 });
 
+test("builds English shortlist delivery report copy", () => {
+  const result = normalizeTalentSearchResult({
+    search_brief: {
+      original_query: "Find senior LLM inference engineers in North America",
+    },
+    evidence_graph: {
+      source_mix: [
+        { source_type: "code", count: 2 },
+        { source_type: "company", count: 1 },
+      ],
+      candidates: [
+        {
+          candidate_name: "Ada Lovelace",
+          independent_sources: 3,
+          source_types: ["code", "company"],
+          risk_flags: ["Location is single-source."],
+        },
+      ],
+    },
+    candidates: [
+      {
+        name: "Ada Lovelace",
+        current_role: "Staff Engineer",
+        current_company: "Example AI",
+        match_score: 91,
+        strongest_signals: ["Merged public vLLM serving PRs"],
+        evidence_audit: { overall_evidence_quality: "high" },
+        claims: [
+          {
+            claim: "Maintains public vLLM serving work",
+            verdict: "verified",
+            evidence: [{ note: "GitHub", url: "https://github.com/example/vllm", source_type: "code" }],
+          },
+        ],
+      },
+      {
+        name: "Alan Turing",
+        match_score: 62,
+        evidence_audit: { overall_evidence_quality: "low" },
+      },
+    ],
+  });
+
+  const report = talentProfile.buildShortlistDeliveryReport(result, { locale: "en" });
+
+  assert.equal(report.coverage_summary.find((group) => group.key === "practice")?.label, "Practice");
+  assert.ok(report.report_risks.some((risk) => /2 source coverage gaps need backfill\./.test(risk)));
+  assert.ok(report.report_risks.some((risk) => /Weak-evidence candidates: Alan Turing\./.test(risk)));
+  assert.deepEqual(report.next_steps.slice(0, 2), [
+    "Review evidence details for 1 strong recommended candidate.",
+    "Run backfill for 2 source coverage gaps.",
+  ]);
+  assert.equal(report.next_steps.at(-1), "Share candidate details with the hiring manager for human review.");
+});
+
 test("normalizes source execution and falls back to planned jobs", () => {
   const result = normalizeTalentSearchResult({
     search_brief: {

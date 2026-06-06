@@ -1118,7 +1118,33 @@ function candidateRole(candidate) {
   return [candidate?.current_role, candidate?.current_company].map(cleanString).filter(Boolean).join(" / ");
 }
 
-export function buildShortlistDeliveryReport(result) {
+const DELIVERY_REPORT_COPY = {
+  zh: {
+    missingCoverage: "{count} 个信息源覆盖缺口需要补搜。",
+    weakEvidence: "证据偏弱候选人：{names}。",
+    singleSource: "单源声称需复核：{names}。",
+    reviewStrong: "优先审阅 {count} 位强推荐候选人的证据详情。",
+    backfill: "对 {count} 个信息源覆盖缺口执行补搜。",
+    share: "将候选人详情分享给 hiring manager 做人工复核。",
+  },
+  en: {
+    missingCoverage: "{count} source coverage gaps need backfill.",
+    weakEvidence: "Weak-evidence candidates: {names}.",
+    singleSource: "Single-source claims need review: {names}.",
+    reviewStrong: "Review evidence details for {count} strong recommended {candidateWord}.",
+    backfill: "Run backfill for {count} source coverage {gapWord}.",
+    share: "Share candidate details with the hiring manager for human review.",
+  },
+};
+
+function deliveryReportCopy(locale, key, params = {}) {
+  let text = DELIVERY_REPORT_COPY[locale === "en" ? "en" : "zh"][key] ?? DELIVERY_REPORT_COPY.zh[key];
+  for (const [name, value] of Object.entries(params)) text = text.replace(`{${name}}`, String(value));
+  return text;
+}
+
+export function buildShortlistDeliveryReport(result, { locale = "zh" } = {}) {
+  const normalizedLocale = locale === "en" ? "en" : "zh";
   const normalized = normalizeTalentSearchResult(result);
   const coverage = buildEvidenceCoverage(normalized);
   const coveredGroups = coverage.filter((group) => group.status === "covered");
@@ -1146,18 +1172,28 @@ export function buildShortlistDeliveryReport(result) {
       };
     });
   const risks = [];
-  if (missingCoverageCount > 0) risks.push(`${missingCoverageCount} 个信息源覆盖缺口需要补搜。`);
+  if (missingCoverageCount > 0) risks.push(deliveryReportCopy(normalizedLocale, "missingCoverage", { count: missingCoverageCount }));
   if (weakEvidenceCandidates.length > 0) {
-    risks.push(`证据偏弱候选人：${weakEvidenceCandidates.map((candidate) => candidate.name).slice(0, 4).join(", ")}。`);
+    risks.push(deliveryReportCopy(normalizedLocale, "weakEvidence", { names: weakEvidenceCandidates.map((candidate) => candidate.name).slice(0, 4).join(", ") }));
   }
   const singleSourceCandidates = candidateAudits.filter((audit) => audit.single_source_claims.length > 0).map((audit) => audit.candidate_name).filter(Boolean);
   if (singleSourceCandidates.length > 0) {
-    risks.push(`单源声称需复核：${singleSourceCandidates.slice(0, 4).join(", ")}。`);
+    risks.push(deliveryReportCopy(normalizedLocale, "singleSource", { names: singleSourceCandidates.slice(0, 4).join(", ") }));
   }
   const nextSteps = [];
-  if (strongCandidates.length > 0) nextSteps.push(`优先审阅 ${strongCandidates.length} 位强推荐候选人的证据详情。`);
-  if (missingCoverageCount > 0) nextSteps.push(`对 ${missingCoverageCount} 个信息源覆盖缺口执行补搜。`);
-  nextSteps.push("将候选人详情分享给 hiring manager 做人工复核。");
+  if (strongCandidates.length > 0) {
+    nextSteps.push(deliveryReportCopy(normalizedLocale, "reviewStrong", {
+      count: strongCandidates.length,
+      candidateWord: strongCandidates.length === 1 ? "candidate" : "candidates",
+    }));
+  }
+  if (missingCoverageCount > 0) {
+    nextSteps.push(deliveryReportCopy(normalizedLocale, "backfill", {
+      count: missingCoverageCount,
+      gapWord: missingCoverageCount === 1 ? "gap" : "gaps",
+    }));
+  }
+  nextSteps.push(deliveryReportCopy(normalizedLocale, "share"));
 
   return {
     brief_summary: normalized.search_brief.original_query || normalized.search_plan.must_have.join("; ") || "AI talent shortlist",
@@ -1169,7 +1205,7 @@ export function buildShortlistDeliveryReport(result) {
     coverage_group_count: coverage.length,
     coverage_summary: coverage.map((group) => ({
       key: group.key,
-      label: group.label,
+      label: dossierGroupLabel(normalizedLocale, group.key),
       status: group.status,
       count: group.count,
       source_types: group.source_types,

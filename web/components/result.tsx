@@ -343,7 +343,7 @@ function ReportMetric({ label, value, sublabel }: { label: string; value: string
 }
 
 export function ShortlistDeliveryReportView({ result, locale }: { result: TalentSearchResult } & ResultLocaleProps) {
-  const report: ShortlistDeliveryReport = buildShortlistDeliveryReport(result);
+  const report: ShortlistDeliveryReport = buildShortlistDeliveryReport(result, { locale });
   if (report.candidate_count === 0) return null;
   return (
     <ResultSurface>
