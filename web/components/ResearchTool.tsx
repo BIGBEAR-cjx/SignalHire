@@ -449,7 +449,7 @@ export default function ResearchTool({
 
   function runEditablePlan() {
     if (!editablePlan) return;
-    run(buildSearchInputFromEditablePlan({ draft: editablePlan }), { preserveInput: true });
+    run(buildSearchInputFromEditablePlan({ draft: editablePlan, locale }), { preserveInput: true });
   }
 
   function updateConstraintEditorBase(editor: SearchConstraintEditorView, value: string) {

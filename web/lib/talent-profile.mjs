@@ -1312,22 +1312,54 @@ export function buildEditableSearchPlanDraft(query, { locale = "zh" } = {}) {
   });
 }
 
+const EDITABLE_SEARCH_INPUT_COPY = {
+  zh: {
+    title: "SignalHire 可编辑搜索计划。",
+    originalBrief: "原始搜索画像：{value}",
+    mustHave: "必备条件：{value}",
+    niceToHave: "加分条件：{value}",
+    exclude: "排除条件：{value}",
+    notSpecified: "未指定",
+    sourcePlan: "来源计划：",
+    returnPayload: "返回标准 SignalHire 人才 shortlist payload，包含 search_plan、source_execution、coverage_backfill、evidence_graph、talent_map 和 candidates。",
+  },
+  en: {
+    title: "Editable Search Plan for SignalHire.",
+    originalBrief: "Original search brief: {value}",
+    mustHave: "Must-have: {value}",
+    niceToHave: "Nice-to-have: {value}",
+    exclude: "Exclude: {value}",
+    notSpecified: "not specified",
+    sourcePlan: "Source plan:",
+    returnPayload: "Return the normal SignalHire talent shortlist payload with search_plan, source_execution, coverage_backfill, evidence_graph, talent_map, and candidates.",
+  },
+};
+
+function editableSearchInputCopy(locale, key, params = {}) {
+  const normalizedLocale = locale === "zh" ? "zh" : "en";
+  let text = EDITABLE_SEARCH_INPUT_COPY[normalizedLocale][key] ?? EDITABLE_SEARCH_INPUT_COPY.en[key];
+  for (const [name, value] of Object.entries(params)) text = text.replace(`{${name}}`, String(value));
+  return text;
+}
+
 /**
- * @param {{ draft?: unknown }} input
+ * @param {{ draft?: unknown; locale?: string }} input
  */
-export function buildSearchInputFromEditablePlan({ draft } = {}) {
+export function buildSearchInputFromEditablePlan({ draft, locale = "en" } = {}) {
+  const normalizedLocale = locale === "zh" ? "zh" : "en";
   const normalized = normalizeTalentSearchResult(draft);
   const plan = normalized.search_plan;
   const sources = buildSourceQueryPlan(normalized);
+  const emptyValue = editableSearchInputCopy(normalizedLocale, "notSpecified");
   return [
-    "Editable Search Plan for SignalHire.",
-    `Original search brief: ${normalized.search_brief.original_query}`,
-    `Must-have: ${plan.must_have.join("; ") || "not specified"}`,
-    `Nice-to-have: ${plan.nice_to_have.join("; ") || "not specified"}`,
-    `Exclude: ${plan.exclusions.join("; ") || "not specified"}`,
-    "Source plan:",
+    editableSearchInputCopy(normalizedLocale, "title"),
+    editableSearchInputCopy(normalizedLocale, "originalBrief", { value: normalized.search_brief.original_query }),
+    editableSearchInputCopy(normalizedLocale, "mustHave", { value: plan.must_have.join("; ") || emptyValue }),
+    editableSearchInputCopy(normalizedLocale, "niceToHave", { value: plan.nice_to_have.join("; ") || emptyValue }),
+    editableSearchInputCopy(normalizedLocale, "exclude", { value: plan.exclusions.join("; ") || emptyValue }),
+    editableSearchInputCopy(normalizedLocale, "sourcePlan"),
     ...sources.map((source) => `- ${source.coverage_group}/${source.source_type}: ${source.query} (${source.reason || source.target})`),
-    "Return the normal SignalHire talent shortlist payload with search_plan, source_execution, coverage_backfill, evidence_graph, talent_map, and candidates.",
+    editableSearchInputCopy(normalizedLocale, "returnPayload"),
   ].join("\n");
 }
 

@@ -228,6 +228,17 @@ test("builds editable search plan draft and compiles it into search input", () =
   assert.match(input, /Return the normal SignalHire talent shortlist payload/);
 });
 
+test("builds Chinese editable search plan input copy", () => {
+  const draft = talentProfile.buildEditableSearchPlanDraft("Find senior LLM inference engineers with vLLM");
+  const input = talentProfile.buildSearchInputFromEditablePlan({ draft, locale: "zh" });
+
+  assert.match(input, /SignalHire 可编辑搜索计划/);
+  assert.match(input, /原始搜索画像：Find senior LLM inference engineers with vLLM/);
+  assert.match(input, /必备条件：/);
+  assert.match(input, /来源计划：/);
+  assert.match(input, /返回标准 SignalHire 人才 shortlist payload/);
+});
+
 test("builds localized editable search plan draft copy", () => {
   const zh = talentProfile.buildEditableSearchPlanDraft("Find senior LLM inference engineers with vLLM");
   assert.equal(zh.search_plan.source_strategy[0].reason, "校验实现能力与工程实践");

@@ -61,7 +61,7 @@ export function buildBackfillSearchInput(input?: { job?: unknown; originalQuery?
 export function buildBackfillMergeSummary(input?: { originalResult?: unknown; backfillResult?: unknown; locale?: "zh" | "en" | string }): BackfillMergeSummary;
 export function mergeBackfillResult(input?: { originalResult?: unknown; backfillResult?: unknown; mergedAt?: string; locale?: "zh" | "en" | string }): BackfillMergedTalentSearchResult;
 export function buildEditableSearchPlanDraft(query: unknown, options?: { locale?: "zh" | "en" | string }): EditableSearchPlanDraft;
-export function buildSearchInputFromEditablePlan(input?: { draft?: unknown }): string;
+export function buildSearchInputFromEditablePlan(input?: { draft?: unknown; locale?: "zh" | "en" | string }): string;
 export function buildFeedbackOptimizedSearchInput(input?: { result?: unknown; feedback?: SearchFeedback }): string;
 export function buildEvidenceCoverage(result: unknown): EvidenceCoverageGroup[];
 export function buildSourceQueryPlan(result: unknown): SourceQueryPlanItem[];
