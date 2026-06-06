@@ -280,25 +280,68 @@ function candidateBackfillSourceTypes(candidate) {
   return Array.from(types).slice(0, 5);
 }
 
-function buildCandidateEvidenceBackfillInput(item) {
+const CANDIDATE_BACKFILL_INPUT_COPY = {
+  zh: {
+    title: "SignalHire 候选人证据补搜。",
+    candidate: "候选人：{value}",
+    role: "角色/背景：{value}",
+    roleUnknown: "角色未知",
+    directions: "AI 方向：{value}",
+    notSpecified: "未指定",
+    quality: "当前证据质量：{value}",
+    qualityUnknown: "未知",
+    gaps: "证据缺口：{value}",
+    defaultGap: "整体证据较弱或交叉验证不足",
+    sourceTypes: "需要检查的来源类型：{value}",
+    goal: "搜索目标：找到具体公开来源，用来确认、反驳或更新该候选人的匹配判断。",
+    prioritize: "优先查找研究、代码、公司/工作经历、公开写作、演讲和个人资料等独立 URL。",
+    returnPayload: "返回聚焦该候选人证据补搜的标准 SignalHire 人才 shortlist payload，不要引用搜索结果页 URL。",
+  },
+  en: {
+    title: "Candidate evidence backfill search for SignalHire.",
+    candidate: "Candidate: {value}",
+    role: "Role/context: {value}",
+    roleUnknown: "role unknown",
+    directions: "AI directions: {value}",
+    notSpecified: "not specified",
+    quality: "Current evidence quality: {value}",
+    qualityUnknown: "unknown",
+    gaps: "Evidence gaps: {value}",
+    defaultGap: "overall evidence is weak or insufficiently cross-validated",
+    sourceTypes: "Source types to check: {value}",
+    goal: "Search goal: find concrete public sources that confirm, contradict, or update this candidate's fit.",
+    prioritize: "Prioritize independent URLs across research, code, company/work history, public writing, talks, and profile sources.",
+    returnPayload: "Return the normal SignalHire talent shortlist payload focused on this candidate evidence backfill. Do not cite search-result URLs.",
+  },
+};
+
+function candidateBackfillInputCopy(locale, key, params = {}) {
+  const normalizedLocale = locale === "en" ? "en" : "zh";
+  let text = CANDIDATE_BACKFILL_INPUT_COPY[normalizedLocale][key] ?? CANDIDATE_BACKFILL_INPUT_COPY.zh[key];
+  for (const [name, value] of Object.entries(params)) text = text.replace(`{${name}}`, String(value));
+  return text;
+}
+
+function buildCandidateEvidenceBackfillInput(item, locale = "zh") {
+  const normalizedLocale = locale === "en" ? "en" : "zh";
   const candidate = isPlainObject(item?.candidate) ? item.candidate : {};
   const name = candidateName(candidate);
-  const subtitle = candidateSubtitle(candidate) || "role unknown";
-  const quality = cleanString(candidate?.evidence_audit?.overall_evidence_quality) || "unknown";
+  const subtitle = candidateSubtitle(candidate) || candidateBackfillInputCopy(normalizedLocale, "roleUnknown");
+  const quality = cleanString(candidate?.evidence_audit?.overall_evidence_quality) || candidateBackfillInputCopy(normalizedLocale, "qualityUnknown");
   const directions = Array.isArray(candidate?.ai_directions) ? candidate.ai_directions.map(cleanString).filter(Boolean).join(", ") : "";
   const gapClaims = candidateEvidenceGapClaims(candidate);
   const sourceTypes = candidateBackfillSourceTypes(candidate);
   return [
-    "Candidate evidence backfill search for SignalHire.",
-    `Candidate: ${name}`,
-    `Role/context: ${subtitle}`,
-    `AI directions: ${directions || "not specified"}`,
-    `Current evidence quality: ${quality}`,
-    `Evidence gaps: ${gapClaims.length ? gapClaims.join("; ") : "overall evidence is weak or insufficiently cross-validated"}`,
-    `Source types to check: ${sourceTypes.join(", ")}`,
-    "Search goal: find concrete public sources that confirm, contradict, or update this candidate's fit.",
-    "Prioritize independent URLs across research, code, company/work history, public writing, talks, and profile sources.",
-    "Return the normal SignalHire talent shortlist payload focused on this candidate evidence backfill. Do not cite search-result URLs.",
+    candidateBackfillInputCopy(normalizedLocale, "title"),
+    candidateBackfillInputCopy(normalizedLocale, "candidate", { value: name }),
+    candidateBackfillInputCopy(normalizedLocale, "role", { value: subtitle }),
+    candidateBackfillInputCopy(normalizedLocale, "directions", { value: directions || candidateBackfillInputCopy(normalizedLocale, "notSpecified") }),
+    candidateBackfillInputCopy(normalizedLocale, "quality", { value: quality }),
+    candidateBackfillInputCopy(normalizedLocale, "gaps", { value: gapClaims.length ? gapClaims.join("; ") : candidateBackfillInputCopy(normalizedLocale, "defaultGap") }),
+    candidateBackfillInputCopy(normalizedLocale, "sourceTypes", { value: sourceTypes.join(", ") }),
+    candidateBackfillInputCopy(normalizedLocale, "goal"),
+    candidateBackfillInputCopy(normalizedLocale, "prioritize"),
+    candidateBackfillInputCopy(normalizedLocale, "returnPayload"),
   ].join("\n");
 }
 
@@ -355,7 +398,7 @@ export function buildProjectCandidateDecisionQueue({ items = [], locale = "zh" }
       matchScore: Number.isFinite(Number(item.candidate?.match_score)) ? Math.round(Number(item.candidate.match_score)) : null,
       reason: decisionQueueReason(normalizedLocale, key, item),
       canBackfill: key === "needs_evidence",
-      backfillInput: key === "needs_evidence" ? buildCandidateEvidenceBackfillInput(item) : "",
+      backfillInput: key === "needs_evidence" ? buildCandidateEvidenceBackfillInput(item, normalizedLocale) : "",
     });
   }
 

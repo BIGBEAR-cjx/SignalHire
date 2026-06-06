@@ -320,7 +320,9 @@ test("builds project candidate decision queues from status and evidence risk", (
   ]);
   assert.match(zh.columns[2].items[0].reason, /证据/);
   assert.equal(zh.columns[2].items[0].canBackfill, true);
-  assert.match(zh.columns[2].items[0].backfillInput, /Candidate evidence backfill search for SignalHire/);
+  assert.match(zh.columns[2].items[0].backfillInput, /SignalHire 候选人证据补搜/);
+  assert.match(zh.columns[2].items[0].backfillInput, /候选人：Grace/);
+  assert.match(zh.columns[2].items[0].backfillInput, /搜索目标：找到具体公开来源/);
   assert.match(zh.columns[2].items[0].backfillInput, /Grace/);
   assert.match(zh.columns[2].items[0].backfillInput, /Built agent infra/);
   assert.equal(zh.columns[0].items[0].canBackfill, false);
@@ -363,7 +365,7 @@ test("builds a project action brief from candidate queues", () => {
   assert.equal(zh.primaryAction.key, "needs_evidence");
   assert.equal(zh.primaryAction.label, "先补证据");
   assert.match(zh.primaryAction.detail, /Grace/);
-  assert.match(zh.primaryAction.backfillInput, /Candidate evidence backfill search for SignalHire/);
+  assert.match(zh.primaryAction.backfillInput, /SignalHire 候选人证据补搜/);
   assert.match(zh.primaryAction.backfillInput, /Grace/);
   assert.deepEqual(
     zh.actions.map((action) => [action.key, action.count, action.label, Boolean(action.backfillInput)]),
