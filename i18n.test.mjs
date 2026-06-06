@@ -124,6 +124,27 @@ test("translates result verdict and source labels", () => {
   }
 });
 
+test("translates result delivery summary labels", () => {
+  const keys = [
+    ["result.deliveryTitle", "交付报告摘要", "Delivery summary"],
+    ["result.deliveryBadge", "招聘候选名单", "Recruiting shortlist"],
+    ["result.candidates", "候选人", "Candidates"],
+    ["result.strongRecommendations", "3 位强推荐", "3 strong recommendations", { count: 3 }, { count: 3 }],
+    ["result.averageMatch", "平均匹配分", "Average match"],
+    ["result.strongEvidenceCandidates", "证据强候选人", "Strong-evidence candidates"],
+    ["result.sourceCoverage", "信息源覆盖", "Source coverage"],
+    ["result.priorityReview", "优先审阅候选人", "Priority review candidates"],
+    ["result.sourcesShort", "信源", "sources"],
+    ["result.deliveryRisks", "交付风险", "Delivery risks"],
+    ["result.nextSteps", "建议下一步", "Suggested next steps"],
+  ];
+
+  for (const [key, zh, en, zhParams, enParams] of keys) {
+    assert.equal(t("zh", key, zhParams), zh);
+    assert.equal(t("en", key, enParams), en);
+  }
+});
+
 test("translates project detail status labels", () => {
   const keys = [
     ["projects.detail.status.open", "进行中", "Open"],

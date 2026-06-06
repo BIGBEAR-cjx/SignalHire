@@ -85,17 +85,6 @@ const RESULT_COPY = {
     evidenceStrong: "证据强",
     evidenceMedium: "证据中等",
     evidenceWeak: "证据弱",
-    deliveryTitle: "交付报告摘要",
-    deliveryBadge: "招聘候选名单",
-    candidates: "候选人",
-    strongRecommendations: "{count} 位强推荐",
-    averageMatch: "平均匹配分",
-    strongEvidenceCandidates: "证据强候选人",
-    sourceCoverage: "信息源覆盖",
-    priorityReview: "优先审阅候选人",
-    sourcesShort: "信源",
-    deliveryRisks: "交付风险",
-    nextSteps: "建议下一步",
     searchPlanTitle: "搜索计划",
     searchPlanDesc: "系统如何拆解岗位画像、选择来源并扩展相邻人才池。",
     mustHave: "必须条件",
@@ -192,17 +181,6 @@ const RESULT_COPY = {
     evidenceStrong: "Strong evidence",
     evidenceMedium: "Moderate evidence",
     evidenceWeak: "Weak evidence",
-    deliveryTitle: "Delivery summary",
-    deliveryBadge: "Recruiting shortlist",
-    candidates: "Candidates",
-    strongRecommendations: "{count} strong recommendations",
-    averageMatch: "Average match",
-    strongEvidenceCandidates: "Strong-evidence candidates",
-    sourceCoverage: "Source coverage",
-    priorityReview: "Priority review candidates",
-    sourcesShort: "sources",
-    deliveryRisks: "Delivery risks",
-    nextSteps: "Suggested next steps",
     searchPlanTitle: "Search plan",
     searchPlanDesc: "How the system decomposed the role profile, selected sources, and expanded adjacent talent pools.",
     mustHave: "Must-have",
@@ -297,7 +275,24 @@ const RESULT_COPY = {
   },
 } as const;
 
-type SharedResultCopyKey = "unknownCandidate" | "source" | "verified" | "contradicted" | "unverified" | "sourceCountTitle";
+type SharedResultCopyKey =
+  | "unknownCandidate"
+  | "source"
+  | "verified"
+  | "contradicted"
+  | "unverified"
+  | "sourceCountTitle"
+  | "deliveryTitle"
+  | "deliveryBadge"
+  | "candidates"
+  | "strongRecommendations"
+  | "averageMatch"
+  | "strongEvidenceCandidates"
+  | "sourceCoverage"
+  | "priorityReview"
+  | "sourcesShort"
+  | "deliveryRisks"
+  | "nextSteps";
 type ResultCopyKey = keyof typeof RESULT_COPY.zh | SharedResultCopyKey;
 
 function resultCopy(locale: Locale | undefined, key: ResultCopyKey, params: Record<string, string | number> = {}) {
