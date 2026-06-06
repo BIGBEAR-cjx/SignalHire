@@ -85,22 +85,6 @@ const RESULT_COPY = {
     evidenceStrong: "证据强",
     evidenceMedium: "证据中等",
     evidenceWeak: "证据弱",
-    talentMapTitle: "AI 人才方向分布",
-    talentMapDesc: "按岗位画像识别主匹配、相邻可迁移和高潜力人才池。",
-    people: "人",
-    evidenceCoverageTitle: "信息源覆盖",
-    evidenceCoverageDesc: "按研究、实践、工作经历和公开表达检查交叉验证基础。",
-    missing: "缺",
-    comparisonTitle: "候选人对比",
-    comparisonDesc: "按匹配度、证据强度、能力拆解和主要风险快速排序审阅。",
-    direction: "方向",
-    match: "匹配",
-    achievements: "成果",
-    skills: "技能",
-    workHistory: "经历",
-    sourceTypes: "信源",
-    signalRisk: "主要信号 / 风险",
-    gapPrefix: "缺口",
     viewDetails: "查看详情",
     removeFromPool: "移出候选池",
     addToPool: "加入候选池",
@@ -137,22 +121,6 @@ const RESULT_COPY = {
     evidenceStrong: "Strong evidence",
     evidenceMedium: "Moderate evidence",
     evidenceWeak: "Weak evidence",
-    talentMapTitle: "AI talent map",
-    talentMapDesc: "Groups candidates by primary fit, adjacent transferability, and high-potential talent pools.",
-    people: "people",
-    evidenceCoverageTitle: "Source coverage",
-    evidenceCoverageDesc: "Checks the cross-validation base across research, practice, work history, and public voice.",
-    missing: "Missing",
-    comparisonTitle: "Candidate comparison",
-    comparisonDesc: "Quickly rank candidates by match, evidence strength, capability breakdown, and primary risks.",
-    direction: "Direction",
-    match: "Match",
-    achievements: "Achievements",
-    skills: "Skills",
-    workHistory: "Work history",
-    sourceTypes: "Sources",
-    signalRisk: "Key signal / risk",
-    gapPrefix: "Gap",
     viewDetails: "View details",
     removeFromPool: "Remove from pool",
     addToPool: "Add to pool",
@@ -245,7 +213,23 @@ type SharedResultCopyKey =
   | "backfillNewCandidates"
   | "mergedBack"
   | "merging"
-  | "mergeBack";
+  | "mergeBack"
+  | "talentMapTitle"
+  | "talentMapDesc"
+  | "people"
+  | "evidenceCoverageTitle"
+  | "evidenceCoverageDesc"
+  | "missing"
+  | "comparisonTitle"
+  | "comparisonDesc"
+  | "direction"
+  | "match"
+  | "achievements"
+  | "skills"
+  | "workHistory"
+  | "sourceTypes"
+  | "signalRisk"
+  | "gapPrefix";
 type ResultCopyKey = keyof typeof RESULT_COPY.zh | SharedResultCopyKey;
 
 function resultCopy(locale: Locale | undefined, key: ResultCopyKey, params: Record<string, string | number> = {}) {

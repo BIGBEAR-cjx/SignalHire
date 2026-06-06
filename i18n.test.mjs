@@ -216,6 +216,32 @@ test("translates result backfill labels", () => {
   }
 });
 
+test("translates result talent map and comparison labels", () => {
+  const keys = [
+    ["result.talentMapTitle", "AI 人才方向分布", "AI talent map"],
+    ["result.talentMapDesc", "按岗位画像识别主匹配、相邻可迁移和高潜力人才池。", "Groups candidates by primary fit, adjacent transferability, and high-potential talent pools."],
+    ["result.people", "人", "people"],
+    ["result.evidenceCoverageTitle", "信息源覆盖", "Source coverage"],
+    ["result.evidenceCoverageDesc", "按研究、实践、工作经历和公开表达检查交叉验证基础。", "Checks the cross-validation base across research, practice, work history, and public voice."],
+    ["result.missing", "缺", "Missing"],
+    ["result.comparisonTitle", "候选人对比", "Candidate comparison"],
+    ["result.comparisonDesc", "按匹配度、证据强度、能力拆解和主要风险快速排序审阅。", "Quickly rank candidates by match, evidence strength, capability breakdown, and primary risks."],
+    ["result.direction", "方向", "Direction"],
+    ["result.match", "匹配", "Match"],
+    ["result.achievements", "成果", "Achievements"],
+    ["result.skills", "技能", "Skills"],
+    ["result.workHistory", "经历", "Work history"],
+    ["result.sourceTypes", "信源", "Sources"],
+    ["result.signalRisk", "主要信号 / 风险", "Key signal / risk"],
+    ["result.gapPrefix", "缺口", "Gap"],
+  ];
+
+  for (const [key, zh, en] of keys) {
+    assert.equal(t("zh", key), zh);
+    assert.equal(t("en", key), en);
+  }
+});
+
 test("translates project detail status labels", () => {
   const keys = [
     ["projects.detail.status.open", "进行中", "Open"],
