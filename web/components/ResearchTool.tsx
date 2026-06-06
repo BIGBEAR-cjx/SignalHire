@@ -284,7 +284,7 @@ export default function ResearchTool({
         return;
       }
       try {
-        const r = await fetch(`/api/status?id=${jobId}`);
+        const r = await fetch(`/api/status?id=${encodeURIComponent(jobId)}&locale=${locale}`);
         const j: StatusResponse = await r.json();
         if (token !== runTokenRef.current) return;
         pollFailures = 0;
@@ -534,7 +534,7 @@ export default function ResearchTool({
       const res = await fetch("/api/retry", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id: currentJobId }),
+        body: JSON.stringify({ id: currentJobId, locale }),
       });
       const j: StatusResponse & { retried?: boolean } = await res.json().catch(() => ({}));
       if (!res.ok) { setError(j.error || `HTTP ${res.status}`); setLoading(false); return; }

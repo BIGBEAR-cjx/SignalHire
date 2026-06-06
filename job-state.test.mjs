@@ -158,6 +158,47 @@ test("describes user-visible status for polling UI", () => {
   );
 });
 
+test("describes user-visible status in English when requested", () => {
+  assert.deepEqual(describeJobStatus({ status: "queued" }, "en"), {
+    phase: "queued",
+    label: "Queued for research",
+    detail: "Waiting for a worker to pick up the job.",
+    canRetry: false,
+  });
+  assert.deepEqual(describeJobStatus({ status: "running" }, "en"), {
+    phase: "running",
+    label: "Searching, reading, and verifying",
+    detail: "The worker is searching the web, reading pages, and cross-checking evidence.",
+    canRetry: false,
+  });
+  assert.deepEqual(
+    describeJobStatus({
+      status: "retrying",
+      attempt_count: 2,
+      max_attempts: 3,
+      last_error: "HTTP 502",
+    }, "en"),
+    {
+      phase: "retrying",
+      label: "Retrying research",
+      detail: "Last failure: HTTP 502. Preparing attempt 3/3.",
+      canRetry: false,
+    },
+  );
+  assert.deepEqual(describeJobStatus({ status: "done" }, "en"), {
+    phase: "done",
+    label: "Research complete",
+    detail: "The report is ready.",
+    canRetry: false,
+  });
+  assert.deepEqual(describeJobStatus({ status: "canceled" }, "en"), {
+    phase: "canceled",
+    label: "Search stopped",
+    detail: "You stopped this search. Adjust the brief and run again.",
+    canRetry: false,
+  });
+});
+
 test("documents the stale threshold used by web and worker", () => {
   assert.equal(STALE_AFTER_MS, 10 * 60 * 1000);
 });

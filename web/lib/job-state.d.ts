@@ -32,4 +32,4 @@ export function buildRetryUpdate(now?: Date): Record<string, unknown>;
 export function buildCancelUpdate(now?: Date): Record<string, unknown>;
 export function buildStaleRecoveryUpdate(row: unknown, now?: Date): Record<string, unknown>;
 export function buildQueueRetryUpdate(row: unknown, now?: Date): Record<string, unknown>;
-export function describeJobStatus(row: unknown): JobStatusView;
+export function describeJobStatus(row: unknown, locale?: "zh" | "en" | string): JobStatusView;

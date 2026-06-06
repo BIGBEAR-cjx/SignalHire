@@ -365,7 +365,7 @@ export async function enqueue(input: {
 
 // 前端轮询: 按 id 取任务状态/进度/结果。
 // 多租户: 必须传 userId, 不属于该用户的 row 当作不存在 (返 null)。
-export async function getStatus(id: string, userId: string): Promise<RunStatus | null> {
+export async function getStatus(id: string, userId: string, locale?: string): Promise<RunStatus | null> {
   if (!client) return null;
   try {
     const { data, error } = await client.database
@@ -394,7 +394,7 @@ export async function getStatus(id: string, userId: string): Promise<RunStatus |
       finished_at: r.finished_at ?? null,
       updated_at: r.updated_at ?? null,
     };
-    return { ...normalized, status_view: describeJobStatus(normalized) as RunStatus["status_view"] };
+    return { ...normalized, status_view: describeJobStatus(normalized, locale) as RunStatus["status_view"] };
   } catch {
     return null;
   }
@@ -523,10 +523,10 @@ export async function saveSearchFeedback(input: {
 
 // 手动重试失败任务: 只允许 error 行重新入队。返回最新状态供前端继续轮询。
 // 多租户: 不属于该用户的行不允许 retry。
-export async function retryRun(id: string, userId: string): Promise<RunStatus | null> {
+export async function retryRun(id: string, userId: string, locale?: string): Promise<RunStatus | null> {
   if (!client) return null;
   try {
-    const current = await getStatus(id, userId);
+    const current = await getStatus(id, userId, locale);
     if (!current || current.status !== "error") return current;
     const { data, error } = await client.database
       .from(TABLE)
@@ -536,7 +536,7 @@ export async function retryRun(id: string, userId: string): Promise<RunStatus | 
       .eq("status", "error")
       .select("id");
     if (error || !data || data.length === 0) return null;
-    return await getStatus(id, userId);
+    return await getStatus(id, userId, locale);
   } catch {
     return null;
   }

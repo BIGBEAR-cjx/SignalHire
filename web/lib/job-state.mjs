@@ -1,3 +1,5 @@
+import { t as translate } from "./i18n.mjs";
+
 export const DEFAULT_MAX_ATTEMPTS = 3;
 export const STALE_AFTER_MS = 10 * 60 * 1000;
 
@@ -18,6 +20,14 @@ function dateMs(value) {
   if (!value) return null;
   const ms = new Date(value).getTime();
   return Number.isFinite(ms) ? ms : null;
+}
+
+function normalizeLocale(locale) {
+  return locale === "en" ? "en" : "zh";
+}
+
+function msg(locale, key, params) {
+  return translate(locale, key, params);
 }
 
 export function errorMessage(error) {
@@ -121,7 +131,8 @@ export function buildQueueRetryUpdate(row, now = new Date()) {
   };
 }
 
-export function describeJobStatus(row) {
+export function describeJobStatus(row, locale = "zh") {
+  const normalizedLocale = normalizeLocale(locale);
   const status = row?.status || RUN_STATUSES.QUEUED;
   const attempts = attemptCount(row);
   const max = maxAttempts(row);
@@ -130,47 +141,51 @@ export function describeJobStatus(row) {
   if (status === RUN_STATUSES.RUNNING) {
     return {
       phase: "running",
-      label: "正在全网搜索/抓取/核验",
-      detail: "Worker 正在搜索网页、抓取页面并交叉核验证据。",
+      label: msg(normalizedLocale, "job.status.running.label"),
+      detail: msg(normalizedLocale, "job.status.running.detail"),
       canRetry: false,
     };
   }
   if (status === RUN_STATUSES.RETRYING) {
     return {
       phase: "retrying",
-      label: "正在重试",
-      detail: `上次失败: ${last || "研究连接中断"}。正在准备第 ${Math.min(attempts + 1, max)}/${max} 次尝试。`,
+      label: msg(normalizedLocale, "job.status.retrying.label"),
+      detail: msg(normalizedLocale, "job.status.retrying.detail", {
+        last: last || msg(normalizedLocale, "job.status.retrying.fallback"),
+        attempt: Math.min(attempts + 1, max),
+        max,
+      }),
       canRetry: false,
     };
   }
   if (status === RUN_STATUSES.DONE) {
     return {
       phase: "done",
-      label: "研究完成",
-      detail: "报告已生成。",
+      label: msg(normalizedLocale, "job.status.done.label"),
+      detail: msg(normalizedLocale, "job.status.done.detail"),
       canRetry: false,
     };
   }
   if (status === RUN_STATUSES.ERROR) {
     return {
       phase: "error",
-      label: "研究失败",
-      detail: String(row?.error || row?.last_error || "研究多次失败，请重新研究。"),
+      label: msg(normalizedLocale, "job.status.error.label"),
+      detail: String(row?.error || row?.last_error || msg(normalizedLocale, "job.status.error.detail")),
       canRetry: true,
     };
   }
   if (status === RUN_STATUSES.CANCELED) {
     return {
       phase: "canceled",
-      label: "搜索已停止",
-      detail: "你已停止本次搜索。可以调整条件后重新搜索。",
+      label: msg(normalizedLocale, "job.status.canceled.label"),
+      detail: msg(normalizedLocale, "job.status.canceled.detail"),
       canRetry: false,
     };
   }
   return {
     phase: "queued",
-    label: "已进入研究队列",
-    detail: "等待 worker 认领任务。",
+    label: msg(normalizedLocale, "job.status.queued.label"),
+    detail: msg(normalizedLocale, "job.status.queued.detail"),
     canRetry: false,
   };
 }

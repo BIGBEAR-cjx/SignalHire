@@ -9,10 +9,12 @@ export async function GET(req: Request) {
   const user = await getUser();
   if (!user) return Response.json({ error: "请先登录" }, { status: 401 });
 
-  const id = new URL(req.url).searchParams.get("id");
+  const params = new URL(req.url).searchParams;
+  const id = params.get("id");
+  const locale = params.get("locale") || undefined;
   if (!id) return Response.json({ error: "缺少 id" }, { status: 400 });
 
-  const s = await getStatus(id, user.id);
+  const s = await getStatus(id, user.id, locale);
   if (!s) return Response.json({ status: "unknown" }, { status: 404 });
   return Response.json({ runId: id, ...s });
 }
