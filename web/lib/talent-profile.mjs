@@ -954,6 +954,15 @@ function candidateDisplayName(value, locale) {
   return name;
 }
 
+function evidenceQualityDisplay(value, locale) {
+  const quality = cleanString(value).toLowerCase();
+  const normalizedQuality = EVIDENCE_QUALITY.includes(quality) ? quality : "medium";
+  const labels = locale === "en"
+    ? { high: "High", medium: "Medium", low: "Low" }
+    : { high: "强", medium: "中", low: "弱" };
+  return labels[normalizedQuality];
+}
+
 /**
  * @param {{ result?: unknown; candidate?: unknown; locale?: "zh" | "en" }} input
  */
@@ -1005,7 +1014,7 @@ export function buildCandidateReadingSummary({ result, candidate, locale = "zh" 
           verified: audit.verified_count,
           unverified: audit.unverified_count,
           contradicted: audit.contradicted_count,
-          quality: audit.overall_evidence_quality,
+          quality: evidenceQualityDisplay(audit.overall_evidence_quality, normalizedLocale),
         }),
       },
       {
@@ -1124,6 +1133,7 @@ export function buildCandidateEvidenceDossier({ result, candidate, locale = "zh"
     || cleanStringArray(audit.unverified_claims, 1)[0]
     || "";
   const quality = audit.overall_evidence_quality || "medium";
+  const qualityLabel = evidenceQualityDisplay(quality, locale);
   const signalText = topSignal ? dossierCopy(locale, "signalPrefix", { signal: topSignal }) : "";
   const evidenceGroups = buildDossierEvidenceGroups({ audit, claims: selected?.claims, locale });
   const verificationGaps = evidenceGroups
@@ -1143,7 +1153,7 @@ export function buildCandidateEvidenceDossier({ result, candidate, locale = "zh"
       role,
       signal: signalText,
       sources: audit.independent_sources,
-      quality,
+      quality: qualityLabel,
     }),
     risk_summary: risk ? dossierCopy(locale, "riskPrefix", { risk }) : dossierCopy(locale, "noMaterialRisk"),
     verdict_summary: dossierCopy(locale, "verdictSummary", {
@@ -1154,7 +1164,7 @@ export function buildCandidateEvidenceDossier({ result, candidate, locale = "zh"
     metrics: [
       { label: dossierCopy(locale, "match"), value: String(score) },
       { label: dossierCopy(locale, "sources"), value: String(audit.independent_sources) },
-      { label: dossierCopy(locale, "quality"), value: quality },
+      { label: dossierCopy(locale, "quality"), value: qualityLabel },
     ],
     source_types: audit.source_types,
     primary_evidence: audit.strongest_evidence.slice(0, 3),

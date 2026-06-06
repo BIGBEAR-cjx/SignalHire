@@ -476,6 +476,10 @@ test("builds localized candidate evidence dossier for result review", () => {
   assert.match(zh.conclusion, /强匹配/);
   assert.equal(zh.metrics[0].label, "匹配分");
   assert.equal(zh.metrics[0].value, "91");
+  assert.equal(zh.metrics[2].label, "证据质量");
+  assert.equal(zh.metrics[2].value, "强");
+  assert.match(zh.conclusion, /强 证据质量/);
+  assert.doesNotMatch(zh.conclusion, /high 证据质量/);
   assert.deepEqual(zh.source_types, ["code", "paper", "company"]);
   assert.equal(zh.primary_evidence[0], "Public serving repository and paper cite the same inference work.");
   assert.match(zh.risk_summary, /Availability is single-source/);
@@ -505,6 +509,7 @@ test("builds localized candidate evidence dossier for result review", () => {
   assert.match(en.conclusion, /strong match/);
   assert.equal(en.metrics[1].label, "Independent sources");
   assert.equal(en.metrics[1].value, "4");
+  assert.equal(en.metrics[2].value, "High");
   assert.match(en.verdict_summary, /1 verified/);
   assert.equal(en.evidence_groups[0].label, "Research");
   assert.ok(en.verification_gaps.some((gap) => /Public voice evidence is missing/.test(gap)));
@@ -666,6 +671,8 @@ test("builds localized candidate reading summary before raw evidence", () => {
   assert.equal(zh.sections[2].label, "证据可信度");
   assert.match(zh.sections[2].body, /4 个独立信源/);
   assert.match(zh.sections[2].body, /1 条已验证/);
+  assert.match(zh.sections[2].body, /整体证据质量为 强/);
+  assert.doesNotMatch(zh.sections[2].body, /整体证据质量为 high/);
   assert.equal(zh.sections[3].label, "风险与下一步");
   assert.match(zh.sections[3].body, /Availability is single-source/);
   assert.match(zh.sections[3].body, /人工复核/);
@@ -676,6 +683,7 @@ test("builds localized candidate reading summary before raw evidence", () => {
   assert.match(en.sections[0].body, /strong recommendation/);
   assert.equal(en.sections[2].label, "Evidence confidence");
   assert.match(en.sections[2].body, /4 independent sources/);
+  assert.match(en.sections[2].body, /overall evidence quality is High/);
   assert.match(en.sections[3].body, /Human review/);
 });
 
