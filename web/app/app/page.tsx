@@ -269,9 +269,9 @@ export default function Overview() {
       {/* 空状态 onboarding */}
       {empty && (
         <EmptyState
-          title="开始第一轮 AI 人才搜索"
-          description="创建项目或直接描述人才画像，SignalHire 会生成候选名单、证据摘要和下一轮优化建议。"
-          action={<PrimaryAction href="/app/search">开始搜人</PrimaryAction>}
+          title={t("overview.emptyTitle")}
+          description={t("overview.emptyDesc")}
+          action={<PrimaryAction href="/app/search">{t("overview.emptyAction")}</PrimaryAction>}
         />
       )}
     </div>

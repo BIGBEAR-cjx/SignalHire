@@ -179,3 +179,16 @@ test("translates projects fallback labels", () => {
   assert.equal(t("zh", "projects.loadFailed"), "加载失败");
   assert.equal(t("en", "projects.loadFailed"), "Failed to load projects");
 });
+
+test("translates overview empty onboarding labels", () => {
+  const keys = [
+    ["overview.emptyTitle", "开始第一轮 AI 人才搜索", "Start your first AI talent search"],
+    ["overview.emptyDesc", "创建项目或直接描述人才画像，SignalHire 会生成候选名单、证据摘要和下一轮优化建议。", "Create a project or describe the talent profile directly. SignalHire will generate a shortlist, evidence summary, and next-round recommendations."],
+    ["overview.emptyAction", "开始搜人", "Start search"],
+  ];
+
+  for (const [key, zh, en] of keys) {
+    assert.equal(t("zh", key), zh);
+    assert.equal(t("en", key), en);
+  }
+});
