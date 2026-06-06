@@ -52,13 +52,13 @@ export default function ProjectsPage() {
     try {
       const r = await fetch("/api/projects");
       const j = await r.json();
-      if (!r.ok) throw new Error(j.error || "加载失败");
+      if (!r.ok) throw new Error(j.error || t("projects.loadFailed"));
       setProjects((j.projects ?? []) as ProjectKpi[]);
       setError("");
     } catch (e) {
       setError((e as Error).message);
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => { void reload(); }, [reload]); // eslint-disable-line react-hooks/set-state-in-effect
 

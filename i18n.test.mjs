@@ -174,3 +174,8 @@ test("translates shortlist fallback labels", () => {
   assert.equal(t("zh", "shortlist.loadFailed"), "加载失败");
   assert.equal(t("en", "shortlist.loadFailed"), "Failed to load shortlist");
 });
+
+test("translates projects fallback labels", () => {
+  assert.equal(t("zh", "projects.loadFailed"), "加载失败");
+  assert.equal(t("en", "projects.loadFailed"), "Failed to load projects");
+});
