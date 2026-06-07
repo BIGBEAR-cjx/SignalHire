@@ -27,6 +27,8 @@ last_verify_content.txt
 .agents/
 .claude/
 .impeccable/live/
+.playwright-cli/
+.superpowers/
 
 # 第三方参考克隆 (不用其代码, 保留本地参考, 不提交到 repo)
 deep-research/

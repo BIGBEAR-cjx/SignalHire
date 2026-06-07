@@ -36,7 +36,7 @@ test("translates project evidence matrix labels", () => {
     ["projects.evidenceMatrix.column.status", "状态", "Status"],
     ["projects.evidenceMatrix.column.match", "匹配", "Match"],
     ["projects.evidenceMatrix.column.evidence", "证据", "Evidence"],
-    ["projects.evidenceMatrix.column.sources", "信源", "Sources"],
+    ["projects.evidenceMatrix.column.sources", "来源", "Sources"],
     ["projects.evidenceMatrix.column.checks", "核验", "Checks"],
     ["projects.evidenceMatrix.column.priority", "优先级", "Priority"],
     ["projects.evidenceMatrix.column.next", "下一步", "Next step"],
@@ -147,14 +147,14 @@ test("translates research progress labels", () => {
 test("translates source quality labels", () => {
   const keys = [
     ["sourceQuality.strong.label", "证据较厚", "Strong evidence"],
-    ["sourceQuality.strong.hint", "多数声称有多个独立信源支撑", "Most claims are supported by multiple independent sources"],
+    ["sourceQuality.strong.hint", "多数信息有多个独立来源支撑", "Most claims are supported by multiple independent sources"],
     ["sourceQuality.moderate.label", "证据中等", "Moderate evidence"],
-    ["sourceQuality.moderate.hint", "大部分声称有信源, 但密度不高", "Most claims have sources, but the density is limited"],
+    ["sourceQuality.moderate.hint", "大部分信息有来源, 但密度不高", "Most claims have sources, but the density is limited"],
     ["sourceQuality.thin.label", "证据偏薄", "Thin evidence"],
-    ["sourceQuality.thin.hint", "信源稀疏, 谨慎做决策依据", "Sources are sparse; use caution before making decisions"],
+    ["sourceQuality.thin.hint", "来源稀疏, 谨慎做决策依据", "Sources are sparse; use caution before making decisions"],
     ["sourceQuality.sourceCount.none", "无来源", "No sources"],
-    ["sourceQuality.sourceCount.one", "1 处独立信源", "1 independent source", { count: 1 }, { count: 1 }],
-    ["sourceQuality.sourceCount.many", "2 处独立信源", "2 independent sources", { count: 2 }, { count: 2 }],
+    ["sourceQuality.sourceCount.one", "1 处独立来源", "1 independent source", { count: 1 }, { count: 1 }],
+    ["sourceQuality.sourceCount.many", "2 处独立来源", "2 independent sources", { count: 2 }, { count: 2 }],
   ];
 
   for (const [key, zh, en, zhParams, enParams] of keys) {
@@ -170,7 +170,7 @@ test("translates result verdict and source labels", () => {
     ["result.verified", "已验证", "Verified"],
     ["result.contradicted", "矛盾", "Contradicted"],
     ["result.unverified", "查无实据", "No evidence found"],
-    ["result.sourceCountTitle", "覆盖该声称的不同域名数 (越多越可靠)", "Number of distinct domains covering this claim (more is stronger)"],
+    ["result.sourceCountTitle", "覆盖该信息的不同域名数 (越多越可靠)", "Number of distinct domains covering this claim (more is stronger)"],
   ];
 
   for (const [key, zh, en] of keys) {
@@ -189,7 +189,7 @@ test("translates result delivery summary labels", () => {
     ["result.strongEvidenceCandidates", "证据强候选人", "Strong-evidence candidates"],
     ["result.sourceCoverage", "信息源覆盖", "Source coverage"],
     ["result.priorityReview", "优先审阅候选人", "Priority review candidates"],
-    ["result.sourcesShort", "信源", "sources"],
+    ["result.sourcesShort", "来源", "sources"],
     ["result.deliveryRisks", "交付风险", "Delivery risks"],
     ["result.nextSteps", "建议下一步", "Suggested next steps"],
   ];
@@ -277,7 +277,7 @@ test("translates result talent map and comparison labels", () => {
     ["result.talentMapDesc", "按岗位画像识别主匹配、相邻可迁移和高潜力人才池。", "Groups candidates by primary fit, adjacent transferability, and high-potential talent pools."],
     ["result.people", "人", "people"],
     ["result.evidenceCoverageTitle", "信息源覆盖", "Source coverage"],
-    ["result.evidenceCoverageDesc", "按研究、实践、工作经历和公开表达检查交叉验证基础。", "Checks the cross-validation base across research, practice, work history, and public voice."],
+    ["result.evidenceCoverageDesc", "按研究、实践、工作经历和公开表达检查核对基础。", "Checks the cross-validation base across research, practice, work history, and public voice."],
     ["result.missing", "缺", "Missing"],
     ["result.comparisonTitle", "候选人对比", "Candidate comparison"],
     ["result.comparisonDesc", "按匹配度、证据强度、能力拆解和主要风险快速排序审阅。", "Quickly rank candidates by match, evidence strength, capability breakdown, and primary risks."],
@@ -286,7 +286,7 @@ test("translates result talent map and comparison labels", () => {
     ["result.achievements", "成果", "Achievements"],
     ["result.skills", "技能", "Skills"],
     ["result.workHistory", "经历", "Work history"],
-    ["result.sourceTypes", "信源", "Sources"],
+    ["result.sourceTypes", "来源", "Sources"],
     ["result.signalRisk", "主要信号 / 风险", "Key signal / risk"],
     ["result.gapPrefix", "缺口", "Gap"],
   ];
@@ -302,12 +302,12 @@ test("translates result evidence audit labels", () => {
     ["result.viewDetails", "查看详情", "View details"],
     ["result.removeFromPool", "移出候选池", "Remove from pool"],
     ["result.addToPool", "加入候选池", "Add to pool"],
-    ["result.claim", "声称", "Claim"],
+    ["result.claim", "信息", "Claim"],
     ["result.auditTitle", "证据审计", "Evidence audit"],
     ["result.dossierCoverage", "证据覆盖", "Evidence coverage"],
     ["result.verificationGaps", "待补验证", "Verification gaps"],
-    ["result.independentSources", "2 个独立信源", "2 independent sources", { count: 2 }, { count: 2 }],
-    ["result.singleSourceClaims", "单源声称", "Single-source claims"],
+    ["result.independentSources", "2 个独立来源", "2 independent sources", { count: 2 }, { count: 2 }],
+    ["result.singleSourceClaims", "单来源信息", "Single-source claims"],
     ["result.identityRisk", "身份风险", "Identity risk"],
     ["result.recencyNotes", "时效说明", "Recency notes"],
     ["result.none", "无", "None"],
@@ -335,14 +335,14 @@ test("translates result trust and caveat labels", () => {
     ["result.high", "高", "High"],
     ["result.medium", "中", "Medium"],
     ["result.low", "低", "Low"],
-    ["result.redFlags", "红旗", "Red flags"],
-    ["result.reportBasedOn", "报告基于 2 个独立信源", "Based on 2 independent sources", { count: 2 }, { count: 2 }],
+    ["result.redFlags", "需要复核", "Red flags"],
+    ["result.reportBasedOn", "报告基于 2 个独立来源", "Based on 2 independent sources", { count: 2 }, { count: 2 }],
     ["result.reportCaveatTitle", "如何解读这份报告 · 局限性", "How to read this report · limitations"],
     ["result.caveat1", "本报告由 AI 自动抓取公开网页生成，不构成对候选人最终判断，仅作为第一道筛查。", "This report is generated by AI from public web pages. It is a first screening aid, not a final judgment on the candidate."],
-    ["result.caveat2", "\"已核实 / 矛盾 / 未核实\"是模型在抓取时的判断，可能存在误判或漏判，关键决策请人工复核每条声称的原始链接。", "\"Verified / contradicted / unverified\" are model judgments at crawl time and may contain false positives or omissions. Review the original links before making important decisions."],
-    ["result.caveat3", "\"独立信源数\"= 该条声称的 evidence 中不同域名数；数越多通常越可靠，但同一来源转发不算独立。", "\"Independent sources\" means distinct domains in the evidence for a claim. More sources usually help, but reposts from one origin are not independent."],
-    ["result.caveat4", "信源时效以抓取时刻为准，公开网页内容可能已经更新，请在做最终决策前点击原链接核对。", "Source freshness is based on crawl time. Public pages may have changed; check the original links before final decisions."],
-    ["result.caveat5", "未发现红旗不代表候选人完全可信；已发现红旗也不代表候选人不可用，可能是同名或信源错误。", "No red flags does not mean the candidate is fully reliable. A red flag does not mean the candidate is unusable; it may come from name ambiguity or source error."],
+    ["result.caveat2", "\"已核实 / 矛盾 / 未核实\"是模型在抓取时的判断，可能存在误判或漏判，关键决策请人工复核每条信息的原始链接。", "\"Verified / contradicted / unverified\" are model judgments at crawl time and may contain false positives or omissions. Review the original links before making important decisions."],
+    ["result.caveat3", "\"独立来源数\"= 该条信息的 evidence 中不同域名数；数越多通常越可靠，但同一来源转发不算独立。", "\"Independent sources\" means distinct domains in the evidence for a claim. More sources usually help, but reposts from one origin are not independent."],
+    ["result.caveat4", "来源时效以抓取时刻为准，公开网页内容可能已经更新，请在做最终决策前点击原链接核对。", "Source freshness is based on crawl time. Public pages may have changed; check the original links before final decisions."],
+    ["result.caveat5", "未发现需要复核的问题不代表候选人完全可信；发现需要复核的问题也不代表候选人不可用，可能是同名或来源错误。", "No red flags does not mean the candidate is fully reliable. A red flag does not mean the candidate is unusable; it may come from name ambiguity or source error."],
   ];
 
   for (const [key, zh, en, zhParams, enParams] of keys) {
