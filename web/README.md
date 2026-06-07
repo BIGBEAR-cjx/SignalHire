@@ -1,36 +1,55 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# SignalHire Web App
 
-## Getting Started
+This directory contains the Next.js App Router frontend and API routes for SignalHire.
 
-First, run the development server:
+## Responsibilities
+
+- Product UI for search, projects, shortlist, history, settings, verification, and public reports.
+- API routes for search, verify, status polling, cancel, retry, feedback, projects, shortlist, history, auth session sync, worker health, and outreach drafts.
+- Domain helpers for MiroMind research, Insforge persistence, localization, evidence quality, research-loop presentation, and talent payload normalization.
+- Scripts for schema checks, live-job smoke tests, retry checks, worker-health checks, and database seeding.
+
+## Quick Start
 
 ```bash
+cp .env.example .env.local
+npm ci
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open http://localhost:3000.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+Cached sample searches can be used without a live worker. Non-cached live research requires Insforge and MiroMind credentials plus a running worker process from `../worker`.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Useful Commands
 
-## Learn More
+```bash
+npm run lint
+npm run build
+npm run verify:schema
+npm run verify:worker-health
+npm run verify:live
+npm run verify:retry
+```
 
-To learn more about Next.js, take a look at the following resources:
+Environment-dependent checks need `.env.local` values. See `../docs/verification.md` for expected outputs and production smoke-test variants.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Key Files
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+| Path | Purpose |
+|------|---------|
+| `app/app/search/page.tsx` | Main search workspace route |
+| `components/ResearchTool.tsx` | Search run orchestration, polling, stop, feedback loop, results |
+| `components/research-workspace.tsx` | Shared panels for input, process, feedback, timelines, errors, sharing |
+| `components/result.tsx` | Evidence-first talent result and public report rendering |
+| `lib/miro.ts` | MiroMind client, prompt, stream handling, output parsing |
+| `lib/db.ts` | Insforge persistence and research queue helpers |
+| `lib/research-loop.mjs` | Testable research-loop, feedback, and project iteration view models |
+| `lib/talent-profile.mjs` | Talent payload normalization and evidence view helpers |
+| `lib/i18n.mjs` | Chinese/English fixed copy |
+| `scripts/` | Production and local verification utilities |
 
-## Deploy on Vercel
+## Production Demo
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- Demo: https://signal-hire-eight.vercel.app
+- Search workspace: https://signal-hire-eight.vercel.app/app/search

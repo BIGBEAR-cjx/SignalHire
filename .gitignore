@@ -23,6 +23,11 @@ last_verify_content.txt
 # 临时
 /tmp_*
 
+# local agent/tooling caches
+.agents/
+.claude/
+.impeccable/live/
+
 # 第三方参考克隆 (不用其代码, 保留本地参考, 不提交到 repo)
 deep-research/
 .gstack/

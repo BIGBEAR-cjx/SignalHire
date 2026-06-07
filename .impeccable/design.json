@@ -1,0 +1,110 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-06-04T00:00:00+08:00",
+  "title": "Design System: SignalHire",
+  "extensions": {
+    "colorMeta": {
+      "canvas": {
+        "role": "neutral",
+        "displayName": "Canvas Gray",
+        "canonical": "#f5f5f7",
+        "tonalRamp": ["#ffffff", "#f5f5f7", "#e8e8ed", "#d2d2d7"]
+      },
+      "ink": {
+        "role": "neutral",
+        "displayName": "Ink Black",
+        "canonical": "#1d1d1f",
+        "tonalRamp": ["#86868b", "#6e6e73", "#424245", "#1d1d1f"]
+      },
+      "primary-blue": {
+        "role": "primary",
+        "displayName": "Action Blue",
+        "canonical": "#0071e3",
+        "tonalRamp": ["#eaf4ff", "#b8dcff", "#0071e3", "#0057b8"]
+      },
+      "verified": {
+        "role": "semantic",
+        "displayName": "Verified Green",
+        "canonical": "#047857",
+        "tonalRamp": ["#ecfdf5", "#a7f3d0", "#047857", "#064e3b"]
+      },
+      "warning": {
+        "role": "semantic",
+        "displayName": "Unverified Amber",
+        "canonical": "#b45309",
+        "tonalRamp": ["#fffbeb", "#fde68a", "#b45309", "#78350f"]
+      },
+      "danger": {
+        "role": "semantic",
+        "displayName": "Contradiction Red",
+        "canonical": "#b91c1c",
+        "tonalRamp": ["#fef2f2", "#fecaca", "#b91c1c", "#7f1d1d"]
+      }
+    },
+    "typographyMeta": {
+      "display": {
+        "displayName": "Display",
+        "purpose": "Landing hero and rare first-screen messages only."
+      },
+      "headline": {
+        "displayName": "Headline",
+        "purpose": "Page introductions and major workspace screens."
+      },
+      "title": {
+        "displayName": "Title",
+        "purpose": "Panel, section, and result-card headings."
+      },
+      "body": {
+        "displayName": "Body",
+        "purpose": "Recruiting explanations, evidence summaries, and supporting copy."
+      },
+      "label": {
+        "displayName": "Label",
+        "purpose": "Buttons, badges, tabs, compact metadata, and field labels."
+      }
+    },
+    "elevation": {
+      "surfaceAmbient": "0 20px 60px rgba(0, 0, 0, 0.05)",
+      "buttonLift": "0 12px 30px rgba(0, 113, 227, 0.24)",
+      "demoSurface": "0 28px 90px rgba(0, 0, 0, 0.10)",
+      "hoverLift": "0 24px 68px rgba(0, 0, 0, 0.10)"
+    },
+    "motion": {
+      "fast": "150ms",
+      "base": "180ms",
+      "entrance": "500ms",
+      "easing": "ease-out",
+      "reducedMotion": "Disable decorative float and fade animations under prefers-reduced-motion."
+    },
+    "breakpoints": {
+      "mobile": "0px",
+      "sm": "640px",
+      "md": "768px",
+      "lg": "1024px"
+    },
+    "componentNotes": {
+      "primaryAction": "Pill button using --sh-blue, white text, 40px minimum height, 600 weight.",
+      "secondaryAction": "Pill button using translucent white fill, hairline border, ink text.",
+      "surface": "24px radius, --sh-line border, --sh-surface fill, ambient shadow, backdrop blur.",
+      "claimBlock": "Full semantic border and subtle semantic background; never a colored side stripe.",
+      "verdictBadge": "Icon plus label with semantic color. Color alone is insufficient."
+    },
+    "narrative": {
+      "northStar": "The Evidence Desk",
+      "register": "product",
+      "antiReferences": [
+        "traditional resume database",
+        "ATS back office",
+        "generic purple-blue SaaS template",
+        "complex BI dashboard"
+      ],
+      "rules": [
+        "Lead with evidence, not volume.",
+        "Use blue for actions and selection only.",
+        "Tie green, amber, and red to evidence states.",
+        "Use full borders instead of side-tab accent borders.",
+        "Make uncertainty visible and useful."
+      ]
+    }
+  }
+}

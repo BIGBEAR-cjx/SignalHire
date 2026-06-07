@@ -2,6 +2,18 @@
 
 ## 静态检查
 
+运行核心 domain/helper 检查：
+
+```bash
+node --test research-loop.test.mjs
+node --test research-progress.test.mjs
+node --test talent-profile.test.mjs
+node --test i18n.test.mjs
+```
+
+期望：全部 pass。它们覆盖实时研究展示、反馈优化预览、项目下一步建议、人才 payload
+normalization，以及中英文固定文案。
+
 运行 web 检查：
 
 ```bash
@@ -10,6 +22,15 @@ npm run lint
 npm run build
 npm run verify:worker-health
 ```
+
+生产 demo 可访问性检查：
+
+```bash
+curl -I -L https://signal-hire-eight.vercel.app
+curl -I -L https://signal-hire-eight.vercel.app/app/search
+```
+
+期望：HTTP 200。
 
 运行 worker 语法检查：
 
