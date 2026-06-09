@@ -34,23 +34,45 @@ function detectFileType(file: File): ResumeFileType {
 }
 
 function normalizeExtractedText(value: string): string {
-  return String(value ?? "")
+  let normalized = String(value ?? "")
     .replace(/\r\n?/g, "\n")
     .split("\n")
     .map((line) => line.replace(/[ \t]+/g, " ").trim())
     .join("\n")
     .replace(/\n{2,}/g, "\n")
     .trim();
+  for (let i = 0; i < 4; i += 1) {
+    normalized = normalized.replace(/([\p{Script=Han}])\s+([\p{Script=Han}])/gu, "$1$2");
+  }
+  return normalized;
 }
 
 async function extractPdf(buffer: Buffer): Promise<string> {
-  const { PDFParse } = await import("pdf-parse");
-  const parser = new PDFParse({ data: buffer });
+  const { getDocument, VerbosityLevel } = await import("pdfjs-dist/legacy/build/pdf.mjs");
+  const loadingTask = getDocument({
+    data: new Uint8Array(buffer),
+    verbosity: VerbosityLevel.ERRORS,
+  });
+  const pdf = await loadingTask.promise;
   try {
-    const data = await parser.getText({ pageJoiner: "\n" });
-    return data.text;
+    const pages: string[] = [];
+    for (let pageNo = 1; pageNo <= pdf.numPages; pageNo += 1) {
+      const page = await pdf.getPage(pageNo);
+      const content = await page.getTextContent();
+      const parts: string[] = [];
+      for (const item of content.items) {
+        if (!("str" in item)) continue;
+        const text = item.str.trim();
+        if (!text) continue;
+        parts.push(text);
+        if (item.hasEOL) parts.push("\n");
+      }
+      pages.push(parts.join(" "));
+      page.cleanup();
+    }
+    return pages.join("\n");
   } finally {
-    await parser.destroy();
+    await pdf.destroy();
   }
 }
 
