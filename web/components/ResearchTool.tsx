@@ -43,6 +43,7 @@ import { buildBackfillMergeSummary, buildEditableSearchPlanDraft, buildFeedbackO
 import type { BackfillMergeSummary, CoverageBackfillJob, TalentCandidate, TalentSearchResult } from "@/lib/talent-profile.mjs";
 import { buildCandidateFeedbackPanel, buildFeedbackOptimizationPreview, buildResearchLoopView, buildSearchConstraintEditor, buildSearchInputFromConstraintEditor } from "@/lib/research-loop.mjs";
 import { buildEvidencePriorityView } from "@/lib/evidence-priority.mjs";
+import { MAX_RESUME_FILE_BYTES, detectSupportedResumeFileType } from "@/lib/resume-upload-constraints.mjs";
 
 type FeedItem = { id: number; kind: "search" | "fetch"; info: string };
 type SearchResult = { candidates?: Candidate[] } | TalentSearchResult;
@@ -427,6 +428,14 @@ export default function ResearchTool({
 
   async function uploadResume(file: File) {
     if (mode !== "verify" || loading || resumeUploading) return;
+    if (!detectSupportedResumeFileType(file.name, file.type)) {
+      setResumeUploadError(t("api.error.resumeUnsupportedType"));
+      return;
+    }
+    if (file.size > MAX_RESUME_FILE_BYTES) {
+      setResumeUploadError(t("api.error.resumeTooLarge"));
+      return;
+    }
     setResumeUploading(true);
     setResumeUploadMessage("");
     setResumeUploadWarning("");
@@ -436,7 +445,7 @@ export default function ResearchTool({
       const form = new FormData();
       form.set("file", file);
       form.set("locale", locale);
-      const res = await fetch("/api/verify/extract", { method: "POST", body: form });
+      const res = await fetch(`/api/verify/extract?locale=${locale}`, { method: "POST", body: form });
       const data: ResumeExtractResponse = await res.json().catch(() => ({}));
       if (!res.ok || !data.text?.trim()) {
         setResumeUploadError(data.error || t("api.error.resumeParseFailed"));

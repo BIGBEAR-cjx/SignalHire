@@ -1,5 +1,10 @@
-export const MAX_RESUME_FILE_BYTES = 8 * 1024 * 1024;
-export const MAX_RESUME_TEXT_CHARS = 20_000;
+import {
+  MAX_RESUME_FILE_BYTES,
+  MAX_RESUME_TEXT_CHARS,
+  detectSupportedResumeFileType,
+} from "./resume-upload-constraints.mjs";
+
+export { MAX_RESUME_FILE_BYTES, MAX_RESUME_TEXT_CHARS };
 
 export type ResumeFileType = "txt" | "pdf" | "docx";
 
@@ -12,31 +17,19 @@ export type ResumeExtractResult = {
 
 export class ResumeExtractError extends Error {
   code: "missing_file" | "too_large" | "unsupported" | "empty" | "parse_failed";
+  cause?: unknown;
 
-  constructor(code: ResumeExtractError["code"], message = code) {
+  constructor(code: ResumeExtractError["code"], message = code, cause?: unknown) {
     super(message);
     this.name = "ResumeExtractError";
     this.code = code;
+    this.cause = cause;
   }
 }
 
-function extensionOf(name: string): string {
-  const clean = name.toLowerCase().split("?")[0]?.split("#")[0] ?? "";
-  const dot = clean.lastIndexOf(".");
-  return dot >= 0 ? clean.slice(dot + 1) : "";
-}
-
 function detectFileType(file: File): ResumeFileType {
-  const ext = extensionOf(file.name);
-  if (ext === "txt") return "txt";
-  if (ext === "pdf") return "pdf";
-  if (ext === "docx") return "docx";
-
-  const mime = file.type.toLowerCase();
-  if (mime === "text/plain") return "txt";
-  if (mime === "application/pdf") return "pdf";
-  if (mime === "application/vnd.openxmlformats-officedocument.wordprocessingml.document") return "docx";
-
+  const fileType = detectSupportedResumeFileType(file.name, file.type);
+  if (fileType) return fileType;
   throw new ResumeExtractError("unsupported");
 }
 
@@ -84,7 +77,7 @@ export async function extractResumeText(file: File | null | undefined): Promise<
     rawText = await extractRawText(file, fileType);
   } catch (error) {
     if (error instanceof ResumeExtractError) throw error;
-    throw new ResumeExtractError("parse_failed");
+    throw new ResumeExtractError("parse_failed", "parse_failed", error);
   }
 
   const normalized = normalizeExtractedText(rawText);
