@@ -53,6 +53,13 @@ type ResearchDoneEvent = { type: "done"; data: AppResult; stats?: RunStats | nul
 type ResearchErrorEvent = { type: "error"; error?: string };
 type ResearchEvent = ResearchStepEvent | ResearchDoneEvent | ResearchErrorEvent;
 type QueueResponse = { queued?: boolean; jobId?: string; error?: string };
+type ResumeExtractResponse = {
+  text?: string;
+  fileName?: string;
+  truncated?: boolean;
+  warning?: string;
+  error?: string;
+};
 type JobStatusView = {
   phase: "queued" | "running" | "retrying" | "done" | "error" | "canceled";
   label: string;
@@ -247,6 +254,10 @@ export default function ResearchTool({
   const [mergedOriginalRunId, setMergedOriginalRunId] = useState<string | null>(null);
   const [editablePlan, setEditablePlan] = useState<EditableSearchPlanDraft | null>(null);
   const [searchFeedback, setSearchFeedback] = useState<SearchFeedbackState>(EMPTY_SEARCH_FEEDBACK);
+  const [resumeUploading, setResumeUploading] = useState(false);
+  const [resumeUploadMessage, setResumeUploadMessage] = useState("");
+  const [resumeUploadWarning, setResumeUploadWarning] = useState("");
+  const [resumeUploadError, setResumeUploadError] = useState("");
   const idRef = useRef(0);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const abortRef = useRef<AbortController | null>(null);
@@ -411,6 +422,35 @@ export default function ResearchTool({
       setLoading(false);
     } finally {
       if (token === runTokenRef.current) abortRef.current = null;
+    }
+  }
+
+  async function uploadResume(file: File) {
+    if (mode !== "verify" || loading || resumeUploading) return;
+    setResumeUploading(true);
+    setResumeUploadMessage("");
+    setResumeUploadWarning("");
+    setResumeUploadError("");
+    setError("");
+    try {
+      const form = new FormData();
+      form.set("file", file);
+      form.set("locale", locale);
+      const res = await fetch("/api/verify/extract", { method: "POST", body: form });
+      const data: ResumeExtractResponse = await res.json().catch(() => ({}));
+      if (!res.ok || !data.text?.trim()) {
+        setResumeUploadError(data.error || t("api.error.resumeParseFailed"));
+        return;
+      }
+      setInput(data.text);
+      setResumeUploadMessage(t("research.resumeUploadSelected", { name: data.fileName || file.name }));
+      setResumeUploadWarning(data.warning || (data.truncated ? t("research.resumeUploadTruncated") : ""));
+      setResumeUploading(false);
+      await run(data.text);
+    } catch {
+      setResumeUploadError(t("api.error.resumeParseFailed"));
+    } finally {
+      setResumeUploading(false);
     }
   }
 
@@ -712,6 +752,11 @@ export default function ResearchTool({
         onRun={() => run()}
         onCreatePlan={isSearch ? createEditablePlan : undefined}
         loading={loading}
+        onResumeUpload={mode === "verify" ? uploadResume : undefined}
+        resumeUploading={resumeUploading}
+        resumeUploadMessage={resumeUploadMessage}
+        resumeUploadWarning={resumeUploadWarning}
+        resumeUploadError={resumeUploadError}
       />
 
       {constraintEditor && constraintEditor.sections.length > 0 && (

@@ -71,6 +71,11 @@ test("translates research fallback error labels", () => {
     ["api.error.missingAccessToken", "缺少 accessToken", "Missing accessToken."],
     ["api.error.missingQuery", "缺少 query", "Missing query."],
     ["api.error.missingBio", "缺少 bio", "Missing bio."],
+    ["api.error.resumeMissingFile", "缺少简历文件", "Missing resume file."],
+    ["api.error.resumeUnsupportedType", "暂不支持这个文件格式，请上传 PDF、DOCX 或 TXT", "Unsupported file type. Upload a PDF, DOCX, or TXT file."],
+    ["api.error.resumeTooLarge", "文件超过 8MB，请压缩后再上传", "File is larger than 8MB. Compress it and upload again."],
+    ["api.error.resumeEmptyText", "没有读取到可核验文字，扫描件或图片简历暂不支持", "No readable text was found. Scanned or image resumes are not supported yet."],
+    ["api.error.resumeParseFailed", "简历读取失败，请换一个文件或直接粘贴文本", "Could not read the resume. Try another file or paste the text directly."],
     ["api.error.queueUnavailableTrySample", "队列暂不可用 (DB 未配置)，请试试示例查询", "Queue is unavailable (DB is not configured). Try a sample query."],
     ["api.error.missingBackfillJob", "缺少补搜任务", "Missing backfill job."],
     ["api.error.queueUnavailableRetry", "队列暂不可用 (DB 未配置)，请稍后重试", "Queue is unavailable (DB is not configured). Try again later."],
@@ -107,6 +112,22 @@ test("translates research fallback error labels", () => {
     ["api.error.shortlistUpdateUnavailable", "更新失败或条目不存在", "Update failed or item was not found."],
     ["api.error.shortlistItemDeleteUnavailable", "删除失败或条目不存在", "Delete failed or item was not found."],
     ["run.label.backfill", "补搜 practice/code", "Backfill practice/code", { coverage: "practice", source: "code" }, { coverage: "practice", source: "code" }],
+  ];
+
+  for (const [key, zh, en, zhParams, enParams] of keys) {
+    assert.equal(t("zh", key, zhParams), zh);
+    assert.equal(t("en", key, enParams), en);
+  }
+});
+
+test("translates resume upload labels", () => {
+  const keys = [
+    ["research.resumeUploadButton", "上传简历", "Upload resume"],
+    ["research.resumeUploadDrop", "拖拽 PDF、DOCX 或 TXT 到这里，上传后会自动开始核验。", "Drop a PDF, DOCX, or TXT here. Verification starts after upload."],
+    ["research.resumeUploadSupported", "支持 PDF / DOCX / TXT，不保存原文件。", "Supports PDF / DOCX / TXT. Original files are not stored."],
+    ["research.resumeUploading", "正在读取简历", "Reading resume"],
+    ["research.resumeUploadTruncated", "简历文字较长，已截取前 20000 字用于核验。", "Resume text is long, so the first 20000 characters will be verified."],
+    ["research.resumeUploadSelected", "已读取 resume.pdf", "Read resume.pdf", { name: "resume.pdf" }, { name: "resume.pdf" }],
   ];
 
   for (const [key, zh, en, zhParams, enParams] of keys) {
