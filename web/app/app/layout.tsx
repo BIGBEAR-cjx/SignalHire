@@ -26,7 +26,7 @@ function isActivePath(currentPath: string, href: string) {
 function Sidebar({ user, currentPath, onLogout }: { user: User; currentPath: string; onLogout: () => void }) {
   const { t } = useI18n();
   return (
-    <aside className="hidden w-[216px] shrink-0 border-r border-black/5 bg-white/72 px-3 py-4 backdrop-blur-2xl md:flex md:flex-col">
+    <aside className="hidden h-screen w-[216px] shrink-0 overflow-y-auto border-r border-black/5 bg-white/72 px-3 py-4 backdrop-blur-2xl md:flex md:flex-col">
       <Link href="/" className="flex items-center gap-2 rounded-2xl px-3 py-2 text-[var(--sh-ink)]">
         <LogoMark className="h-7 w-7" />
         <span className="text-[15px] font-semibold tracking-tight">SignalHire</span>
@@ -84,7 +84,7 @@ function Sidebar({ user, currentPath, onLogout }: { user: User; currentPath: str
 function MobileTopBar({ user, onLogout }: { user: User; onLogout: () => void }) {
   const { t } = useI18n();
   return (
-    <div className="flex items-center justify-between border-b border-black/5 bg-white/80 px-4 py-3 backdrop-blur-2xl md:hidden">
+    <div className="flex shrink-0 items-center justify-between border-b border-black/5 bg-white/80 px-4 py-3 backdrop-blur-2xl md:hidden">
       <Link href="/" className="flex items-center gap-2 text-gray-900">
         <LogoMark className="h-6 w-6" />
         <span className="text-[15px] font-semibold tracking-tight">SignalHire</span>
@@ -180,11 +180,11 @@ export default function ConsoleLayout({ children }: { children: React.ReactNode 
   }
 
   return (
-    <div className="flex min-h-screen bg-[var(--sh-canvas)] text-[var(--sh-ink)]">
+    <div className="flex h-screen overflow-hidden bg-[var(--sh-canvas)] text-[var(--sh-ink)]">
       <Sidebar user={user} currentPath={pathname} onLogout={handleLogout} />
-      <div className="flex min-w-0 flex-1 flex-col">
+      <div className="flex h-screen min-h-0 min-w-0 flex-1 flex-col">
         <MobileTopBar user={user} onLogout={handleLogout} />
-        <main className="flex-1 px-4 pb-24 pt-5 md:px-8 md:pb-10 md:pt-8">
+        <main className="min-h-0 flex-1 overflow-y-auto px-4 pb-24 pt-5 md:px-8 md:pb-10 md:pt-8">
           <div className="mx-auto w-full max-w-7xl">{children}</div>
         </main>
         <MobileBottomNav currentPath={pathname} />
