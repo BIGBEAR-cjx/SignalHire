@@ -43,6 +43,7 @@ import { buildBackfillMergeSummary, buildEditableSearchPlanDraft, buildFeedbackO
 import type { BackfillMergeSummary, CoverageBackfillJob, TalentCandidate, TalentSearchResult } from "@/lib/talent-profile.mjs";
 import { buildCandidateFeedbackPanel, buildFeedbackOptimizationPreview, buildResearchLoopView, buildSearchConstraintEditor, buildSearchInputFromConstraintEditor } from "@/lib/research-loop.mjs";
 import { buildEvidencePriorityView } from "@/lib/evidence-priority.mjs";
+import { extractPdfTextFromFile } from "@/lib/client-resume-extract";
 import { MAX_RESUME_FILE_BYTES, detectSupportedResumeFileType } from "@/lib/resume-upload-constraints.mjs";
 
 type FeedItem = { id: number; kind: "search" | "fetch"; info: string };
@@ -428,7 +429,8 @@ export default function ResearchTool({
 
   async function uploadResume(file: File) {
     if (mode !== "verify" || loading || resumeUploading) return;
-    if (!detectSupportedResumeFileType(file.name, file.type)) {
+    const fileType = detectSupportedResumeFileType(file.name, file.type);
+    if (!fileType) {
       setResumeUploadError(t("api.error.resumeUnsupportedType"));
       return;
     }
@@ -442,6 +444,20 @@ export default function ResearchTool({
     setResumeUploadError("");
     setError("");
     try {
+      if (fileType === "pdf") {
+        const data = await extractPdfTextFromFile(file);
+        if (!data.text.trim()) {
+          setResumeUploadError(t("api.error.resumeEmptyText"));
+          return;
+        }
+        setInput(data.text);
+        setResumeUploadMessage(t("research.resumeUploadSelected", { name: file.name }));
+        setResumeUploadWarning(data.truncated ? t("research.resumeUploadTruncated") : "");
+        setResumeUploading(false);
+        await run(data.text);
+        return;
+      }
+
       const form = new FormData();
       form.set("file", file);
       form.set("locale", locale);
