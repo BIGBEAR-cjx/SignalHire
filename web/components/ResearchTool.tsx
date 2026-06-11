@@ -78,6 +78,7 @@ type StatusResponse = {
   status_view?: JobStatusView;
 };
 type BackfillContext = { originalResult: TalentSearchResult; originalRunId: string | null; job: CoverageBackfillJob };
+type VerifyUploadKind = "resume" | "educationMaterial";
 type MergeBackfillResponse = { merged?: boolean; runId?: string; result?: AppResult; mergeSummary?: BackfillMergeSummary; error?: string };
 type SaveFeedbackResponse = { saved?: boolean; optimizedInput?: string; result?: AppResult; error?: string };
 type EditableSearchPlanDraft = TalentSearchResult;
@@ -260,6 +261,7 @@ export default function ResearchTool({
   const [resumeUploadMessage, setResumeUploadMessage] = useState("");
   const [resumeUploadWarning, setResumeUploadWarning] = useState("");
   const [resumeUploadError, setResumeUploadError] = useState("");
+  const [verifyUploadKind, setVerifyUploadKind] = useState<VerifyUploadKind>("resume");
   const idRef = useRef(0);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const abortRef = useRef<AbortController | null>(null);
@@ -427,8 +429,19 @@ export default function ResearchTool({
     }
   }
 
-  async function uploadResume(file: File) {
+  function buildEducationMaterialInput(text: string, fileName: string) {
+    return [
+      t("research.educationMaterialPrefillHeader"),
+      "",
+      t("research.educationMaterialUploadSelected", { name: fileName }),
+      "",
+      text,
+    ].join("\n");
+  }
+
+  async function uploadVerificationFile(file: File, kind: VerifyUploadKind = "resume") {
     if (mode !== "verify" || loading || resumeUploading) return;
+    setVerifyUploadKind(kind);
     const fileType = detectSupportedResumeFileType(file.name, file.type);
     if (!fileType) {
       setResumeUploadError(t("api.error.resumeUnsupportedType"));
@@ -450,11 +463,12 @@ export default function ResearchTool({
           setResumeUploadError(t("api.error.resumeEmptyText"));
           return;
         }
-        setInput(data.text);
-        setResumeUploadMessage(t("research.resumeUploadSelected", { name: file.name }));
+        const inputText = kind === "educationMaterial" ? buildEducationMaterialInput(data.text, file.name) : data.text;
+        setInput(inputText);
+        setResumeUploadMessage(t(kind === "educationMaterial" ? "research.educationMaterialUploadSelected" : "research.resumeUploadSelected", { name: file.name }));
         setResumeUploadWarning(data.truncated ? t("research.resumeUploadTruncated") : "");
         setResumeUploading(false);
-        await run(data.text);
+        await run(inputText);
         return;
       }
 
@@ -467,11 +481,13 @@ export default function ResearchTool({
         setResumeUploadError(data.error || t("api.error.resumeParseFailed"));
         return;
       }
-      setInput(data.text);
-      setResumeUploadMessage(t("research.resumeUploadSelected", { name: data.fileName || file.name }));
+      const fileName = data.fileName || file.name;
+      const inputText = kind === "educationMaterial" ? buildEducationMaterialInput(data.text, fileName) : data.text;
+      setInput(inputText);
+      setResumeUploadMessage(t(kind === "educationMaterial" ? "research.educationMaterialUploadSelected" : "research.resumeUploadSelected", { name: fileName }));
       setResumeUploadWarning(data.warning || (data.truncated ? t("research.resumeUploadTruncated") : ""));
       setResumeUploading(false);
-      await run(data.text);
+      await run(inputText);
     } catch {
       setResumeUploadError(t("api.error.resumeParseFailed"));
     } finally {
@@ -777,7 +793,9 @@ export default function ResearchTool({
         onRun={() => run()}
         onCreatePlan={isSearch ? createEditablePlan : undefined}
         loading={loading}
-        onResumeUpload={mode === "verify" ? uploadResume : undefined}
+        onResumeUpload={mode === "verify" ? (file) => uploadVerificationFile(file, "resume") : undefined}
+        onEducationMaterialUpload={mode === "verify" ? (file) => uploadVerificationFile(file, "educationMaterial") : undefined}
+        activeUploadKind={verifyUploadKind}
         resumeUploading={resumeUploading}
         resumeUploadMessage={resumeUploadMessage}
         resumeUploadWarning={resumeUploadWarning}

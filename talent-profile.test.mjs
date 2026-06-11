@@ -1554,6 +1554,8 @@ test("search prompt requests search plan and evidence graph", async () => {
   assert.match(verify, /lab_profile/);
   assert.match(verify, /education_verification/);
   assert.match(verify, /manual_attestation/);
+  assert.match(verify, /HR-provided education verification material/);
+  assert.match(verify, /diploma, degree certificate, online verification report, school proof, or employer verification result/);
   assert.match(verify, /Do not mark education claims as "contradicted" solely because no public source is found/);
   assert.match(verify, /red_flags/);
 });
@@ -1637,6 +1639,8 @@ test("worker prompt and normalizer support search plan and evidence graph", asyn
   assert.match(verify, /lab_profile/);
   assert.match(verify, /education_verification/);
   assert.match(verify, /manual_attestation/);
+  assert.match(verify, /HR-provided education verification material/);
+  assert.match(verify, /diploma, degree certificate, online verification report, school proof, or employer verification result/);
   assert.match(verify, /Do not mark education claims as "contradicted" solely because no public source is found/);
   assert.match(verify, /claim/);
   assert.match(verify, /red_flags/);

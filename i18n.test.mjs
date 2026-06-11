@@ -129,6 +129,12 @@ test("translates resume upload labels", () => {
     ["research.resumeUploading", "正在读取简历", "Reading resume"],
     ["research.resumeUploadTruncated", "简历文字较长，已截取前 20000 字用于核验。", "Resume text is long, so the first 20000 characters will be verified."],
     ["research.resumeUploadSelected", "已读取 resume.pdf", "Read resume.pdf", { name: "resume.pdf" }, { name: "resume.pdf" }],
+    ["research.educationMaterialUploadButton", "上传学历材料", "Upload education material"],
+    ["research.educationMaterialUploadDrop", "拖拽学历证书、验证报告或学校证明到这里，上传后会自动开始核验。", "Drop a diploma, verification report, or school proof here. Verification starts after upload."],
+    ["research.educationMaterialUploadSupported", "支持 PDF / DOCX / TXT，不保存原文件；可包含学信网、HEDD、NSC、My eQuals 或企业核验结果。", "Supports PDF / DOCX / TXT. Original files are not stored; CHSI, HEDD, NSC, My eQuals, or employer verification results can be included."],
+    ["research.educationMaterialUploading", "正在读取学历材料", "Reading education material"],
+    ["research.educationMaterialUploadSelected", "已读取学历材料 degree.pdf", "Read education material degree.pdf", { name: "degree.pdf" }, { name: "degree.pdf" }],
+    ["research.educationMaterialPrefillHeader", "HR 补充学历核验材料", "HR-provided education verification material"],
   ];
 
   for (const [key, zh, en, zhParams, enParams] of keys) {
@@ -216,6 +222,9 @@ test("translates neutral education verification labels", () => {
     ["result.education.method.manual_hr_attestation", "人工记录", "Manual HR attestation"],
     ["result.education.nextAction", "建议下一步", "Recommended next step"],
     ["result.education.missingFields", "缺少字段", "Missing fields"],
+    ["result.education.supplementAction", "补充学历材料", "Add education material"],
+    ["result.education.supplementHint", "上传证书、验证报告或企业核验结果，补强这条学历判断。", "Upload a certificate, verification report, or employer verification result to strengthen this education check."],
+    ["result.education.supplementPrefill", "请在这里补充学历证书、学信网在线验证报告、HEDD/NSC/My eQuals 链接、学校证明或企业核验结果。", "Add a diploma, CHSI online verification report, HEDD/NSC/My eQuals link, school proof, or employer verification result here."],
   ];
 
   for (const [key, zh, en] of keys) {

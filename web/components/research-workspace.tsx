@@ -163,6 +163,8 @@ export function ResearchInputStage({
   onRun,
   onCreatePlan,
   onResumeUpload,
+  onEducationMaterialUpload,
+  activeUploadKind = "resume",
   loading,
   resumeUploading = false,
   resumeUploadMessage = "",
@@ -175,6 +177,8 @@ export function ResearchInputStage({
   onRun: () => void;
   onCreatePlan?: () => void;
   onResumeUpload?: (file: File) => void;
+  onEducationMaterialUpload?: (file: File) => void;
+  activeUploadKind?: "resume" | "educationMaterial";
   loading: boolean;
   resumeUploading?: boolean;
   resumeUploadMessage?: string;
@@ -184,16 +188,38 @@ export function ResearchInputStage({
   const { t } = useI18n();
   const isSearch = mode === "search";
   const uploadDisabled = loading || resumeUploading;
-  function handleFileInput(event: ChangeEvent<HTMLInputElement>) {
+  function handleFileInput(event: ChangeEvent<HTMLInputElement>, kind: "resume" | "educationMaterial") {
     const file = event.target.files?.[0];
     event.target.value = "";
-    if (file && onResumeUpload && !uploadDisabled) onResumeUpload(file);
+    const handler = kind === "educationMaterial" ? onEducationMaterialUpload : onResumeUpload;
+    if (file && handler && !uploadDisabled) handler(file);
   }
-  function handleDrop(event: DragEvent<HTMLDivElement>) {
+  function handleDrop(event: DragEvent<HTMLDivElement>, kind: "resume" | "educationMaterial") {
     event.preventDefault();
     const file = event.dataTransfer.files?.[0];
-    if (file && onResumeUpload && !uploadDisabled) onResumeUpload(file);
+    const handler = kind === "educationMaterial" ? onEducationMaterialUpload : onResumeUpload;
+    if (file && handler && !uploadDisabled) handler(file);
   }
+  const uploadItems = [
+    {
+      kind: "resume" as const,
+      onUpload: onResumeUpload,
+      dropKey: "research.resumeUploadDrop",
+      supportedKey: "research.resumeUploadSupported",
+      buttonKey: "research.resumeUploadButton",
+      uploadingKey: "research.resumeUploading",
+      tone: "bg-amber-50 text-amber-700 ring-amber-100",
+    },
+    {
+      kind: "educationMaterial" as const,
+      onUpload: onEducationMaterialUpload,
+      dropKey: "research.educationMaterialUploadDrop",
+      supportedKey: "research.educationMaterialUploadSupported",
+      buttonKey: "research.educationMaterialUploadButton",
+      uploadingKey: "research.educationMaterialUploading",
+      tone: "bg-indigo-50 text-indigo-700 ring-indigo-100",
+    },
+  ];
   return (
     <Surface className="overflow-hidden p-0">
       <div className="px-5 py-5 md:px-7 md:py-6">
@@ -212,47 +238,56 @@ export function ResearchInputStage({
           </span>
         </div>
         {!isSearch && onResumeUpload && (
-          <div
-            onDragOver={(event) => event.preventDefault()}
-            onDrop={handleDrop}
-            className="mt-5 rounded-2xl border border-dashed border-black/15 bg-white/62 p-4"
-          >
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <div className="flex min-w-0 items-start gap-3">
-                <span className="mt-0.5 inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-50 text-amber-700 ring-1 ring-amber-100">
-                  {resumeUploading ? <FiZap className="h-5 w-5 animate-pulse" aria-hidden="true" /> : <FiUploadCloud className="h-5 w-5" aria-hidden="true" />}
-                </span>
-                <div className="min-w-0">
-                  <p className="text-sm font-semibold text-[var(--sh-ink)]">
-                    {resumeUploading ? t("research.resumeUploading") : t("research.resumeUploadDrop")}
-                  </p>
-                  <p className="mt-1 text-xs leading-5 text-[var(--sh-muted)]">{t("research.resumeUploadSupported")}</p>
-                  {resumeUploadMessage && (
-                    <p className="mt-2 inline-flex max-w-full items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-700 ring-1 ring-emerald-100">
-                      <FiFileText className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-                      <span className="truncate">{resumeUploadMessage}</span>
-                    </p>
-                  )}
-                  {resumeUploadWarning && <p className="mt-2 text-xs leading-5 text-amber-700">{resumeUploadWarning}</p>}
-                  {resumeUploadError && <p className="mt-2 text-xs leading-5 text-red-600">{resumeUploadError}</p>}
+          <div className="mt-5 grid gap-3 lg:grid-cols-2">
+            {uploadItems.filter((item) => item.onUpload).map((item) => {
+              const isActive = activeUploadKind === item.kind;
+              const isUploadingThis = resumeUploading && isActive;
+              return (
+                <div
+                  key={item.kind}
+                  onDragOver={(event) => event.preventDefault()}
+                  onDrop={(event) => handleDrop(event, item.kind)}
+                  className="rounded-2xl border border-dashed border-black/15 bg-white/62 p-4"
+                >
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div className="flex min-w-0 items-start gap-3">
+                      <span className={`mt-0.5 inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 ${item.tone}`}>
+                        {isUploadingThis ? <FiZap className="h-5 w-5 animate-pulse" aria-hidden="true" /> : <FiUploadCloud className="h-5 w-5" aria-hidden="true" />}
+                      </span>
+                      <div className="min-w-0">
+                        <p className="text-sm font-semibold text-[var(--sh-ink)]">
+                          {isUploadingThis ? t(item.uploadingKey) : t(item.dropKey)}
+                        </p>
+                        <p className="mt-1 text-xs leading-5 text-[var(--sh-muted)]">{t(item.supportedKey)}</p>
+                        {isActive && resumeUploadMessage && (
+                          <p className="mt-2 inline-flex max-w-full items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-700 ring-1 ring-emerald-100">
+                            <FiFileText className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                            <span className="truncate">{resumeUploadMessage}</span>
+                          </p>
+                        )}
+                        {isActive && resumeUploadWarning && <p className="mt-2 text-xs leading-5 text-amber-700">{resumeUploadWarning}</p>}
+                        {isActive && resumeUploadError && <p className="mt-2 text-xs leading-5 text-red-600">{resumeUploadError}</p>}
+                      </div>
+                    </div>
+                    <label className={`inline-flex cursor-pointer items-center gap-2 rounded-full px-4 py-2 text-sm font-semibold ring-1 transition ${
+                      uploadDisabled
+                        ? "pointer-events-none cursor-not-allowed bg-neutral-100 text-neutral-400 ring-black/5"
+                        : "bg-white text-[var(--sh-ink)] ring-black/10 hover:bg-neutral-50"
+                    }`}>
+                      <FiUploadCloud className="h-4 w-4" aria-hidden="true" />
+                      {t(item.buttonKey)}
+                      <input
+                        type="file"
+                        accept=".pdf,.docx,.txt,text/plain,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                        onChange={(event) => handleFileInput(event, item.kind)}
+                        className="sr-only"
+                        disabled={uploadDisabled}
+                      />
+                    </label>
+                  </div>
                 </div>
-              </div>
-              <label className={`inline-flex cursor-pointer items-center gap-2 rounded-full px-4 py-2 text-sm font-semibold ring-1 transition ${
-                uploadDisabled
-                  ? "pointer-events-none cursor-not-allowed bg-neutral-100 text-neutral-400 ring-black/5"
-                  : "bg-white text-[var(--sh-ink)] ring-black/10 hover:bg-neutral-50"
-              }`}>
-                <FiUploadCloud className="h-4 w-4" aria-hidden="true" />
-                {t("research.resumeUploadButton")}
-                <input
-                  type="file"
-                  accept=".pdf,.docx,.txt,text/plain,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-                  onChange={handleFileInput}
-                  className="sr-only"
-                  disabled={uploadDisabled}
-                />
-              </label>
-            </div>
+              );
+            })}
           </div>
         )}
         <textarea
