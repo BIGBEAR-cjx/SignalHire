@@ -163,7 +163,7 @@ export function ResearchInputStage({
   onRun,
   onCreatePlan,
   onResumeUpload,
-  onEducationMaterialUpload,
+  onSupportingMaterialUpload,
   activeUploadKind = "resume",
   loading,
   resumeUploading = false,
@@ -177,8 +177,8 @@ export function ResearchInputStage({
   onRun: () => void;
   onCreatePlan?: () => void;
   onResumeUpload?: (file: File) => void;
-  onEducationMaterialUpload?: (file: File) => void;
-  activeUploadKind?: "resume" | "educationMaterial";
+  onSupportingMaterialUpload?: (file: File) => void;
+  activeUploadKind?: "resume" | "supportingMaterial";
   loading: boolean;
   resumeUploading?: boolean;
   resumeUploadMessage?: string;
@@ -188,16 +188,16 @@ export function ResearchInputStage({
   const { t } = useI18n();
   const isSearch = mode === "search";
   const uploadDisabled = loading || resumeUploading;
-  function handleFileInput(event: ChangeEvent<HTMLInputElement>, kind: "resume" | "educationMaterial") {
+  function handleFileInput(event: ChangeEvent<HTMLInputElement>, kind: "resume" | "supportingMaterial") {
     const file = event.target.files?.[0];
     event.target.value = "";
-    const handler = kind === "educationMaterial" ? onEducationMaterialUpload : onResumeUpload;
+    const handler = kind === "supportingMaterial" ? onSupportingMaterialUpload : onResumeUpload;
     if (file && handler && !uploadDisabled) handler(file);
   }
-  function handleDrop(event: DragEvent<HTMLDivElement>, kind: "resume" | "educationMaterial") {
+  function handleDrop(event: DragEvent<HTMLDivElement>, kind: "resume" | "supportingMaterial") {
     event.preventDefault();
     const file = event.dataTransfer.files?.[0];
-    const handler = kind === "educationMaterial" ? onEducationMaterialUpload : onResumeUpload;
+    const handler = kind === "supportingMaterial" ? onSupportingMaterialUpload : onResumeUpload;
     if (file && handler && !uploadDisabled) handler(file);
   }
   const uploadItems = [
@@ -211,12 +211,12 @@ export function ResearchInputStage({
       tone: "bg-amber-50 text-amber-700 ring-amber-100",
     },
     {
-      kind: "educationMaterial" as const,
-      onUpload: onEducationMaterialUpload,
-      dropKey: "research.educationMaterialUploadDrop",
-      supportedKey: "research.educationMaterialUploadSupported",
-      buttonKey: "research.educationMaterialUploadButton",
-      uploadingKey: "research.educationMaterialUploading",
+      kind: "supportingMaterial" as const,
+      onUpload: onSupportingMaterialUpload,
+      dropKey: "research.supportingMaterialUploadDrop",
+      supportedKey: "research.supportingMaterialUploadSupported",
+      buttonKey: "research.supportingMaterialUploadButton",
+      uploadingKey: "research.supportingMaterialUploading",
       tone: "bg-indigo-50 text-indigo-700 ring-indigo-100",
     },
   ];

@@ -34,20 +34,22 @@ test("backfill requests include the active locale", () => {
   assert.match(source, /original_run_id:[\s\S]{0,220}locale,[\s\S]{0,220}backfill_run_id:/);
 });
 
-test("verify workspace exposes resume and education material uploads", () => {
+test("verify workspace exposes resume and supporting material uploads", () => {
   const source = readFileSync("web/components/research-workspace.tsx", "utf8");
 
   assert.match(source, /research\.resumeUploadDrop/);
-  assert.match(source, /research\.educationMaterialUploadDrop/);
-  assert.match(source, /educationMaterialUploadButton/);
+  assert.match(source, /research\.supportingMaterialUploadDrop/);
+  assert.match(source, /supportingMaterialUploadButton/);
+  assert.doesNotMatch(source, /educationMaterialUploadDrop|educationMaterialUploadButton/);
 });
 
-test("education claims expose a supplement-material entry", () => {
+test("claims expose a unified supplement-material entry", () => {
   const source = readFileSync("web/components/result.tsx", "utf8");
 
-  assert.match(source, /result\.education\.supplementAction/);
+  assert.match(source, /result\.supportingMaterial\.supplementAction/);
   assert.match(source, /\/app\/verify\?bio=/);
-  assert.match(source, /educationMaterialPrefillHeader/);
+  assert.match(source, /supportingMaterialPrefillHeader/);
+  assert.doesNotMatch(source, /educationMaterialPrefillHeader|result\.education\.supplementAction/);
 });
 
 test("job control API error responses stay locale-keyed", () => {

@@ -78,7 +78,7 @@ type StatusResponse = {
   status_view?: JobStatusView;
 };
 type BackfillContext = { originalResult: TalentSearchResult; originalRunId: string | null; job: CoverageBackfillJob };
-type VerifyUploadKind = "resume" | "educationMaterial";
+type VerifyUploadKind = "resume" | "supportingMaterial";
 type MergeBackfillResponse = { merged?: boolean; runId?: string; result?: AppResult; mergeSummary?: BackfillMergeSummary; error?: string };
 type SaveFeedbackResponse = { saved?: boolean; optimizedInput?: string; result?: AppResult; error?: string };
 type EditableSearchPlanDraft = TalentSearchResult;
@@ -429,11 +429,11 @@ export default function ResearchTool({
     }
   }
 
-  function buildEducationMaterialInput(text: string, fileName: string) {
+  function buildSupportingMaterialInput(text: string, fileName: string) {
     return [
-      t("research.educationMaterialPrefillHeader"),
+      t("research.supportingMaterialPrefillHeader"),
       "",
-      t("research.educationMaterialUploadSelected", { name: fileName }),
+      t("research.supportingMaterialUploadSelected", { name: fileName }),
       "",
       text,
     ].join("\n");
@@ -463,9 +463,9 @@ export default function ResearchTool({
           setResumeUploadError(t("api.error.resumeEmptyText"));
           return;
         }
-        const inputText = kind === "educationMaterial" ? buildEducationMaterialInput(data.text, file.name) : data.text;
+        const inputText = kind === "supportingMaterial" ? buildSupportingMaterialInput(data.text, file.name) : data.text;
         setInput(inputText);
-        setResumeUploadMessage(t(kind === "educationMaterial" ? "research.educationMaterialUploadSelected" : "research.resumeUploadSelected", { name: file.name }));
+        setResumeUploadMessage(t(kind === "supportingMaterial" ? "research.supportingMaterialUploadSelected" : "research.resumeUploadSelected", { name: file.name }));
         setResumeUploadWarning(data.truncated ? t("research.resumeUploadTruncated") : "");
         setResumeUploading(false);
         await run(inputText);
@@ -482,9 +482,9 @@ export default function ResearchTool({
         return;
       }
       const fileName = data.fileName || file.name;
-      const inputText = kind === "educationMaterial" ? buildEducationMaterialInput(data.text, fileName) : data.text;
+      const inputText = kind === "supportingMaterial" ? buildSupportingMaterialInput(data.text, fileName) : data.text;
       setInput(inputText);
-      setResumeUploadMessage(t(kind === "educationMaterial" ? "research.educationMaterialUploadSelected" : "research.resumeUploadSelected", { name: fileName }));
+      setResumeUploadMessage(t(kind === "supportingMaterial" ? "research.supportingMaterialUploadSelected" : "research.resumeUploadSelected", { name: fileName }));
       setResumeUploadWarning(data.warning || (data.truncated ? t("research.resumeUploadTruncated") : ""));
       setResumeUploading(false);
       await run(inputText);
@@ -794,7 +794,7 @@ export default function ResearchTool({
         onCreatePlan={isSearch ? createEditablePlan : undefined}
         loading={loading}
         onResumeUpload={mode === "verify" ? (file) => uploadVerificationFile(file, "resume") : undefined}
-        onEducationMaterialUpload={mode === "verify" ? (file) => uploadVerificationFile(file, "educationMaterial") : undefined}
+        onSupportingMaterialUpload={mode === "verify" ? (file) => uploadVerificationFile(file, "supportingMaterial") : undefined}
         activeUploadKind={verifyUploadKind}
         resumeUploading={resumeUploading}
         resumeUploadMessage={resumeUploadMessage}

@@ -129,12 +129,12 @@ test("translates resume upload labels", () => {
     ["research.resumeUploading", "正在读取简历", "Reading resume"],
     ["research.resumeUploadTruncated", "简历文字较长，已截取前 20000 字用于核验。", "Resume text is long, so the first 20000 characters will be verified."],
     ["research.resumeUploadSelected", "已读取 resume.pdf", "Read resume.pdf", { name: "resume.pdf" }, { name: "resume.pdf" }],
-    ["research.educationMaterialUploadButton", "上传学历材料", "Upload education material"],
-    ["research.educationMaterialUploadDrop", "拖拽学历证书、验证报告或学校证明到这里，上传后会自动开始核验。", "Drop a diploma, verification report, or school proof here. Verification starts after upload."],
-    ["research.educationMaterialUploadSupported", "支持 PDF / DOCX / TXT，不保存原文件；可包含学信网、HEDD、NSC、My eQuals 或企业核验结果。", "Supports PDF / DOCX / TXT. Original files are not stored; CHSI, HEDD, NSC, My eQuals, or employer verification results can be included."],
-    ["research.educationMaterialUploading", "正在读取学历材料", "Reading education material"],
-    ["research.educationMaterialUploadSelected", "已读取学历材料 degree.pdf", "Read education material degree.pdf", { name: "degree.pdf" }, { name: "degree.pdf" }],
-    ["research.educationMaterialPrefillHeader", "HR 补充学历核验材料", "HR-provided education verification material"],
+    ["research.supportingMaterialUploadButton", "上传补充证明材料", "Upload supporting material"],
+    ["research.supportingMaterialUploadDrop", "拖拽证书、验证报告、工作证明、获奖证明或其他佐证材料到这里，上传后会自动开始核验。", "Drop certificates, verification reports, employment proof, award proof, or other supporting material here. Verification starts after upload."],
+    ["research.supportingMaterialUploadSupported", "支持 PDF / DOCX / TXT，不保存原文件；系统会自动识别材料类型并关联相关信息。", "Supports PDF / DOCX / TXT. Original files are not stored; the system identifies the material type and links it to related claims."],
+    ["research.supportingMaterialUploading", "正在读取补充证明材料", "Reading supporting material"],
+    ["research.supportingMaterialUploadSelected", "已读取补充证明材料 proof.pdf", "Read supporting material proof.pdf", { name: "proof.pdf" }, { name: "proof.pdf" }],
+    ["research.supportingMaterialPrefillHeader", "HR 补充证明材料", "HR-provided supporting material"],
   ];
 
   for (const [key, zh, en, zhParams, enParams] of keys) {
@@ -222,9 +222,9 @@ test("translates neutral education verification labels", () => {
     ["result.education.method.manual_hr_attestation", "人工记录", "Manual HR attestation"],
     ["result.education.nextAction", "建议下一步", "Recommended next step"],
     ["result.education.missingFields", "缺少字段", "Missing fields"],
-    ["result.education.supplementAction", "补充学历材料", "Add education material"],
-    ["result.education.supplementHint", "上传证书、验证报告或企业核验结果，补强这条学历判断。", "Upload a certificate, verification report, or employer verification result to strengthen this education check."],
-    ["result.education.supplementPrefill", "请在这里补充学历证书、学信网在线验证报告、HEDD/NSC/My eQuals 链接、学校证明或企业核验结果。", "Add a diploma, CHSI online verification report, HEDD/NSC/My eQuals link, school proof, or employer verification result here."],
+    ["result.supportingMaterial.supplementAction", "补充证明材料", "Add supporting material"],
+    ["result.supportingMaterial.supplementHint", "上传或粘贴可证明这条信息的材料，系统会自动判断材料类型。", "Upload or paste material that supports this claim; the system will identify the material type."],
+    ["result.supportingMaterial.supplementPrefill", "请在这里补充可证明这条信息的材料，例如证书、验证报告、工作证明、获奖证明、项目证明、推荐信或企业核验结果。", "Add material that supports this claim, such as certificates, verification reports, employment proof, award proof, project proof, references, or employer verification results."],
   ];
 
   for (const [key, zh, en] of keys) {

@@ -425,8 +425,12 @@ EDUCATION CLAIM RULES (critical):
 - Use "source_confidence" EXACTLY as one of: "high", "medium", "low", "unknown".
 - If public sources are insufficient, keep "verdict": "unverified", set "education_check_status": "public_insufficient" or "needs_formal", and explain in "recommended_next_action" that this cannot directly disprove the education claim.
 - If the user provided CHSI/HEDD/NSC/My eQuals material, a verification PDF, a code/report number, or an official verification link, treat that as candidate_provided_verification or employer_ordered_verification evidence; do not store raw files in output.
-- If the input includes the heading "HR-provided education verification material" or "HR 补充学历核验材料", treat any diploma, degree certificate, online verification report, school proof, or employer verification result as formal education material for the related education claim.
 - Supported education source_type values include: "school_official", "admission_notice", "award_notice", "thesis_repository", "lab_profile", "education_verification", "manual_attestation".
+
+SUPPORTING MATERIAL RULES (critical):
+- If the input includes the heading "HR-provided supporting material" or "HR 补充证明材料", treat it as HR-provided evidence for one or more related claims.
+- Automatically classify the material_type as exactly one of: education_verification | work_verification | award_verification | project_verification | publication_verification | identity_verification | manual_attestation | other_supporting_material.
+- Use the material to support or conflict with the related claim only when the extracted text gives concrete fields, identifiers, dates, names, links, or official/HR attestation details. Do not assume a file name alone proves a claim.
 
 ${outputLanguageRules(platformLanguage)}
 
