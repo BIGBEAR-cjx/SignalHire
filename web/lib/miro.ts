@@ -162,6 +162,10 @@ function normalizeClaims(claims: ClaimLike[]): void {
     let v = String(cl.verdict ?? "").toLowerCase().trim();
     if (!VERDICTS.includes(v as Verdict)) v = "unverified";
     if (v === "verified" && cl.evidence.length === 0) v = "unverified";
+    if (v === "contradicted" && cl.claim_category === "education" && cl.evidence.length === 0) {
+      v = "unverified";
+      cl.education_check_status = "public_insufficient";
+    }
     cl.verdict = v;
   }
 }
@@ -402,13 +406,26 @@ public web sources. Be skeptical — resumes commonly overstate.
 VERDICT RUBRIC:
 - "verified"     = 2+ independent public sources confirm the claim.
 - "contradicted" = public evidence conflicts with the claim (e.g. someone else is the real
-                   creator/author, the role/title/tenure is overstated, or the credential cannot be found).
-- "unverified"   = no public evidence found either way.
+                   creator/author, the role/title/tenure is overstated, or an education claim conflicts with a concrete source).
+- "unverified"   = no public evidence found either way. For education claims, this usually means "public_insufficient".
 Scrutinize creator/founder/lead, seniority, tenure, and credential (degree) claims HARDEST.
 
 VERDICT & EVIDENCE RULES (critical):
 - "verdict" MUST be EXACTLY one of: "verified", "contradicted", "unverified". Never any other value. If unsure, use "unverified".
 - Every evidence "url" MUST be a SPECIFIC source page that contains the fact. NEVER cite a search-results URL (nothing with google.com/search, bing.com/search, or a "?q=" query). If no concrete page exists, mark the claim "unverified".
+- Do not mark education claims as "contradicted" solely because no public source is found.
+- Only mark an education claim "contradicted" when a specific public source, candidate-provided verification, employer-ordered verification, or manual HR attestation conflicts with the claim.
+
+EDUCATION CLAIM RULES (critical):
+- For school, department, major, degree, education level, attendance dates, graduation dates, scholarships, honors, exchange programs, and joint training, set "claim_category": "education".
+- First run a public-source precheck. Use public school/department/graduate-school pages, admissions/admitted-student notices, award notices, graduation/defense/thesis pages, lab/member/advisor pages, thesis repositories, public papers, personal pages, LinkedIn, GitHub, Gitee, Google Scholar, ORCID, and DBLP.
+- Do not scrape or submit forms for databases that require login, captcha, report number, payment, account access, or candidate consent. CHSI, Ministry of Education degree queries, HEDD, NSC, My eQuals, and similar systems are formal verification paths only when legal verification material or authorization is provided.
+- Use "education_check_status" EXACTLY as one of: "public_supported", "public_partial", "public_insufficient", "inconsistent", "needs_formal", "formal_verified", "materials_needed".
+- Use "verification_method" EXACTLY as one of: "public_evidence_search", "candidate_provided_verification", "employer_ordered_verification", "manual_hr_attestation".
+- Use "source_confidence" EXACTLY as one of: "high", "medium", "low", "unknown".
+- If public sources are insufficient, keep "verdict": "unverified", set "education_check_status": "public_insufficient" or "needs_formal", and explain in "recommended_next_action" that this cannot directly disprove the education claim.
+- If the user provided CHSI/HEDD/NSC/My eQuals material, a verification PDF, a code/report number, or an official verification link, treat that as candidate_provided_verification or employer_ordered_verification evidence; do not store raw files in output.
+- Supported education source_type values include: "school_official", "admission_notice", "award_notice", "thesis_repository", "lab_profile", "education_verification", "manual_attestation".
 
 ${outputLanguageRules(platformLanguage)}
 
@@ -417,8 +434,15 @@ OUTPUT RULES (critical): respond with ONLY one JSON object, no prose, exactly th
   "candidate_name": "string",
   "overall_trust": "high | medium | low",
   "claims": [
-    { "claim": "...", "verdict": "verified | contradicted | unverified",
-      "evidence": [ { "note": "what the source shows", "url": "https://..." } ] }
+    { "claim": "...",
+      "verdict": "verified | contradicted | unverified",
+      "claim_category": "education | work | identity | achievement | credential | other",
+      "education_check_status": "public_supported | public_partial | public_insufficient | inconsistent | needs_formal | formal_verified | materials_needed",
+      "verification_method": "public_evidence_search | candidate_provided_verification | employer_ordered_verification | manual_hr_attestation",
+      "source_confidence": "high | medium | low | unknown",
+      "missing_fields": ["school | department | major | degree | level | start_date | end_date | graduation_date | scholarship | verification_material"],
+      "recommended_next_action": "short neutral next step for this claim",
+      "evidence": [ { "note": "what the source shows", "url": "https://...", "source_type": "paper | code | profile | company | talk | blog | project | community | patent | dataset | benchmark | school_official | admission_notice | award_notice | thesis_repository | lab_profile | education_verification | manual_attestation | other" } ] }
   ],
   "red_flags": [ "short bullet of anything that looks exaggerated or false" ]
 }

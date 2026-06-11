@@ -13,7 +13,7 @@
 - 次按钮：白底 + `border-gray-300`
 - 裁决语义色（验证徽章）：
   - 已验证 verified → emerald（`bg-emerald-100 text-emerald-700`）
-  - 查无实据 unverified → amber（`bg-amber-100 text-amber-800`）
+  - 未确认 unverified → amber（`bg-amber-100 text-amber-800`）
   - 矛盾 contradicted → red（`bg-red-100 text-red-700`）
 
 ## 字体

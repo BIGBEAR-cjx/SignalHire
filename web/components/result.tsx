@@ -34,8 +34,31 @@ import {
 type Locale = "zh" | "en";
 
 export type Verdict = "verified" | "contradicted" | "unverified";
-export type Evidence = { note: string; url: string };
-export type Claim = { claim: string; verdict: Verdict; evidence: Evidence[] };
+export type EducationCheckStatus =
+  | "public_supported"
+  | "public_partial"
+  | "public_insufficient"
+  | "inconsistent"
+  | "needs_formal"
+  | "formal_verified"
+  | "materials_needed";
+export type VerificationMethod =
+  | "public_evidence_search"
+  | "candidate_provided_verification"
+  | "employer_ordered_verification"
+  | "manual_hr_attestation";
+export type Evidence = { note: string; url: string; source_type?: string };
+export type Claim = {
+  claim: string;
+  verdict: Verdict;
+  evidence: Evidence[];
+  claim_category?: string;
+  education_check_status?: EducationCheckStatus | string;
+  verification_method?: VerificationMethod | string;
+  source_confidence?: "high" | "medium" | "low" | "unknown" | string;
+  missing_fields?: string[];
+  recommended_next_action?: string;
+};
 export type Candidate = {
   name: string;
   headline: string;
@@ -202,6 +225,32 @@ const VERDICT: Record<Verdict, { labelKey: "verified" | "contradicted" | "unveri
   unverified: { labelKey: "unverified", Icon: FiHelpCircle, chip: "bg-amber-50 text-amber-700 ring-amber-200", panel: "border-amber-100 bg-amber-50/45" },
 };
 
+const EDUCATION_STATUS: Record<string, { key: string; tone: string }> = {
+  public_supported: { key: "public_supported", tone: "bg-emerald-50 text-emerald-700 ring-emerald-200" },
+  public_partial: { key: "public_partial", tone: "bg-sky-50 text-sky-700 ring-sky-200" },
+  public_insufficient: { key: "public_insufficient", tone: "bg-amber-50 text-amber-700 ring-amber-200" },
+  inconsistent: { key: "inconsistent", tone: "bg-red-50 text-red-700 ring-red-200" },
+  needs_formal: { key: "needs_formal", tone: "bg-indigo-50 text-indigo-700 ring-indigo-200" },
+  formal_verified: { key: "formal_verified", tone: "bg-emerald-50 text-emerald-700 ring-emerald-200" },
+  materials_needed: { key: "materials_needed", tone: "bg-gray-100 text-gray-700 ring-gray-200" },
+};
+
+function isEducationClaim(c: Claim): boolean {
+  return c.claim_category === "education" || Boolean(c.education_check_status);
+}
+
+function educationStatusLabel(status: string | undefined, locale?: Locale): string {
+  if (!status) return "";
+  const meta = EDUCATION_STATUS[status];
+  return meta ? uiCopy(locale, `result.education.${meta.key}`) : status;
+}
+
+function educationMethodLabel(method: string | undefined, locale?: Locale): string {
+  if (!method) return "";
+  const label = uiCopy(locale, `result.education.method.${method}`);
+  return label === `result.education.method.${method}` ? method : label;
+}
+
 function ResultSurface({
   children,
   className = "",
@@ -255,6 +304,9 @@ export function Tally({ claims, locale }: { claims: Claim[] } & ResultLocaleProp
 export function ClaimBlock({ c, locale }: { c: Claim } & ResultLocaleProps) {
   const m = VERDICT[c.verdict] ?? VERDICT.unverified;
   const sourceCount = uniqueSourcesOf(c);
+  const educationStatus = educationStatusLabel(c.education_check_status, locale);
+  const educationMethod = educationMethodLabel(c.verification_method, locale);
+  const educationStatusTone = c.education_check_status ? EDUCATION_STATUS[c.education_check_status]?.tone : undefined;
   return (
     <div className={`rounded-xl border p-3.5 ${m.panel}`}>
       <div className="flex items-start justify-between gap-3">
@@ -270,6 +322,37 @@ export function ClaimBlock({ c, locale }: { c: Claim } & ResultLocaleProps) {
           </span>
         </div>
       </div>
+      {isEducationClaim(c) && (
+        <div className="mt-2.5 space-y-2 border-t border-black/5 pt-2.5">
+          <div className="flex flex-wrap gap-1.5">
+            {educationStatus && (
+              <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold ring-1 ${educationStatusTone ?? "bg-gray-100 text-gray-700 ring-gray-200"}`}>
+                {educationStatus}
+              </span>
+            )}
+            {educationMethod && (
+              <span className="inline-flex items-center rounded-full bg-white/70 px-2 py-0.5 text-xs font-medium text-gray-600 ring-1 ring-gray-200">
+                {educationMethod}
+              </span>
+            )}
+          </div>
+          {c.recommended_next_action && (
+            <p className="flex gap-1.5 text-xs leading-relaxed text-gray-600">
+              <FiInfo className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+              <span>
+                <span className="font-semibold text-gray-700">{uiCopy(locale, "result.education.nextAction")}：</span>
+                {c.recommended_next_action}
+              </span>
+            </p>
+          )}
+          {Array.isArray(c.missing_fields) && c.missing_fields.length > 0 && (
+            <p className="text-xs leading-relaxed text-gray-500">
+              <span className="font-semibold text-gray-600">{uiCopy(locale, "result.education.missingFields")}：</span>
+              {c.missing_fields.join(", ")}
+            </p>
+          )}
+        </div>
+      )}
       {c.evidence?.length > 0 && (
         <ul className="mt-2.5 space-y-1.5">
           {c.evidence.map((e, i) => (

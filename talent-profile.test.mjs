@@ -83,6 +83,27 @@ test("normalizes talent shortlist shape and clamps scores", () => {
   assert.ok(AI_DIRECTIONS.includes("AI Infrastructure / LLM Systems"));
 });
 
+test("normalizes unsupported education claims without sources as unverified", async () => {
+  const { normalizeResult } = await import("./web/lib/miro.ts");
+  const result = normalizeResult({
+    candidate_name: "Kerry Zheng",
+    overall_trust: "medium",
+    claims: [
+      {
+        claim: "本科就读于湖北师范大学电子信息工程专业",
+        verdict: "contradicted",
+        claim_category: "education",
+        education_check_status: "inconsistent",
+        evidence: [],
+      },
+    ],
+    red_flags: [],
+  });
+
+  assert.equal(result.claims[0].verdict, "unverified");
+  assert.equal(result.claims[0].education_check_status, "public_insufficient");
+});
+
 test("normalizes search plan and evidence graph", () => {
   const result = normalizeTalentSearchResult({
     search_plan: {
@@ -592,7 +613,7 @@ test("builds a candidate claim-source matrix for evidence dossier review", () =>
     matrix.rows.map((row) => [row.claim, row.verdict, row.verdict_label, row.evidence_count, row.risk_label]),
     [
       ["Maintains public vLLM serving code", "verified", "已验证", 2, "多来源"],
-      ["Currently available", "unverified", "查无实据", 0, "无公开来源"],
+      ["Currently available", "unverified", "未确认", 0, "无公开来源"],
       ["Currently works at OldCo", "contradicted", "矛盾", 1, "矛盾"],
     ],
   );
@@ -1494,7 +1515,7 @@ test("normalizes cached v1 talent payload for web streaming output", async () =>
 test("search prompt requests search plan and evidence graph", async () => {
   const { searchPrompt, verifyPrompt } = await import("./web/lib/miro.ts");
   const prompt = searchPrompt("Find AI infra engineers");
-  const verify = verifyPrompt("Ada says she built a vLLM project.");
+  const verify = verifyPrompt("Ada says she built a vLLM project and earned an AI master's degree.");
 
   assert.match(prompt, /"search_plan"/);
   assert.match(prompt, /"source_execution"/);
@@ -1519,13 +1540,28 @@ test("search prompt requests search plan and evidence graph", async () => {
   assert.match(verify, /OUTPUT LANGUAGE/);
   assert.match(verify, /Platform language: Chinese \(Simplified\)/);
   assert.match(verify, /claim/);
+  assert.match(verify, /claim_category/);
+  assert.match(verify, /education_check_status/);
+  assert.match(verify, /recommended_next_action/);
+  assert.match(verify, /public_evidence_search/);
+  assert.match(verify, /candidate_provided_verification/);
+  assert.match(verify, /employer_ordered_verification/);
+  assert.match(verify, /manual_hr_attestation/);
+  assert.match(verify, /school_official/);
+  assert.match(verify, /admission_notice/);
+  assert.match(verify, /award_notice/);
+  assert.match(verify, /thesis_repository/);
+  assert.match(verify, /lab_profile/);
+  assert.match(verify, /education_verification/);
+  assert.match(verify, /manual_attestation/);
+  assert.match(verify, /Do not mark education claims as "contradicted" solely because no public source is found/);
   assert.match(verify, /red_flags/);
 });
 
 test("worker prompt and normalizer support search plan and evidence graph", async () => {
   const { searchPrompt, verifyPrompt } = await import("./worker/lib.mjs");
   const prompt = searchPrompt("Find AI infra engineers");
-  const verify = verifyPrompt("Ada says she built a vLLM project.");
+  const verify = verifyPrompt("Ada says she built a vLLM project and earned an AI master's degree.");
   const result = normalizeWorkerTalentSearchResult({
     search_plan: {
       must_have: ["LLM serving"],
@@ -1587,6 +1623,21 @@ test("worker prompt and normalizer support search plan and evidence graph", asyn
   assert.match(prompt, /Do not paste raw source passages/);
   assert.match(verify, /OUTPUT LANGUAGE/);
   assert.match(verify, /Platform language: Chinese \(Simplified\)/);
+  assert.match(verify, /claim_category/);
+  assert.match(verify, /education_check_status/);
+  assert.match(verify, /recommended_next_action/);
+  assert.match(verify, /public_evidence_search/);
+  assert.match(verify, /candidate_provided_verification/);
+  assert.match(verify, /employer_ordered_verification/);
+  assert.match(verify, /manual_hr_attestation/);
+  assert.match(verify, /school_official/);
+  assert.match(verify, /admission_notice/);
+  assert.match(verify, /award_notice/);
+  assert.match(verify, /thesis_repository/);
+  assert.match(verify, /lab_profile/);
+  assert.match(verify, /education_verification/);
+  assert.match(verify, /manual_attestation/);
+  assert.match(verify, /Do not mark education claims as "contradicted" solely because no public source is found/);
   assert.match(verify, /claim/);
   assert.match(verify, /red_flags/);
   assert.deepEqual(result.search_plan.must_have, ["LLM serving"]);

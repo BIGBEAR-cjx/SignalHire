@@ -191,8 +191,31 @@ test("translates result verdict and source labels", () => {
     ["result.source", "来源", "Source"],
     ["result.verified", "已验证", "Verified"],
     ["result.contradicted", "矛盾", "Contradicted"],
-    ["result.unverified", "查无实据", "No evidence found"],
+    ["result.unverified", "未确认", "Unverified"],
     ["result.sourceCountTitle", "覆盖该信息的不同域名数 (越多越可靠)", "Number of distinct domains covering this claim (more is stronger)"],
+  ];
+
+  for (const [key, zh, en] of keys) {
+    assert.equal(t("zh", key), zh);
+    assert.equal(t("en", key), en);
+  }
+});
+
+test("translates neutral education verification labels", () => {
+  const keys = [
+    ["result.education.public_supported", "公开来源支持", "Public sources support"],
+    ["result.education.public_partial", "公开来源部分支持", "Partially supported by public sources"],
+    ["result.education.public_insufficient", "公开来源不足", "Insufficient public evidence"],
+    ["result.education.inconsistent", "信息不一致", "Information mismatch"],
+    ["result.education.needs_formal", "需要正式学历核验", "Formal education verification needed"],
+    ["result.education.formal_verified", "正式核验已确认", "Formal verification confirmed"],
+    ["result.education.materials_needed", "需要补充材料", "Additional materials needed"],
+    ["result.education.method.public_evidence_search", "公开来源预核验", "Public-source precheck"],
+    ["result.education.method.candidate_provided_verification", "候选人授权材料", "Candidate-provided verification"],
+    ["result.education.method.employer_ordered_verification", "企业核验结果", "Employer-ordered verification"],
+    ["result.education.method.manual_hr_attestation", "人工记录", "Manual HR attestation"],
+    ["result.education.nextAction", "建议下一步", "Recommended next step"],
+    ["result.education.missingFields", "缺少字段", "Missing fields"],
   ];
 
   for (const [key, zh, en] of keys) {
