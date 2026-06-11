@@ -287,6 +287,13 @@ export default function ProjectDetailPage() {
   const [error, setError] = useState("");
   const [statusFilter, setStatusFilter] = useState<ShortlistStatus | "all">("all");
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
+  const candidateDetailRef = useRef<HTMLDivElement | null>(null);
+  const openCandidateDetail = useCallback((itemId: string) => {
+    setSelectedItemId(itemId);
+    requestAnimationFrame(() => {
+      candidateDetailRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+  }, []);
 
   const reloadDetail = useCallback(async () => {
     try {
@@ -445,7 +452,7 @@ export default function ProjectDetailPage() {
         room={controlRoom}
         searchHref={searchHref}
         projectId={id}
-        onOpenCandidate={(itemId) => setSelectedItemId(itemId)}
+        onOpenCandidate={(itemId) => openCandidateDetail(itemId)}
       />
 
       {actionBrief && (
@@ -453,7 +460,7 @@ export default function ProjectDetailPage() {
           brief={actionBrief}
           searchHref={searchHref}
           projectId={id}
-          onOpenCandidate={(itemId) => setSelectedItemId(itemId)}
+          onOpenCandidate={(itemId) => openCandidateDetail(itemId)}
         />
       )}
 
@@ -495,7 +502,7 @@ export default function ProjectDetailPage() {
           queue={decisionQueue}
           projectId={id}
           selectedItemId={selectedItemId}
-          onOpenCandidate={(itemId) => setSelectedItemId(itemId)}
+          onOpenCandidate={(itemId) => openCandidateDetail(itemId)}
         />
       )}
 
@@ -532,7 +539,7 @@ export default function ProjectDetailPage() {
                 locale={locale}
                 onOpenCandidate={(priorityItem) => {
                   const item = filteredItems[priorityItem.candidate_index];
-                  if (item) setSelectedItemId(item.id);
+                  if (item) openCandidateDetail(item.id);
                 }}
               />
             )}
@@ -541,20 +548,20 @@ export default function ProjectDetailPage() {
                 matrix={projectEvidenceMatrix}
                 projectId={id}
                 selectedItemId={selectedItemId}
-                onOpenCandidate={(itemId) => setSelectedItemId(itemId)}
+                onOpenCandidate={(itemId) => openCandidateDetail(itemId)}
               />
             )}
             {showCandidateComparison && <CandidateComparisonView result={projectComparisonResult} locale={locale} />}
             <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(360px,0.85fr)]">
               <ul className="space-y-2">
                 {filteredItems.map((it) => (
-                  <CandidateItem key={it.id} item={it} locale={locale} selected={selectedItemId === it.id} onClick={() => setSelectedItemId(it.id)} />
+                  <CandidateItem key={it.id} item={it} locale={locale} selected={selectedItemId === it.id} onClick={() => openCandidateDetail(it.id)} />
                 ))}
                 {filteredItems.length === 0 && (
                   <li><EmptyState title={t("projects.detail.candidates.filteredEmptyTitle")} description={t("projects.detail.candidates.filteredEmptyDesc")} /></li>
                 )}
               </ul>
-              <div className="lg:sticky lg:top-6 lg:self-start">
+              <div ref={candidateDetailRef} className="scroll-mt-6 lg:sticky lg:top-6 lg:self-start">
                 {selectedItem ? (
                   <CandidateDetailPanel
                     key={selectedItem.id}

@@ -52,6 +52,16 @@ test("claims expose a unified supplement-material entry", () => {
   assert.doesNotMatch(source, /educationMaterialPrefillHeader|result\.education\.supplementAction/);
 });
 
+test("project evidence detail buttons scroll to the candidate detail panel", () => {
+  const source = readFileSync("web/app/app/projects/[id]/page.tsx", "utf8");
+
+  assert.match(source, /candidateDetailRef/);
+  assert.match(source, /function openCandidateDetail|const openCandidateDetail/);
+  assert.match(source, /scrollIntoView\(\{ behavior: "smooth", block: "start" \}\)/);
+  assert.match(source, /onOpenCandidate=\{\(itemId\) => openCandidateDetail\(itemId\)\}/);
+  assert.doesNotMatch(source, /onOpenCandidate=\{\(itemId\) => setSelectedItemId\(itemId\)\}/);
+});
+
 test("job control API error responses stay locale-keyed", () => {
   for (const file of ["web/app/api/status/route.ts", "web/app/api/retry/route.ts", "web/app/api/cancel/route.ts"]) {
     const source = readFileSync(file, "utf8");
