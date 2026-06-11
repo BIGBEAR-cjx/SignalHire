@@ -4,7 +4,7 @@
 // Phase 1.1: 把原 page.tsx 的搜索/验证/轮询逻辑抽出来, 由 mode prop 锁定模式。
 // 搜索 → TalentMap + ShortlistCard 列表
 // 核验 → TrustReportView
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { FiMail } from "react-icons/fi";
 import { useI18n } from "@/components/LanguageProvider";
 import {
@@ -39,7 +39,7 @@ import {
   type ProjectFeedbackPreferenceView,
 } from "@/components/research-workspace";
 import { Surface } from "@/components/ui/signal-ui";
-import { buildBackfillMergeSummary, buildEditableSearchPlanDraft, buildFeedbackOptimizedSearchInput, buildSearchInputFromEditablePlan } from "@/lib/talent-profile.mjs";
+import { buildBackfillMergeSummary, buildCoverageBackfillPlan, buildEditableSearchPlanDraft, buildFeedbackOptimizedSearchInput, buildSearchInputFromEditablePlan } from "@/lib/talent-profile.mjs";
 import type { BackfillMergeSummary, CoverageBackfillJob, TalentCandidate, TalentSearchResult } from "@/lib/talent-profile.mjs";
 import { buildCandidateFeedbackPanel, buildFeedbackOptimizationPreview, buildResearchLoopView, buildSearchConstraintEditor, buildSearchInputFromConstraintEditor } from "@/lib/research-loop.mjs";
 import { buildEvidencePriorityView } from "@/lib/evidence-priority.mjs";
@@ -92,6 +92,7 @@ type SearchFeedbackState = {
 type SearchFeedbackField = keyof SearchFeedbackState;
 type SearchFeedbackOption = { value: SearchFeedbackState[SearchFeedbackField]; labelKey: string };
 type SearchFeedbackGroup = { key: SearchFeedbackField; labelKey: string; options: SearchFeedbackOption[] };
+type CandidateDecision = "saved" | "needs_evidence" | "passed";
 type CandidateFeedbackPanelView = {
   title: string;
   description: string;
@@ -203,6 +204,211 @@ function CandidateFeedbackControls({
   );
 }
 
+function CandidateReviewCommand({
+  count,
+  firstName,
+  reviewed,
+  onReview,
+  onShowProcess,
+}: {
+  count: number;
+  firstName: string;
+  reviewed: number;
+  onReview: () => void;
+  onShowProcess: () => void;
+}) {
+  const { t } = useI18n();
+  return (
+    <Surface className="p-5 md:p-6">
+      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+        <div className="max-w-3xl">
+          <h2 className="text-2xl font-semibold tracking-tight text-[var(--sh-ink)]">
+            {t("result.reviewFlow.title", { count, name: firstName })}
+          </h2>
+          <p className="mt-2 text-sm leading-6 text-[var(--sh-muted)]">{t("result.reviewFlow.desc")}</p>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={onReview}
+            className="sh-primary-action px-4"
+          >
+            {reviewed > 0 ? t("result.reviewFlow.reviewNext") : t("result.reviewFlow.reviewFirst")}
+          </button>
+          <button
+            type="button"
+            onClick={onShowProcess}
+            className="sh-secondary-action px-4"
+          >
+            {t("result.reviewFlow.process")}
+          </button>
+        </div>
+      </div>
+    </Surface>
+  );
+}
+
+function AdvancedResultDetails({
+  open,
+  onToggle,
+  children,
+}: {
+  open: boolean;
+  onToggle: (open: boolean) => void;
+  children: ReactNode;
+}) {
+  const { t } = useI18n();
+  return (
+    <details
+      open={open}
+      onToggle={(event) => onToggle(event.currentTarget.open)}
+      className="rounded-2xl border border-black/10 bg-white/78 p-4"
+    >
+      <summary className="cursor-pointer text-sm font-semibold text-[var(--sh-ink)]">
+        {t("result.reviewFlow.advancedTitle")}
+      </summary>
+      <div className="mt-4 space-y-5">{children}</div>
+    </details>
+  );
+}
+
+function CandidateReviewFlow({
+  result,
+  selectedIndex,
+  shortlist,
+  decisions,
+  candidateFeedbackPanel,
+  feedbackGroups,
+  feedbackPreview,
+  loading,
+  onOpenCandidate,
+  onAddToPool,
+  onNeedEvidence,
+  onPass,
+  onOutreach,
+  onFeedbackSelect,
+  onRunFeedback,
+}: {
+  result: TalentSearchResult;
+  selectedIndex: number;
+  shortlist: number[];
+  decisions: Record<number, CandidateDecision>;
+  candidateFeedbackPanel: CandidateFeedbackPanelView | null;
+  feedbackGroups: Array<{ key: string; label: string; options: Array<{ value: string; label: string; selected: boolean }> }>;
+  feedbackPreview: ReturnType<typeof buildFeedbackOptimizationPreview>;
+  loading: boolean;
+  onOpenCandidate: (index: number) => void;
+  onAddToPool: (index: number, candidate: TalentCandidate) => void;
+  onNeedEvidence: (index: number, candidate: TalentCandidate, job?: CoverageBackfillJob) => void;
+  onPass: (index: number) => void;
+  onOutreach: () => void;
+  onFeedbackSelect: (key: string, value: string) => void;
+  onRunFeedback: () => void;
+}) {
+  const { locale, t } = useI18n();
+  const selectedCandidate = result.candidates[selectedIndex] ?? result.candidates[0];
+  const safeSelectedIndex = Math.max(0, result.candidates.indexOf(selectedCandidate));
+  const reviewed = Object.keys(decisions).length;
+  const isSaved = shortlist.includes(safeSelectedIndex);
+  const decision = decisions[safeSelectedIndex];
+
+  return (
+    <section className="grid gap-4 lg:grid-cols-[minmax(280px,0.78fr)_minmax(0,1.22fr)]">
+      <div className="space-y-3">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h2 className="text-base font-semibold text-[var(--sh-ink)]">{t("result.reviewFlow.queueTitle")}</h2>
+          <span className="rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-[var(--sh-muted)] ring-1 ring-black/10">
+            {t("result.reviewFlow.progress", { reviewed, total: result.candidates.length })}
+          </span>
+        </div>
+        <div className="space-y-2">
+          {result.candidates.map((candidate, index) => (
+            <ShortlistCard
+              key={`${candidate.name}-${index}`}
+              candidate={candidate}
+              selected={index === safeSelectedIndex}
+              onOpen={() => onOpenCandidate(index)}
+              locale={locale}
+            />
+          ))}
+        </div>
+      </div>
+
+      <div className="space-y-3 lg:sticky lg:top-6 lg:self-start">
+        <div className="rounded-2xl border border-black/10 bg-white/86 p-4">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h2 className="text-base font-semibold text-[var(--sh-ink)]">{t("result.reviewFlow.detailTitle")}</h2>
+            {(decision || isSaved) && (
+              <span className="rounded-full bg-[var(--sh-canvas)] px-2.5 py-1 text-xs font-semibold text-[var(--sh-muted)] ring-1 ring-black/10">
+                {isSaved ? t("result.reviewFlow.addToPool") : decision === "needs_evidence" ? t("result.reviewFlow.needEvidence") : t("result.reviewFlow.pass")}
+              </span>
+            )}
+          </div>
+          <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+            <button
+              type="button"
+              onClick={() => onAddToPool(safeSelectedIndex, selectedCandidate)}
+              disabled={isSaved}
+              className="rounded-full bg-[var(--sh-ink)] px-3 py-2 text-sm font-semibold text-white transition hover:bg-black disabled:cursor-default disabled:bg-gray-300"
+            >
+              {t("result.reviewFlow.addToPool")}
+            </button>
+            <button
+              type="button"
+              onClick={() => onNeedEvidence(safeSelectedIndex, selectedCandidate)}
+              disabled={loading}
+              className="rounded-full bg-white px-3 py-2 text-sm font-semibold text-amber-800 ring-1 ring-amber-200 transition hover:bg-amber-50 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {t("result.reviewFlow.needEvidence")}
+            </button>
+            <button
+              type="button"
+              onClick={() => onPass(safeSelectedIndex)}
+              className="rounded-full bg-white px-3 py-2 text-sm font-semibold text-[var(--sh-muted)] ring-1 ring-black/10 transition hover:bg-neutral-50"
+            >
+              {t("result.reviewFlow.pass")}
+            </button>
+            {isSaved && (
+              <button
+                type="button"
+                onClick={onOutreach}
+                className="rounded-full bg-white px-3 py-2 text-sm font-semibold text-[var(--sh-ink)] ring-1 ring-black/10 transition hover:bg-neutral-50"
+              >
+                <FiMail className="mr-1.5 inline h-4 w-4 align-[-2px]" aria-hidden="true" />
+                {t("result.reviewFlow.outreach")}
+              </button>
+            )}
+          </div>
+        </div>
+
+        {candidateFeedbackPanel && reviewed > 0 && (
+          <section className="space-y-3">
+            <p className="text-sm font-semibold text-[var(--sh-ink)]">{t("result.reviewFlow.feedbackTitle")}</p>
+            <CandidateFeedbackControls view={candidateFeedbackPanel} onSelect={onFeedbackSelect} />
+          </section>
+        )}
+        {reviewed > 0 && (
+          <FeedbackOptimizationPreview
+            groups={feedbackGroups}
+            preview={feedbackPreview}
+            loading={loading}
+            onSelect={onFeedbackSelect}
+            onRun={onRunFeedback}
+          />
+        )}
+        <EvidenceGraphView result={result} candidate={selectedCandidate} />
+        <CandidateProfileView
+          candidate={selectedCandidate}
+          result={result}
+          onBackfillJob={(job) => onNeedEvidence(safeSelectedIndex, selectedCandidate, job)}
+          backfillDisabled={loading}
+          locale={locale}
+        />
+      </div>
+    </section>
+  );
+}
+
 function userFacingStatus(view: JobStatusView, elapsedMs: number, t: (key: string, params?: Record<string, string | number>) => string): JobStatusView {
   if (view.phase === "queued" && elapsedMs > WORKER_DELAY_MS) {
     return {
@@ -262,6 +468,8 @@ export default function ResearchTool({
   const [resumeUploadWarning, setResumeUploadWarning] = useState("");
   const [resumeUploadError, setResumeUploadError] = useState("");
   const [verifyUploadKind, setVerifyUploadKind] = useState<VerifyUploadKind>("resume");
+  const [candidateDecisions, setCandidateDecisions] = useState<Record<number, CandidateDecision>>({});
+  const [advancedDetailsOpen, setAdvancedDetailsOpen] = useState(false);
   const idRef = useRef(0);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const abortRef = useRef<AbortController | null>(null);
@@ -363,6 +571,8 @@ export default function ResearchTool({
     setJobStatus(null); setCopied(false); setBackfillContext(null); setBackfillMergeSummary(null);
     setMergingBackfill(false); setMergedOriginalRunId(null);
     setSearchFeedback(EMPTY_SEARCH_FEEDBACK);
+    setCandidateDecisions({});
+    setAdvancedDetailsOpen(false);
     if (!options.preserveInput) setEditablePlan(null);
     try {
       const url = mode === "search" ? "/api/search" : "/api/verify";
@@ -716,6 +926,14 @@ export default function ResearchTool({
     return () => { cancelled = true; };
   }, [locale, mode, runId]);
 
+  useEffect(() => {
+    if (!isTalentSearchResult(result)) return;
+    if (result.candidates.length === 0) return;
+    if (selectedCandidateIndex === null || selectedCandidateIndex >= result.candidates.length) {
+      setSelectedCandidateIndex(0);
+    }
+  }, [result, selectedCandidateIndex]);
+
   // 收藏 toggle: 调 API 持久化 + 乐观更新; 失败回滚。
   async function toggleShortlist(idx: number, candidate: unknown) {
     if (savingIdx.has(idx)) return;
@@ -747,6 +965,45 @@ export default function ResearchTool({
     } finally {
       setSavingIdx((s) => { const n = new Set(s); n.delete(idx); return n; });
     }
+  }
+
+  function openCandidateForReview(index: number) {
+    setSelectedCandidateIndex(index);
+  }
+
+  async function addCandidateToPool(index: number, candidate: TalentCandidate) {
+    if (!shortlist.includes(index)) {
+      await toggleShortlist(index, candidate);
+    }
+    setCandidateDecisions((current) => ({ ...current, [index]: "saved" }));
+  }
+
+  function candidateBackfillJob(candidate: TalentCandidate, explicitJob?: CoverageBackfillJob): CoverageBackfillJob | null {
+    if (explicitJob) return explicitJob;
+    if (!isTalentSearchResult(result)) return null;
+    const jobs = buildCoverageBackfillPlan(result, { locale }).jobs.filter((job: CoverageBackfillJob) => job.status === "planned");
+    return jobs.find((job: CoverageBackfillJob) => job.candidate_names.includes(candidate.name)) ?? jobs[0] ?? null;
+  }
+
+  function needEvidenceForCandidate(index: number, candidate: TalentCandidate, explicitJob?: CoverageBackfillJob) {
+    setCandidateDecisions((current) => ({ ...current, [index]: "needs_evidence" }));
+    const job = candidateBackfillJob(candidate, explicitJob);
+    if (job) {
+      void enqueueBackfillJob(job);
+    } else {
+      setAdvancedDetailsOpen(true);
+    }
+  }
+
+  function passCandidate(index: number) {
+    setCandidateDecisions((current) => ({ ...current, [index]: "passed" }));
+  }
+
+  function reviewPrimaryCandidate() {
+    if (!isTalentSearchResult(result) || result.candidates.length === 0) return;
+    const start = selectedCandidateIndex === null ? 0 : selectedCandidateIndex + 1;
+    const next = result.candidates.findIndex((_, index) => index >= start && !candidateDecisions[index]);
+    setSelectedCandidateIndex(next >= 0 ? next : 0);
   }
 
   const isSearch = mode === "search";
@@ -962,95 +1219,58 @@ export default function ResearchTool({
                   locale={locale}
                 />
               )}
-              <SearchPlanView result={result} locale={locale} />
-              <ShortlistDeliveryReportView result={result} locale={locale} />
-              <SourceExecutionView result={result} locale={locale} />
-              <CoverageBackfillView result={result} onBackfillJob={enqueueBackfillJob} backfillDisabled={loading} locale={locale} />
-              <EvidenceCoverageView result={result} locale={locale} />
-              <TalentMapView result={result} locale={locale} />
-              <CandidateComparisonView result={result} locale={locale} />
-              {evidencePriorityView && (
-                <EvidencePriorityPanel
-                  view={evidencePriorityView}
-                  onOpenCandidate={(item) => {
-                    if (item.candidate_index >= 0 && item.candidate_index < result.candidates.length) {
-                      setSelectedCandidateIndex(item.candidate_index);
-                    }
-                  }}
-                  locale={locale}
-                />
+              {result.candidates.length > 0 ? (
+                <>
+                  <CandidateReviewCommand
+                    count={result.candidates.length}
+                    firstName={result.candidates[0]?.name ?? t("result.unknownCandidate")}
+                    reviewed={Object.keys(candidateDecisions).length}
+                    onReview={reviewPrimaryCandidate}
+                    onShowProcess={() => setAdvancedDetailsOpen(true)}
+                  />
+                  <CandidateReviewFlow
+                    result={result}
+                    selectedIndex={selectedCandidateIndex ?? 0}
+                    shortlist={shortlist}
+                    decisions={candidateDecisions}
+                    candidateFeedbackPanel={candidateFeedbackPanel}
+                    feedbackGroups={feedbackGroups}
+                    feedbackPreview={feedbackPreview}
+                    loading={loading}
+                    onOpenCandidate={openCandidateForReview}
+                    onAddToPool={addCandidateToPool}
+                    onNeedEvidence={needEvidenceForCandidate}
+                    onPass={passCandidate}
+                    onOutreach={() => setOutreachOpen(true)}
+                    onFeedbackSelect={(key, value) => updateSearchFeedback(key as SearchFeedbackField, value as SearchFeedbackState[SearchFeedbackField])}
+                    onRunFeedback={runFeedbackOptimizedSearch}
+                  />
+                </>
+              ) : (
+                <Surface className="p-5 text-sm leading-6 text-[var(--sh-muted)]">
+                  {t("result.reviewFlow.empty")}
+                </Surface>
               )}
-              <FeedbackOptimizationPreview
-                groups={feedbackGroups}
-                preview={feedbackPreview}
-                loading={loading}
-                onSelect={(key, value) => updateSearchFeedback(key as SearchFeedbackField, value as SearchFeedbackState[SearchFeedbackField])}
-                onRun={runFeedbackOptimizedSearch}
-              />
-              <section className="space-y-3">
-                <div className="flex flex-wrap items-end justify-between gap-3">
-                  <div>
-                    <h2 className="text-lg font-semibold text-gray-900">{t("result.shortlistTitle")}</h2>
-                    <p className="mt-1 text-sm text-gray-500">
-                      {t("result.selectedCount", { selected: shortlist.length, total: result.candidates.length })}
-                    </p>
-                  </div>
-                  {result.search_brief.target_directions.length > 0 && (
-                    <div className="flex flex-wrap gap-1.5">
-                      {result.search_brief.target_directions.map((direction) => (
-                        <span key={direction} className="rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600">
-                          {direction}
-                        </span>
-                      ))}
-                    </div>
-                  )}
-                </div>
-                <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(320px,0.85fr)]">
-                  <div className="space-y-4">
-                    {result.candidates.map((candidate: TalentCandidate, i: number) => (
-                      <ShortlistCard
-                        key={`${candidate.name}-${i}`}
-                        candidate={candidate}
-                        selected={shortlist.includes(i)}
-                        onOpen={() => setSelectedCandidateIndex(i)}
-                        onToggle={() => toggleShortlist(i, candidate)}
-                        locale={locale}
-                      />
-                    ))}
-                  </div>
-                  <div className="lg:sticky lg:top-6 lg:self-start space-y-3">
-                    {selectedCandidateIndex === null ? (
-                      <div className="rounded-3xl border border-dashed border-black/10 bg-white/80 p-5 text-sm text-[var(--sh-muted)]">
-                        {t("result.openHint")}
-                      </div>
-                    ) : (
-                      <>
-                        <button
-                          onClick={() => setOutreachOpen(true)}
-                          className="inline-flex w-full items-center justify-center gap-2 rounded-full bg-[var(--sh-ink)] px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-black"
-                        >
-                          <FiMail className="h-4 w-4" aria-hidden="true" />
-                          {t("result.outreachTo", { name: result.candidates[selectedCandidateIndex]?.name?.split(" ")[0] ?? "" })}
-                        </button>
-                        {candidateFeedbackPanel && (
-                          <CandidateFeedbackControls
-                            view={candidateFeedbackPanel}
-                            onSelect={(key, value) => updateSearchFeedback(key as SearchFeedbackField, value as SearchFeedbackState[SearchFeedbackField])}
-                          />
-                        )}
-                        <EvidenceGraphView result={result} candidate={result.candidates[selectedCandidateIndex]} locale={locale} />
-                        <CandidateProfileView
-                          candidate={result.candidates[selectedCandidateIndex]}
-                          result={result}
-                          onBackfillJob={enqueueBackfillJob}
-                          backfillDisabled={loading}
-                          locale={locale}
-                        />
-                      </>
-                    )}
-                  </div>
-                </div>
-              </section>
+              <AdvancedResultDetails open={advancedDetailsOpen} onToggle={setAdvancedDetailsOpen}>
+                <SearchPlanView result={result} locale={locale} />
+                <ShortlistDeliveryReportView result={result} locale={locale} />
+                <SourceExecutionView result={result} locale={locale} />
+                <CoverageBackfillView result={result} onBackfillJob={enqueueBackfillJob} backfillDisabled={loading} locale={locale} />
+                <EvidenceCoverageView result={result} locale={locale} />
+                <TalentMapView result={result} locale={locale} />
+                <CandidateComparisonView result={result} locale={locale} />
+                {evidencePriorityView && (
+                  <EvidencePriorityPanel
+                    view={evidencePriorityView}
+                    onOpenCandidate={(item) => {
+                      if (item.candidate_index >= 0 && item.candidate_index < result.candidates.length) {
+                        openCandidateForReview(item.candidate_index);
+                      }
+                    }}
+                    locale={locale}
+                  />
+                )}
+              </AdvancedResultDetails>
             </>
           ) : isVerifyReport(result) ? (
             <TrustReportView r={result} locale={locale} />

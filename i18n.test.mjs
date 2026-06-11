@@ -412,6 +412,32 @@ test("result comparison count uses localized people label", () => {
   assert.match(source, /\{rows\.length\}\s+\{resultCopy\(locale, "people"\)\}/);
 });
 
+test("translates guided smart-search review flow labels", () => {
+  const keys = [
+    ["result.reviewFlow.title", "找到 3 位候选人，建议先审阅 Ada", "Found 3 candidates. Review Ada first.", { count: 3, name: "Ada" }, { count: 3, name: "Ada" }],
+    ["result.reviewFlow.desc", "先看匹配理由和证据强弱，再决定是否加入候选池。", "Check fit rationale and evidence strength before adding anyone to the shortlist."],
+    ["result.reviewFlow.reviewFirst", "审阅第一位候选人", "Review first candidate"],
+    ["result.reviewFlow.reviewNext", "继续审阅下一位", "Review next candidate"],
+    ["result.reviewFlow.process", "查看搜索过程", "View search process"],
+    ["result.reviewFlow.advancedTitle", "分析与搜索过程", "Analysis and search process"],
+    ["result.reviewFlow.queueTitle", "候选人队列", "Candidate queue"],
+    ["result.reviewFlow.detailTitle", "候选人详情", "Candidate details"],
+    ["result.reviewFlow.progress", "已审阅 1 / 3", "Reviewed 1 / 3", { reviewed: 1, total: 3 }, { reviewed: 1, total: 3 }],
+    ["result.reviewFlow.addToPool", "加入候选池", "Add to shortlist"],
+    ["result.reviewFlow.needEvidence", "需要补证据", "Need more evidence"],
+    ["result.reviewFlow.pass", "暂不推进", "Pass for now"],
+    ["result.reviewFlow.outreach", "起草外联", "Draft outreach"],
+    ["result.reviewFlow.feedbackTitle", "这轮结果怎么样？优化下一轮搜索", "How was this round? Optimize the next search"],
+    ["result.reviewFlow.empty", "这次没有找到可审阅的候选人。可以展开搜索过程，调整需求后再试一次。", "No reviewable candidates were found this time. Open the search process, adjust the brief, and try again."],
+    ["research.advancedPlanToggle", "高级：先调整搜索计划", "Advanced: adjust search plan first"],
+  ];
+
+  for (const [key, zh, en, zhParams, enParams] of keys) {
+    assert.equal(t("zh", key, zhParams), zh);
+    assert.equal(t("en", key, enParams), en);
+  }
+});
+
 test("shared shell navigation and loading copy stay keyed", () => {
   const source = readFileSync(new URL("./web/components/ui/signal-ui.tsx", import.meta.url), "utf8");
 

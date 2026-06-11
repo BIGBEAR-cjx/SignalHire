@@ -52,6 +52,25 @@ test("claims expose a unified supplement-material entry", () => {
   assert.doesNotMatch(source, /educationMaterialPrefillHeader|result\.education\.supplementAction/);
 });
 
+test("smart search results default to a guided candidate review flow", () => {
+  const researchTool = readFileSync("web/components/ResearchTool.tsx", "utf8");
+  const resultComponents = readFileSync("web/components/result.tsx", "utf8");
+  const shortlistCard = resultComponents.slice(
+    resultComponents.indexOf("export function ShortlistCard"),
+    resultComponents.indexOf("function AuditStat"),
+  );
+
+  assert.match(researchTool, /function CandidateReviewCommand/);
+  assert.match(researchTool, /function CandidateReviewFlow/);
+  assert.match(researchTool, /function AdvancedResultDetails/);
+  assert.match(researchTool, /<CandidateReviewCommand[\s\S]{0,900}<CandidateReviewFlow/);
+  assert.match(researchTool, /<details[\s\S]{0,600}result\.reviewFlow\.advancedTitle/);
+  assert.match(researchTool, /<AdvancedResultDetails[\s\S]*<SearchPlanView result=\{result\}/);
+  assert.match(researchTool, /<AdvancedResultDetails[\s\S]*<CandidateComparisonView result=\{result\}/);
+  assert.match(researchTool, /setSelectedCandidateIndex\(0\)/);
+  assert.doesNotMatch(shortlistCard, /resultCopy\(locale, "viewDetails"\)|resultCopy\(locale, "addToPool"\)|resultCopy\(locale, "removeFromPool"\)/);
+});
+
 test("project evidence detail buttons scroll to the candidate detail panel", () => {
   const source = readFileSync("web/app/app/projects/[id]/page.tsx", "utf8");
 

@@ -309,7 +309,7 @@ export function ResearchInputStage({
           {isSearch && onCreatePlan && (
             <SecondaryAction onClick={onCreatePlan} className="px-5" disabled={loading || !input.trim()}>
               <FiEdit3 className="h-4 w-4" aria-hidden="true" />
-              {t("research.createPlan")}
+              {t("research.advancedPlanToggle")}
             </SecondaryAction>
           )}
           <span className="text-xs text-[var(--sh-faint)]">{t("research.charCount", { count: input.length })}</span>

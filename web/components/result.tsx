@@ -1158,35 +1158,43 @@ function CandidateMeta({ candidate }: { candidate: TalentCandidate }) {
 export function ShortlistCard({
   candidate,
   selected,
-  onToggle,
   onOpen,
   locale,
 }: {
   candidate: TalentCandidate;
   selected: boolean;
-  onToggle?: () => void;
   onOpen?: () => void;
 } & ResultLocaleProps) {
   const uncertainty = candidate.uncertainties[0];
-  const topSignals = candidate.strongest_signals.slice(0, 3);
+  const topSignal = candidate.strongest_signals[0] || candidate.summary || candidate.headline;
 
   return (
-    <article className="rounded-[28px] border border-black/10 bg-white/86 p-5 shadow-[0_18px_52px_rgba(0,0,0,0.06)]">
+    <button
+      type="button"
+      onClick={onOpen}
+      disabled={!onOpen}
+      aria-pressed={selected}
+      className={`block w-full rounded-2xl border p-4 text-left transition ${
+        selected
+          ? "border-[var(--sh-ink)] bg-white shadow-sm"
+          : "border-black/10 bg-white/82 hover:border-black/20 hover:bg-white"
+      } disabled:cursor-default disabled:opacity-70`}
+    >
       <div className="flex items-start gap-3">
         <ScorePill score={candidate.match_score} />
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
-            <h3 className="text-lg font-semibold text-gray-900">{candidate.name}</h3>
+            <h3 className="text-base font-semibold text-gray-900">{candidate.name}</h3>
             <QualityPill value={candidate.evidence_audit.overall_evidence_quality} locale={locale} />
           </div>
-          {candidate.headline && <p className="mt-1 text-sm leading-relaxed text-gray-700">{candidate.headline}</p>}
+          {candidate.headline && <p className="mt-1 line-clamp-2 text-sm leading-relaxed text-gray-700">{candidate.headline}</p>}
           <CandidateMeta candidate={candidate} />
         </div>
       </div>
 
       {candidate.ai_directions.length > 0 && (
-        <div className="mt-4 flex flex-wrap gap-1.5">
-          {candidate.ai_directions.map((direction) => (
+        <div className="mt-3 flex flex-wrap gap-1.5">
+          {candidate.ai_directions.slice(0, 3).map((direction) => (
             <span key={direction} className="rounded-full bg-blue-50 px-2 py-0.5 text-xs font-medium text-blue-700 ring-1 ring-blue-100">
               {direction}
             </span>
@@ -1194,46 +1202,18 @@ export function ShortlistCard({
         </div>
       )}
 
-      {topSignals.length > 0 && (
-        <ul className="mt-4 space-y-1.5">
-          {topSignals.map((signal) => (
-            <li key={signal} className="flex gap-2 text-sm leading-relaxed text-gray-700">
-              <FiCheckCircle className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" aria-hidden="true" />
-              {signal}
-            </li>
-          ))}
-        </ul>
-      )}
-
-      {uncertainty && (
-        <p className="mt-3 rounded-2xl bg-amber-50 px-3 py-2 text-sm leading-relaxed text-amber-700 ring-1 ring-amber-100">
-          {uncertainty}
+      {topSignal && (
+        <p className="mt-3 line-clamp-2 text-sm leading-6 text-gray-700">
+          {topSignal}
         </p>
       )}
 
-      <div className="mt-4 flex flex-wrap gap-2 border-t border-gray-100 pt-4">
-        <button
-          type="button"
-          onClick={onOpen}
-          disabled={!onOpen}
-          className="rounded-full bg-[var(--sh-ink)] px-3.5 py-2 text-sm font-semibold text-white transition hover:bg-black disabled:cursor-not-allowed disabled:bg-gray-300"
-        >
-          {resultCopy(locale, "viewDetails")}
-        </button>
-        <button
-          type="button"
-          onClick={onToggle}
-          disabled={!onToggle}
-          className={`rounded-full px-3.5 py-2 text-sm font-semibold ring-1 transition disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-gray-400 disabled:ring-gray-200 ${
-            selected
-              ? "bg-red-50 text-red-700 ring-red-200 hover:bg-red-100"
-              : "bg-emerald-50 text-emerald-700 ring-emerald-200 hover:bg-emerald-100"
-          }`}
-        >
-          {selected ? resultCopy(locale, "removeFromPool") : resultCopy(locale, "addToPool")}
-        </button>
-      </div>
-    </article>
+      {uncertainty && (
+        <p className="mt-3 line-clamp-2 rounded-xl bg-amber-50 px-3 py-2 text-sm leading-relaxed text-amber-700 ring-1 ring-amber-100">
+          {uncertainty}
+        </p>
+      )}
+    </button>
   );
 }
 
