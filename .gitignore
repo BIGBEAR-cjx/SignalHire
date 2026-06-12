@@ -34,3 +34,4 @@ last_verify_content.txt
 deep-research/
 .gstack/
 .worktrees/
+.vercel/
