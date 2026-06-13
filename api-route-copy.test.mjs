@@ -195,11 +195,15 @@ test("auth session API error responses stay locale-keyed", () => {
 test("auth session requests include the active locale", () => {
   const auth = readFileSync("web/lib/auth.ts", "utf8");
   const sync = readFileSync("web/lib/auth-session-sync.mjs", "utf8");
+  const layout = readFileSync("web/app/app/layout.tsx", "utf8");
 
   assert.match(auth, /async function setSession\(accessToken: string, locale: string\)/);
-  assert.match(auth, /JSON\.stringify\(\{ accessToken, locale \}\)/);
+  assert.match(auth, /writeAndConfirmSessionCookie\(accessToken, fetch, locale\)/);
   assert.match(auth, /setSession\(data\.accessToken, locale\)/);
+  assert.match(auth, /confirmSessionCookie\(fetch, locale\)/);
+  assert.match(layout, /currentUser\(locale\)/);
   assert.match(sync, /JSON\.stringify\(\{ accessToken: token, locale \}\)/);
+  assert.match(sync, /\/api\/whoami\?locale=/);
 });
 
 test("shortlist collection API error responses stay locale-keyed", () => {

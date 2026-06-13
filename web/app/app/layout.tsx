@@ -133,12 +133,12 @@ function MobileBottomNav({ currentPath }: { currentPath: string }) {
 export default function ConsoleLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
-  const { t } = useI18n();
+  const { locale, t } = useI18n();
   const [user, setUser] = useState<User | null | undefined>(undefined); // undefined = 初始加载中
 
   useEffect(() => {
-    currentUser().then((u) => setUser(u));
-  }, []);
+    currentUser(locale).then((u) => setUser(u));
+  }, [locale]);
 
   async function handleLogout() {
     await logout();
