@@ -173,7 +173,7 @@ export default function ConsoleLayout({ children }: { children: React.ReactNode 
         <AuthModal
           open={true}
           onClose={() => router.push("/")}
-          onAuthed={(u) => setUser(u)}
+          onAuthed={() => location.reload()}
         />
       </>
     );

@@ -41,7 +41,7 @@ export default function Home() {
         onAuthed={(u) => {
           setUser(u);
           setAuthOpen(false);
-          router.push(postAuthUrl);
+          location.href = postAuthUrl;
         }}
       />
     </>
