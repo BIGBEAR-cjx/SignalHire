@@ -9,6 +9,7 @@
 | `INSFORGE_API_BASE_URL` | Insforge 项目 URL(如 `https://xxx.insforge.app`) |
 | `INSFORGE_API_KEY` | Insforge access key |
 | `MIROMIND_API_KEY` / `MIROMIND_BASE_URL` / `MIROMIND_MODEL` | MiroMind 凭证 |
+| `ANYSEARCH_API_KEY` | 可选。AnySearch 搜索 API key；不配置时走匿名限额 |
 
 ## 本地跑
 

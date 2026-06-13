@@ -2,6 +2,7 @@
 // 内容与根 miro.mjs / web/lib/miro.ts 同源 (此处复制一份, 让 worker 目录可独立打进 Docker)。
 
 import { isTalentSearchResult, normalizeTalentSearchResult } from "./talent-profile.mjs";
+import { buildOpenEvidenceSourcePromptBlock } from "./open-evidence-sources.mjs";
 
 export async function streamResearch(userPrompt, onStep = () => {}) {
   const BASE = process.env.MIROMIND_BASE_URL;
@@ -87,11 +88,42 @@ function outputLanguageRules(platformLanguage = DEFAULT_PLATFORM_LANGUAGE) {
 - Do not paste raw source passages as the answer. Summarize or translate source evidence into the platform language.`;
 }
 
-export const searchPrompt = (query, platformLanguage = DEFAULT_PLATFORM_LANGUAGE) => `You are SignalHire, an AI talent sourcing and evidence-audit agent for HR teams and headhunters.
+function candidateCacheHintBlock(candidateHints = []) {
+  const hints = (Array.isArray(candidateHints) ? candidateHints : []).slice(0, 5).map((hint) => {
+    const name = String(hint?.name ?? "").trim();
+    if (!name) return "";
+    const role = String(hint?.role ?? "").trim();
+    const tags = Array.isArray(hint?.vertical_tags) ? hint.vertical_tags.join(", ") : "";
+    const sources = Array.isArray(hint?.source_types) ? hint.source_types.join(", ") : "";
+    const terms = Array.isArray(hint?.matched_terms) ? hint.matched_terms.join(", ") : "";
+    const urls = Array.isArray(hint?.evidence_urls) ? hint.evidence_urls.slice(0, 3).join(", ") : "";
+    return `- ${name}${role ? ` · ${role}` : ""}${tags ? ` · tags: ${tags}` : ""}${sources ? ` · sources: ${sources}` : ""}${terms ? ` · matched: ${terms}` : ""}${urls ? ` · evidence: ${urls}` : ""}`;
+  }).filter(Boolean);
+  if (hints.length === 0) return "";
+  return `\nCANDIDATE CACHE HINTS:\nThese are previously seen, evidence-backed candidate leads that may help with recall or adjacent pools. Re-verify every claim with current public evidence. Do not stop at these cached candidates; continue searching for new and stronger matches.\n${hints.join("\n")}\n`;
+}
+
+function openEvidenceLeadBlock(openEvidenceLeads = []) {
+  const leads = (Array.isArray(openEvidenceLeads) ? openEvidenceLeads : []).slice(0, 12).map((lead) => {
+    const name = String(lead?.candidate_name ?? "").trim();
+    const title = String(lead?.title ?? "").trim();
+    const url = String(lead?.url ?? "").trim();
+    if (!name || !url) return "";
+    const provider = String(lead?.provider ?? "").trim();
+    const sourceType = String(lead?.source_type ?? "").trim();
+    return `- ${name}${title ? ` · ${title}` : ""}${provider ? ` · ${provider}` : ""}${sourceType ? ` · ${sourceType}` : ""} · ${url}`;
+  }).filter(Boolean);
+  if (leads.length === 0) return "";
+  return `\nOPEN-SOURCE PRECHECK LEADS:\nThese leads came from public source APIs before deep research. Treat them as recall hints only; verify identity, fit, and claims with concrete source URLs before recommending.\n${leads.join("\n")}\n`;
+}
+
+export const searchPrompt = (query, platformLanguage = DEFAULT_PLATFORM_LANGUAGE, candidateHints = [], openEvidenceLeads = []) => `You are SignalHire, an AI talent sourcing and evidence-audit agent for HR teams and headhunters.
 
 TASK:
 Search globally for 10 to 15 real AI talent candidates for this hiring brief:
 "${query}"
+${candidateCacheHintBlock(candidateHints)}
+${openEvidenceLeadBlock(openEvidenceLeads)}
 
 The result must feel like a high-quality hiring shortlist, not raw search results.
 
@@ -130,6 +162,8 @@ EVIDENCE RULES:
 - "contradicted" means public evidence conflicts with the claim.
 - "unverified" means the claim is plausible but not supported by clear public evidence.
 - If a claim has no concrete evidence URL, use "unverified".
+
+${buildOpenEvidenceSourcePromptBlock(query)}
 
 ${outputLanguageRules(platformLanguage)}
 

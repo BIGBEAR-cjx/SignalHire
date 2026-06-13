@@ -9,6 +9,8 @@
 import { createServer } from "node:http";
 import { createClient } from "@insforge/sdk";
 import { streamResearch, parseJson, normalizeResult, searchPrompt, verifyPrompt } from "./lib.mjs";
+import { buildOpenEvidenceLeadRowsForRun, runOpenEvidenceSourcePrecheck } from "./open-evidence-sources.mjs";
+import { buildCandidateEvidenceSourceRowsForRun, buildCandidateProfileRowsForRun } from "./talent-profile.mjs";
 import {
   buildRunFailureUpdate,
   buildRunStartUpdate,
@@ -30,6 +32,9 @@ if (!BASE || !KEY) {
 }
 const db = createClient({ baseUrl: BASE, anonKey: KEY, isServerMode: true }).database;
 const TABLE = "research_runs";
+const CANDIDATE_PROFILE_TABLE = "candidate_profiles";
+const CANDIDATE_EVIDENCE_SOURCE_TABLE = "candidate_evidence_sources";
+const OPEN_EVIDENCE_LEAD_TABLE = "open_evidence_leads";
 const POLL_MS = 4000; // 没任务时的轮询间隔
 const PROGRESS_MS = 3000; // 进度写库节流
 
@@ -58,7 +63,7 @@ async function recoverStaleRunning() {
 // 认领一个排队/待重试任务: 取最老任务, 原子置 running。返回任务行或 null。
 async function claimByStatus(status) {
   const { data } = await db.from(TABLE)
-    .select("id,kind,query_text,progress,attempt_count,max_attempts")
+    .select("id,kind,query_text,progress,attempt_count,max_attempts,user_id")
     .eq("status", status)
     .order("created_at", { ascending: true })
     .limit(1);
@@ -100,11 +105,109 @@ function summarize(kind, data) {
   return `可信度 ${data?.overall_trust ?? "?"}${contra ? ` · ${contra} 矛盾` : ""}`;
 }
 
+async function upsertCandidateProfilesForRun({ userId, sourceRunId, observedAt, result }) {
+  const rows = buildCandidateProfileRowsForRun({ userId, sourceRunId, observedAt, result });
+  if (rows.length === 0) return 0;
+  try {
+    const { error } = await db.from(CANDIDATE_PROFILE_TABLE).upsert(rows, { onConflict: "cache_key" });
+    if (error) {
+      console.warn(`[${new Date().toISOString()}] 候选人缓存写入失败: ${error.message || error}`);
+      return 0;
+    }
+    return rows.length;
+  } catch (e) {
+    console.warn(`[${new Date().toISOString()}] 候选人缓存写入失败: ${e?.message || e}`);
+    return 0;
+  }
+}
+
+async function upsertCandidateEvidenceSourcesForRun({ userId, sourceRunId, observedAt, result }) {
+  const rows = buildCandidateEvidenceSourceRowsForRun({ userId, sourceRunId, observedAt, result });
+  if (rows.length === 0) return 0;
+  try {
+    const { error } = await db.from(CANDIDATE_EVIDENCE_SOURCE_TABLE).upsert(rows, { onConflict: "cache_key" });
+    if (error) {
+      console.warn(`[${new Date().toISOString()}] 候选人证据来源写入失败: ${error.message || error}`);
+      return 0;
+    }
+    return rows.length;
+  } catch (e) {
+    console.warn(`[${new Date().toISOString()}] 候选人证据来源写入失败: ${e?.message || e}`);
+    return 0;
+  }
+}
+
+async function upsertOpenEvidenceLeadsForRun({ userId, sourceRunId, queryText, observedAt, leads }) {
+  const rows = buildOpenEvidenceLeadRowsForRun({ userId, sourceRunId, queryText, observedAt, leads });
+  if (rows.length === 0) return 0;
+  try {
+    const { error } = await db.from(OPEN_EVIDENCE_LEAD_TABLE).upsert(rows, { onConflict: "cache_key" });
+    if (error) {
+      console.warn(`[${new Date().toISOString()}] 开放证据预检线索写入失败: ${error.message || error}`);
+      return 0;
+    }
+    return rows.length;
+  } catch (e) {
+    console.warn(`[${new Date().toISOString()}] 开放证据预检线索写入失败: ${e?.message || e}`);
+    return 0;
+  }
+}
+
+function formatOpenEvidenceProviderStats(providerStats = {}) {
+  return Object.entries(providerStats)
+    .map(([provider, stat]) => {
+      const status = stat?.status || stat?.error || "unknown";
+      return `${provider}:status=${status},attempts=${stat?.attempts ?? 0},leads=${stat?.lead_count ?? 0},ms=${stat?.duration_ms ?? 0}`;
+    })
+    .join(" | ");
+}
+
+function openEvidenceMaxQueries() {
+  const value = Number(process.env.OPEN_EVIDENCE_MAX_QUERIES ?? 4);
+  if (!Number.isFinite(value)) return 4;
+  return Math.max(1, Math.min(8, Math.round(value)));
+}
+
+async function runOpenEvidencePrecheck(queryText) {
+  try {
+    const result = await runOpenEvidenceSourcePrecheck(queryText, {
+      apiKeys: {
+        github: process.env.GITHUB_TOKEN || process.env.GITHUB_API_KEY,
+        semantic_scholar: process.env.SEMANTIC_SCHOLAR_API_KEY,
+        openalex: process.env.OPENALEX_API_KEY,
+        huggingface: process.env.HF_TOKEN || process.env.HUGGINGFACE_TOKEN,
+        anysearch: process.env.ANYSEARCH_API_KEY,
+      },
+      maxQueries: openEvidenceMaxQueries(),
+    });
+    const stats = formatOpenEvidenceProviderStats(result.provider_stats);
+    if (stats) console.log(`[${new Date().toISOString()}] 开放证据预检统计: ${stats}`);
+    if (result.errors.length > 0) {
+      console.warn(`[${new Date().toISOString()}] 开放证据预检部分失败: ${JSON.stringify(result.errors).slice(0, 500)}`);
+    }
+    return result.leads;
+  } catch (e) {
+    console.warn(`[${new Date().toISOString()}] 开放证据预检失败: ${e?.message || e}`);
+    return [];
+  }
+}
+
 async function runJob(job) {
   console.log(`[${new Date().toISOString()}] 认领任务 ${job.id} (${job.kind})`);
   const queryText = typeof job.progress?.original_query === "string" ? job.progress.original_query : job.query_text;
   const platformLanguage = typeof job.progress?.platform_language === "string" ? job.progress.platform_language : undefined;
-  const prompt = job.kind === "search" ? searchPrompt(queryText, platformLanguage) : verifyPrompt(queryText, platformLanguage);
+  const candidateHints = Array.isArray(job.progress?.candidate_profile_hints) ? job.progress.candidate_profile_hints : [];
+  const openEvidenceLeads = job.kind === "search" ? await runOpenEvidencePrecheck(queryText) : [];
+  if (job.kind === "search") {
+    await upsertOpenEvidenceLeadsForRun({
+      userId: job.user_id,
+      sourceRunId: job.id,
+      queryText,
+      observedAt: new Date().toISOString(),
+      leads: openEvidenceLeads,
+    });
+  }
+  const prompt = job.kind === "search" ? searchPrompt(queryText, platformLanguage, candidateHints, openEvidenceLeads) : verifyPrompt(queryText, platformLanguage);
 
   const recent = [];
   let lastWrite = 0;
@@ -132,6 +235,7 @@ async function runJob(job) {
     if (!out) throw lastErr ?? new Error();
     const data = normalizeResult(parseJson(out.content));
     if (!data) throw new Error("模型输出不是干净 JSON");
+    const finishedAt = new Date().toISOString();
     const doneRow = {
       result: data,
       stats: { searches: out.searches, fetches: out.fetches },
@@ -141,8 +245,8 @@ async function runJob(job) {
       error: null,
       last_error: null,
       locked_at: null,
-      finished_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
+      finished_at: finishedAt,
+      updated_at: finishedAt,
     };
     // 关键写库: 用 .select() 确认真的更新了行, 没成功就重试 (代理偶发会黑洞掉 PATCH 却返回 OK)。
     let saved = false;
@@ -157,6 +261,20 @@ async function runJob(job) {
       await sleep(2000);
     }
     if (!saved) throw new Error("结果写库失败 (多次重试未成功)");
+    if (job.kind === "search") {
+      await upsertCandidateProfilesForRun({
+        userId: job.user_id,
+        sourceRunId: job.id,
+        observedAt: finishedAt,
+        result: data,
+      });
+      await upsertCandidateEvidenceSourcesForRun({
+        userId: job.user_id,
+        sourceRunId: job.id,
+        observedAt: finishedAt,
+        result: data,
+      });
+    }
     console.log(`[${new Date().toISOString()}] 完成 ${job.id}: 搜索 ${out.searches} 抓取 ${out.fetches}`);
   } catch (e) {
     // 标记失败或待重试 (await + try, 确保不把任务孤儿在 running)。
