@@ -4,6 +4,9 @@
 declare module "@/lib/talent-profile.mjs" {
   export type CandidateComparisonRow = import("@/lib/talent-profile").CandidateComparisonRow;
   export type CandidateReadingSummary = import("@/lib/talent-profile").CandidateReadingSummary;
+  export type CandidateReviewBrief = import("@/lib/talent-profile").CandidateReviewBrief;
+  export type CandidateProfileCacheEntry = import("@/lib/talent-profile").CandidateProfileCacheEntry;
+  export type SimilarCandidateSuggestion = import("@/lib/talent-profile").SimilarCandidateSuggestion;
   export type CandidateEvidenceDossier = import("@/lib/talent-profile").CandidateEvidenceDossier;
   export type CandidateEvidenceMatrix = import("@/lib/talent-profile").CandidateEvidenceMatrix;
   export type BackfillMergeSummary = import("@/lib/talent-profile").BackfillMergeSummary;
@@ -13,15 +16,17 @@ declare module "@/lib/talent-profile.mjs" {
   export type ShortlistDeliveryReport = import("@/lib/talent-profile").ShortlistDeliveryReport;
   export type SourceExecutionJob = import("@/lib/talent-profile").SourceExecutionJob;
   export type SourceQueryPlanItem = import("@/lib/talent-profile").SourceQueryPlanItem;
+  export type SearchResultWorkspace = import("@/lib/talent-profile").SearchResultWorkspace;
   export type TalentCandidate = import("@/lib/talent-profile").TalentCandidate;
   export type TalentSearchResult = import("@/lib/talent-profile").TalentSearchResult;
 }
 
-import type { BackfillMergeSummary, CandidateComparisonRow, CandidateEvidenceAuditSummary, CandidateEvidenceMatrix, CandidateReadingSummary, CandidateEvidenceDossier, CoverageBackfillJob, EvidenceCoverageGroup, ShortlistDeliveryReport, SourceExecutionJob, SourceQueryPlanItem, TalentCandidate, TalentSearchResult } from "@/lib/talent-profile.mjs";
-import { buildCandidateComparisonRows, buildCandidateEvidenceAudit, buildCandidateEvidenceMatrix, buildCandidateReadingSummary, buildCandidateEvidenceDossier, buildCoverageBackfillPlan, buildEvidenceCoverage, buildShortlistDeliveryReport, buildSourceExecution, buildSourceQueryPlan } from "@/lib/talent-profile.mjs";
+import type { BackfillMergeSummary, CandidateComparisonRow, CandidateEvidenceAuditSummary, CandidateEvidenceMatrix, CandidateProfileCacheEntry, CandidateReadingSummary, CandidateReviewBrief, CandidateEvidenceDossier, CoverageBackfillJob, EvidenceCoverageGroup, SearchResultWorkspace, ShortlistDeliveryReport, SimilarCandidateSuggestion, SourceExecutionJob, SourceQueryPlanItem, TalentCandidate, TalentSearchResult } from "@/lib/talent-profile.mjs";
+import { buildCandidateComparisonRows, buildCandidateEvidenceAudit, buildCandidateEvidenceMatrix, buildCandidateProfileCacheEntry, buildCandidateReadingSummary, buildCandidateReviewBrief, buildCandidateEvidenceDossier, buildCoverageBackfillPlan, buildEvidenceCoverage, buildSearchResultWorkspace, buildShortlistDeliveryReport, buildSimilarCandidateSuggestions, buildSourceExecution, buildSourceQueryPlan } from "@/lib/talent-profile.mjs";
 import type { IconType } from "react-icons";
-import { FiCheckCircle, FiExternalLink, FiFlag, FiHelpCircle, FiInfo, FiLink2, FiUploadCloud, FiXCircle } from "react-icons/fi";
+import { FiCheckCircle, FiChevronDown, FiClock, FiExternalLink, FiFlag, FiHelpCircle, FiInfo, FiMail, FiLink2, FiRefreshCw, FiUploadCloud, FiXCircle } from "react-icons/fi";
 import { t as translate } from "@/lib/i18n.mjs";
+import { buildRelatedTalentView, buildTalentIntelligenceReport } from "@/lib/talent-intelligence.mjs";
 import {
   reportUniqueSources,
   sourceCountChip,
@@ -1217,6 +1222,443 @@ export function ShortlistCard({
   );
 }
 
+type WorkspaceStats = { searches?: number; fetches?: number; durationSeconds?: number; duration_seconds?: number };
+
+function workspaceUiCopy(locale: Locale | undefined, key: string) {
+  const zh: Record<string, string> = {
+    completionMeta: "完成态",
+    candidatesFound: "候选人",
+    sourceTools: "来源任务",
+    coverage: "证据覆盖",
+    stats: "搜索统计",
+    searches: "搜索",
+    fetches: "抓取",
+    seconds: "秒",
+    submitted: "已提交",
+    trace: "执行 trace",
+    deliveryClusters: "交付分组",
+    sourceMix: "来源组合",
+    submittedVia: "已提交来源",
+    listTitle: "候选人列表",
+    listDesc: "按匹配度、证据质量和风险优先级审阅。",
+    selected: "当前查看",
+    sources: "来源",
+    noSources: "暂无来源类型",
+    matchContext: "匹配上下文",
+    primaryRisk: "待确认 / 风险",
+    drawerTitle: "候选人情报",
+    shortlist: "加入候选池",
+    shortlisted: "已加入候选池",
+    draftOutreach: "起草外联",
+    needEvidence: "需要补证据",
+    pass: "暂不推进",
+    researchLog: "Research Log",
+    researchLogDesc: "默认折叠，保留可追溯的搜索计划和来源执行。",
+    showProcess: "查看完整搜索过程",
+    noticeTitle: "商业化入口",
+  };
+  const en: Record<string, string> = {
+    completionMeta: "Completion",
+    candidatesFound: "Candidates",
+    sourceTools: "Source tasks",
+    coverage: "Coverage",
+    stats: "Stats",
+    searches: "searches",
+    fetches: "fetches",
+    seconds: "sec",
+    submitted: "Submitted",
+    trace: "Execution trace",
+    deliveryClusters: "Delivery clusters",
+    sourceMix: "Source mix",
+    submittedVia: "Submitted via",
+    listTitle: "Candidate list",
+    listDesc: "Review by fit, evidence quality, and risk priority.",
+    selected: "Selected",
+    sources: "Sources",
+    noSources: "No source types yet",
+    matchContext: "Match context",
+    primaryRisk: "To verify / risk",
+    drawerTitle: "Candidate intelligence",
+    shortlist: "Shortlist",
+    shortlisted: "Shortlisted",
+    draftOutreach: "Draft outreach",
+    needEvidence: "Need more evidence",
+    pass: "Pass",
+    researchLog: "Research Log",
+    researchLogDesc: "Collapsed by default with traceable search plan and source execution.",
+    showProcess: "View full search process",
+    noticeTitle: "Commercial entry",
+  };
+  return (locale === "en" ? en : zh)[key] ?? zh[key] ?? key;
+}
+
+function WorkspaceMetric({ label, value, detail }: { label: string; value: string | number; detail?: string }) {
+  return (
+    <div className="rounded-2xl bg-white/72 p-3 ring-1 ring-black/5">
+      <p className="text-xl font-semibold leading-none text-[var(--sh-ink)]">{value}</p>
+      <p className="mt-1 text-xs font-semibold text-[var(--sh-muted)]">{label}</p>
+      {detail && <p className="mt-1 text-xs leading-5 text-[var(--sh-muted)]">{detail}</p>}
+    </div>
+  );
+}
+
+function WorkspaceQualityPill({ value, locale }: { value: string } & ResultLocaleProps) {
+  return <QualityPill value={value} locale={locale} />;
+}
+
+function WorkspaceCandidateRow({
+  row,
+  selected,
+  saved,
+  decision,
+  onOpen,
+  locale,
+}: {
+  row: SearchResultWorkspace["candidates"][number];
+  selected: boolean;
+  saved: boolean;
+  decision?: string;
+  onOpen: () => void;
+} & ResultLocaleProps) {
+  const status = saved ? "shortlisted" : decision || row.bucket.replace("_", " ");
+  const submission = row.submission;
+  return (
+    <button
+      type="button"
+      onClick={onOpen}
+      aria-pressed={selected}
+      className={`w-full rounded-2xl border p-3 text-left transition ${
+        selected ? "border-[var(--sh-ink)] bg-white shadow-sm" : "border-black/10 bg-white/78 hover:border-black/20 hover:bg-white"
+      }`}
+    >
+      <div className="flex items-start gap-3">
+        <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[var(--sh-canvas)] text-sm font-semibold text-[var(--sh-ink)] ring-1 ring-black/10">
+          {row.initials}
+        </span>
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-2">
+            <h3 className="text-sm font-semibold text-[var(--sh-ink)]">{row.name}</h3>
+            <span className="rounded-full bg-white px-2 py-0.5 text-xs font-semibold text-[var(--sh-muted)] ring-1 ring-black/10">
+              {row.match_score}%
+            </span>
+            <WorkspaceQualityPill value={row.evidence_quality} />
+          </div>
+          {row.role && <p className="mt-1 line-clamp-1 text-xs text-[var(--sh-muted)]">{row.role}</p>}
+          <p className="mt-2 line-clamp-2 text-sm leading-5 text-[var(--sh-ink)]">{row.match_reason}</p>
+          <p className="mt-2 line-clamp-2 text-xs leading-5 text-amber-800">{row.primary_risk}</p>
+          <div className="mt-2 flex flex-wrap items-center gap-1.5">
+            <span className="rounded-full bg-[var(--sh-canvas)] px-2 py-0.5 text-xs font-semibold text-[var(--sh-muted)] ring-1 ring-black/10">
+              {row.independent_sources} sources
+            </span>
+            <span className="rounded-full bg-[var(--sh-canvas)] px-2 py-0.5 text-xs font-semibold text-[var(--sh-muted)] ring-1 ring-black/10">
+              {status}
+            </span>
+            <span className="rounded-full bg-neutral-950 px-2 py-0.5 text-xs font-semibold text-white">
+              {row.commercial_action.label}
+            </span>
+          </div>
+          {submission && (
+            <p className="mt-2 line-clamp-1 text-xs leading-5 text-[var(--sh-muted)]">
+              {workspaceUiCopy(locale, "submittedVia")} {submission.source}: {submission.reason || row.match_reason}
+            </p>
+          )}
+        </div>
+      </div>
+    </button>
+  );
+}
+
+function CandidateSourceLinks({ candidate, sourceTypes, locale }: { candidate: TalentCandidate; sourceTypes: string[] } & ResultLocaleProps) {
+  const links = [
+    ["GitHub", candidate.links.github],
+    ["LinkedIn", candidate.links.linkedin],
+    ["Scholar", candidate.links.scholar],
+    ["Hugging Face", candidate.links.huggingface],
+    [resultCopy(locale, "homepage"), candidate.links.website || candidate.links.other],
+  ].filter((entry): entry is [string, string] => Boolean(entry[1]));
+  return (
+    <div className="flex flex-wrap gap-1.5">
+      {links.map(([label, href]) => <LinkPill key={`${label}-${href}`} href={href}>{label}</LinkPill>)}
+      {links.length === 0 && sourceTypes.length === 0 && (
+        <span className="rounded-full bg-[var(--sh-canvas)] px-2.5 py-1 text-xs font-medium text-[var(--sh-muted)] ring-1 ring-black/10">
+          {workspaceUiCopy(locale, "noSources")}
+        </span>
+      )}
+      {sourceTypes.slice(0, 4).map((sourceType) => (
+        <span key={sourceType} className="rounded-full bg-[var(--sh-canvas)] px-2.5 py-1 text-xs font-medium text-[var(--sh-muted)] ring-1 ring-black/10">
+          {sourceType}
+        </span>
+      ))}
+    </div>
+  );
+}
+
+export function SearchResultWorkspaceView({
+  result,
+  stats,
+  selectedIndex,
+  shortlist,
+  decisions,
+  loading,
+  commercialNotice,
+  onOpenCandidate,
+  onAddToPool,
+  onNeedEvidence,
+  onPass,
+  onOutreach,
+  onGetEmail,
+  onShowProcess,
+  locale,
+}: {
+  result: TalentSearchResult;
+  stats?: WorkspaceStats | null;
+  selectedIndex: number | null;
+  shortlist: number[];
+  decisions: Record<number, string>;
+  loading: boolean;
+  commercialNotice?: string;
+  onOpenCandidate: (index: number) => void;
+  onAddToPool: (index: number, candidate: TalentCandidate) => void;
+  onNeedEvidence: (index: number, candidate: TalentCandidate, job?: CoverageBackfillJob) => void;
+  onPass: (index: number) => void;
+  onOutreach: () => void;
+  onGetEmail: (index: number, candidate: TalentCandidate) => void;
+  onShowProcess: () => void;
+} & ResultLocaleProps) {
+  const workspace = buildSearchResultWorkspace(result, { locale, stats: stats ?? undefined }) as SearchResultWorkspace;
+  const requestedIndex = selectedIndex ?? workspace.selected_candidate_index ?? 0;
+  const safeSelectedIndex = Math.min(Math.max(0, requestedIndex), Math.max(0, result.candidates.length - 1));
+  const selectedCandidate = result.candidates[safeSelectedIndex] ?? result.candidates[0];
+  const selectedRow = workspace.candidates.find((row) => row.index === safeSelectedIndex) ?? workspace.candidates[0];
+  if (!selectedCandidate || !selectedRow) return null;
+  const saved = shortlist.includes(safeSelectedIndex);
+
+  return (
+    <section className="space-y-4">
+      <ResultSurface>
+        <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
+          <div className="max-w-3xl">
+            <p className="inline-flex items-center gap-2 text-xs font-semibold text-emerald-700">
+              <FiCheckCircle aria-hidden="true" />
+              {workspace.completion.label}
+            </p>
+            <h2 className="mt-2 text-xl font-semibold text-[var(--sh-ink)]">{workspace.summary}</h2>
+          </div>
+          <button type="button" onClick={onShowProcess} className="sh-secondary-action shrink-0 px-4">
+            <FiRefreshCw aria-hidden="true" />
+            {workspaceUiCopy(locale, "showProcess")}
+          </button>
+        </div>
+        <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <WorkspaceMetric label={workspaceUiCopy(locale, "candidatesFound")} value={workspace.completion.candidate_count} />
+          <WorkspaceMetric label={workspaceUiCopy(locale, "submitted")} value={workspace.completion.submitted_count} />
+          <WorkspaceMetric label={workspaceUiCopy(locale, "trace")} value={workspace.completion.execution_trace_count || workspace.completion.tool_count || workspace.completion.source_count} />
+          <WorkspaceMetric label={workspaceUiCopy(locale, "coverage")} value={`${workspace.completion.covered_group_count}/${workspace.completion.coverage_group_count}`} />
+        </div>
+        <div className="mt-3 grid gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(240px,0.45fr)]">
+          {workspace.delivery_clusters.length > 0 && (
+            <div className="rounded-2xl bg-white/72 p-3 ring-1 ring-black/5">
+              <p className="text-xs font-semibold text-[var(--sh-muted)]">{workspaceUiCopy(locale, "deliveryClusters")}</p>
+              <div className="mt-2 flex flex-wrap gap-2">
+                {workspace.delivery_clusters.map((cluster) => (
+                  <span key={cluster.key} className="rounded-full bg-[var(--sh-canvas)] px-2.5 py-1 text-xs font-semibold text-[var(--sh-ink)] ring-1 ring-black/10">
+                    {cluster.label} {cluster.candidate_indices.length}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+          <div className="rounded-2xl bg-white/72 p-3 ring-1 ring-black/5">
+            <p className="text-xs font-semibold text-[var(--sh-muted)]">{workspaceUiCopy(locale, "sourceMix")}</p>
+            <p className="mt-2 text-sm leading-6 text-[var(--sh-ink)]">
+              {workspace.agent_execution.telemetry.source_mix.slice(0, 5).map((item) => `${item.source_type} ${item.count}`).join(" / ") || `${workspace.completion.searches} ${workspaceUiCopy(locale, "searches")} / ${workspace.completion.fetches} ${workspaceUiCopy(locale, "fetches")}`}
+            </p>
+            {workspace.completion.duration_seconds > 0 && (
+              <p className="mt-1 text-xs text-[var(--sh-muted)]">{workspace.completion.duration_seconds}{workspaceUiCopy(locale, "seconds")}</p>
+            )}
+          </div>
+        </div>
+      </ResultSurface>
+
+      <section className="grid gap-4 xl:grid-cols-[minmax(360px,0.9fr)_minmax(0,1.1fr)]">
+        <div className="space-y-3">
+          <div className="rounded-2xl border border-black/10 bg-white/82 p-4">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <h2 className="text-base font-semibold text-[var(--sh-ink)]">{workspaceUiCopy(locale, "listTitle")}</h2>
+                <p className="mt-1 text-xs leading-5 text-[var(--sh-muted)]">{workspaceUiCopy(locale, "listDesc")}</p>
+              </div>
+              <span className="rounded-full bg-[var(--sh-canvas)] px-2.5 py-1 text-xs font-semibold text-[var(--sh-muted)] ring-1 ring-black/10">
+                {workspace.groups.map((group) => `${group.label} ${group.count}`).join(" / ")}
+              </span>
+            </div>
+          </div>
+          <div className="space-y-3">
+            {workspace.groups.map((group) => {
+              const rows = group.candidate_indices
+                .map((index) => workspace.candidates.find((row) => row.index === index))
+                .filter((row): row is SearchResultWorkspace["candidates"][number] => Boolean(row));
+              return (
+                <section key={group.key} className="rounded-2xl border border-black/10 bg-white/70 p-3">
+                  <div className="mb-2 flex flex-wrap items-start justify-between gap-2">
+                    <div>
+                      <h3 className="text-sm font-semibold text-[var(--sh-ink)]">{group.label}</h3>
+                      <p className="mt-0.5 text-xs leading-5 text-[var(--sh-muted)]">{group.description}</p>
+                    </div>
+                    <span className="rounded-full bg-[var(--sh-canvas)] px-2 py-0.5 text-xs font-semibold text-[var(--sh-muted)] ring-1 ring-black/10">
+                      {group.count}
+                    </span>
+                  </div>
+                  <div className="space-y-2">
+                    {rows.map((row) => (
+                      <WorkspaceCandidateRow
+                        key={`${row.name}-${row.index}`}
+                        row={row}
+                        selected={row.index === safeSelectedIndex}
+                        saved={shortlist.includes(row.index)}
+                        decision={decisions[row.index]}
+                        onOpen={() => onOpenCandidate(row.index)}
+                        locale={locale}
+                      />
+                    ))}
+                  </div>
+                </section>
+              );
+            })}
+          </div>
+        </div>
+
+        <aside className="space-y-3 xl:sticky xl:top-6 xl:self-start">
+          <div className="rounded-[24px] border border-black/10 bg-white/88 p-4 shadow-[0_18px_52px_rgba(0,0,0,0.06)]">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div className="min-w-0">
+                <p className="text-xs font-semibold text-[var(--sh-muted)]">{workspaceUiCopy(locale, "drawerTitle")}</p>
+                <div className="mt-2 flex items-center gap-3">
+                  <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-[var(--sh-canvas)] text-base font-semibold text-[var(--sh-ink)] ring-1 ring-black/10">
+                    {selectedRow.initials}
+                  </span>
+                  <div className="min-w-0">
+                    <h2 className="text-xl font-semibold text-[var(--sh-ink)]">{selectedRow.name}</h2>
+                    {selectedRow.role && <p className="mt-1 text-sm leading-5 text-[var(--sh-muted)]">{selectedRow.role}</p>}
+                  </div>
+                </div>
+              </div>
+              <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700 ring-1 ring-emerald-100">
+                {selectedRow.match_score}%
+              </span>
+            </div>
+
+            <div className="mt-4">
+              <CandidateSourceLinks candidate={selectedCandidate} sourceTypes={selectedRow.source_types} locale={locale} />
+            </div>
+
+            <div className="mt-4 rounded-2xl bg-[var(--sh-canvas)] p-3">
+              <p className="text-xs font-semibold text-[var(--sh-muted)]">{workspaceUiCopy(locale, "matchContext")}</p>
+              <p className="mt-1 text-sm leading-6 text-[var(--sh-ink)]">{selectedRow.match_reason}</p>
+            </div>
+            <div className="mt-3 rounded-2xl border border-amber-100 bg-amber-50/70 p-3">
+              <p className="text-xs font-semibold text-amber-800">{workspaceUiCopy(locale, "primaryRisk")}</p>
+              <p className="mt-1 text-sm leading-6 text-amber-950">{selectedRow.primary_risk}</p>
+            </div>
+
+            <div className="mt-4 grid gap-2 sm:grid-cols-2">
+              <button
+                type="button"
+                onClick={() => onGetEmail(safeSelectedIndex, selectedCandidate)}
+                disabled={!selectedRow.commercial_action.enabled}
+                title={selectedRow.commercial_action.reason}
+                className="inline-flex min-h-10 items-center justify-center gap-2 rounded-full bg-[var(--sh-ink)] px-4 py-2 text-sm font-semibold text-white transition hover:bg-black disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <FiMail aria-hidden="true" />
+                {selectedRow.commercial_action.label}
+              </button>
+              <button
+                type="button"
+                onClick={() => onAddToPool(safeSelectedIndex, selectedCandidate)}
+                disabled={saved}
+                className="inline-flex min-h-10 items-center justify-center rounded-full bg-white px-4 py-2 text-sm font-semibold text-[var(--sh-ink)] ring-1 ring-black/10 transition hover:bg-neutral-50 disabled:cursor-default disabled:bg-gray-100 disabled:text-gray-400"
+              >
+                {saved ? workspaceUiCopy(locale, "shortlisted") : workspaceUiCopy(locale, "shortlist")}
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  onOpenCandidate(safeSelectedIndex);
+                  onOutreach();
+                }}
+                className="inline-flex min-h-10 items-center justify-center rounded-full bg-white px-4 py-2 text-sm font-semibold text-[var(--sh-ink)] ring-1 ring-black/10 transition hover:bg-neutral-50"
+              >
+                {workspaceUiCopy(locale, "draftOutreach")}
+              </button>
+              <button
+                type="button"
+                onClick={() => onNeedEvidence(safeSelectedIndex, selectedCandidate)}
+                disabled={loading}
+                className="inline-flex min-h-10 items-center justify-center rounded-full bg-white px-4 py-2 text-sm font-semibold text-amber-800 ring-1 ring-amber-200 transition hover:bg-amber-50 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {workspaceUiCopy(locale, "needEvidence")}
+              </button>
+              <button
+                type="button"
+                onClick={() => onPass(safeSelectedIndex)}
+                className="inline-flex min-h-10 items-center justify-center rounded-full bg-white px-4 py-2 text-sm font-semibold text-[var(--sh-muted)] ring-1 ring-black/10 transition hover:bg-neutral-50 sm:col-span-2"
+              >
+                {workspaceUiCopy(locale, "pass")}
+              </button>
+            </div>
+            {commercialNotice && (
+              <div className="mt-3 rounded-2xl border border-blue-100 bg-blue-50/70 p-3 text-sm leading-6 text-blue-900">
+                <p className="font-semibold">{workspaceUiCopy(locale, "noticeTitle")}</p>
+                <p className="mt-1">{commercialNotice}</p>
+              </div>
+            )}
+          </div>
+
+          <CandidateProfileView
+            candidate={selectedCandidate}
+            result={result}
+            onBackfillJob={(job) => onNeedEvidence(safeSelectedIndex, selectedCandidate, job)}
+            backfillDisabled={loading}
+            locale={locale}
+          />
+        </aside>
+      </section>
+
+      <details className="group rounded-2xl border border-black/10 bg-white/78 p-4">
+        <summary className="flex cursor-pointer list-none items-center justify-between gap-3 text-sm font-semibold text-[var(--sh-ink)]">
+          <span className="inline-flex items-center gap-2">
+            <FiClock aria-hidden="true" />
+            {workspaceUiCopy(locale, "researchLog")}
+          </span>
+          <FiChevronDown className="transition group-open:rotate-180" aria-hidden="true" />
+        </summary>
+        <p className="mt-2 text-sm leading-6 text-[var(--sh-muted)]">{workspace.research_log.summary || workspaceUiCopy(locale, "researchLogDesc")}</p>
+        <div className="mt-4 space-y-4">
+          <SearchPlanView result={result} locale={locale} />
+          <SourceExecutionView result={result} locale={locale} />
+          <CoverageBackfillView result={result} locale={locale} />
+          <EvidenceCoverageView result={result} locale={locale} />
+          <TalentMapView result={result} locale={locale} />
+          <CandidateComparisonView result={result} locale={locale} />
+        </div>
+        {workspace.research_log.execution_trace.length > 0 && (
+          <div className="mt-3 grid gap-2">
+            {workspace.research_log.execution_trace.slice(0, 8).map((trace) => (
+              <div key={trace.trace_id} className="rounded-xl bg-[var(--sh-canvas)] p-3 text-xs leading-5 text-[var(--sh-muted)] ring-1 ring-black/5">
+                <span className="font-semibold text-[var(--sh-ink)]">{trace.tool}</span>
+                <span> · {trace.status}</span>
+                <span> · {trace.candidates_found} candidates / {trace.evidence_found} evidence</span>
+                {trace.query && <p className="mt-1 break-words font-mono">{trace.query}</p>}
+                {trace.note && <p className="mt-1">{trace.note}</p>}
+              </div>
+            ))}
+          </div>
+        )}
+      </details>
+    </section>
+  );
+}
+
 function AuditStat({ label, value, tone }: { label: string; value: number; tone: "emerald" | "amber" | "red" | "gray" }) {
   const toneClass = {
     emerald: "bg-emerald-50 text-emerald-700 ring-emerald-100",
@@ -1609,21 +2051,205 @@ function CandidateEvidenceDossierView({
   );
 }
 
+export function CandidateReviewBriefView({ brief }: { brief: CandidateReviewBrief }) {
+  return (
+    <section className="mt-4 rounded-2xl border border-black/10 bg-[var(--sh-canvas)] p-4">
+      <p className="text-sm font-semibold text-gray-900">{brief.title}</p>
+      <div className="mt-3 grid gap-3 md:grid-cols-3">
+        {brief.sections.map((section) => (
+          <div key={section.key} className="rounded-xl bg-white/80 p-3 ring-1 ring-black/5">
+            <p className="text-xs font-semibold text-gray-500">{section.label}</p>
+            <p className="mt-1 text-sm leading-relaxed text-gray-800">{section.body}</p>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function verticalProfileCopy(locale: Locale | undefined, key: "title" | "sources" | "confidence" | "similar" | "noSimilar") {
+  const copy = {
+    zh: {
+      title: "AI 垂直画像",
+      sources: "可缓存来源",
+      confidence: "证据可信度",
+      similar: "相似候选人",
+      noSimilar: "暂无相似候选人建议",
+    },
+    en: {
+      title: "AI vertical profile",
+      sources: "Cacheable sources",
+      confidence: "Evidence confidence",
+      similar: "Similar candidates",
+      noSimilar: "No similar candidate suggestions yet",
+    },
+  };
+  return copy[locale === "en" ? "en" : "zh"][key];
+}
+
+function verticalQualityLabel(value: string, locale: Locale | undefined) {
+  if (value === "high") return resultCopy(locale, "evidenceStrong");
+  if (value === "low") return resultCopy(locale, "evidenceWeak");
+  return resultCopy(locale, "evidenceMedium");
+}
+
+export function AIVerticalProfileView({
+  result,
+  candidate,
+  locale,
+}: {
+  result?: TalentSearchResult;
+  candidate: TalentCandidate;
+} & ResultLocaleProps) {
+  const cacheEntry = buildCandidateProfileCacheEntry({ result, candidate }) as CandidateProfileCacheEntry;
+  const similar = buildSimilarCandidateSuggestions({ result, candidate, limit: 3 }) as SimilarCandidateSuggestion[];
+  const sourceText = cacheEntry.source_types.length > 0 ? cacheEntry.source_types.join(", ") : resultCopy(locale, "none");
+
+  return (
+    <section className="mt-4 rounded-2xl border border-blue-100 bg-blue-50/55 p-4">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <p className="text-sm font-semibold text-blue-950">{verticalProfileCopy(locale, "title")}</p>
+          <div className="mt-2 flex flex-wrap gap-1.5">
+            {cacheEntry.vertical_tags.map((tag) => (
+              <span key={tag} className="rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-blue-800 ring-1 ring-blue-100">
+                {tag}
+              </span>
+            ))}
+          </div>
+        </div>
+        <div className="text-right text-xs leading-5 text-blue-900/75">
+          <p><span className="font-semibold">{verticalProfileCopy(locale, "confidence")}:</span> {verticalQualityLabel(cacheEntry.confidence, locale)}</p>
+          <p><span className="font-semibold">{verticalProfileCopy(locale, "sources")}:</span> {sourceText}</p>
+        </div>
+      </div>
+      <div className="mt-3 rounded-xl bg-white/72 p-3 ring-1 ring-blue-100">
+        <p className="text-xs font-semibold text-blue-950">{verticalProfileCopy(locale, "similar")}</p>
+        {similar.length > 0 ? (
+          <div className="mt-2 space-y-2">
+            {similar.map((item) => (
+              <div key={item.name} className="flex flex-wrap items-center justify-between gap-2 text-sm text-blue-950">
+                <span className="font-medium">{item.name}</span>
+                <span className="text-xs text-blue-800/70">{item.shared_vertical_tags.join(", ") || item.shared_directions.join(", ")}</span>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className="mt-1 text-sm text-blue-900/70">{verticalProfileCopy(locale, "noSimilar")}</p>
+        )}
+      </div>
+    </section>
+  );
+}
+
+function TalentIntelligencePanel({
+  report,
+  related,
+  locale,
+}: {
+  report: {
+    evidence_quality: string;
+    audit: { verified_count: number; unverified_count: number; contradicted_count: number; independent_sources: number };
+    sections: Array<{ key: string; title: string; evidence_count: number; summary: string }>;
+    next_actions: string[];
+  };
+  related: {
+    items: Array<{ name: string; role: string; relation_reason: string; evidence_urls: string[] }>;
+    generated_search_brief: string;
+  };
+  locale: Locale;
+}) {
+  const isEn = locale === "en";
+  return (
+    <section className="mt-4 rounded-2xl border border-black/10 bg-white/70 p-4">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <p className="text-sm font-semibold text-gray-900">{isEn ? "Talent Intelligence Report" : "人才情报报告"}</p>
+          <p className="mt-1 text-xs leading-5 text-gray-500">
+            {isEn ? "Four capability views grounded in public evidence." : "围绕公开证据拆解技术、研究、影响力和职业轨迹。"}
+          </p>
+        </div>
+        <div className="flex flex-wrap gap-1.5">
+          <span className="rounded-full bg-emerald-50 px-2 py-1 text-xs font-semibold text-emerald-700 ring-1 ring-emerald-200">
+            {isEn ? "Verified" : "已验证"} {report.audit.verified_count}
+          </span>
+          <span className="rounded-full bg-amber-50 px-2 py-1 text-xs font-semibold text-amber-800 ring-1 ring-amber-200">
+            {isEn ? "Gaps" : "缺口"} {report.audit.unverified_count}
+          </span>
+          <span className="rounded-full bg-gray-50 px-2 py-1 text-xs font-semibold text-gray-700 ring-1 ring-gray-200">
+            {isEn ? "Sources" : "来源"} {report.audit.independent_sources}
+          </span>
+        </div>
+      </div>
+      <div className="mt-3 grid gap-2 sm:grid-cols-2">
+        {report.sections.map((section) => (
+          <div key={section.key} className="rounded-xl bg-gray-50 p-3 ring-1 ring-black/5">
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-xs font-semibold text-gray-900">{section.title}</p>
+              <span className="text-[11px] font-medium text-gray-500">{section.evidence_count}</span>
+            </div>
+            <p className="mt-1 line-clamp-2 text-xs leading-5 text-gray-600">{section.summary}</p>
+          </div>
+        ))}
+      </div>
+      <div className="mt-3 rounded-xl bg-blue-50/70 p-3 ring-1 ring-blue-100">
+        <p className="text-xs font-semibold text-blue-900">{isEn ? "Recommended next steps" : "推荐下一步"}</p>
+        <ul className="mt-1 list-disc space-y-1 pl-5 text-xs leading-5 text-blue-900/80">
+          {report.next_actions.map((action) => <li key={action}>{action}</li>)}
+        </ul>
+      </div>
+      <div className="mt-3 rounded-xl bg-white p-3 ring-1 ring-black/5">
+        <p className="text-xs font-semibold text-gray-900">{isEn ? "Related Talent" : "相关人才"}</p>
+        {related.items.length > 0 ? (
+          <div className="mt-2 space-y-2">
+            {related.items.slice(0, 4).map((item) => (
+              <div key={item.name} className="rounded-lg bg-gray-50 px-3 py-2">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <span className="text-sm font-medium text-gray-900">{item.name}</span>
+                  {item.role && <span className="text-xs text-gray-500">{item.role}</span>}
+                </div>
+                <p className="mt-1 text-xs leading-5 text-gray-600">{item.relation_reason}</p>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className="mt-1 text-xs leading-5 text-gray-500">
+            {isEn ? "No evidence-backed related candidates in this result yet." : "本轮结果里暂未发现有证据支撑的相关候选人。"}
+          </p>
+        )}
+        <p className="mt-2 rounded-lg bg-gray-50 p-2 text-xs leading-5 text-gray-600">{related.generated_search_brief}</p>
+      </div>
+    </section>
+  );
+}
+
 export function CandidateProfileView({
   candidate,
   result,
+  relatedCandidates,
   onBackfillJob,
   backfillDisabled = false,
   locale,
 }: {
   candidate: TalentCandidate;
   result?: TalentSearchResult;
+  relatedCandidates?: unknown[];
   onBackfillJob?: (job: CoverageBackfillJob) => void;
   backfillDisabled?: boolean;
 } & ResultLocaleProps) {
   const readingSummary = buildCandidateReadingSummary({ result, candidate, locale: locale ?? "zh" }) as CandidateReadingSummary;
+  const reviewBrief = buildCandidateReviewBrief({ result, candidate, locale: locale ?? "zh" }) as CandidateReviewBrief;
   const dossier = buildCandidateEvidenceDossier({ result, candidate, locale: locale ?? "zh" }) as CandidateEvidenceDossier;
   const evidenceMatrix = buildCandidateEvidenceMatrix({ result, candidate, locale: locale ?? "zh" }) as CandidateEvidenceMatrix;
+  const intelligence = buildTalentIntelligenceReport({ candidate, locale: locale ?? "zh" });
+  const relatedTalent = buildRelatedTalentView({
+    candidate,
+    pool: ((relatedCandidates ?? result?.candidates ?? []) as TalentCandidate[]).filter((item) => item.name !== candidate.name) as never[],
+    locale: locale ?? "zh",
+  }) as {
+    items: Array<{ name: string; role: string; relation_reason: string; evidence_urls: string[] }>;
+    generated_search_brief: string;
+  };
 
   return (
     <article className="rounded-[28px] border border-black/10 bg-white/86 p-5 shadow-[0_18px_52px_rgba(0,0,0,0.06)]">
@@ -1639,6 +2265,12 @@ export function CandidateProfileView({
           <CandidateMeta candidate={candidate} />
         </div>
       </div>
+
+      <CandidateReviewBriefView brief={reviewBrief} />
+
+      <TalentIntelligencePanel report={intelligence} related={relatedTalent} locale={locale ?? "zh"} />
+
+      <AIVerticalProfileView result={result} candidate={candidate} locale={locale} />
 
       <CandidateReadingSummaryView summary={readingSummary} />
 

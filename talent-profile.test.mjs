@@ -8,11 +8,16 @@ import {
   buildSourceExecution,
   buildSourceQueryPlan,
   buildCandidateComparisonRows,
+  buildAgentExecutionLayer,
+  buildAgentSearchStrategy,
+  buildSearchResultWorkspace,
   normalizeTalentSearchResult,
   isTalentSearchResult,
+  parsePublicTalentSource,
 } from "./web/lib/talent-profile.mjs";
 import { researchStream } from "./web/lib/miro.ts";
 import {
+  buildCandidateEvidenceSourceRowsForRun as buildWorkerCandidateEvidenceSourceRowsForRun,
   normalizeTalentSearchResult as normalizeWorkerTalentSearchResult,
 } from "./worker/talent-profile.mjs";
 
@@ -223,6 +228,281 @@ test("builds executable source query plan from brief and source strategy", () =>
   assert.match(plan[1].query, /site:arxiv.org/);
 });
 
+test("builds agent search strategy with multi-channel query fan-out", () => {
+  const strategy = buildAgentSearchStrategy("AI Marketing / AI 增长负责人，Web3 + AI 招聘赛道，内容矩阵，小红书 Twitter", {
+    locale: "zh",
+    cachedCandidateHints: [{ name: "Ada Growth" }],
+  });
+
+  assert.equal(strategy.channels.length >= 4, true);
+  assert.equal(strategy.role_category, "growth_marketing");
+  assert.equal(strategy.recall_mode, "aggressive_public_web_recall");
+  assert.ok(strategy.channels.some((channel) => channel.key === "content-social"));
+  assert.equal(strategy.channels.some((channel) => channel.key === "open-source" && channel.coverage_group === "practice"), false);
+  assert.ok(strategy.channels.some((channel) => channel.coverage_group === "public_voice"));
+  assert.ok(strategy.channels.flatMap((channel) => channel.query_variants).some((query) => /AI Marketing|AI 增长|内容矩阵/.test(query)));
+  assert.ok(strategy.score_dimensions.some((item) => /增长|Growth/i.test(item.label)));
+  assert.ok(strategy.evidence_priorities.some((item) => /没有具体 URL/.test(item)));
+  assert.ok(strategy.evidence_priorities.some((item) => /Ada Growth/.test(item)));
+});
+
+test("detects 12 internet role categories and builds role-specific playbooks", () => {
+  const cases = [
+    ["React Next.js 全栈工程师 Node.js Python", "software_engineering", /GitHub|Stack Overflow|技术社区/i],
+    ["机器学习算法工程师 推荐系统 数据科学 Python", "ai_ml_data", /Google Scholar|Kaggle|Hugging Face|论文/i],
+    ["B2B SaaS 产品经理 增长产品 用户路径", "product_management", /Product Hunt|产品案例|roadmap/i],
+    ["UX Designer 产品设计师 Figma 作品集", "design_creative", /Behance|Dribbble|portfolio|作品集/i],
+    ["AI Marketing 增长负责人 内容矩阵 小红书 Twitter", "growth_marketing", /内容平台|小红书|Twitter|case study/i],
+    ["社区运营 用户运营 活动运营 Discord", "operations_community", /Discord|社区|活动|社群/i],
+    ["BD 商务拓展 SaaS 销售 GTM enterprise", "sales_bd_gtm", /客户案例|CRM|Sales Navigator|company/i],
+    ["客户成功 解决方案 售前 支持 renewal", "customer_success_support", /case study|客户成功|support|solution/i],
+    ["DevOps SRE 云原生 Kubernetes 安全", "security_infra_devops", /CNCF|GitHub|安全|incident/i],
+    ["CEO Office 战略 经营分析 商业分析", "business_strategy_ops", /咨询|strategy|analysis|经营/i],
+    ["招聘负责人 HRBP 财务 法务 行政", "people_finance_admin", /LinkedIn|HR|招聘|finance/i],
+    ["COO VP Growth 创始型业务负责人", "executive_founder_leadership", /founder|CEO|高管|媒体/i],
+  ];
+
+  for (const [query, expectedCategory, channelPattern] of cases) {
+    assert.equal(talentProfile.detectInternetRoleCategory(query), expectedCategory);
+    const playbook = talentProfile.buildInternetRoleSearchPlaybook(query, { locale: "zh" });
+    assert.equal(playbook.role_category, expectedCategory);
+    assert.ok(playbook.channels.length >= 4);
+    assert.ok(playbook.channels.some((channel) => channelPattern.test(`${channel.target} ${channel.label} ${channel.query_variants.join(" ")}`)), query);
+    assert.ok(playbook.query_clusters.some((cluster) => cluster.key === "precise_match"));
+    assert.ok(playbook.score_dimensions.length >= 4);
+  }
+});
+
+test("cleans pasted internet JD into role context without polluting candidate requirements", () => {
+  const jd = [
+    "AI Marketing / AI 增长负责人",
+    "复制",
+    "复制",
+    "",
+    "分享",
+    "分享",
+    "#Web3",
+    "#员工内推",
+    "#AI",
+    "岗位职责",
+    "你将负责从 0 到 1 搭建 OkayJob 的「AI 驱动增长体系」：",
+    "1. 全网内容与流量增长",
+    "负责在以下平台建立内容矩阵：",
+    "* Twitter（X）、小红书、知乎、公众号、YouTube、TikTok",
+    "岗位要求",
+    "必备能力（硬要求）",
+    "* 熟悉至少 2 个主流内容平台（如小红书 / Twitter / 公众号）",
+    "* 有实际增长案例（比如从 0→1 或 10万+用户）",
+    "* 熟练使用 AI 工具",
+    "加分项（强烈加分）",
+    "做过 AI 产品或增长项目",
+    "会搭建自动化营销系统",
+    "我们不想要的人",
+    "* 只会“写文案”，但没有增长结果",
+    "* 只做执行，不思考增长策略",
+    "岗位备注",
+    "* Web3 + AI 的高增长赛道",
+  ].join("\n");
+
+  const draft = talentProfile.buildSearchIntakeDraft(jd, { locale: "zh" });
+
+  assert.equal(draft.role_category, "growth_marketing");
+  assert.equal(draft.role_title, "AI Marketing / AI 增长负责人");
+  assert.ok(draft.employer_context.some((item) => /OkayJob/.test(item)));
+  assert.ok(draft.candidate_requirements.some((item) => /主流内容平台|增长案例|AI 工具/.test(item)));
+  assert.ok(draft.nice_to_have.some((item) => /AI 产品|自动化营销系统/.test(item)));
+  assert.ok(draft.exclusions.some((item) => /只会.*写文案|不思考增长策略/.test(item)));
+  assert.ok(draft.raw_noise.includes("复制"));
+  assert.equal(draft.must_have.some((item) => /OkayJob/.test(item)), false);
+  assert.equal(draft.must_have.some((item) => /^复制$|^分享$|#Web3/.test(item)), false);
+
+  const input = talentProfile.buildSearchInputFromSearchIntake({ draft, locale: "zh" });
+  assert.match(input, /岗位类别：增长\/市场\/品牌\/内容/);
+  assert.match(input, /role_category: growth_marketing/);
+  assert.match(input, /雇主背景：/);
+  assert.match(input, /渠道计划：/);
+  assert.doesNotMatch(input, /^复制$/m);
+});
+
+test("role detection prioritizes role title over employer market context", () => {
+  const growthJd = [
+    "AI Growth / Marketing Lead",
+    "职责:",
+    "负责 OkayJob HR SaaS recruiting automation 平台增长",
+    "要求:",
+    "熟悉小红书/Twitter 内容矩阵，有增长案例",
+  ].join("\n");
+  const productJd = [
+    "Product Manager",
+    "职责:",
+    "负责 Recruiting SaaS 产品路线图和用户路径",
+    "要求:",
+    "B2B SaaS 产品经验，做过自动化工作流",
+  ].join("\n");
+
+  const growthDraft = talentProfile.buildSearchIntakeDraft(growthJd, { locale: "zh" });
+  const productDraft = talentProfile.buildSearchIntakeDraft(productJd, { locale: "zh" });
+
+  assert.equal(talentProfile.detectInternetRoleCategory(growthJd), "growth_marketing");
+  assert.equal(growthDraft.role_category, "growth_marketing");
+  assert.ok(growthDraft.employer_context.some((item) => /OkayJob HR SaaS/.test(item)));
+  assert.ok(growthDraft.candidate_requirements.some((item) => /小红书|增长案例/.test(item)));
+  assert.equal(growthDraft.must_have.some((item) => /^职责:?$|^要求:?$/i.test(item)), false);
+
+  assert.equal(talentProfile.detectInternetRoleCategory(productJd), "product_management");
+  assert.equal(productDraft.role_category, "product_management");
+  assert.ok(productDraft.candidate_requirements.some((item) => /产品路线图|用户路径|B2B SaaS 产品经验/.test(item)));
+  assert.equal(productDraft.employer_context.some((item) => /产品路线图|B2B SaaS 产品经验/.test(item)), false);
+  assert.equal(productDraft.must_have.some((item) => /^职责:?$|^要求:?$/i.test(item)), false);
+
+  const queuedGrowthInput = talentProfile.buildSearchInputFromSearchIntake({ draft: growthDraft, locale: "zh" });
+  const queuedProductInput = talentProfile.buildSearchInputFromSearchIntake({ draft: productDraft, locale: "zh" });
+  assert.equal(buildAgentSearchStrategy(queuedGrowthInput, { locale: "zh" }).role_category, "growth_marketing");
+  assert.equal(buildAgentSearchStrategy(queuedProductInput, { locale: "zh" }).role_category, "product_management");
+});
+
+test("builds agent execution layer with submissions and delivery clusters", () => {
+  const result = {
+    search_brief: { original_query: "Find AI growth lead with Web3 and content matrix evidence" },
+    search_plan: {
+      source_strategy: [
+        {
+          source_type: "profile",
+          target: "LinkedIn",
+          coverage_group: "work_history",
+          query: "AI growth lead Web3 LinkedIn",
+          reason: "verify work history",
+        },
+        {
+          source_type: "blog",
+          target: "public content",
+          coverage_group: "public_voice",
+          query: "AI growth content matrix blog",
+          reason: "verify public voice",
+        },
+      ],
+    },
+    source_execution: {
+      jobs: [
+        {
+          job_id: "profile-1",
+          source_type: "profile",
+          coverage_group: "work_history",
+          query: "AI growth lead Web3 LinkedIn",
+          status: "completed",
+          urls_found: 3,
+          evidence_found: 2,
+          candidate_leads: ["Julio Barragan"],
+        },
+      ],
+    },
+    evidence_graph: {
+      source_mix: [
+        { source_type: "profile", count: 2 },
+        { source_type: "blog", count: 1 },
+      ],
+      candidates: [
+        {
+          candidate_name: "Julio Barragan",
+          independent_sources: 2,
+          source_types: ["profile", "blog"],
+          strongest_evidence: ["Company profile and campaign blog agree on AI + Web3 marketing work"],
+          weakest_evidence: [],
+          risk_flags: [],
+        },
+        {
+          candidate_name: "Single Source Lead",
+          independent_sources: 1,
+          source_types: ["profile"],
+          strongest_evidence: ["Profile headline mentions AI growth"],
+          weakest_evidence: ["Only one source supports the fit"],
+          risk_flags: ["single-source"],
+        },
+      ],
+    },
+    candidates: [
+      {
+        name: "Julio Barragan",
+        current_role: "Head of Marketing",
+        current_company: "Sahara AI",
+        match_score: 86,
+        strongest_signals: ["AI + Web3 marketing leader with public campaign evidence"],
+        claims: [
+          {
+            claim: "Works on AI + Web3 marketing",
+            verdict: "verified",
+            evidence: [
+              { note: "Company profile", url: "https://example.com/julio", source_type: "profile" },
+              { note: "Campaign blog", url: "https://example.com/blog", source_type: "blog" },
+            ],
+          },
+        ],
+        evidence_audit: { overall_evidence_quality: "high" },
+      },
+      {
+        name: "Single Source Lead",
+        current_role: "Growth Consultant",
+        current_company: "Example",
+        match_score: 82,
+        strongest_signals: ["LinkedIn headline mentions AI growth"],
+        claims: [
+          {
+            claim: "AI growth consultant",
+            verdict: "verified",
+            evidence: [{ note: "Profile", url: "https://example.com/profile", source_type: "profile" }],
+          },
+        ],
+        evidence_audit: { overall_evidence_quality: "medium" },
+      },
+    ],
+  };
+
+  const execution = buildAgentExecutionLayer(result, { locale: "zh", stats: { searches: 7, fetches: 4 }, durationMs: 123000 });
+
+  assert.equal(execution.candidate_submission_events.length, 2);
+  assert.equal(execution.candidate_submission_events[0].name, "Julio Barragan");
+  assert.equal(execution.candidate_submission_events[0].independent_sources, 2);
+  assert.equal(execution.execution_trace[0].tool, "profile");
+  assert.equal(execution.telemetry.search_count, 7);
+  assert.equal(execution.telemetry.fetch_count, 4);
+  assert.equal(execution.telemetry.submitted_count, 2);
+  assert.ok(execution.delivery_clusters.some((cluster) => cluster.key === "high_confidence" && cluster.candidate_indices.includes(0)));
+  assert.ok(execution.delivery_clusters.some((cluster) => cluster.key === "needs_verification" && cluster.candidate_indices.includes(1)));
+
+  const workspace = buildSearchResultWorkspace(result, { locale: "zh", stats: { searches: 7, fetches: 4, durationSeconds: 123 } });
+  assert.equal(workspace.completion.submitted_count, 2);
+  assert.equal(workspace.completion.execution_trace_count, 1);
+  assert.equal(workspace.candidates[0].submission.name, "Julio Barragan");
+  assert.ok(workspace.delivery_clusters.some((cluster) => cluster.key === "high_confidence"));
+  assert.equal(workspace.agent_execution.telemetry.source_mix.length, 2);
+});
+
+test("normalizes cached talent results without dropping persisted agent execution", () => {
+  const result = normalizeTalentSearchResult({
+    search_brief: { original_query: "Find AI growth lead" },
+    candidates: [{ name: "Ada Growth", match_score: 88 }],
+    agent_execution: {
+      search_strategy: {
+        summary: "Persisted strategy",
+        channels: [{ key: "people-profile", label: "People profiles", coverage_group: "work_history", source_types: ["profile"], query_variants: ["AI growth LinkedIn"], reason: "verify profile" }],
+        target_segments: [],
+        evidence_priorities: ["No URL, no verified claim."],
+      },
+      execution_trace: [{ trace_id: "trace-1", tool: "profile", source_type: "profile", coverage_group: "work_history", query: "AI growth LinkedIn", status: "completed", candidates_found: 1, evidence_found: 1, duration_ms: 12, note: "cached trace" }],
+      candidate_submission_events: [{ row_id: "row-1", candidate_index: 0, name: "Ada Growth", role: "Growth Lead", source: "profile", match_score: 88, evidence_quality: "medium", independent_sources: 1, reason: "cached submission", status: "submitted" }],
+      delivery_clusters: [{ key: "needs_verification", label: "Needs verification", candidate_indices: [0], rationale: "single source", next_action: "backfill" }],
+      telemetry: { duration_ms: 1200, search_count: 2, fetch_count: 1, tool_count: 1, submitted_count: 1, source_mix: [{ source_type: "profile", count: 1 }] },
+    },
+  });
+
+  assert.equal(result.agent_execution.search_strategy.summary, "Persisted strategy");
+  assert.equal(result.agent_execution.execution_trace[0].note, "cached trace");
+  assert.equal(result.agent_execution.candidate_submission_events[0].reason, "cached submission");
+  const workspace = buildSearchResultWorkspace(result, { locale: "en" });
+  assert.equal(workspace.agent_execution.telemetry.duration_ms, 1200);
+  assert.equal(workspace.candidates[0].submission.reason, "cached submission");
+});
+
 test("builds editable search plan draft and compiles it into search input", () => {
   assert.equal(typeof talentProfile.buildEditableSearchPlanDraft, "function");
   assert.equal(typeof talentProfile.buildSearchInputFromEditablePlan, "function");
@@ -249,6 +529,211 @@ test("builds editable search plan draft and compiles it into search input", () =
   assert.match(input, /Return the normal SignalHire talent shortlist payload/);
 });
 
+test("builds editable search plan by decomposing a pasted JD instead of copying the whole JD", () => {
+  const jd = [
+    "AI Marketing / AI 增长负责人",
+    "岗位职责",
+    "你将负责从 0 到 1 搭建 OkayJob 的「AI 驱动增长体系」：",
+    "1. 全网内容与流量增长，负责小红书、公众号、视频号、LinkedIn 等内容矩阵。",
+    "2. 增长实验与转化，设计落地页、注册、激活和转介绍实验。",
+    "任职要求",
+    "1. 3 年以上增长、内容营销或 AI 产品增长经验。",
+    "2. 熟悉 AI 工具、自动化工作流和数据分析。",
+    "加分项",
+    "- 做过海外市场增长。",
+    "- 有招聘或 HR SaaS 经验。",
+    "排除项",
+    "- 只做传统投放、没有内容或产品增长经验。",
+    "- 不能接受早期 0 到 1 环境。",
+  ].join("\n");
+
+  const draft = talentProfile.buildEditableSearchPlanDraft(jd, { locale: "zh" });
+  const plan = draft.search_plan;
+  const sourceQueries = plan.source_strategy.map((source) => source.query);
+
+  assert.ok(plan.must_have.some((item) => /AI Marketing|AI 增长/.test(item)));
+  assert.ok(plan.must_have.some((item) => /3 年以上|增长.*经验/.test(item)));
+  assert.ok(plan.nice_to_have.some((item) => /海外市场/.test(item)));
+  assert.ok(plan.exclusions.some((item) => /传统投放/.test(item)));
+
+  assert.equal(plan.must_have.includes(jd), false);
+  assert.equal(plan.source_strategy.some((source) => source.query.includes("岗位职责")), false);
+  assert.equal(sourceQueries.some((query) => query.length > 180), false);
+});
+
+test("builds a search result workspace with completion metrics, candidate groups, and commercial email entry", () => {
+  assert.equal(typeof buildSearchResultWorkspace, "function");
+
+  const result = normalizeTalentSearchResult({
+    search_brief: {
+      original_query: "Find AI full-stack engineers with Next.js and LangChain",
+    },
+    search_plan: {
+      source_strategy: [
+        { source_type: "code", target: "GitHub", reason: "verify projects", coverage_group: "practice", query: "Next.js LangChain site:github.com" },
+        { source_type: "profile", target: "LinkedIn", reason: "verify work history", coverage_group: "work_history", query: "AI full stack LinkedIn" },
+      ],
+    },
+    source_execution: {
+      jobs: [
+        { source_type: "code", query: "Next.js LangChain site:github.com", status: "completed", urls_found: 12, evidence_found: 4, candidate_leads: ["Ada Chen"] },
+        { source_type: "profile", query: "AI full stack LinkedIn", status: "partial", urls_found: 6, evidence_found: 1, candidate_leads: ["Bo Lin"] },
+      ],
+    },
+    evidence_graph: {
+      source_mix: [
+        { source_type: "code", count: 4 },
+        { source_type: "company", count: 1 },
+      ],
+      candidates: [
+        {
+          candidate_name: "Ada Chen",
+          independent_sources: 3,
+          source_types: ["code", "company"],
+          strongest_evidence: ["Maintains a LangChain app repository"],
+        },
+        {
+          candidate_name: "Bo Lin",
+          independent_sources: 1,
+          source_types: ["profile"],
+          weakest_evidence: ["Only one public profile supports current role"],
+        },
+      ],
+    },
+    candidates: [
+      {
+        name: "Ada Chen",
+        headline: "AI full-stack engineer",
+        current_role: "Engineer",
+        current_company: "Example AI",
+        match_score: 88,
+        strongest_signals: ["Maintains a LangChain app repository"],
+        ai_directions: ["Applied AI / Agents"],
+        evidence_audit: { overall_evidence_quality: "high" },
+        links: { github: "https://github.com/ada/langchain-app" },
+        claims: [
+          {
+            claim: "Maintains a LangChain app repository",
+            verdict: "verified",
+            evidence: [{ note: "repo", url: "https://github.com/ada/langchain-app", source_type: "code" }],
+          },
+        ],
+      },
+      {
+        name: "Bo Lin",
+        headline: "AI engineer",
+        match_score: 68,
+        uncertainties: ["Only one public profile supports current role"],
+        evidence_audit: { overall_evidence_quality: "low" },
+        claims: [
+          {
+            claim: "Works on AI full-stack apps",
+            verdict: "unverified",
+            evidence: [],
+          },
+        ],
+      },
+    ],
+  });
+
+  const workspace = buildSearchResultWorkspace(result, {
+    locale: "zh",
+    stats: { searches: 9, fetches: 57, durationSeconds: 218 },
+  });
+
+  assert.equal(workspace.completion.status, "complete");
+  assert.equal(workspace.completion.candidate_count, 2);
+  assert.equal(workspace.completion.tool_count, 2);
+  assert.equal(workspace.completion.searches, 9);
+  assert.equal(workspace.completion.fetches, 57);
+  assert.equal(workspace.completion.duration_seconds, 218);
+  assert.equal(workspace.selected_candidate_index, 0);
+  assert.equal(workspace.candidates[0].name, "Ada Chen");
+  assert.equal(workspace.candidates[0].commercial_action.label, "Get email -10");
+  assert.equal(workspace.candidates[0].commercial_action.cost, 10);
+  assert.equal(workspace.candidates[0].bucket, "high_confidence");
+  assert.equal(workspace.candidates[1].bucket, "needs_verification");
+  assert.ok(workspace.candidates[1].primary_risk.includes("Only one public profile"));
+  assert.deepEqual(workspace.groups.map((group) => group.key), ["high_confidence", "needs_verification"]);
+  assert.equal(workspace.research_log.default_open, false);
+  assert.equal(workspace.research_log.jobs.length, 2);
+  assert.ok(workspace.summary.includes("2 位候选人"));
+});
+
+test("builds search intake draft and clarification questions from a pasted JD", () => {
+  assert.equal(typeof talentProfile.buildSearchIntakeDraft, "function");
+  assert.equal(typeof talentProfile.buildSearchIntakeQuestions, "function");
+  assert.equal(typeof talentProfile.answerSearchIntakeQuestion, "function");
+  assert.equal(typeof talentProfile.buildSearchInputFromSearchIntake, "function");
+
+  const jd = [
+    "AI全栈开发工程师",
+    "岗位职责",
+    "负责 OkayJob 平台全栈迭代与 AI Agent 应用。",
+    "任职要求",
+    "熟悉 React/Next.js + Node.js/Python 全栈技术栈。",
+    "具备 vibe coding 实战作品和 AI 原生思维。",
+    "加分项",
+    "开源维护、技术内容创作、LangChain/AutoGPT 等 LLM 应用经验。",
+    "排除项",
+    "纯传统 CRUD 开发，无 AI 原生开发经验。",
+  ].join("\n");
+
+  const draft = talentProfile.buildSearchIntakeDraft(jd, { locale: "zh" });
+  assert.equal(draft.role_title, "AI全栈开发工程师");
+  assert.ok(draft.must_have.some((item) => /React\/Next\.js/.test(item)));
+  assert.ok(draft.nice_to_have.some((item) => /开源维护/.test(item)));
+  assert.ok(draft.exclusions.some((item) => /传统 CRUD/.test(item)));
+  assert.ok(draft.unknowns.includes("location"));
+  assert.ok(draft.unknowns.includes("salary"));
+  assert.ok(draft.unknowns.includes("target_count"));
+
+  const questions = talentProfile.buildSearchIntakeQuestions(draft, { locale: "zh" });
+  assert.deepEqual(questions.slice(0, 3).map((question) => question.key), ["location", "salary", "target_count"]);
+  assert.ok(questions[0].options.some((option) => option.value === "remote_anywhere"));
+  assert.equal(questions.every((question) => question.skippable), true);
+
+  const withLocation = talentProfile.answerSearchIntakeQuestion(draft, {
+    key: "location",
+    value: "remote_anywhere",
+    label: "不限地点（全国/海外远程均可）",
+  });
+  const withSalary = talentProfile.answerSearchIntakeQuestion(withLocation, {
+    key: "salary",
+    value: "20-30K",
+    label: "20-30K",
+  });
+  const withCount = talentProfile.answerSearchIntakeQuestion(withSalary, {
+    key: "target_count",
+    value: "many",
+    label: "越多越好",
+  });
+
+  assert.equal(withCount.clarification.location, "不限地点（全国/海外远程均可）");
+  assert.equal(withCount.clarification.salary, "20-30K");
+  assert.equal(withCount.clarification.target_count, "越多越好");
+  assert.equal(withCount.unknowns.includes("location"), false);
+
+  const input = talentProfile.buildSearchInputFromSearchIntake({ draft: withCount, locale: "zh" });
+  assert.match(input, /搜索前需求确认/);
+  assert.match(input, /地点：不限地点/);
+  assert.match(input, /薪资：20-30K/);
+  assert.match(input, /目标候选数量：越多越好/);
+  assert.doesNotMatch(input, /岗位职责/);
+});
+
+test("keeps skipped search intake questions out of the clarification queue", () => {
+  const draft = talentProfile.buildSearchIntakeDraft("AI 全栈开发工程师，熟悉 React 和 AI Agent", { locale: "zh" });
+  const skipped = ["location", "salary", "target_count"].reduce((current, key) => talentProfile.answerSearchIntakeQuestion(current, {
+    key,
+    skipped: true,
+  }), draft);
+
+  assert.deepEqual(skipped.unknowns, []);
+  assert.deepEqual(skipped.skipped_questions, ["location", "salary", "target_count"]);
+  assert.deepEqual(talentProfile.buildSearchIntakeQuestions(skipped, { locale: "zh" }), []);
+});
+
 test("builds Chinese editable search plan input copy", () => {
   const draft = talentProfile.buildEditableSearchPlanDraft("Find senior LLM inference engineers with vLLM");
   const input = talentProfile.buildSearchInputFromEditablePlan({ draft, locale: "zh" });
@@ -264,12 +749,132 @@ test("builds Chinese editable search plan input copy", () => {
 
 test("builds localized editable search plan draft copy", () => {
   const zh = talentProfile.buildEditableSearchPlanDraft("Find senior LLM inference engineers with vLLM");
-  assert.equal(zh.search_plan.source_strategy[0].reason, "校验实现能力与工程实践");
+  assert.match(zh.search_plan.source_strategy[0].reason, /代码|工程|实践/);
   assert.equal(zh.search_plan.adjacent_pools[0].reason, "从精确关键词之外发现可迁移的公开证据");
 
   const en = talentProfile.buildEditableSearchPlanDraft("Find senior LLM inference engineers with vLLM", { locale: "en" });
-  assert.equal(en.search_plan.source_strategy[0].reason, "verify implementation and engineering practice");
+  assert.match(en.search_plan.source_strategy[0].reason, /code|engineering|practice/i);
   assert.equal(en.search_plan.adjacent_pools[0].reason, "surface transferable public evidence beyond exact keyword matches");
+});
+
+test("builds a three-question candidate review brief", () => {
+  assert.equal(typeof talentProfile.buildCandidateReviewBrief, "function");
+
+  const result = normalizeTalentSearchResult({
+    candidates: [
+      {
+        name: "Ada Lovelace",
+        current_role: "Staff AI Infrastructure Engineer",
+        current_company: "Example AI",
+        ai_directions: ["AI Infrastructure / LLM Systems"],
+        match_score: 91,
+        strongest_signals: ["Maintains public vLLM serving code"],
+        uncertainties: ["Availability is single-source."],
+        claims: [
+          {
+            claim: "Maintains public vLLM serving code",
+            verdict: "verified",
+            evidence: [
+              { note: "GitHub repo", url: "https://github.com/example/vllm", source_type: "code" },
+              { note: "Paper", url: "https://arxiv.org/abs/1234.5678", source_type: "paper" },
+            ],
+          },
+          {
+            claim: "Recently led hiring for an AI infra team",
+            verdict: "unverified",
+            evidence: [],
+          },
+        ],
+        evidence_audit: { overall_evidence_quality: "high" },
+      },
+    ],
+  });
+
+  const brief = talentProfile.buildCandidateReviewBrief({ result, candidate: result.candidates[0], locale: "zh" });
+
+  assert.deepEqual(brief.sections.map((section) => section.key), [
+    "why_recommended",
+    "evidence_strength",
+    "next_action",
+  ]);
+  assert.equal(brief.sections.length, 3);
+  assert.match(brief.sections[0].body, /Maintains public vLLM serving code/);
+  assert.match(brief.sections[1].body, /证据质量/);
+  assert.match(brief.sections[2].body, /补齐|复核|推进/);
+});
+
+test("builds AI vertical profile cache entries and similar candidate suggestions", () => {
+  assert.equal(typeof talentProfile.buildCandidateProfileCacheEntry, "function");
+  assert.equal(typeof talentProfile.buildSimilarCandidateSuggestions, "function");
+
+  const result = normalizeTalentSearchResult({
+    search_brief: {
+      original_query: "Find LLM inference and RAG evaluation engineers",
+      required_skills: ["vLLM", "retrieval eval"],
+    },
+    candidates: [
+      {
+        name: "Ada Lovelace",
+        current_role: "Staff AI Infrastructure Engineer",
+        current_company: "Example AI",
+        ai_directions: ["AI Infrastructure / LLM Systems", "Data / Evaluation / Safety"],
+        match_score: 91,
+        strongest_signals: ["Maintains vLLM serving and RAG evaluation repos"],
+        claims: [
+          {
+            claim: "Maintains vLLM serving and RAG evaluation repos",
+            verdict: "verified",
+            evidence: [
+              { note: "GitHub repo", url: "https://github.com/example/vllm", source_type: "code" },
+              { note: "Eval paper", url: "https://openreview.net/forum?id=eval", source_type: "paper" },
+            ],
+          },
+        ],
+        evidence_audit: { overall_evidence_quality: "high" },
+      },
+      {
+        name: "Grace Hopper",
+        current_role: "RAG Evaluation Lead",
+        current_company: "RetrievalCo",
+        ai_directions: ["Data / Evaluation / Safety"],
+        match_score: 86,
+        strongest_signals: ["Built retrieval evaluation harnesses for agentic RAG"],
+        claims: [
+          {
+            claim: "Built retrieval evaluation harnesses for agentic RAG",
+            verdict: "verified",
+            evidence: [
+              { note: "Project", url: "https://huggingface.co/example/rag-eval", source_type: "huggingface" },
+            ],
+          },
+        ],
+        evidence_audit: { overall_evidence_quality: "medium" },
+      },
+      {
+        name: "Lin Chen",
+        current_role: "AI GTM Lead",
+        current_company: "SalesAI",
+        ai_directions: ["AI Product / Solutions"],
+        match_score: 78,
+        strongest_signals: ["Led AI GTM motion for enterprise copilots"],
+        claims: [],
+      },
+    ],
+  });
+
+  const cacheEntry = talentProfile.buildCandidateProfileCacheEntry({ result, candidate: result.candidates[0] });
+  assert.equal(cacheEntry.cache_key, "ada-lovelace");
+  assert.deepEqual(cacheEntry.vertical_tags, ["LLM infra", "RAG", "eval"]);
+  assert.equal(cacheEntry.evidence_urls.length, 2);
+  assert.deepEqual(cacheEntry.source_types, ["code", "paper"]);
+  assert.equal(cacheEntry.confidence, "high");
+  assert.match(cacheEntry.search_text, /Ada Lovelace/);
+  assert.match(cacheEntry.search_text, /retrieval eval/);
+
+  const similar = talentProfile.buildSimilarCandidateSuggestions({ result, candidate: result.candidates[0] });
+  assert.equal(similar[0].name, "Grace Hopper");
+  assert.deepEqual(similar[0].shared_vertical_tags, ["RAG", "eval"]);
+  assert.equal(similar.some((candidate) => candidate.name === "Lin Chen"), false);
 });
 
 test("builds feedback-optimized search input for the next round", () => {
@@ -1517,6 +2122,13 @@ test("search prompt requests search plan and evidence graph", async () => {
   const prompt = searchPrompt("Find AI infra engineers");
   const verify = verifyPrompt("Ada says she built a vLLM project and earned an AI master's degree.");
 
+  assert.doesNotMatch(prompt, /AI DIRECTIONS/);
+  assert.match(prompt, /INTERNET ROLE STRATEGY/);
+  assert.match(prompt, /role_category/);
+  assert.match(prompt, /query_clusters/);
+  assert.match(prompt, /score_dimensions/);
+  assert.match(prompt, /source mix/);
+  assert.match(prompt, /Do not treat the hiring company or product as a candidate target/);
   assert.match(prompt, /"search_plan"/);
   assert.match(prompt, /"source_execution"/);
   assert.match(prompt, /"coverage_backfill"/);
@@ -1531,6 +2143,12 @@ test("search prompt requests search plan and evidence graph", async () => {
   assert.match(prompt, /research \| practice \| work_history \| public_voice/);
   assert.match(prompt, /patent \| dataset \| benchmark/);
   assert.match(prompt, /source_strategy/);
+  assert.match(prompt, /OPEN-SOURCE EVIDENCE ENRICHMENT PLAN/);
+  assert.match(prompt, /GitHub repository search/);
+  assert.match(prompt, /Hugging Face model search/);
+  assert.match(prompt, /OpenAlex works search/);
+  assert.match(prompt, /Semantic Scholar paper search/);
+  assert.match(prompt, /OpenReview note search/);
   assert.match(prompt, /independent_sources/);
   assert.match(prompt, /cross_validation/);
   assert.match(prompt, /OUTPUT LANGUAGE/);
@@ -1562,8 +2180,31 @@ test("search prompt requests search plan and evidence graph", async () => {
 
 test("worker prompt and normalizer support search plan and evidence graph", async () => {
   const { searchPrompt, verifyPrompt } = await import("./worker/lib.mjs");
-  const prompt = searchPrompt("Find AI infra engineers");
+  const prompt = searchPrompt("AI Marketing / AI 增长负责人，内容矩阵，小红书 Twitter", "Chinese (Simplified)", [
+    {
+      name: "Ada Growth",
+      role: "Head of Growth",
+      vertical_tags: ["growth marketing"],
+      source_types: ["content_platform"],
+      matched_terms: ["content matrix", "AI growth"],
+      evidence_urls: ["https://example.com/growth-case"],
+    },
+  ], [
+    {
+      candidate_name: "growth-case",
+      title: "AI growth case study",
+      provider: "anysearch",
+      source_type: "case_study",
+      url: "https://example.com/growth-case",
+    },
+  ]);
   const verify = verifyPrompt("Ada says she built a vLLM project and earned an AI master's degree.");
+  assert.doesNotMatch(prompt, /AI DIRECTIONS/);
+  assert.match(prompt, /INTERNET ROLE STRATEGY/);
+  assert.match(prompt, /growth_marketing/);
+  assert.match(prompt, /content-social/);
+  assert.match(prompt, /candidate_pool_summary/);
+  assert.match(prompt, /Do not treat the hiring company or product as a candidate target/);
   const result = normalizeWorkerTalentSearchResult({
     search_plan: {
       must_have: ["LLM serving"],
@@ -1623,6 +2264,11 @@ test("worker prompt and normalizer support search plan and evidence graph", asyn
   assert.match(prompt, /Platform language: Chinese \(Simplified\)/);
   assert.match(prompt, /user-facing text fields/);
   assert.match(prompt, /Do not paste raw source passages/);
+  assert.match(prompt, /CANDIDATE CACHE HINTS/);
+  assert.match(prompt, /Ada Growth/);
+  assert.match(prompt, /Do not stop at these cached candidates/);
+  assert.match(prompt, /OPEN-SOURCE PRECHECK LEADS/);
+  assert.match(prompt, /growth-case/);
   assert.match(verify, /OUTPUT LANGUAGE/);
   assert.match(verify, /Platform language: Chinese \(Simplified\)/);
   assert.match(verify, /claim_category/);
@@ -1653,4 +2299,77 @@ test("worker prompt and normalizer support search plan and evidence graph", asyn
   assert.equal(result.coverage_backfill.jobs[0].coverage_group, "practice");
   assert.equal(result.coverage_backfill.jobs[0].missing_source_type, "code");
   assert.equal(result.evidence_graph.candidates[0].candidate_name, "Ada Lovelace");
+});
+
+test("open evidence query builder uses role-aware aggressive public web recall", async () => {
+  const { buildOpenEvidenceSearchQueries, buildOpenEvidenceSourceRequests } = await import("./worker/open-evidence-sources.mjs");
+  const strategy = buildAgentSearchStrategy("AI Marketing / AI 增长负责人，内容矩阵，小红书 Twitter", { locale: "zh" });
+  const queries = buildOpenEvidenceSearchQueries("AI Marketing / AI 增长负责人，内容矩阵，小红书 Twitter", {
+    maxQueries: 8,
+    searchStrategy: strategy,
+  });
+
+  assert.ok(queries.some((query) => /LinkedIn|site:linkedin\.com/.test(query)));
+  assert.ok(queries.some((query) => /小红书|Twitter|YouTube|TikTok|内容平台/.test(query)));
+  assert.ok(queries.some((query) => /case study|增长案例|portfolio|公开案例/i.test(query)));
+  assert.equal(queries.some((query) => /\bemail|phone|private contact|邮箱猜测\b/i.test(query)), false);
+
+  const requests = buildOpenEvidenceSourceRequests("AI Marketing / AI 增长负责人，内容矩阵，小红书 Twitter", {
+    maxQueries: 2,
+    searchStrategy: strategy,
+  });
+  assert.ok(requests.some((request) => request.provider === "anysearch" && request.source_type === "web"));
+  assert.ok(requests.some((request) => request.source_query.includes("LinkedIn")));
+});
+
+test("parses public AI talent sources into structured source signals", () => {
+  const cases = [
+    ["https://github.com/vllm-project/vllm", "github_repo", "practice", "code", "vllm-project", "vllm"],
+    ["https://arxiv.org/abs/2401.12345", "arxiv_paper", "research", "paper", "2401.12345", ""],
+    ["https://openreview.net/forum?id=abc123", "openreview_paper", "research", "paper", "abc123", ""],
+    ["https://huggingface.co/meta-llama/Llama-3.1-8B", "huggingface_model", "practice", "huggingface", "meta-llama", "Llama-3.1-8B"],
+    ["https://scholar.google.com/citations?user=abcDEF", "google_scholar_profile", "work_history", "profile", "abcDEF", ""],
+    ["https://example.ai/team/ada-lovelace", "company_team_page", "work_history", "company", "example.ai", ""],
+  ];
+
+  for (const [url, family, coverageGroup, sourceType, primaryId, secondaryId] of cases) {
+    const parsed = parsePublicTalentSource(url);
+    assert.equal(parsed.url, url);
+    assert.equal(parsed.family, family);
+    assert.equal(parsed.coverage_group, coverageGroup);
+    assert.equal(parsed.source_type, sourceType);
+    assert.equal(parsed.primary_id, primaryId);
+    assert.equal(parsed.secondary_id, secondaryId);
+  }
+});
+
+test("worker builds candidate evidence source rows for persisted search output", () => {
+  assert.equal(typeof buildWorkerCandidateEvidenceSourceRowsForRun, "function");
+
+  const rows = buildWorkerCandidateEvidenceSourceRowsForRun({
+    userId: "user-1",
+    sourceRunId: "run-1",
+    observedAt: "2026-06-12T00:00:00.000Z",
+    result: {
+      search_brief: { original_query: "Find vLLM maintainers" },
+      candidates: [
+        {
+          name: "Ada Lovelace",
+          match_score: 91,
+          claims: [
+            {
+              claim: "Maintains vLLM",
+              verdict: "verified",
+              evidence: [{ note: "repo", url: "https://github.com/example/vllm", source_type: "code" }],
+            },
+          ],
+        },
+      ],
+    },
+  });
+
+  assert.equal(rows.length, 1);
+  assert.equal(rows[0].candidate_profile_cache_key, "user-1:ada-lovelace");
+  assert.equal(rows[0].family, "github_repo");
+  assert.equal(rows[0].source_type, "code");
 });

@@ -8,13 +8,8 @@ import {
   CandidateCard,
   CandidateComparisonView,
   CandidateProfileView,
-  CoverageBackfillView,
-  EvidenceCoverageView,
   EvidenceGraphView,
-  SearchPlanView,
   ShortlistDeliveryReportView,
-  SourceExecutionView,
-  TalentMapView,
   TrustReportView,
   type Claim,
   type Candidate,
@@ -256,12 +251,7 @@ export default async function ReportPage({
               {row.kind === "search" ? (
                 talentResult ? (
                   <>
-                    <SearchPlanView result={talentResult} locale={locale} />
                     <ShortlistDeliveryReportView result={talentResult} locale={locale} />
-                    <SourceExecutionView result={talentResult} locale={locale} />
-                    <CoverageBackfillView result={talentResult} locale={locale} />
-                    <EvidenceCoverageView result={talentResult} locale={locale} />
-                    <TalentMapView result={talentResult} locale={locale} />
                     <CandidateComparisonView result={talentResult} locale={locale} />
                     {talentResult.candidates.map((candidate, index) => (
                       <div key={`${candidate.name}-${index}`} className="space-y-3">

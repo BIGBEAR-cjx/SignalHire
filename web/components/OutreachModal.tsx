@@ -4,7 +4,7 @@
 // 4 tone 切换 + 可编辑 subject/body + 复制 + 用邮件 App 发送 (mailto:) + 重新生成。
 // 候选人详情面板/收藏夹/搜人结果都挂同一个 Modal。
 import { useEffect, useRef, useState } from "react";
-import { FiCheckCircle, FiCopy, FiRefreshCw, FiSend, FiX } from "react-icons/fi";
+import { FiCheckCircle, FiClock, FiCopy, FiMail, FiRefreshCw, FiSend, FiX } from "react-icons/fi";
 import { useI18n } from "@/components/LanguageProvider";
 import { IconButton, SegmentedControl, StatusBadge } from "@/components/ui/signal-ui";
 import {
@@ -24,6 +24,12 @@ const TONE_VALUES: Tone[] = [
 
 const SENDER_KEY = "sh_outreach_sender";
 
+function defaultFollowUpDate() {
+  const date = new Date();
+  date.setDate(date.getDate() + 3);
+  return date.toISOString().slice(0, 10);
+}
+
 export interface OutreachModalProps {
   open: boolean;
   onClose: () => void;
@@ -31,9 +37,12 @@ export interface OutreachModalProps {
   candidateName?: string;    // 仅用于显示
   candidateEmail?: string;   // 有邮箱直接进 mailto: To
   roleBrief?: string;        // 可选: 当前岗位画像, 让邮件更贴需求
+  shortlistItemId?: string | null;
+  projectId?: string | null;
+  onSaved?: () => void;
 }
 
-export default function OutreachModal({ open, onClose, candidate, candidateName, candidateEmail, roleBrief }: OutreachModalProps) {
+export default function OutreachModal({ open, onClose, candidate, candidateName, candidateEmail, roleBrief, shortlistItemId, projectId, onSaved }: OutreachModalProps) {
   const { locale, t } = useI18n();
   const [tone, setTone] = useState<Tone>("professional");
   const [sender, setSender] = useState(() => {
@@ -47,6 +56,9 @@ export default function OutreachModal({ open, onClose, candidate, candidateName,
   const [error, setError] = useState("");
   const [copied, setCopied] = useState(false);
   const [evidenceCopied, setEvidenceCopied] = useState(false);
+  const [savingThread, setSavingThread] = useState(false);
+  const [savedThread, setSavedThread] = useState(false);
+  const [nextFollowUpAt, setNextFollowUpAt] = useState(defaultFollowUpDate);
   const generatedFor = useRef<{ tone: Tone; candidate: unknown } | null>(null);
 
   // Esc 关闭
@@ -134,6 +146,35 @@ export default function OutreachModal({ open, onClose, candidate, candidateName,
     const su = encodeURIComponent(subject);
     const bo = encodeURIComponent(body);
     window.location.href = `mailto:${to}?subject=${su}&body=${bo}`;
+  }
+
+  async function saveThread(status: "drafted" | "contacted") {
+    if (savingThread || !subject.trim() || !body.trim()) return;
+    setSavingThread(true);
+    try {
+      const r = await fetch("/api/outreach-threads", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          candidate,
+          project_id: projectId ?? null,
+          shortlist_item_id: shortlistItemId ?? null,
+          tone,
+          role_brief: roleBrief,
+          subject,
+          body,
+          status,
+          next_follow_up_at: status === "contacted" && nextFollowUpAt ? `${nextFollowUpAt}T09:00:00.000Z` : null,
+          locale,
+        }),
+      });
+      if (!r.ok) throw new Error();
+      setSavedThread(true);
+      onSaved?.();
+      setTimeout(() => setSavedThread(false), 1800);
+    } finally {
+      setSavingThread(false);
+    }
   }
 
   function regen() {
@@ -249,6 +290,27 @@ export default function OutreachModal({ open, onClose, candidate, candidateName,
           </section>
         )}
 
+        <div className="mb-3 grid gap-3 rounded-3xl border border-black/10 bg-white/80 p-4 sm:grid-cols-[minmax(0,1fr)_180px]">
+          <div>
+            <p className="text-xs font-semibold text-[var(--sh-muted)]">{locale === "en" ? "Follow-up tracking" : "跟进记录"}</p>
+            <p className="mt-1 text-xs leading-5 text-[var(--sh-muted)]">
+              {locale === "en" ? "Save a draft, or mark this candidate contacted after manually sending the message." : "可先保存草稿；手动发送后可标记已联系并进入后续跟进队列。"}
+            </p>
+          </div>
+          <label className="block">
+            <span className="mb-1 flex items-center gap-1.5 text-xs font-semibold text-[var(--sh-muted)]">
+              <FiClock className="h-3.5 w-3.5" aria-hidden="true" />
+              {locale === "en" ? "Next follow-up" : "下次跟进"}
+            </span>
+            <input
+              type="date"
+              value={nextFollowUpAt}
+              onChange={(event) => setNextFollowUpAt(event.target.value)}
+              className="block min-h-10 w-full rounded-2xl border border-black/10 bg-white px-3 text-sm text-[var(--sh-ink)] outline-none focus:border-black/20"
+            />
+          </label>
+        </div>
+
         <div className="flex flex-wrap items-center justify-end gap-2">
           <button
             onClick={regen}
@@ -265,6 +327,22 @@ export default function OutreachModal({ open, onClose, candidate, candidateName,
           >
             {copied ? <FiCheckCircle className="h-4 w-4" aria-hidden="true" /> : <FiCopy className="h-4 w-4" aria-hidden="true" />}
             {copied ? t("common.copied") : t("outreach.copyAll")}
+          </button>
+          <button
+            onClick={() => saveThread("drafted")}
+            disabled={loading || savingThread || !body}
+            className="sh-secondary-action min-h-10 px-3 py-2 text-sm disabled:opacity-50"
+          >
+            {savedThread ? <FiCheckCircle className="h-4 w-4" aria-hidden="true" /> : <FiMail className="h-4 w-4" aria-hidden="true" />}
+            {savedThread ? (locale === "en" ? "Saved" : "已保存") : (locale === "en" ? "Save draft" : "保存草稿")}
+          </button>
+          <button
+            onClick={() => saveThread("contacted")}
+            disabled={loading || savingThread || !body}
+            className="sh-secondary-action min-h-10 px-3 py-2 text-sm disabled:opacity-50"
+          >
+            {savedThread ? <FiCheckCircle className="h-4 w-4" aria-hidden="true" /> : <FiMail className="h-4 w-4" aria-hidden="true" />}
+            {savedThread ? (locale === "en" ? "Saved" : "已保存") : (locale === "en" ? "Mark contacted" : "标记已联系")}
           </button>
           <button
             onClick={openMailto}

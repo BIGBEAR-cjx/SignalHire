@@ -73,13 +73,25 @@ export async function logout() {
 export async function currentUser(locale = "zh"): Promise<{ email: string } | null> {
   try {
     const { data } = await client.auth.getCurrentUser();
-    if (!data?.user) return null;
+    if (!data?.user) return await currentUserFromCookie(locale);
     // 同步 cookie: SDK 内部刚刚可能用 refresh_token 续了 accessToken,
     // 而 /api/auth/session 写的 sh_token cookie 还是旧的 JWT (已过期 → API 401)。
     // 这里把当前(可能新)accessToken 重写回 cookie, 保证服务端鉴权能用。
     await syncSessionCookie(locale);
     if (!await confirmSessionCookie(fetch, locale)) return null;
     return { email: data.user.email };
+  } catch {
+    return await currentUserFromCookie(locale);
+  }
+}
+
+async function currentUserFromCookie(locale: string): Promise<{ email: string } | null> {
+  try {
+    const res = await fetch(`/api/whoami?locale=${encodeURIComponent(locale)}`);
+    if (!res.ok) return null;
+    const data = await res.json().catch(() => null);
+    const email = typeof data?.user?.email === "string" ? data.user.email : "";
+    return email ? { email } : null;
   } catch {
     return null;
   }

@@ -18,26 +18,35 @@ function SearchInner() {
   const initialQ = sp.get("q") || "";
   const projectId = sp.get("project") || undefined;
   const autoRun = shouldAutoRunInitialSearch({ initialInput: initialQ, projectId });
-  const [projectName, setProjectName] = useState<string | undefined>();
-  const [projectFeedbackPreference, setProjectFeedbackPreference] = useState<ProjectFeedbackPreferenceView | null>(null);
+  const [projectContext, setProjectContext] = useState<{
+    projectId: string;
+    name?: string;
+    feedbackPreference: ProjectFeedbackPreferenceView | null;
+  } | null>(null);
 
   // 在项目上下文时拉项目名 (面包屑显示)
   useEffect(() => {
-    if (!projectId) {
-      setProjectName(undefined);
-      setProjectFeedbackPreference(null);
-      return;
-    }
+    if (!projectId) return;
+    let cancelled = false;
     fetch(`/api/projects/${projectId}`).then((r) => r.ok ? r.json() : null).then((j) => {
-      if (j?.project?.name) setProjectName(j.project.name);
+      if (cancelled) return;
       const preference = buildLatestProjectFeedbackPreference({
         runs: Array.isArray(j?.runs) ? j.runs : [],
         baseInput: initialQ,
         locale,
       });
-      setProjectFeedbackPreference(preference.canApply ? preference : null);
+      setProjectContext({
+        projectId,
+        name: typeof j?.project?.name === "string" ? j.project.name : undefined,
+        feedbackPreference: preference.canApply ? preference : null,
+      });
     }).catch(() => {});
+    return () => { cancelled = true; };
   }, [initialQ, locale, projectId]);
+
+  const activeProjectContext = projectContext?.projectId === projectId ? projectContext : null;
+  const projectName = activeProjectContext?.name;
+  const projectFeedbackPreference = activeProjectContext?.feedbackPreference ?? null;
 
   return (
     <div className="space-y-6">

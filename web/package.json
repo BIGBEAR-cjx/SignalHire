@@ -7,7 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "verify:schema": "node --env-file-if-exists=.env.local scripts/check-research-runs-schema.mjs",
+    "migrate:ai-cache": "node --env-file-if-exists=.env.local scripts/apply-ai-talent-cache-migration.mjs",
+    "verify:schema": "node --env-file-if-exists=.env.local scripts/check-research-runs-schema.mjs && node --env-file-if-exists=.env.local scripts/check-ai-talent-cache-schema.mjs",
     "verify:worker-health": "node --env-file-if-exists=.env.local scripts/check-worker-health.mjs",
     "verify:live": "node --env-file-if-exists=.env.local scripts/verify-live-research-job.mjs",
     "verify:retry": "node --env-file-if-exists=.env.local scripts/verify-retry-api.mjs"

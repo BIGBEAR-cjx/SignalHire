@@ -358,6 +358,7 @@ export function normalizeTalentSearchResult(data) {
     evidence_graph: normalizeEvidenceGraph(source.evidence_graph),
     talent_map: normalizeTalentMap(source.talent_map),
     candidates: (Array.isArray(source.candidates) ? source.candidates : []).map(normalizeCandidate),
+    ...(isPlainObject(source.agent_execution) ? { agent_execution: source.agent_execution } : {}),
   };
 }
 

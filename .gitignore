@@ -1,5 +1,6 @@
 # secrets — 永不提交
 .env
+.env*
 .env.local
 .env.*.local
 *.key
@@ -35,3 +36,18 @@ deep-research/
 .gstack/
 .worktrees/
 .vercel/
+
+# InsForge & AI agent skills
+.insforge
+.agent
+.agents
+.augment
+.claude
+.cline
+.github/copilot*
+.kilocode
+.qoder
+.qwen
+.roo
+.trae
+.windsurf

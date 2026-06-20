@@ -5,20 +5,18 @@
 // 搜索 → TalentMap + ShortlistCard 列表
 // 核验 → TrustReportView
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { FiMail } from "react-icons/fi";
+import { FiCheckCircle, FiChevronDown, FiPlay, FiSliders } from "react-icons/fi";
 import { useI18n } from "@/components/LanguageProvider";
 import {
   BackfillMergeSummaryView,
   CandidateCard,
   CandidateComparisonView,
-  CandidateProfileView,
   CoverageBackfillView,
   EvidenceCoverageView,
-  EvidenceGraphView,
   EvidencePriorityPanel,
   SearchPlanView,
+  SearchResultWorkspaceView,
   ShortlistDeliveryReportView,
-  ShortlistCard,
   SourceExecutionView,
   TalentMapView,
   TrustReportView,
@@ -28,7 +26,6 @@ import {
 import OutreachModal from "@/components/OutreachModal";
 import {
   EditableSearchPlanPanel,
-  FeedbackOptimizationPreview,
   ProjectContextBanner,
   ProjectFeedbackPreferenceBanner,
   ResearchErrorPanel,
@@ -39,9 +36,18 @@ import {
   type ProjectFeedbackPreferenceView,
 } from "@/components/research-workspace";
 import { Surface } from "@/components/ui/signal-ui";
-import { buildBackfillMergeSummary, buildCoverageBackfillPlan, buildEditableSearchPlanDraft, buildFeedbackOptimizedSearchInput, buildSearchInputFromEditablePlan } from "@/lib/talent-profile.mjs";
+import {
+  answerSearchIntakeQuestion,
+  buildBackfillMergeSummary,
+  buildCoverageBackfillPlan,
+  buildEditableSearchPlanDraft,
+  buildSearchInputFromEditablePlan,
+  buildSearchInputFromSearchIntake,
+  buildSearchIntakeDraft,
+  buildSearchIntakeQuestions,
+} from "@/lib/talent-profile.mjs";
 import type { BackfillMergeSummary, CoverageBackfillJob, TalentCandidate, TalentSearchResult } from "@/lib/talent-profile.mjs";
-import { buildCandidateFeedbackPanel, buildFeedbackOptimizationPreview, buildResearchLoopView, buildSearchConstraintEditor, buildSearchInputFromConstraintEditor } from "@/lib/research-loop.mjs";
+import { buildResearchLoopView, buildSearchConstraintEditor, buildSearchInputFromConstraintEditor } from "@/lib/research-loop.mjs";
 import { buildEvidencePriorityView } from "@/lib/evidence-priority.mjs";
 import { extractPdfTextFromFile } from "@/lib/client-resume-extract";
 import { MAX_RESUME_FILE_BYTES, detectSupportedResumeFileType } from "@/lib/resume-upload-constraints.mjs";
@@ -80,172 +86,47 @@ type StatusResponse = {
 type BackfillContext = { originalResult: TalentSearchResult; originalRunId: string | null; job: CoverageBackfillJob };
 type VerifyUploadKind = "resume" | "supportingMaterial";
 type MergeBackfillResponse = { merged?: boolean; runId?: string; result?: AppResult; mergeSummary?: BackfillMergeSummary; error?: string };
-type SaveFeedbackResponse = { saved?: boolean; optimizedInput?: string; result?: AppResult; error?: string };
 type EditableSearchPlanDraft = TalentSearchResult;
 type EditableSourceStrategy = TalentSearchResult["search_plan"]["source_strategy"][number];
-type SearchFeedbackState = {
-  precision: "" | "accurate" | "partial" | "off";
-  satisfaction: "" | "satisfied" | "mixed" | "unsatisfied";
-  issue: "" | "too_broad" | "wrong_seniority" | "wrong_direction" | "weak_evidence" | "wrong_location" | "too_few" | "too_many" | "other";
-  focus: "" | "stricter_match" | "expand_sources" | "stronger_evidence" | "adjacent_pools" | "higher_seniority" | "location_fit";
+type SearchIntakeQuestion = {
+  key: "location" | "salary" | "target_count";
+  question: string;
+  reason: string;
+  options: Array<{ value: string; label: string }>;
+  allow_custom: boolean;
+  skippable: boolean;
 };
-type SearchFeedbackField = keyof SearchFeedbackState;
-type SearchFeedbackOption = { value: SearchFeedbackState[SearchFeedbackField]; labelKey: string };
-type SearchFeedbackGroup = { key: SearchFeedbackField; labelKey: string; options: SearchFeedbackOption[] };
+type SearchIntakeDraft = {
+  original_query: string;
+  role_title: string;
+  role_category?: string;
+  role_category_label?: string;
+  employer_context?: string[];
+  candidate_requirements?: string[];
+  negative_constraints?: string[];
+  raw_noise?: string[];
+  channel_plan?: Array<{ key: string; label: string; target: string; coverage_group: string; source_types: string[] }>;
+  query_clusters?: Array<{ key: string; label: string; query_variants: string[] }>;
+  score_dimensions?: Array<{ key: string; label: string; weight: number }>;
+  must_have: string[];
+  nice_to_have: string[];
+  exclusions: string[];
+  unknowns: Array<SearchIntakeQuestion["key"]>;
+  clarification: Partial<Record<SearchIntakeQuestion["key"], string>>;
+  skipped_questions: SearchIntakeQuestion["key"][];
+};
 type CandidateDecision = "saved" | "needs_evidence" | "passed";
-type CandidateFeedbackPanelView = {
-  title: string;
-  description: string;
-  groups: Array<{
-    key: string;
-    label: string;
-    options: Array<{ value: string; label: string; selected: boolean }>;
-  }>;
-};
 type SearchConstraintEditorView = ReturnType<typeof buildSearchConstraintEditor>;
+const buildIntakeSearchInput = buildSearchInputFromSearchIntake as (input: { draft: SearchIntakeDraft; locale: string }) => string;
 
 const WORKER_DELAY_MS = 2 * 60 * 1000;
 const JOB_TIMEOUT_MS = 15 * 60 * 1000;
-const EMPTY_SEARCH_FEEDBACK: SearchFeedbackState = {
-  precision: "",
-  satisfaction: "",
-  issue: "",
-  focus: "",
-};
-const SEARCH_FEEDBACK_GROUPS: SearchFeedbackGroup[] = [
-  {
-    key: "precision",
-    labelKey: "feedback.precision",
-    options: [
-      { value: "accurate", labelKey: "feedback.precision.accurate" },
-      { value: "partial", labelKey: "feedback.precision.partial" },
-      { value: "off", labelKey: "feedback.precision.off" },
-    ],
-  },
-  {
-    key: "satisfaction",
-    labelKey: "feedback.satisfaction",
-    options: [
-      { value: "satisfied", labelKey: "feedback.satisfaction.satisfied" },
-      { value: "mixed", labelKey: "feedback.satisfaction.mixed" },
-      { value: "unsatisfied", labelKey: "feedback.satisfaction.unsatisfied" },
-    ],
-  },
-  {
-    key: "issue",
-    labelKey: "feedback.issue",
-    options: [
-      { value: "too_broad", labelKey: "feedback.issue.too_broad" },
-      { value: "wrong_seniority", labelKey: "feedback.issue.wrong_seniority" },
-      { value: "wrong_direction", labelKey: "feedback.issue.wrong_direction" },
-      { value: "weak_evidence", labelKey: "feedback.issue.weak_evidence" },
-      { value: "wrong_location", labelKey: "feedback.issue.wrong_location" },
-      { value: "too_few", labelKey: "feedback.issue.too_few" },
-      { value: "too_many", labelKey: "feedback.issue.too_many" },
-    ],
-  },
-  {
-    key: "focus",
-    labelKey: "feedback.focus",
-    options: [
-      { value: "stricter_match", labelKey: "feedback.focus.stricter_match" },
-      { value: "expand_sources", labelKey: "feedback.focus.expand_sources" },
-      { value: "stronger_evidence", labelKey: "feedback.focus.stronger_evidence" },
-      { value: "adjacent_pools", labelKey: "feedback.focus.adjacent_pools" },
-      { value: "higher_seniority", labelKey: "feedback.focus.higher_seniority" },
-      { value: "location_fit", labelKey: "feedback.focus.location_fit" },
-    ],
-  },
-];
 
 function isVerifyReport(result: AppResult): result is VerifyReport {
   return "claims" in result;
 }
 function isTalentSearchResult(result: AppResult | null): result is TalentSearchResult {
   return Boolean(result && "talent_map" in result && "search_brief" in result && Array.isArray((result as TalentSearchResult).candidates));
-}
-
-function CandidateFeedbackControls({
-  view,
-  onSelect,
-}: {
-  view: CandidateFeedbackPanelView;
-  onSelect: (key: string, value: string) => void;
-}) {
-  return (
-    <section className="rounded-3xl border border-black/10 bg-white/86 p-4 shadow-[0_16px_42px_rgba(0,0,0,0.05)]">
-      <p className="text-sm font-semibold text-[var(--sh-ink)]">{view.title}</p>
-      <p className="mt-1 text-xs leading-5 text-[var(--sh-muted)]">{view.description}</p>
-      <div className="mt-3 space-y-3">
-        {view.groups.map((group) => (
-          <div key={group.key}>
-            <p className="text-xs font-semibold text-[var(--sh-muted)]">{group.label}</p>
-            <div className="mt-1.5 flex flex-wrap gap-1.5">
-              {group.options.map((option) => (
-                <button
-                  key={option.value}
-                  type="button"
-                  aria-pressed={option.selected}
-                  onClick={() => onSelect(group.key, option.value)}
-                  className={`rounded-full px-3 py-1.5 text-xs font-semibold ring-1 transition ${
-                    option.selected
-                      ? "bg-[var(--sh-ink)] text-white ring-[var(--sh-ink)]"
-                      : "bg-white text-[var(--sh-muted)] ring-black/10 hover:bg-[var(--sh-faint)] hover:text-[var(--sh-ink)]"
-                  }`}
-                >
-                  {option.label}
-                </button>
-              ))}
-            </div>
-          </div>
-        ))}
-      </div>
-    </section>
-  );
-}
-
-function CandidateReviewCommand({
-  count,
-  firstName,
-  reviewed,
-  onReview,
-  onShowProcess,
-}: {
-  count: number;
-  firstName: string;
-  reviewed: number;
-  onReview: () => void;
-  onShowProcess: () => void;
-}) {
-  const { t } = useI18n();
-  return (
-    <Surface className="p-5 md:p-6">
-      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-        <div className="max-w-3xl">
-          <h2 className="text-2xl font-semibold tracking-tight text-[var(--sh-ink)]">
-            {t("result.reviewFlow.title", { count, name: firstName })}
-          </h2>
-          <p className="mt-2 text-sm leading-6 text-[var(--sh-muted)]">{t("result.reviewFlow.desc")}</p>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <button
-            type="button"
-            onClick={onReview}
-            className="sh-primary-action px-4"
-          >
-            {reviewed > 0 ? t("result.reviewFlow.reviewNext") : t("result.reviewFlow.reviewFirst")}
-          </button>
-          <button
-            type="button"
-            onClick={onShowProcess}
-            className="sh-secondary-action px-4"
-          >
-            {t("result.reviewFlow.process")}
-          </button>
-        </div>
-      </div>
-    </Surface>
-  );
 }
 
 function AdvancedResultDetails({
@@ -272,140 +153,205 @@ function AdvancedResultDetails({
   );
 }
 
-function CandidateReviewFlow({
-  result,
-  selectedIndex,
-  shortlist,
-  decisions,
-  candidateFeedbackPanel,
-  feedbackGroups,
-  feedbackPreview,
+function SearchIntakePanel({
+  draft,
+  questions,
   loading,
-  onOpenCandidate,
-  onAddToPool,
-  onNeedEvidence,
-  onPass,
-  onOutreach,
-  onFeedbackSelect,
-  onRunFeedback,
+  onAnswer,
+  onCustomAnswer,
+  onSkip,
+  onRun,
+  onOpenAdvanced,
 }: {
-  result: TalentSearchResult;
-  selectedIndex: number;
-  shortlist: number[];
-  decisions: Record<number, CandidateDecision>;
-  candidateFeedbackPanel: CandidateFeedbackPanelView | null;
-  feedbackGroups: Array<{ key: string; label: string; options: Array<{ value: string; label: string; selected: boolean }> }>;
-  feedbackPreview: ReturnType<typeof buildFeedbackOptimizationPreview>;
+  draft: SearchIntakeDraft;
+  questions: SearchIntakeQuestion[];
   loading: boolean;
-  onOpenCandidate: (index: number) => void;
-  onAddToPool: (index: number, candidate: TalentCandidate) => void;
-  onNeedEvidence: (index: number, candidate: TalentCandidate, job?: CoverageBackfillJob) => void;
-  onPass: (index: number) => void;
-  onOutreach: () => void;
-  onFeedbackSelect: (key: string, value: string) => void;
-  onRunFeedback: () => void;
+  onAnswer: (question: SearchIntakeQuestion, option: { value: string; label: string }) => void;
+  onCustomAnswer: (question: SearchIntakeQuestion, value: string) => void;
+  onSkip: (question: SearchIntakeQuestion) => void;
+  onRun: () => void;
+  onOpenAdvanced: () => void;
 }) {
   const { locale, t } = useI18n();
-  const selectedCandidate = result.candidates[selectedIndex] ?? result.candidates[0];
-  const safeSelectedIndex = Math.max(0, result.candidates.indexOf(selectedCandidate));
-  const reviewed = Object.keys(decisions).length;
-  const isSaved = shortlist.includes(safeSelectedIndex);
-  const decision = decisions[safeSelectedIndex];
+  const [customValue, setCustomValue] = useState("");
+  const currentQuestion = questions[0] ?? null;
+  const clarificationSummary = Object.entries(draft.clarification).filter((entry): entry is [SearchIntakeQuestion["key"], string] => Boolean(entry[1]));
+  const roleCategoryLabel = draft.role_category_label || draft.role_category || "";
+  const employerContext = Array.isArray(draft.employer_context) ? draft.employer_context : [];
+  const channelPlan = Array.isArray(draft.channel_plan) ? draft.channel_plan : [];
+
+  function submitCustom() {
+    if (!currentQuestion || !customValue.trim()) return;
+    onCustomAnswer(currentQuestion, customValue);
+    setCustomValue("");
+  }
 
   return (
-    <section className="grid gap-4 lg:grid-cols-[minmax(280px,0.78fr)_minmax(0,1.22fr)]">
-      <div className="space-y-3">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <h2 className="text-base font-semibold text-[var(--sh-ink)]">{t("result.reviewFlow.queueTitle")}</h2>
-          <span className="rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-[var(--sh-muted)] ring-1 ring-black/10">
-            {t("result.reviewFlow.progress", { reviewed, total: result.candidates.length })}
+    <Surface className="p-5 md:p-6">
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+        <div className="max-w-3xl">
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-neutral-500">{t("research.intake.eyebrow")}</p>
+          <h2 className="mt-2 text-2xl font-semibold tracking-tight text-[var(--sh-ink)]">{t("research.intake.title")}</h2>
+          <p className="mt-2 text-sm leading-6 text-[var(--sh-muted)]">{t("research.intake.description")}</p>
+        </div>
+        <button
+          type="button"
+          onClick={onRun}
+          disabled={loading}
+          className="sh-primary-action shrink-0 px-4"
+        >
+          <FiPlay aria-hidden="true" />
+          {t("research.intake.searchNow")}
+        </button>
+      </div>
+
+      <div className="mt-6 rounded-2xl border border-black/10 bg-white/74 p-4">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <p className="text-xs font-semibold text-[var(--sh-muted)]">{t("research.intake.understanding")}</p>
+            <h3 className="mt-1 text-lg font-semibold text-[var(--sh-ink)]">{draft.role_title}</h3>
+            {roleCategoryLabel ? (
+              <p className="mt-1 text-xs font-semibold text-[var(--sh-muted)]">
+                {roleCategoryLabel}
+              </p>
+            ) : null}
+          </div>
+          <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700 ring-1 ring-emerald-100">
+            <FiCheckCircle aria-hidden="true" />
+            {t("research.intake.parsed")}
           </span>
         </div>
-        <div className="space-y-2">
-          {result.candidates.map((candidate, index) => (
-            <ShortlistCard
-              key={`${candidate.name}-${index}`}
-              candidate={candidate}
-              selected={index === safeSelectedIndex}
-              onOpen={() => onOpenCandidate(index)}
-              locale={locale}
-            />
-          ))}
+        <div className="mt-4 grid gap-3 md:grid-cols-3">
+          <IntakeList title={t("research.intake.mustHave")} tone="emerald" items={draft.must_have} fallback={t("research.intake.empty")} />
+          <IntakeList title={t("research.intake.niceToHave")} tone="blue" items={draft.nice_to_have} fallback={t("research.intake.empty")} />
+          <IntakeList title={t("research.intake.exclusions")} tone="red" items={draft.exclusions} fallback={t("research.intake.empty")} />
         </div>
-      </div>
-
-      <div className="space-y-3 lg:sticky lg:top-6 lg:self-start">
-        <div className="rounded-2xl border border-black/10 bg-white/86 p-4">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <h2 className="text-base font-semibold text-[var(--sh-ink)]">{t("result.reviewFlow.detailTitle")}</h2>
-            {(decision || isSaved) && (
-              <span className="rounded-full bg-[var(--sh-canvas)] px-2.5 py-1 text-xs font-semibold text-[var(--sh-muted)] ring-1 ring-black/10">
-                {isSaved ? t("result.reviewFlow.addToPool") : decision === "needs_evidence" ? t("result.reviewFlow.needEvidence") : t("result.reviewFlow.pass")}
+        {(employerContext.length > 0 || channelPlan.length > 0) && (
+          <div className="mt-4 grid gap-3 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
+            {employerContext.length > 0 && (
+              <div className="rounded-2xl border border-black/10 bg-white p-3">
+                <p className="text-xs font-semibold text-[var(--sh-muted)]">{locale === "en" ? "Employer context" : "雇主背景"}</p>
+                <div className="mt-2 space-y-1 text-sm leading-6 text-[var(--sh-ink)]">
+                  {employerContext.slice(0, 3).map((item) => (
+                    <p key={item}>{item}</p>
+                  ))}
+                </div>
+              </div>
+            )}
+            {channelPlan.length > 0 && (
+              <div className="rounded-2xl border border-black/10 bg-white p-3">
+                <p className="text-xs font-semibold text-[var(--sh-muted)]">{locale === "en" ? "Channel plan" : "渠道计划"}</p>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {channelPlan.slice(0, 6).map((item) => (
+                    <span key={item.key} className="rounded-full bg-[var(--sh-faint)] px-3 py-1 text-xs font-semibold text-[var(--sh-ink)] ring-1 ring-black/10" title={item.target}>
+                      {item.label}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+        {(draft.unknowns.length > 0 || clarificationSummary.length > 0) && (
+          <div className="mt-4 flex flex-wrap gap-2">
+            {clarificationSummary.map(([key, value]) => (
+              <span key={`${key}-${value}`} className="rounded-full bg-[var(--sh-faint)] px-3 py-1 text-xs font-semibold text-[var(--sh-ink)] ring-1 ring-black/10">
+                {t(`research.intake.label.${key}`)}: {value}
               </span>
-            )}
+            ))}
+            {draft.unknowns.map((key) => (
+              <span key={key} className="rounded-full bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-700 ring-1 ring-amber-100">
+                {t(`research.intake.missing.${key}`)}
+              </span>
+            ))}
           </div>
-          <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
-            <button
-              type="button"
-              onClick={() => onAddToPool(safeSelectedIndex, selectedCandidate)}
-              disabled={isSaved}
-              className="rounded-full bg-[var(--sh-ink)] px-3 py-2 text-sm font-semibold text-white transition hover:bg-black disabled:cursor-default disabled:bg-gray-300"
-            >
-              {t("result.reviewFlow.addToPool")}
-            </button>
-            <button
-              type="button"
-              onClick={() => onNeedEvidence(safeSelectedIndex, selectedCandidate)}
-              disabled={loading}
-              className="rounded-full bg-white px-3 py-2 text-sm font-semibold text-amber-800 ring-1 ring-amber-200 transition hover:bg-amber-50 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              {t("result.reviewFlow.needEvidence")}
-            </button>
-            <button
-              type="button"
-              onClick={() => onPass(safeSelectedIndex)}
-              className="rounded-full bg-white px-3 py-2 text-sm font-semibold text-[var(--sh-muted)] ring-1 ring-black/10 transition hover:bg-neutral-50"
-            >
-              {t("result.reviewFlow.pass")}
-            </button>
-            {isSaved && (
+        )}
+      </div>
+
+      {currentQuestion ? (
+        <div className="mt-4 rounded-2xl border border-black/10 bg-[var(--sh-canvas)] p-4">
+          <p className="text-xs font-semibold text-[var(--sh-muted)]">{t("research.intake.questionLabel")}</p>
+          <h3 className="mt-2 text-lg font-semibold text-[var(--sh-ink)]">{currentQuestion.question}</h3>
+          <p className="mt-1 text-sm leading-6 text-[var(--sh-muted)]">{currentQuestion.reason}</p>
+          <div className="mt-4 flex flex-wrap gap-2">
+            {currentQuestion.options.map((option) => (
               <button
+                key={option.value}
                 type="button"
-                onClick={onOutreach}
-                className="rounded-full bg-white px-3 py-2 text-sm font-semibold text-[var(--sh-ink)] ring-1 ring-black/10 transition hover:bg-neutral-50"
+                onClick={() => onAnswer(currentQuestion, option)}
+                className="rounded-full border border-black/10 bg-white px-4 py-2 text-sm font-semibold text-[var(--sh-ink)] transition hover:border-black/20 hover:bg-[var(--sh-faint)]"
               >
-                <FiMail className="mr-1.5 inline h-4 w-4 align-[-2px]" aria-hidden="true" />
-                {t("result.reviewFlow.outreach")}
+                {option.label}
               </button>
-            )}
+            ))}
+          </div>
+          <div className="mt-4 flex flex-col gap-2 sm:flex-row">
+            <input
+              value={customValue}
+              onChange={(event) => setCustomValue(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter") submitCustom();
+              }}
+              placeholder={t("research.intake.customPlaceholder")}
+              className="min-h-11 flex-1 rounded-full border border-black/10 bg-white px-4 text-sm text-[var(--sh-ink)] outline-none transition placeholder:text-[var(--sh-muted)] focus:border-black/25"
+            />
+            <button type="button" onClick={submitCustom} className="sh-secondary-action px-4">
+              {t("research.intake.submitCustom")}
+            </button>
+            <button type="button" onClick={() => onSkip(currentQuestion)} className="sh-secondary-action px-4">
+              {t("research.intake.skip")}
+            </button>
           </div>
         </div>
+      ) : (
+        <div className="mt-4 flex flex-col gap-3 rounded-2xl border border-emerald-100 bg-emerald-50/70 p-4 md:flex-row md:items-center md:justify-between">
+          <div>
+            <h3 className="text-base font-semibold text-emerald-950">{t("research.intake.confirmedTitle")}</h3>
+            <p className="mt-1 text-sm leading-6 text-emerald-800">{t("research.intake.confirmedDescription")}</p>
+          </div>
+          <button type="button" onClick={onRun} disabled={loading} className="sh-primary-action px-4">
+            <FiPlay aria-hidden="true" />
+            {t("research.intake.searchNow")}
+          </button>
+        </div>
+      )}
 
-        {candidateFeedbackPanel && reviewed > 0 && (
-          <section className="space-y-3">
-            <p className="text-sm font-semibold text-[var(--sh-ink)]">{t("result.reviewFlow.feedbackTitle")}</p>
-            <CandidateFeedbackControls view={candidateFeedbackPanel} onSelect={onFeedbackSelect} />
-          </section>
-        )}
-        {reviewed > 0 && (
-          <FeedbackOptimizationPreview
-            groups={feedbackGroups}
-            preview={feedbackPreview}
-            loading={loading}
-            onSelect={onFeedbackSelect}
-            onRun={onRunFeedback}
-          />
-        )}
-        <EvidenceGraphView result={result} candidate={selectedCandidate} />
-        <CandidateProfileView
-          candidate={selectedCandidate}
-          result={result}
-          onBackfillJob={(job) => onNeedEvidence(safeSelectedIndex, selectedCandidate, job)}
-          backfillDisabled={loading}
-          locale={locale}
-        />
+      <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-black/10 pt-4">
+        <p className="text-xs leading-5 text-[var(--sh-muted)]">{t("research.intake.advancedHint")}</p>
+        <button type="button" onClick={onOpenAdvanced} className="sh-secondary-action px-4">
+          <FiSliders aria-hidden="true" />
+          {t("research.intake.advancedPlan")}
+        </button>
       </div>
-    </section>
+    </Surface>
+  );
+}
+
+function IntakeList({
+  title,
+  tone,
+  items,
+  fallback,
+}: {
+  title: string;
+  tone: "emerald" | "blue" | "red";
+  items: string[];
+  fallback: string;
+}) {
+  const toneClass = {
+    emerald: "border-emerald-100 bg-emerald-50/55 text-emerald-950",
+    blue: "border-blue-100 bg-blue-50/55 text-blue-950",
+    red: "border-red-100 bg-red-50/55 text-red-950",
+  }[tone];
+  return (
+    <div className={`rounded-2xl border p-3 ${toneClass}`}>
+      <p className="text-xs font-semibold">{title}</p>
+      <ul className="mt-2 space-y-1.5 text-sm leading-6">
+        {(items.length > 0 ? items : [fallback]).map((item, index) => (
+          <li key={`${item}-${index}`} className={items.length > 0 ? "" : "opacity-60"}>{item}</li>
+        ))}
+      </ul>
+    </div>
   );
 }
 
@@ -450,6 +396,7 @@ export default function ResearchTool({
   const [shortlist, setShortlist] = useState<number[]>([]); // 已收藏的 candidate_index 集合
   const [savingIdx, setSavingIdx] = useState<Set<number>>(new Set()); // 正在写 API 的 index (防重复点击)
   const [outreachOpen, setOutreachOpen] = useState(false); // AI 外联弹窗
+  const [contactIntentMessage, setContactIntentMessage] = useState("");
   const [stats, setStats] = useState<RunStats | null>(null);
   const [feed, setFeed] = useState<FeedItem[]>([]);
   const [live, setLive] = useState<{ searches: number; fetches: number } | null>(null);
@@ -462,7 +409,8 @@ export default function ResearchTool({
   const [mergingBackfill, setMergingBackfill] = useState(false);
   const [mergedOriginalRunId, setMergedOriginalRunId] = useState<string | null>(null);
   const [editablePlan, setEditablePlan] = useState<EditableSearchPlanDraft | null>(null);
-  const [searchFeedback, setSearchFeedback] = useState<SearchFeedbackState>(EMPTY_SEARCH_FEEDBACK);
+  const [searchIntakeDraft, setSearchIntakeDraft] = useState<SearchIntakeDraft | null>(null);
+  const [advancedPlanOpen, setAdvancedPlanOpen] = useState(false);
   const [resumeUploading, setResumeUploading] = useState(false);
   const [resumeUploadMessage, setResumeUploadMessage] = useState("");
   const [resumeUploadWarning, setResumeUploadWarning] = useState("");
@@ -570,10 +518,13 @@ export default function ResearchTool({
     setFeed([]); setLive(null); setRunId(null); setCurrentJobId(null);
     setJobStatus(null); setCopied(false); setBackfillContext(null); setBackfillMergeSummary(null);
     setMergingBackfill(false); setMergedOriginalRunId(null);
-    setSearchFeedback(EMPTY_SEARCH_FEEDBACK);
     setCandidateDecisions({});
     setAdvancedDetailsOpen(false);
-    if (!options.preserveInput) setEditablePlan(null);
+    if (!options.preserveInput) {
+      setEditablePlan(null);
+      setSearchIntakeDraft(null);
+      setAdvancedPlanOpen(false);
+    }
     try {
       const url = mode === "search" ? "/api/search" : "/api/verify";
       const body: Record<string, unknown> = mode === "search" ? { query: value, locale } : { bio: value, locale };
@@ -705,6 +656,59 @@ export default function ResearchTool({
     }
   }
 
+  async function uploadSearchBriefFile(file: File) {
+    if (mode !== "search" || loading || resumeUploading) return;
+    const fileType = detectSupportedResumeFileType(file.name, file.type);
+    if (!fileType) {
+      setResumeUploadError(t("api.error.resumeUnsupportedType"));
+      return;
+    }
+    if (file.size > MAX_RESUME_FILE_BYTES) {
+      setResumeUploadError(t("api.error.resumeTooLarge"));
+      return;
+    }
+    setResumeUploading(true);
+    setResumeUploadMessage("");
+    setResumeUploadWarning("");
+    setResumeUploadError("");
+    setError("");
+    try {
+      let text = "";
+      let warning = "";
+      let fileName = file.name;
+      if (fileType === "pdf") {
+        const data = await extractPdfTextFromFile(file);
+        text = data.text;
+        warning = data.truncated ? t("research.resumeUploadTruncated") : "";
+      } else {
+        const form = new FormData();
+        form.set("file", file);
+        form.set("locale", locale);
+        const res = await fetch(`/api/verify/extract?locale=${locale}`, { method: "POST", body: form });
+        const data: ResumeExtractResponse = await res.json().catch(() => ({}));
+        if (!res.ok || !data.text?.trim()) {
+          setResumeUploadError(data.error || t("api.error.resumeParseFailed"));
+          return;
+        }
+        text = data.text;
+        fileName = data.fileName || file.name;
+        warning = data.warning || (data.truncated ? t("research.resumeUploadTruncated") : "");
+      }
+      if (!text.trim()) {
+        setResumeUploadError(t("api.error.resumeEmptyText"));
+        return;
+      }
+      setInput(text);
+      createSearchIntake(text);
+      setResumeUploadMessage(t("research.jdUploadSelected", { name: fileName }));
+      setResumeUploadWarning(warning);
+    } catch {
+      setResumeUploadError(t("api.error.resumeParseFailed"));
+    } finally {
+      setResumeUploading(false);
+    }
+  }
+
   function splitPlanText(value: string) {
     return value.split("\n").map((item) => item.trim()).filter(Boolean);
   }
@@ -713,9 +717,97 @@ export default function ResearchTool({
     return items.join("\n");
   }
 
-  function createEditablePlan() {
-    if (!input.trim()) return;
-    setEditablePlan(buildEditableSearchPlanDraft(input, { locale }));
+  function createSearchIntake(value: string) {
+    const draft = buildSearchIntakeDraft(value, { locale }) as SearchIntakeDraft;
+    setSearchIntakeDraft(draft);
+    setEditablePlan(buildEditablePlanFromIntake(draft));
+    setAdvancedPlanOpen(false);
+  }
+
+  function syncSearchIntake(nextDraft: SearchIntakeDraft) {
+    setSearchIntakeDraft(nextDraft);
+    setEditablePlan(buildEditablePlanFromIntake(nextDraft));
+  }
+
+  function buildEditablePlanFromIntake(draft: SearchIntakeDraft) {
+    const base = buildEditableSearchPlanDraft(draft.original_query, { locale }) as EditableSearchPlanDraft;
+    const clarification = draft.clarification ?? {};
+    const constraints = [
+      clarification.location ? `${t("research.intake.label.location")}: ${clarification.location}` : "",
+      clarification.salary ? `${t("research.intake.label.salary")}: ${clarification.salary}` : "",
+      clarification.target_count ? `${t("research.intake.label.target_count")}: ${clarification.target_count}` : "",
+    ].filter(Boolean);
+    const sourceConstraint = constraints.join("；");
+    return {
+      ...base,
+      search_brief: {
+        ...base.search_brief,
+        original_query: buildIntakeSearchInput({ draft, locale }),
+        geography: clarification.location ?? base.search_brief.geography,
+        evidence_preferences: uniquePlanValues([
+          ...(base.search_brief.evidence_preferences ?? []),
+          clarification.salary ? `${t("research.intake.label.salary")}: ${clarification.salary}` : "",
+          clarification.target_count ? `${t("research.intake.label.target_count")}: ${clarification.target_count}` : "",
+        ]),
+      },
+      search_plan: {
+        ...base.search_plan,
+        source_strategy: base.search_plan.source_strategy.map((source: EditableSourceStrategy) => ({
+          ...source,
+          target: uniquePlanValues([source.target, clarification.location]).join(" · "),
+          query: uniquePlanValues([source.query, clarification.location]).join(" "),
+          reason: uniquePlanValues([source.reason, sourceConstraint]).join("；"),
+        })),
+      },
+    };
+  }
+
+  function uniquePlanValues(items: Array<string | null | undefined>) {
+    return Array.from(new Set(items.map((item) => String(item ?? "").trim()).filter(Boolean)));
+  }
+
+  function runSearchFlow() {
+    if (!input.trim() && !searchIntakeDraft) return;
+    if (searchIntakeDraft) {
+      runSearchIntake();
+      return;
+    }
+    createSearchIntake(input);
+  }
+
+  function updateResearchInput(value: string) {
+    setInput(value);
+    if (mode === "search" && searchIntakeDraft && value !== searchIntakeDraft.original_query) {
+      setSearchIntakeDraft(null);
+      setEditablePlan(null);
+      setAdvancedPlanOpen(false);
+    }
+  }
+
+  function answerIntakeQuestion(question: SearchIntakeQuestion, option: { value: string; label: string }) {
+    if (!searchIntakeDraft) return;
+    syncSearchIntake(answerSearchIntakeQuestion(searchIntakeDraft, {
+      key: question.key,
+      value: option.value,
+      label: option.label,
+    }) as SearchIntakeDraft);
+  }
+
+  function answerCustomIntakeQuestion(question: SearchIntakeQuestion, value: string) {
+    if (!searchIntakeDraft || !value.trim()) return;
+    syncSearchIntake(answerSearchIntakeQuestion(searchIntakeDraft, {
+      key: question.key,
+      value,
+      label: value,
+    }) as SearchIntakeDraft);
+  }
+
+  function skipIntakeQuestion(question: SearchIntakeQuestion) {
+    if (!searchIntakeDraft) return;
+    syncSearchIntake(answerSearchIntakeQuestion(searchIntakeDraft, {
+      key: question.key,
+      skipped: true,
+    }) as SearchIntakeDraft);
   }
 
   function updateEditablePlanList(key: "must_have" | "nice_to_have" | "exclusions", value: string) {
@@ -743,6 +835,11 @@ export default function ResearchTool({
     run(buildSearchInputFromEditablePlan({ draft: editablePlan, locale }), { preserveInput: true });
   }
 
+  function runSearchIntake() {
+    if (!searchIntakeDraft) return;
+    run(buildIntakeSearchInput({ draft: searchIntakeDraft, locale }), { preserveInput: true });
+  }
+
   function updateConstraintEditorBase(editor: SearchConstraintEditorView, value: string) {
     setInput(buildSearchInputFromConstraintEditor({
       editor: {
@@ -761,36 +858,6 @@ export default function ResearchTool({
           : section),
       },
     }));
-  }
-
-  function updateSearchFeedback(key: SearchFeedbackField, value: SearchFeedbackState[SearchFeedbackField]) {
-    setSearchFeedback((current) => ({
-      ...current,
-      [key]: current[key] === value ? "" : value,
-    }));
-  }
-
-  async function runFeedbackOptimizedSearch() {
-    if (!isTalentSearchResult(result)) return;
-    let optimizedInput = buildFeedbackOptimizedSearchInput({ result, feedback: searchFeedback, locale });
-    if (runId) {
-      try {
-        const res = await fetch("/api/feedback", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ run_id: runId, locale, feedback: searchFeedback }),
-        });
-        const saved: SaveFeedbackResponse = await res.json().catch(() => ({}));
-        if (res.ok && saved.saved) {
-          if (typeof saved.optimizedInput === "string" && saved.optimizedInput.trim()) {
-            optimizedInput = saved.optimizedInput;
-          }
-          if (saved.result) setResult(saved.result);
-        }
-      } catch {}
-    }
-    setInput(optimizedInput);
-    run(optimizedInput, { preserveInput: true });
   }
 
   function stopCurrentRun() {
@@ -926,14 +993,6 @@ export default function ResearchTool({
     return () => { cancelled = true; };
   }, [locale, mode, runId]);
 
-  useEffect(() => {
-    if (!isTalentSearchResult(result)) return;
-    if (result.candidates.length === 0) return;
-    if (selectedCandidateIndex === null || selectedCandidateIndex >= result.candidates.length) {
-      setSelectedCandidateIndex(0);
-    }
-  }, [result, selectedCandidateIndex]);
-
   // 收藏 toggle: 调 API 持久化 + 乐观更新; 失败回滚。
   async function toggleShortlist(idx: number, candidate: unknown) {
     if (savingIdx.has(idx)) return;
@@ -999,36 +1058,37 @@ export default function ResearchTool({
     setCandidateDecisions((current) => ({ ...current, [index]: "passed" }));
   }
 
-  function reviewPrimaryCandidate() {
-    if (!isTalentSearchResult(result) || result.candidates.length === 0) return;
-    const start = selectedCandidateIndex === null ? 0 : selectedCandidateIndex + 1;
-    const next = result.candidates.findIndex((_, index) => index >= start && !candidateDecisions[index]);
-    setSelectedCandidateIndex(next >= 0 ? next : 0);
+  function requestCandidateEmail(index: number, candidate: TalentCandidate) {
+    setSelectedCandidateIndex(index);
+    setContactIntentMessage(locale === "en"
+      ? `Contact enrichment entry reserved for ${candidate.name}. The next commercial release can connect credits, compliant source logging, and email enrichment here without inventing an address.`
+      : `已为 ${candidate.name} 预留联系方式富集入口。下一版可在这里接入点数扣减、合规来源记录和邮箱富集，不会猜测或展示未验证邮箱。`);
   }
 
   const isSearch = mode === "search";
   const progressView = buildResearchLoopView({ feed, live, jobStatus, locale });
-  const feedbackPreview = buildFeedbackOptimizationPreview({ feedback: searchFeedback, locale });
   const evidencePriorityView = isTalentSearchResult(result) ? buildEvidencePriorityView({ result, locale }) : null;
-  const constraintEditor = isSearch && !loading && !result
+  const intakeQuestions = searchIntakeDraft ? buildSearchIntakeQuestions(searchIntakeDraft, { locale }) : [];
+  const constraintEditor = isSearch && !loading && !result && !searchIntakeDraft
     ? buildSearchConstraintEditor({ input, locale })
     : null;
-  const selectedTalentCandidate = isTalentSearchResult(result) && selectedCandidateIndex !== null
-    ? result.candidates[selectedCandidateIndex] ?? null
+  const constraintEditorSplitIndex = constraintEditor
+    ? Math.max(0, Math.ceil((constraintEditor.sections.length + 1) / 2) - 1)
+    : 0;
+  const constraintEditorLeftSections = constraintEditor
+    ? constraintEditor.sections.slice(0, constraintEditorSplitIndex)
+    : [];
+  const constraintEditorRightSections = constraintEditor
+    ? constraintEditor.sections.slice(constraintEditorSplitIndex)
+    : [];
+  const constraintEditorBaseRows = constraintEditor
+    ? Math.max(3, Math.min(8, splitPlanText(constraintEditor.base.value).length + 1))
+    : 3;
+  const activeCandidateIndex = isTalentSearchResult(result) && result.candidates.length > 0
+    ? Math.min(selectedCandidateIndex ?? 0, result.candidates.length - 1)
     : null;
-  const candidateFeedbackPanel = selectedTalentCandidate
-    ? buildCandidateFeedbackPanel({ candidate: selectedTalentCandidate, feedback: searchFeedback, locale })
-    : null;
-  const feedbackGroups = SEARCH_FEEDBACK_GROUPS.map((group) => ({
-    key: group.key,
-    label: t(group.labelKey),
-    options: group.options.map((option) => ({
-      value: String(option.value),
-      label: t(option.labelKey),
-      selected: searchFeedback[group.key] === option.value,
-    })),
-  }));
-
+  const searchRunStarted = isSearch && (loading || Boolean(result));
+  const showSearchSetup = !isSearch || (!searchRunStarted && !searchIntakeDraft);
   return (
     <div className="space-y-5">
       {projectId && (
@@ -1043,23 +1103,26 @@ export default function ResearchTool({
         <ProjectFeedbackPreferenceBanner preference={projectFeedbackPreference} />
       )}
 
-      <ResearchInputStage
-        mode={mode}
-        input={input}
-        onInputChange={setInput}
-        onRun={() => run()}
-        onCreatePlan={isSearch ? createEditablePlan : undefined}
-        loading={loading}
-        onResumeUpload={mode === "verify" ? (file) => uploadVerificationFile(file, "resume") : undefined}
-        onSupportingMaterialUpload={mode === "verify" ? (file) => uploadVerificationFile(file, "supportingMaterial") : undefined}
-        activeUploadKind={verifyUploadKind}
-        resumeUploading={resumeUploading}
-        resumeUploadMessage={resumeUploadMessage}
-        resumeUploadWarning={resumeUploadWarning}
-        resumeUploadError={resumeUploadError}
-      />
+      {showSearchSetup ? (
+        <ResearchInputStage
+          mode={mode}
+          input={input}
+          onInputChange={updateResearchInput}
+          onRun={isSearch ? runSearchFlow : () => run()}
+          onCreatePlan={undefined}
+          onJdUpload={mode === "search" ? uploadSearchBriefFile : undefined}
+          loading={loading}
+          onResumeUpload={mode === "verify" ? (file) => uploadVerificationFile(file, "resume") : undefined}
+          onSupportingMaterialUpload={mode === "verify" ? (file) => uploadVerificationFile(file, "supportingMaterial") : undefined}
+          activeUploadKind={mode === "search" ? "jd" : verifyUploadKind}
+          resumeUploading={resumeUploading}
+          resumeUploadMessage={resumeUploadMessage}
+          resumeUploadWarning={resumeUploadWarning}
+          resumeUploadError={resumeUploadError}
+        />
+      ) : null}
 
-      {constraintEditor && constraintEditor.sections.length > 0 && (
+      {!searchRunStarted && constraintEditor && constraintEditor.sections.length > 0 && (
         <Surface className="p-5 md:p-6">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div className="max-w-2xl">
@@ -1070,25 +1133,38 @@ export default function ResearchTool({
               {constraintEditor.sections.length}
             </span>
           </div>
-          <div className="mt-5 grid gap-4 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
-            <label className="block">
-              <span className="text-xs font-semibold text-[var(--sh-muted)]">{constraintEditor.base.label}</span>
-              <textarea
-                value={constraintEditor.base.value}
-                onChange={(event) => updateConstraintEditorBase(constraintEditor, event.target.value)}
-                rows={5}
-                className="mt-2 block w-full resize-y rounded-2xl border border-black/10 bg-white/78 px-3 py-3 text-sm leading-6 text-[var(--sh-ink)] outline-none transition focus:border-black/20 focus:bg-white"
-              />
-            </label>
-            <div className="grid gap-3">
-              {constraintEditor.sections.map((section) => (
-                <label key={section.key} className="block rounded-2xl border border-black/10 bg-white/70 p-3">
+          <div className="mt-5 grid gap-5 xl:grid-cols-2">
+            <div className="space-y-4">
+              <label className="block rounded-2xl bg-[var(--sh-canvas)] p-4 ring-1 ring-black/5">
+                <span className="text-xs font-semibold text-[var(--sh-muted)]">{constraintEditor.base.label}</span>
+                <textarea
+                  value={constraintEditor.base.value}
+                  onChange={(event) => updateConstraintEditorBase(constraintEditor, event.target.value)}
+                  rows={constraintEditorBaseRows}
+                  className="mt-2 block w-full resize-y rounded-xl border border-black/10 bg-white px-3 py-3 text-sm leading-6 text-[var(--sh-ink)] outline-none transition focus:border-black/20"
+                />
+              </label>
+              {constraintEditorLeftSections.map((section) => (
+                <label key={section.key} className="block border-t border-black/10 pt-4">
                   <span className="text-xs font-semibold text-[var(--sh-muted)]">{section.label}</span>
                   <textarea
                     value={joinPlanText(section.items)}
                     onChange={(event) => updateConstraintEditorSection(constraintEditor, section.key, event.target.value)}
-                    rows={Math.max(3, section.items.length + 1)}
-                    className="mt-2 block w-full resize-y rounded-xl border border-black/10 bg-[var(--sh-canvas)] px-3 py-2 text-sm leading-6 text-[var(--sh-ink)] outline-none transition focus:border-black/20 focus:bg-white"
+                    rows={Math.max(4, section.items.length + 1)}
+                    className="mt-2 block w-full resize-y rounded-xl border border-black/10 bg-white px-3 py-3 text-sm leading-6 text-[var(--sh-ink)] outline-none transition focus:border-black/20"
+                  />
+                </label>
+              ))}
+            </div>
+            <div className="space-y-4">
+              {constraintEditorRightSections.map((section) => (
+                <label key={section.key} className="block border-t border-black/10 pt-4 first:border-t-0 first:pt-0">
+                  <span className="text-xs font-semibold text-[var(--sh-muted)]">{section.label}</span>
+                  <textarea
+                    value={joinPlanText(section.items)}
+                    onChange={(event) => updateConstraintEditorSection(constraintEditor, section.key, event.target.value)}
+                    rows={Math.max(4, section.items.length + 1)}
+                    className="mt-2 block w-full resize-y rounded-xl border border-black/10 bg-white px-3 py-3 text-sm leading-6 text-[var(--sh-ink)] outline-none transition focus:border-black/20"
                   />
                 </label>
               ))}
@@ -1097,8 +1173,34 @@ export default function ResearchTool({
         </Surface>
       )}
 
-      {isSearch && editablePlan && (
-        <EditableSearchPlanPanel onRunPlan={runEditablePlan} loading={loading}>
+      {!searchRunStarted && isSearch && searchIntakeDraft && !result && (
+        <SearchIntakePanel
+          draft={searchIntakeDraft}
+          questions={intakeQuestions}
+          loading={loading}
+          onAnswer={answerIntakeQuestion}
+          onCustomAnswer={answerCustomIntakeQuestion}
+          onSkip={skipIntakeQuestion}
+          onRun={runSearchIntake}
+          onOpenAdvanced={() => setAdvancedPlanOpen((open) => !open)}
+        />
+      )}
+
+      {!searchRunStarted && isSearch && editablePlan && !result && (
+        <details
+          open={advancedPlanOpen}
+          onToggle={(event) => setAdvancedPlanOpen(event.currentTarget.open)}
+          className="group"
+        >
+          <summary className="flex cursor-pointer list-none items-center justify-between gap-3 rounded-3xl border border-black/10 bg-white/82 px-5 py-4 text-sm font-semibold text-[var(--sh-ink)] shadow-sm transition hover:border-black/20">
+            <span className="inline-flex items-center gap-2">
+              <FiSliders aria-hidden="true" />
+              {t("research.intake.advancedPlan")}
+            </span>
+            <FiChevronDown className="transition group-open:rotate-180" aria-hidden="true" />
+          </summary>
+          <div className="mt-3">
+            <EditableSearchPlanPanel onRunPlan={runEditablePlan} loading={loading}>
           <div className="grid gap-4 md:grid-cols-3">
               <label className="block">
                 <span className="text-xs font-semibold text-emerald-700">{t("research.plan.mustHave")}</span>
@@ -1160,7 +1262,9 @@ export default function ResearchTool({
                 </div>
               ))}
             </div>
-        </EditableSearchPlanPanel>
+            </EditableSearchPlanPanel>
+          </div>
+        </details>
       )}
 
       {/* 进度区 */}
@@ -1221,29 +1325,22 @@ export default function ResearchTool({
               )}
               {result.candidates.length > 0 ? (
                 <>
-                  <CandidateReviewCommand
-                    count={result.candidates.length}
-                    firstName={result.candidates[0]?.name ?? t("result.unknownCandidate")}
-                    reviewed={Object.keys(candidateDecisions).length}
-                    onReview={reviewPrimaryCandidate}
-                    onShowProcess={() => setAdvancedDetailsOpen(true)}
-                  />
-                  <CandidateReviewFlow
+                  <SearchResultWorkspaceView
                     result={result}
-                    selectedIndex={selectedCandidateIndex ?? 0}
+                    stats={stats}
+                    selectedIndex={selectedCandidateIndex}
                     shortlist={shortlist}
                     decisions={candidateDecisions}
-                    candidateFeedbackPanel={candidateFeedbackPanel}
-                    feedbackGroups={feedbackGroups}
-                    feedbackPreview={feedbackPreview}
                     loading={loading}
+                    commercialNotice={contactIntentMessage}
                     onOpenCandidate={openCandidateForReview}
                     onAddToPool={addCandidateToPool}
                     onNeedEvidence={needEvidenceForCandidate}
                     onPass={passCandidate}
                     onOutreach={() => setOutreachOpen(true)}
-                    onFeedbackSelect={(key, value) => updateSearchFeedback(key as SearchFeedbackField, value as SearchFeedbackState[SearchFeedbackField])}
-                    onRunFeedback={runFeedbackOptimizedSearch}
+                    onGetEmail={requestCandidateEmail}
+                    onShowProcess={() => setAdvancedDetailsOpen(true)}
+                    locale={locale}
                   />
                 </>
               ) : (
@@ -1281,12 +1378,12 @@ export default function ResearchTool({
       )}
 
       {/* AI 外联弹窗 (针对搜人结果里选中的候选人) */}
-      {isTalentSearchResult(result) && selectedCandidateIndex !== null && (
+      {isTalentSearchResult(result) && activeCandidateIndex !== null && (
         <OutreachModal
           open={outreachOpen}
           onClose={() => setOutreachOpen(false)}
-          candidate={result.candidates[selectedCandidateIndex]}
-          candidateName={result.candidates[selectedCandidateIndex]?.name}
+          candidate={result.candidates[activeCandidateIndex]}
+          candidateName={result.candidates[activeCandidateIndex]?.name}
           roleBrief={result.search_brief.original_query}
         />
       )}

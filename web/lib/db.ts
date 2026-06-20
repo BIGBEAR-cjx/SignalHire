@@ -21,7 +21,15 @@ import {
   isStaleRunningJob,
 } from "./job-state.mjs";
 import { t as translate } from "./i18n.mjs";
-import { buildFeedbackOptimizedSearchInput, mergeBackfillResult } from "./talent-profile.mjs";
+import {
+  buildCandidateProfileCacheEntry,
+  buildAgentSearchStrategy,
+  buildFeedbackOptimizedSearchInput,
+  isTalentSearchResult,
+  mergeBackfillResult,
+  normalizeTalentSearchResult,
+  parsePublicTalentSource,
+} from "./talent-profile.mjs";
 import { mergeSearchFeedbackIntoResult } from "./research-loop.mjs";
 
 const BASE = process.env.INSFORGE_API_BASE_URL;
@@ -52,6 +60,8 @@ async function runSQL<T = Record<string, unknown>>(query: string, params: unknow
 }
 
 const TABLE = "research_runs";
+const CANDIDATE_PROFILE_TABLE = "candidate_profiles";
+const CANDIDATE_EVIDENCE_SOURCE_TABLE = "candidate_evidence_sources";
 const MAX_CACHE_KEY_LENGTH = 240;
 const MAX_FLAT_KEY_LENGTH = 220;
 const MAX_QUERY_TEXT_LENGTH = 240;
@@ -109,6 +119,10 @@ const cacheKey = (kind: RunKind, flatKey: string, userId?: string | null) => bui
   label: "",
   userId,
 }).cacheKey;
+const buildQueuedAgentSearchStrategy = buildAgentSearchStrategy as (query: unknown, options?: {
+  locale?: string;
+  cachedCandidateHints?: unknown[];
+}) => unknown;
 
 function dateMs(value: string | null | undefined): number | null {
   if (!value) return null;
@@ -217,6 +231,72 @@ export interface SaveSearchFeedbackResult {
   updated_at: string | null;
 }
 
+export interface CandidateProfileRow {
+  user_id: string;
+  source_run_id: string | null;
+  cache_key: string;
+  name: string;
+  current_role: string | null;
+  current_company: string | null;
+  role: string;
+  ai_directions: string[];
+  vertical_tags: string[];
+  match_score: number;
+  confidence: string;
+  independent_sources: number;
+  source_types: string[];
+  evidence_urls: string[];
+  search_text: string;
+  profile: unknown;
+  first_seen_at: string;
+  last_seen_at: string;
+  updated_at: string;
+}
+
+type NormalizedTalentCandidate = {
+  name: string;
+  current_role: string | null;
+  current_company: string | null;
+  claims: Array<{
+    claim: string;
+    verdict: string;
+    evidence: Array<{ note: string; url: string; source_type: string }>;
+  }>;
+};
+
+export interface CandidateEvidenceSourceRow {
+  user_id: string;
+  source_run_id: string | null;
+  candidate_profile_cache_key: string;
+  cache_key: string;
+  candidate_name: string;
+  claim: string;
+  verdict: string;
+  note: string;
+  url: string;
+  host: string;
+  family: string;
+  coverage_group: string;
+  source_type: string;
+  primary_id: string;
+  secondary_id: string;
+  observed_at: string;
+  updated_at: string;
+}
+
+export interface CachedCandidateProfileMatch {
+  cache_key: string;
+  name: string;
+  role: string;
+  vertical_tags: string[];
+  source_types: string[];
+  match_score: number;
+  confidence: string;
+  cache_score: number;
+  matched_terms: string[];
+  evidence_urls: string[];
+}
+
 function normalizeHealthJob(row: {
   id?: string;
   kind?: RunKind;
@@ -308,6 +388,7 @@ export async function saveRun(row: SaveRunInput): Promise<string | null> {
   if (!client) return null;
   const storage = buildRunStorageFields(row);
   try {
+    const finishedAt = new Date().toISOString();
     await client.database.from(TABLE).upsert(
       {
         cache_key: storage.cacheKey,
@@ -324,15 +405,243 @@ export async function saveRun(row: SaveRunInput): Promise<string | null> {
         last_error: null,
         progress: null,
         locked_at: null,
-        finished_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
+        finished_at: finishedAt,
+        updated_at: finishedAt,
       },
       { onConflict: "cache_key" },
     );
-    return await findRunId(row.kind, row.flatKey, row.userId);
+    const runId = await findRunId(row.kind, row.flatKey, row.userId);
+    if (row.kind === "search") {
+      await upsertCandidateProfilesForRun({
+        userId: row.userId,
+        sourceRunId: runId,
+        observedAt: finishedAt,
+        result: row.result,
+      });
+      await upsertCandidateEvidenceSourcesForRun({
+        userId: row.userId,
+        sourceRunId: runId,
+        observedAt: finishedAt,
+        result: row.result,
+      });
+    }
+    return runId;
   } catch {
     // 静默: 写库失败不能影响给用户返回结果
     return null;
+  }
+}
+
+function candidateProfileCacheKey(userId: string, candidateCacheKey: string) {
+  return compactKey(`${userId}:${candidateCacheKey}`, MAX_CACHE_KEY_LENGTH);
+}
+
+function searchTerms(value: string) {
+  const stop = new Set(["find", "with", "strong", "senior", "junior", "engineer", "engineers", "candidate", "candidates"]);
+  return Array.from(new Set(String(value ?? "")
+    .toLowerCase()
+    .split(/[^a-z0-9\u4e00-\u9fa5.+-]+/g)
+    .map((term) => term.trim())
+    .filter((term) => term.length >= 2 && !stop.has(term))));
+}
+
+function rowStringArray(value: unknown): string[] {
+  return Array.isArray(value) ? value.map((item) => String(item ?? "").trim()).filter(Boolean) : [];
+}
+
+export function rankCandidateProfileRowsForSearch(input: {
+  query: string;
+  rows: Array<Partial<CandidateProfileRow>>;
+  limit?: number;
+}): CachedCandidateProfileMatch[] {
+  const terms = searchTerms(input.query);
+  const limit = Math.max(1, Math.min(20, Number(input.limit ?? 6) || 6));
+  return input.rows
+    .map((row) => {
+      const verticalTags = rowStringArray(row.vertical_tags);
+      const sourceTypes = rowStringArray(row.source_types);
+      const evidenceUrls = rowStringArray(row.evidence_urls);
+      const haystack = [
+        row.name,
+        row.role,
+        row.current_role,
+        row.current_company,
+        row.search_text,
+        ...verticalTags,
+        ...sourceTypes,
+      ].join(" ").toLowerCase();
+      const matchedTerms = terms.filter((term) => haystack.includes(term));
+      const tagScore = verticalTags.some((tag) => haystack.includes(tag.toLowerCase())) ? 1 : 0;
+      const sourceScore = sourceTypes.filter((type) => terms.includes(type.toLowerCase())).length;
+      const confidenceBoost = row.confidence === "high" ? 3 : row.confidence === "medium" ? 1 : 0;
+      const cacheScore = (matchedTerms.length * 10) + (tagScore * 4) + (sourceScore * 3) + confidenceBoost + Math.round(Number(row.match_score ?? 0) / 20);
+      return {
+        cache_key: String(row.cache_key ?? ""),
+        name: String(row.name ?? ""),
+        role: String(row.role ?? row.current_role ?? ""),
+        vertical_tags: verticalTags,
+        source_types: sourceTypes,
+        match_score: Number(row.match_score ?? 0),
+        confidence: String(row.confidence ?? "medium"),
+        cache_score: cacheScore,
+        matched_terms: matchedTerms,
+        evidence_urls: evidenceUrls,
+      };
+    })
+    .filter((row) => row.cache_key && row.name)
+    .sort((a, b) => b.cache_score - a.cache_score || b.match_score - a.match_score || a.name.localeCompare(b.name))
+    .slice(0, limit);
+}
+
+export function buildCandidateProfileRowsForRun(input: {
+  userId: string;
+  sourceRunId?: string | null;
+  observedAt?: string | null;
+  result: unknown;
+}): CandidateProfileRow[] {
+  if (!input.userId || !isTalentSearchResult(input.result)) return [];
+  const observedAt = input.observedAt ?? new Date().toISOString();
+  const normalized = normalizeTalentSearchResult(input.result);
+  const candidates = normalized.candidates as NormalizedTalentCandidate[];
+  const rows: CandidateProfileRow[] = [];
+  for (const candidate of candidates) {
+    const entry = buildCandidateProfileCacheEntry({ result: normalized, candidate });
+    if (!entry.cache_key || !entry.name || entry.name === "Unknown candidate") continue;
+    const cacheKeyValue = candidateProfileCacheKey(input.userId, entry.cache_key);
+    rows.push({
+      user_id: input.userId,
+      source_run_id: input.sourceRunId ?? null,
+      cache_key: cacheKeyValue,
+      name: entry.name,
+      current_role: candidate.current_role,
+      current_company: candidate.current_company,
+      role: entry.role,
+      ai_directions: entry.ai_directions,
+      vertical_tags: entry.vertical_tags,
+      match_score: entry.match_score,
+      confidence: entry.confidence,
+      independent_sources: entry.independent_sources,
+      source_types: entry.source_types,
+      evidence_urls: entry.evidence_urls,
+      search_text: truncateText(entry.search_text, 4000),
+      profile: entry,
+      first_seen_at: observedAt,
+      last_seen_at: observedAt,
+      updated_at: observedAt,
+    });
+  }
+  return rows;
+}
+
+export function buildCandidateEvidenceSourceRowsForRun(input: {
+  userId: string;
+  sourceRunId?: string | null;
+  observedAt?: string | null;
+  result: unknown;
+}): CandidateEvidenceSourceRow[] {
+  if (!input.userId || !isTalentSearchResult(input.result)) return [];
+  const observedAt = input.observedAt ?? new Date().toISOString();
+  const normalized = normalizeTalentSearchResult(input.result);
+  const candidates = normalized.candidates as NormalizedTalentCandidate[];
+  const rows: CandidateEvidenceSourceRow[] = [];
+  const seen = new Set<string>();
+  for (const candidate of candidates) {
+    const entry = buildCandidateProfileCacheEntry({ result: normalized, candidate });
+    if (!entry.cache_key || !entry.name || entry.name === "Unknown candidate") continue;
+    const candidateCacheKey = candidateProfileCacheKey(input.userId, entry.cache_key);
+    for (const claim of candidate.claims) {
+      for (const evidence of claim.evidence) {
+        if (!evidence.url) continue;
+        const parsed = parsePublicTalentSource(evidence.url);
+        const sourceKey = compactKey(`${candidateCacheKey}:${shortHash(`${parsed.url}:${claim.claim}`)}`, MAX_CACHE_KEY_LENGTH);
+        if (seen.has(sourceKey)) continue;
+        seen.add(sourceKey);
+        rows.push({
+          user_id: input.userId,
+          source_run_id: input.sourceRunId ?? null,
+          candidate_profile_cache_key: candidateCacheKey,
+          cache_key: sourceKey,
+          candidate_name: entry.name,
+          claim: truncateText(claim.claim, 500),
+          verdict: claim.verdict,
+          note: truncateText(evidence.note, 500),
+          url: parsed.url,
+          host: parsed.host,
+          family: parsed.family,
+          coverage_group: parsed.coverage_group,
+          source_type: evidence.source_type || parsed.source_type,
+          primary_id: parsed.primary_id,
+          secondary_id: parsed.secondary_id,
+          observed_at: observedAt,
+          updated_at: observedAt,
+        });
+      }
+    }
+  }
+  return rows;
+}
+
+export async function upsertCandidateProfilesForRun(input: {
+  userId: string;
+  sourceRunId?: string | null;
+  observedAt?: string | null;
+  result: unknown;
+}): Promise<number> {
+  if (!client) return 0;
+  const rows = buildCandidateProfileRowsForRun(input);
+  if (rows.length === 0) return 0;
+  try {
+    const { error } = await client.database
+      .from(CANDIDATE_PROFILE_TABLE)
+      .upsert(rows, { onConflict: "cache_key" });
+    if (error) return 0;
+    return rows.length;
+  } catch {
+    return 0;
+  }
+}
+
+export async function upsertCandidateEvidenceSourcesForRun(input: {
+  userId: string;
+  sourceRunId?: string | null;
+  observedAt?: string | null;
+  result: unknown;
+}): Promise<number> {
+  if (!client) return 0;
+  const rows = buildCandidateEvidenceSourceRowsForRun(input);
+  if (rows.length === 0) return 0;
+  try {
+    const { error } = await client.database
+      .from(CANDIDATE_EVIDENCE_SOURCE_TABLE)
+      .upsert(rows, { onConflict: "cache_key" });
+    if (error) return 0;
+    return rows.length;
+  } catch {
+    return 0;
+  }
+}
+
+export async function findCachedCandidateProfilesForSearch(input: {
+  userId: string;
+  query: string;
+  limit?: number;
+}): Promise<CachedCandidateProfileMatch[]> {
+  if (!client) return [];
+  try {
+    const { data, error } = await client.database
+      .from(CANDIDATE_PROFILE_TABLE)
+      .select("cache_key,name,current_role,current_company,role,vertical_tags,source_types,evidence_urls,match_score,confidence,search_text,last_seen_at")
+      .eq("user_id", input.userId)
+      .order("last_seen_at", { ascending: false })
+      .limit(120);
+    if (error || !data) return [];
+    return rankCandidateProfileRowsForSearch({
+      query: input.query,
+      rows: data as Array<Partial<CandidateProfileRow>>,
+      limit: input.limit ?? 5,
+    });
+  } catch {
+    return [];
   }
 }
 
@@ -342,23 +651,30 @@ export async function saveRun(row: SaveRunInput): Promise<string | null> {
 export async function enqueue(input: {
   kind: RunKind; flatKey: string; queryText: string; label: string; userId: string;
   projectId?: string | null;
+  searchTaskId?: string | null;
   platformLanguage?: string | null;
+  cachedCandidateHints?: CachedCandidateProfileMatch[];
 }): Promise<string | null> {
   if (!client) return null;
   const storage = buildRunStorageFields(input);
   try {
+    const agentExecution = input.kind === "search"
+      ? { search_strategy: buildQueuedAgentSearchStrategy(input.queryText, { locale: input.platformLanguage === "English" ? "en" : "zh", cachedCandidateHints: input.cachedCandidateHints ?? [] }) }
+      : null;
     const row: Record<string, unknown> = {
       cache_key: storage.cacheKey, kind: input.kind, flat_key: storage.flatKey,
       query_text: storage.queryText, label: storage.label,
       summary: storage.summary, result: null, stats: null,
       status: "queued",
       user_id: input.userId,
-      error: null, last_error: null, progress: storage.queuedProgress,
+      error: null, last_error: null,
+      progress: { ...storage.queuedProgress, candidate_profile_hints: input.cachedCandidateHints ?? [], agent_execution: agentExecution },
       attempt_count: 0, max_attempts: DEFAULT_MAX_ATTEMPTS,
       locked_at: null, started_at: null, finished_at: null,
       updated_at: new Date().toISOString(),
     };
     if (input.projectId !== undefined) row.project_id = input.projectId;
+    if (input.searchTaskId !== undefined) row.search_task_id = input.searchTaskId;
     await client.database.from(TABLE).upsert(row, { onConflict: "cache_key" });
     return await findRunId(input.kind, input.flatKey, input.userId);
   } catch {

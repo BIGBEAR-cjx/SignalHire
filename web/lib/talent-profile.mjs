@@ -7,6 +7,36 @@ export const AI_DIRECTIONS = [
   "AI Product / Solutions",
   "Founder / Builder",
 ];
+export const AI_VERTICAL_TAXONOMY = [
+  {
+    tag: "LLM infra",
+    terms: ["llm infra", "llm systems", "inference", "serving", "vllm", "sglang", "tensorrt-llm", "triton", "cuda", "gpu"],
+  },
+  {
+    tag: "RAG",
+    terms: ["rag", "retrieval", "vector", "embedding", "rerank", "knowledge base"],
+  },
+  {
+    tag: "agent",
+    terms: ["agent", "agents", "tool use", "workflow", "multi-agent", "automation"],
+  },
+  {
+    tag: "multimodal",
+    terms: ["multimodal", "vision-language", "vlm", "image", "video", "audio", "ocr"],
+  },
+  {
+    tag: "eval",
+    terms: ["eval", "evaluation", "benchmark", "safety", "red team", "observability", "quality"],
+  },
+  {
+    tag: "AI product",
+    terms: ["ai product", "product", "copilot", "llm app", "solution", "workflow"],
+  },
+  {
+    tag: "AI GTM",
+    terms: ["ai gtm", "gtm", "sales", "solution consultant", "field", "customer", "growth"],
+  },
+];
 
 export const VERDICTS = ["verified", "contradicted", "unverified"];
 export const EVIDENCE_QUALITY = ["high", "medium", "low"];
@@ -38,6 +68,93 @@ const SOURCE_QUERY_OPERATORS = {
   podcast: "podcast interview",
   interview: "interview podcast",
 };
+
+export const INTERNET_ROLE_TAXONOMY = [
+  {
+    key: "software_engineering",
+    label_zh: "技术研发/工程",
+    label_en: "Software engineering",
+    patterns: [/全栈|前端|后端|客户端|移动端|工程师|研发|架构师|frontend|backend|full[- ]?stack|software engineer|developer|react|next\.js|node\.js|python/i],
+    sourceHint: "GitHub Stack Overflow 技术社区",
+  },
+  {
+    key: "ai_ml_data",
+    label_zh: "AI/算法/数据",
+    label_en: "AI, ML and data",
+    patterns: [/算法|机器学习|深度学习|数据科学|数据分析|推荐系统|大模型|LLM|ML|AI engineer|data scientist|Kaggle|Hugging Face/i],
+    sourceHint: "Google Scholar Kaggle Hugging Face 论文",
+  },
+  {
+    key: "product_management",
+    label_zh: "产品管理",
+    label_en: "Product management",
+    patterns: [/产品经理|产品负责人|增长产品|平台产品|PM\b|product manager|roadmap|需求分析|用户路径/i],
+    sourceHint: "Product Hunt 产品案例 roadmap",
+  },
+  {
+    key: "design_creative",
+    label_zh: "设计/创意",
+    label_en: "Design and creative",
+    patterns: [/设计师|UI|UX|交互|视觉|品牌设计|Figma|作品集|designer|product design|portfolio/i],
+    sourceHint: "Behance Dribbble portfolio 作品集",
+  },
+  {
+    key: "growth_marketing",
+    label_zh: "增长/市场/品牌/内容",
+    label_en: "Growth, marketing and brand",
+    patterns: [/增长|市场|营销|品牌|内容矩阵|投放|SEO|社媒|小红书|公众号|Twitter|TikTok|YouTube|Marketing|Growth/i],
+    sourceHint: "内容平台 小红书 Twitter case study",
+  },
+  {
+    key: "operations_community",
+    label_zh: "运营/社区",
+    label_en: "Operations and community",
+    patterns: [/运营|社区|社群|活动运营|用户运营|内容运营|Discord|Telegram|community|operations/i],
+    sourceHint: "Discord 社区 活动 社群",
+  },
+  {
+    key: "sales_bd_gtm",
+    label_zh: "销售/BD/GTM",
+    label_en: "Sales, BD and GTM",
+    patterns: [/销售|商务|BD|渠道|GTM|客户拓展|enterprise|sales|business development|go[- ]?to[- ]?market/i],
+    sourceHint: "客户案例 CRM Sales Navigator company",
+  },
+  {
+    key: "customer_success_support",
+    label_zh: "客户成功/售前/支持",
+    label_en: "Customer success and support",
+    patterns: [/客户成功|售前|售后|解决方案|技术支持|support|solution|customer success|renewal|pre[- ]?sales/i],
+    sourceHint: "case study 客户成功 support solution",
+  },
+  {
+    key: "security_infra_devops",
+    label_zh: "安全/基础设施/DevOps",
+    label_en: "Security, infra and DevOps",
+    patterns: [/安全|SRE|DevOps|运维|云原生|Kubernetes|K8s|CNCF|incident|security|infrastructure/i],
+    sourceHint: "CNCF GitHub 安全 incident",
+  },
+  {
+    key: "business_strategy_ops",
+    label_zh: "战略/经营/商业分析",
+    label_en: "Business strategy and operations",
+    patterns: [/战略|经营分析|商业分析|项目管理|CEO Office|咨询|strategy|business operations|analysis|bizops/i],
+    sourceHint: "咨询 strategy analysis 经营",
+  },
+  {
+    key: "people_finance_admin",
+    label_zh: "HR/财务/法务/行政",
+    label_en: "People, finance and admin",
+    patterns: [/HR|招聘|人力|HRBP|财务|法务|行政|recruiter|talent acquisition|finance|legal/i],
+    sourceHint: "LinkedIn HR 招聘 finance",
+  },
+  {
+    key: "executive_founder_leadership",
+    label_zh: "高管/负责人/创始型",
+    label_en: "Executive and founder leadership",
+    patterns: [/高管|负责人|VP|C[EOFO]{2}|COO|CTO|CMO|创始|founder|head of|leadership|总监/i],
+    sourceHint: "founder CEO 高管 媒体",
+  },
+];
 
 export function isSearchUrl(url) {
   return (
@@ -77,6 +194,58 @@ function normalizeEvidence(evidence) {
 
 function normalizeSourceUrls(value, limit = 12) {
   return cleanStringArray(value, limit).filter((url) => !isSearchUrl(url));
+}
+
+function emptyParsedSource(url) {
+  return {
+    url: cleanString(url),
+    family: "other_public_source",
+    coverage_group: "public_voice",
+    source_type: "other",
+    primary_id: "",
+    secondary_id: "",
+    host: "",
+  };
+}
+
+export function parsePublicTalentSource(url) {
+  const cleanUrl = cleanString(url);
+  if (!cleanUrl || isSearchUrl(cleanUrl)) return emptyParsedSource(cleanUrl);
+  let parsed;
+  try {
+    parsed = new URL(cleanUrl);
+  } catch {
+    return emptyParsedSource(cleanUrl);
+  }
+  const host = parsed.hostname.replace(/^www\./, "").toLowerCase();
+  const segments = parsed.pathname.split("/").map((segment) => decodeURIComponent(segment)).filter(Boolean);
+  const base = { ...emptyParsedSource(cleanUrl), host };
+
+  if (host === "github.com" && segments.length >= 2) {
+    return { ...base, family: "github_repo", coverage_group: "practice", source_type: "code", primary_id: segments[0], secondary_id: segments[1] };
+  }
+  if (host === "arxiv.org" && ["abs", "pdf"].includes(segments[0]) && segments[1]) {
+    return { ...base, family: "arxiv_paper", coverage_group: "research", source_type: "paper", primary_id: segments[1].replace(/\.pdf$/i, "") };
+  }
+  if (host === "openreview.net" && parsed.searchParams.get("id")) {
+    return { ...base, family: "openreview_paper", coverage_group: "research", source_type: "paper", primary_id: parsed.searchParams.get("id") ?? "" };
+  }
+  if (host === "huggingface.co" && segments.length >= 2) {
+    if (segments[0] === "datasets" && segments.length >= 3) {
+      return { ...base, family: "huggingface_dataset", coverage_group: "research", source_type: "dataset", primary_id: segments[1], secondary_id: segments[2] };
+    }
+    if (segments[0] === "spaces" && segments.length >= 3) {
+      return { ...base, family: "huggingface_space", coverage_group: "practice", source_type: "project", primary_id: segments[1], secondary_id: segments[2] };
+    }
+    return { ...base, family: "huggingface_model", coverage_group: "practice", source_type: "huggingface", primary_id: segments[0], secondary_id: segments[1] };
+  }
+  if (host === "scholar.google.com" && parsed.searchParams.get("user")) {
+    return { ...base, family: "google_scholar_profile", coverage_group: "work_history", source_type: "profile", primary_id: parsed.searchParams.get("user") ?? "" };
+  }
+  if (segments.some((segment) => ["team", "people", "about-us", "about"].includes(segment.toLowerCase()))) {
+    return { ...base, family: "company_team_page", coverage_group: "work_history", source_type: "company", primary_id: host };
+  }
+  return base;
 }
 
 function normalizeClaim(claim) {
@@ -274,8 +443,363 @@ function fallbackSourceQuery(sourceType, brief) {
   return [sourceQueryTerms(brief), operator].filter(Boolean).join(" ").trim();
 }
 
+function stripListMarker(line) {
+  return cleanString(line)
+    .replace(/^[\s\-*•·]+/, "")
+    .replace(/^\d+[\s.、)）-]*/, "")
+    .replace(/^[（(]?\d+[）)][\s-]*/, "")
+    .trim();
+}
+
+function isJdSectionLabel(line) {
+  return /^(职责|要求|岗位职责|工作职责|职责描述|主要职责|任职要求|职位要求|岗位要求|任职资格|必备条件|加分项|优先条件|优先考虑|排除项|排除条件|不适合|不考虑|avoid|requirements?|responsibilities|nice to have|preferred|bonus|exclusions?)[:：\s]*$/i.test(stripListMarker(line));
+}
+
+function sectionKind(line) {
+  const text = stripListMarker(line).toLowerCase();
+  if (/^(加分项|优先条件|优先考虑|nice to have|preferred|bonus)/i.test(text)) return "nice";
+  if (/^(排除项|排除条件|不适合|不考虑|我们不想要的人|avoid|exclusions?)/i.test(text)) return "exclude";
+  if (/^(职责|要求|岗位职责|工作职责|职责描述|主要职责|任职要求|职位要求|岗位要求|任职资格|必备条件|requirements?|responsibilities)/i.test(text)) return "must";
+  if (/^(岗位备注|公司介绍|项目背景|岗位背景|备注|about company|company context)/i.test(text)) return "context";
+  return null;
+}
+
+function cleanPlanCondition(line) {
+  const text = stripListMarker(line)
+    .replace(/^(你将负责|负责|需要|要求|具备|熟悉|能够|可以)[:：\s]*/i, "")
+    .replace(/[。；;]+$/g, "")
+    .trim();
+  if (!text || isJdSectionLabel(text)) return "";
+  if (/^(岗位职责|任职要求|加分项|排除项)[:：]/.test(text)) return "";
+  return text.length > 96 ? `${text.slice(0, 94)}…` : text;
+}
+
+function firstRoleLine(query) {
+  const lines = cleanString(query).split(/\n+/).map(stripListMarker).filter(Boolean);
+  const first = lines.find((line) => !isJdSectionLabel(line) && line.length <= 80);
+  return cleanPlanCondition(first);
+}
+
+function parseEditableBrief(query) {
+  const clean = cleanString(query);
+  const buckets = { must: [], nice: [], exclusions: [], context: [] };
+  let current = "must";
+  const role = firstRoleLine(clean);
+  if (role) buckets.must.push(role);
+
+  for (const rawLine of clean.split(/\n+/)) {
+    const marker = stripListMarker(rawLine);
+    const nextKind = sectionKind(marker);
+    if (nextKind) {
+      current = nextKind === "exclude" ? "exclusions" : nextKind;
+      continue;
+    }
+    const item = cleanPlanCondition(rawLine);
+    if (!item || item === role) continue;
+    if (current !== "context") buckets[current].push(item);
+  }
+
+  return {
+    must_have: uniqueStrings(buckets.must, 8),
+    nice_to_have: uniqueStrings(buckets.nice, 8),
+    exclusions: uniqueStrings(buckets.exclusions, 8),
+  };
+}
+
+function isNoiseLine(line) {
+  const text = stripListMarker(line);
+  return !text || /^(复制|分享|copy|share)$/i.test(text) || /^#[^\s#]+/.test(text);
+}
+
+function looksLikeEmployerContext(line) {
+  const text = cleanString(line);
+  return /OkayJob|公司介绍|岗位备注|雇主|employer|company context|about company|第一心智|从\s*0\s*到\s*1|行业级影响力|直接影响|机会/i.test(text);
+}
+
+function cleanPastedJobBrief(query) {
+  const original = cleanString(query);
+  const rawNoise = [];
+  const lines = [];
+  for (const rawLine of original.split(/\n+/)) {
+    const line = stripListMarker(rawLine);
+    if (isNoiseLine(line)) {
+      if (line) rawNoise.push(line);
+      continue;
+    }
+    lines.push(line);
+  }
+  const roleTitle = cleanPlanCondition(lines.find((line) => !isJdSectionLabel(line) && !sectionKind(line) && line.length <= 80)) || "";
+  const buckets = { must: [], nice: [], exclusions: [], context: [] };
+  let current = "must";
+  for (const rawLine of lines) {
+    const marker = stripListMarker(rawLine);
+    const nextKind = sectionKind(marker);
+    if (nextKind) {
+      current = nextKind === "exclude" ? "exclusions" : nextKind;
+      continue;
+    }
+    const item = cleanPlanCondition(marker);
+    if (!item || item === roleTitle) continue;
+    if (looksLikeEmployerContext(item) && current !== "nice" && current !== "exclusions") {
+      buckets.context.push(item);
+      continue;
+    }
+    if (current === "context") buckets.context.push(item);
+    else buckets[current].push(item);
+  }
+  const candidateRequirements = uniqueStrings([
+    ...buckets.must,
+    ...keywordTermsFromText(buckets.must.join("\n")),
+  ], 12);
+  return {
+    cleaned_query: lines.join("\n"),
+    role_title: roleTitle,
+    must_have: uniqueStrings(candidateRequirements, 8),
+    nice_to_have: uniqueStrings(buckets.nice, 8),
+    exclusions: uniqueStrings(buckets.exclusions, 8),
+    employer_context: uniqueStrings(buckets.context, 8),
+    candidate_requirements: uniqueStrings(candidateRequirements, 12),
+    negative_constraints: uniqueStrings(buckets.exclusions, 8),
+    raw_noise: uniqueStrings(rawNoise, 20),
+  };
+}
+
+function keywordTermsFromText(text) {
+  const clean = cleanString(text);
+  const patterns = [
+    [/AI\s*Marketing/i, "AI Marketing"],
+    [/AI\s*增长|AI\s*growth/i, "AI 增长"],
+    [/增长|growth/i, "增长"],
+    [/内容营销|content marketing/i, "内容营销"],
+    [/内容矩阵|小红书|公众号|视频号|LinkedIn/i, "内容矩阵"],
+    [/海外市场|global|overseas/i, "海外市场"],
+    [/HR\s*SaaS|招聘|recruiting/i, "HR SaaS"],
+    [/AI\s*产品|AI product/i, "AI 产品"],
+    [/自动化工作流|workflow automation|automation/i, "自动化工作流"],
+    [/数据分析|analytics/i, "数据分析"],
+    [/agent|agents/i, "AI Agent"],
+    [/llm|large language model/i, "LLM"],
+    [/inference|serving/i, "inference serving"],
+    [/vllm/i, "vLLM"],
+    [/triton/i, "Triton"],
+    [/rag|retrieval/i, "RAG"],
+  ];
+  return patterns.filter(([pattern]) => pattern.test(clean)).map(([, term]) => term);
+}
+
+function roleTaxonomyItem(category) {
+  return INTERNET_ROLE_TAXONOMY.find((item) => item.key === category) || INTERNET_ROLE_TAXONOMY[0];
+}
+
+function roleLabel(category, locale = "zh") {
+  const item = roleTaxonomyItem(category);
+  return locale === "en" ? item.label_en : item.label_zh;
+}
+
+export function detectInternetRoleCategory(query) {
+  const clean = cleanString(query);
+  if (!clean) return "software_engineering";
+  const explicitCategory = clean.match(/\brole_category\s*[:：]\s*([a-z_]+)/i)?.[1];
+  if (INTERNET_ROLE_TAXONOMY.some((item) => item.key === explicitCategory)) return explicitCategory;
+  const title = firstRoleLine(clean);
+  if (/CEO Office|战略|经营|商业分析|strategy|business operations|bizops/i.test(title)) return "business_strategy_ops";
+  if (/\b(COO|CEO|CTO|CMO|VP)\b|创始|founder|head of/i.test(title)) return "executive_founder_leadership";
+  if (/AI\s*Marketing|AI\s*增长|growth|marketing|市场|营销|内容/i.test(title)) return "growth_marketing";
+  if (/产品经理|产品负责人|Product Manager|Product Lead|\bPM\b/i.test(title)) return "product_management";
+  if (/UX|UI|设计师|designer|product design/i.test(title)) return "design_creative";
+  if (/客户成功|售前|售后|solution|support|customer success/i.test(title)) return "customer_success_support";
+  if (/BD|销售|商务|GTM|sales|business development/i.test(title)) return "sales_bd_gtm";
+  if (/HR|招聘|HRBP|recruiter|talent acquisition|财务|法务|行政/i.test(title)) return "people_finance_admin";
+  if (/DevOps|SRE|安全|infra|infrastructure|Kubernetes/i.test(title)) return "security_infra_devops";
+  if (/负责人/i.test(title)) return "executive_founder_leadership";
+  if (/算法|机器学习|数据科学|data scientist|ML|AI researcher/i.test(title)) return "ai_ml_data";
+  if (/工程师|developer|engineer|研发|前端|后端|全栈|software/i.test(title)) return "software_engineering";
+  const scores = new Map(INTERNET_ROLE_TAXONOMY.map((item) => [item.key, 0]));
+  for (const item of INTERNET_ROLE_TAXONOMY) {
+    for (const pattern of item.patterns) {
+      if (pattern.test(clean)) scores.set(item.key, (scores.get(item.key) ?? 0) + 1);
+    }
+  }
+  if (/AI\s*Marketing|AI\s*增长/i.test(clean)) scores.set("growth_marketing", (scores.get("growth_marketing") ?? 0) + 3);
+  if (/产品经理|product manager/i.test(clean)) scores.set("product_management", (scores.get("product_management") ?? 0) + 2);
+  if (/CEO Office|战略|经营分析|商业分析|business operations|bizops/i.test(clean)) scores.set("business_strategy_ops", (scores.get("business_strategy_ops") ?? 0) + 3);
+  if (/HR|招聘|人力|HRBP|财务|法务|行政|recruiter|talent acquisition|finance|legal/i.test(clean)) scores.set("people_finance_admin", (scores.get("people_finance_admin") ?? 0) + 3);
+  if (/\b(COO|CEO|CTO|CMO|VP)\b|负责人|创始|founder|head of/i.test(clean)) scores.set("executive_founder_leadership", (scores.get("executive_founder_leadership") ?? 0) + 2);
+  if (/DevOps|SRE|Kubernetes|安全/i.test(clean)) scores.set("security_infra_devops", (scores.get("security_infra_devops") ?? 0) + 2);
+  if (/(engineer|工程师|developer|研发|inference|serving|vllm|triton|react|node\.js|next\.js)/i.test(clean)) scores.set("software_engineering", (scores.get("software_engineering") ?? 0) + 3);
+  if (/算法|机器学习|深度学习|数据科学|数据分析|推荐系统|data scientist|Kaggle/i.test(clean)) scores.set("ai_ml_data", (scores.get("ai_ml_data") ?? 0) + 3);
+  if (/AI|LLM|算法|机器学习/i.test(clean) && !/Marketing|增长|产品|运营/i.test(clean)) scores.set("ai_ml_data", (scores.get("ai_ml_data") ?? 0) + 2);
+  return [...scores.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] || "software_engineering";
+}
+
+function channel(key, label, coverageGroup, sourceTypes, target, suffixes, reason, baseTerms) {
+  return {
+    key,
+    label,
+    coverage_group: coverageGroup,
+    source_types: sourceTypes,
+    target,
+    query_variants: suffixes.map((suffix) => strategyQuery(baseTerms, suffix)),
+    reason,
+  };
+}
+
+function roleChannelTemplates(category, locale, baseTerms) {
+  const zh = locale !== "en";
+  const sharedProfile = channel(
+    "public-profiles",
+    zh ? "公开履历与职业档案" : "Public profiles",
+    "work_history",
+    ["profile", "social_profile", "company_profile"],
+    "LinkedIn, company team pages, speaker bios",
+    ["site:linkedin.com/in public profile current role", "company team page bio speaker profile"],
+    zh ? "核验角色、资历、行业背景和职业轨迹。" : "Verify role, seniority, industry background, and career trajectory.",
+    baseTerms,
+  );
+  const publicVoice = channel(
+    "public-voice",
+    zh ? "公开表达与影响力" : "Public voice",
+    "public_voice",
+    ["blog", "talk", "interview", "media"],
+    "blogs, talks, podcasts, interviews, newsletters",
+    ["blog podcast interview newsletter", "YouTube talk webinar media interview"],
+    zh ? "核验判断力、影响力和公开表达质量。" : "Verify judgment, influence, and public communication.",
+    baseTerms,
+  );
+  const templates = {
+    software_engineering: [
+      channel("code-practice", zh ? "代码与工程实践" : "Code and engineering practice", "practice", ["code", "repository", "project"], "GitHub, Stack Overflow, 技术社区", ["site:github.com repository contributor", "Stack Overflow 技术社区 engineering blog"], zh ? "用代码、项目和技术社区记录核验工程能力。" : "Verify engineering ability through code, projects, and technical community traces.", baseTerms),
+      sharedProfile,
+      channel("technical-writing", zh ? "技术内容" : "Technical writing", "public_voice", ["blog", "talk"], "engineering blogs, talks, podcasts", ["engineering blog talk architecture", "conference talk podcast interview"], zh ? "补充架构判断、复杂项目经验和表达能力。" : "Backfill architecture judgment, complex project work, and communication.", baseTerms),
+      channel("adjacent-builders", zh ? "相邻构建者" : "Adjacent builders", "practice", ["project", "community"], "hackathons, builders, OSS communities", ["hackathon builder open source community", "indie builder product shipping"], zh ? "扩大到有可迁移项目证据的人。" : "Expand to people with transferable shipped-project evidence.", baseTerms),
+    ],
+    ai_ml_data: [
+      sharedProfile,
+      channel("research-data", zh ? "研究与数据证据" : "Research and data evidence", "research", ["paper", "dataset", "benchmark"], "Google Scholar, arXiv, OpenReview, Kaggle", ["Google Scholar arXiv OpenReview paper", "Kaggle Hugging Face dataset benchmark"], zh ? "核验算法、研究、数据集和 benchmark 产出。" : "Verify algorithm, research, dataset, and benchmark output.", baseTerms),
+      channel("model-practice", zh ? "模型与工程落地" : "Model implementation", "practice", ["code", "huggingface", "project"], "GitHub, Hugging Face, Papers with Code", ["site:github.com model training inference", "site:huggingface.co model dataset space"], zh ? "确认是否有可运行模型、代码或产品化实践。" : "Confirm runnable models, code, or production practice.", baseTerms),
+      publicVoice,
+    ],
+    product_management: [
+      sharedProfile,
+      channel("product-shipping", zh ? "产品交付与案例" : "Shipped product evidence", "practice", ["project", "case_study", "company_profile"], "Product Hunt, launch notes, product case studies", ["Product Hunt launch roadmap case study", "产品案例 用户路径 增长产品"], zh ? "核验产品从需求到上线和指标影响。" : "Verify product shipping from requirements to launch and metrics.", baseTerms),
+      channel("market-user-sense", zh ? "用户与市场判断" : "User and market judgment", "public_voice", ["blog", "media", "content_platform"], "blogs, newsletters, podcasts", ["product teardown user research blog", "roadmap strategy interview podcast"], zh ? "评估用户理解、市场判断和表达能力。" : "Assess user understanding, market judgment, and communication.", baseTerms),
+      channel("adjacent-operators", zh ? "相邻增长/运营产品" : "Adjacent product operators", "practice", ["community", "case_study"], "growth, ops, founder operator pools", ["growth product operator founder", "platform product operations case study"], zh ? "扩展到做过相邻业务闭环的人。" : "Expand to people who owned adjacent business loops.", baseTerms),
+    ],
+    design_creative: [
+      sharedProfile,
+      channel("portfolio", zh ? "作品集与设计案例" : "Portfolio and design cases", "practice", ["portfolio", "project", "case_study"], "Behance, Dribbble, portfolio, 作品集", ["Behance Dribbble portfolio 作品集", "Figma case study product design"], zh ? "用作品集和案例核验设计能力。" : "Verify design ability through portfolios and case studies.", baseTerms),
+      channel("design-voice", zh ? "设计表达" : "Design voice", "public_voice", ["blog", "talk", "media"], "design blogs, talks, communities", ["design blog talk interview", "Figma community product design article"], zh ? "评估设计方法、审美判断和表达能力。" : "Assess design method, judgment, and communication.", baseTerms),
+      channel("brand-product-fit", zh ? "品牌/产品适配" : "Brand and product fit", "work_history", ["company_profile", "profile"], "company pages, product pages", ["brand visual product page team", "startup design lead company profile"], zh ? "确认行业、团队和产品阶段适配。" : "Confirm industry, team, and product-stage fit.", baseTerms),
+    ],
+    growth_marketing: [
+      sharedProfile,
+      channel("content-social", zh ? "内容平台与社媒增长" : "Content and social growth", "public_voice", ["content_platform", "social_profile", "media"], "小红书, Twitter, YouTube, TikTok, 公众号", ["小红书 Twitter YouTube TikTok 内容平台", "LinkedIn X 公众号 增长 内容矩阵"], zh ? "核验内容矩阵、社媒增长和公开影响力。" : "Verify content matrix, social growth, and public influence.", baseTerms),
+      channel("growth-cases", zh ? "增长案例与业务结果" : "Growth cases and business outcomes", "practice", ["case_study", "company_profile", "project"], "case studies, company pages, campaign pages", ["growth case study 增长案例 conversion", "campaign user acquisition CAC retention"], zh ? "优先找有真实增长结果和转化指标的人。" : "Prioritize people with real growth outcomes and conversion metrics.", baseTerms),
+      channel("community-kol", zh ? "社区/KOL 资源" : "Community and KOL network", "public_voice", ["community", "event", "media"], "communities, events, KOL networks", ["KOL community event speaker", "Web3 AI community growth marketing"], zh ? "补充渠道资源和行业影响力证据。" : "Backfill channel network and industry influence evidence.", baseTerms),
+    ],
+    operations_community: [
+      sharedProfile,
+      channel("community-ops", zh ? "社区与活动运营" : "Community and event operations", "practice", ["community", "event", "social_profile"], "Discord, Telegram, communities, events", ["Discord Telegram 社区 活动 社群", "community operations event growth"], zh ? "核验社区搭建、活动执行和用户运营能力。" : "Verify community building, event execution, and user operations.", baseTerms),
+      channel("content-ops", zh ? "内容/用户运营案例" : "Content and user ops cases", "practice", ["case_study", "content_platform"], "content platforms, user lifecycle cases", ["内容运营 用户运营 case study", "user lifecycle community retention"], zh ? "寻找可复盘的运营动作和留存结果。" : "Find reviewable operations actions and retention outcomes.", baseTerms),
+      publicVoice,
+    ],
+    sales_bd_gtm: [
+      sharedProfile,
+      channel("gtm-cases", zh ? "客户案例与商业结果" : "Customer cases and commercial results", "practice", ["case_study", "company_profile"], "客户案例, CRM, Sales Navigator, company pages", ["客户案例 enterprise sales CRM", "Sales Navigator GTM case study revenue"], zh ? "核验客户拓展、成交和商业结果。" : "Verify customer acquisition, deals, and commercial results.", baseTerms),
+      channel("industry-network", zh ? "行业网络" : "Industry network", "work_history", ["profile", "event", "media"], "industry events, partner pages, media", ["industry event partner speaker", "BD partnership channel media"], zh ? "补充行业连接、渠道和合作伙伴证据。" : "Backfill industry connections, channels, and partner evidence.", baseTerms),
+      publicVoice,
+    ],
+    customer_success_support: [
+      sharedProfile,
+      channel("success-cases", zh ? "客户成功案例" : "Customer success cases", "practice", ["case_study", "company_profile"], "case study, customer success, support, solution", ["customer success case study renewal", "solution consultant support implementation"], zh ? "核验客户交付、续约、支持和解决方案能力。" : "Verify delivery, renewal, support, and solution capability.", baseTerms),
+      channel("solution-content", zh ? "解决方案内容" : "Solution content", "public_voice", ["blog", "talk", "project"], "solution blogs, webinars, documentation", ["solution webinar documentation blog", "implementation playbook support article"], zh ? "评估复杂问题解释和客户教育能力。" : "Assess complex problem explanation and customer education.", baseTerms),
+      channel("customer-facing-history", zh ? "客户侧经历" : "Customer-facing history", "work_history", ["profile", "company_profile"], "public profiles, company pages", ["customer-facing profile enterprise implementation", "pre-sales solution engineer company profile"], zh ? "确认是否有真实客户侧交付经历。" : "Confirm real customer-facing delivery history.", baseTerms),
+    ],
+    security_infra_devops: [
+      sharedProfile,
+      channel("infra-practice", zh ? "基础设施与开源实践" : "Infra and open-source practice", "practice", ["code", "repository", "project"], "CNCF, GitHub, security, incident reports", ["CNCF Kubernetes GitHub SRE", "security incident postmortem DevOps"], zh ? "用开源、事故复盘和基础设施项目核验能力。" : "Verify through OSS, incident reviews, and infra projects.", baseTerms),
+      channel("security-ops", zh ? "安全/稳定性证据" : "Security and reliability evidence", "research", ["paper", "benchmark", "case_study"], "security papers, benchmarks, postmortems", ["security benchmark paper CVE", "reliability postmortem observability"], zh ? "补充安全、可靠性和可观测性证据。" : "Backfill security, reliability, and observability evidence.", baseTerms),
+      publicVoice,
+    ],
+    business_strategy_ops: [
+      sharedProfile,
+      channel("strategy-cases", zh ? "战略/经营案例" : "Strategy and business cases", "practice", ["case_study", "company_profile", "media"], "咨询, strategy, analysis, 经营", ["strategy business analysis case study", "consulting operating model market analysis"], zh ? "核验战略分析、经营改善和跨部门推进结果。" : "Verify strategy analysis, operating improvement, and cross-functional outcomes.", baseTerms),
+      channel("operator-network", zh ? "经营/项目网络" : "Operator network", "work_history", ["profile", "event", "media"], "operator communities, events, company pages", ["CEO Office business operations profile", "operator event project management"], zh ? "补充经营、项目和团队协作背景。" : "Backfill operating, project, and team collaboration background.", baseTerms),
+      publicVoice,
+    ],
+    people_finance_admin: [
+      sharedProfile,
+      channel("people-finance-proof", zh ? "职能专业证据" : "Function expertise evidence", "work_history", ["profile", "company_profile", "case_study"], "LinkedIn, HR, 招聘, finance, legal", ["LinkedIn HR 招聘 finance legal", "talent acquisition case study HRBP"], zh ? "核验职能经验、合规边界和组织阶段适配。" : "Verify function experience, compliance boundaries, and org-stage fit.", baseTerms),
+      channel("process-outcomes", zh ? "流程与结果" : "Process and outcomes", "practice", ["case_study", "project"], "hiring funnels, finance processes, legal ops", ["hiring funnel recruiting metrics", "finance operations legal process"], zh ? "寻找流程建设、效率和业务结果证据。" : "Find process building, efficiency, and business outcome evidence.", baseTerms),
+      publicVoice,
+    ],
+    executive_founder_leadership: [
+      sharedProfile,
+      channel("leadership-proof", zh ? "领导力与业务结果" : "Leadership and business outcomes", "work_history", ["company_profile", "media", "case_study"], "founder, CEO, 高管, 媒体", ["founder CEO VP leadership media", "business outcome company profile case study"], zh ? "核验负责人经历、业务结果和组织影响力。" : "Verify leadership history, business outcomes, and organizational influence.", baseTerms),
+      channel("public-reputation", zh ? "公开声誉与行业影响" : "Public reputation and industry influence", "public_voice", ["media", "talk", "event"], "media interviews, podcasts, events", ["media interview podcast keynote", "industry event speaker leadership"], zh ? "评估行业声量、观点质量和可信度。" : "Assess industry visibility, quality of judgment, and credibility.", baseTerms),
+      channel("adjacent-founders", zh ? "相邻创始型人才" : "Adjacent founder operators", "practice", ["project", "community"], "founder operators, startup builders", ["founder operator startup builder", "0 to 1 business lead community"], zh ? "扩展到有 0 到 1 业务建设证据的人。" : "Expand to people with zero-to-one business building evidence.", baseTerms),
+    ],
+  };
+  return templates[category] || templates.software_engineering;
+}
+
+export function buildInternetRoleSearchPlaybook(query, { locale = "zh" } = {}) {
+  const normalizedLocale = locale === "en" ? "en" : "zh";
+  const category = detectInternetRoleCategory(query);
+  const baseTerms = strategyTermsFromQuery(query);
+  const channels = roleChannelTemplates(category, normalizedLocale, baseTerms);
+  const label = roleLabel(category, normalizedLocale);
+  return {
+    role_category: category,
+    role_category_label: label,
+    recall_mode: "aggressive_public_web_recall",
+    channels,
+    channel_plan: channels.map((item) => ({
+      key: item.key,
+      label: item.label,
+      target: item.target,
+      coverage_group: item.coverage_group,
+      source_types: item.source_types,
+    })),
+    query_clusters: [
+      { key: "precise_match", label: normalizedLocale === "en" ? "Precise matches" : "精准匹配", query_variants: channels.flatMap((item) => item.query_variants.slice(0, 1)).slice(0, 6) },
+      { key: "adjacent_pool", label: normalizedLocale === "en" ? "Adjacent pools" : "相邻人才池", query_variants: channels.flatMap((item) => item.query_variants.slice(1, 2)).slice(0, 6) },
+      { key: "public_evidence", label: normalizedLocale === "en" ? "Public evidence" : "公开证据", query_variants: channels.map((item) => `${baseTerms.join(" ")} ${item.source_types.join(" ")}`).slice(0, 6) },
+    ],
+    score_dimensions: [
+      { key: "role_fit", label: normalizedLocale === "en" ? `${label} fit` : `${label}匹配`, weight: 30 },
+      { key: "achievement_signals", label: normalizedLocale === "en" ? "Achievement signals" : "结果/成就信号", weight: 25 },
+      { key: "evidence_quality", label: normalizedLocale === "en" ? "Evidence quality" : "证据质量", weight: 20 },
+      { key: "work_history", label: normalizedLocale === "en" ? "Career relevance" : "履历相关性", weight: 15 },
+      { key: "public_influence", label: normalizedLocale === "en" ? "Public influence" : "公开影响力", weight: 10 },
+    ],
+    target_segments: [
+      { key: "primary-fit", label: normalizedLocale === "en" ? "Primary matches" : "精准匹配", reason: normalizedLocale === "en" ? `Direct ${label} profiles matching the core brief.` : `直接满足${label}核心条件的人。` },
+      { key: "evidence-strong", label: normalizedLocale === "en" ? "Evidence-strong candidates" : "证据强候选人", reason: normalizedLocale === "en" ? "People supported by multiple independent public sources." : "具备多源公开证据的人。" },
+      { key: "adjacent-transferable", label: normalizedLocale === "en" ? "Adjacent transferable pool" : "相邻可迁移人才", reason: normalizedLocale === "en" ? "Nearby backgrounds worth checking when exact matches are limited." : "精准匹配不足时可补充验证的相邻背景。" },
+    ],
+  };
+}
+
+function editableSourceTerms(query, plan) {
+  const values = [
+    firstRoleLine(query),
+    ...cleanStringArray(plan.must_have, 5),
+    ...cleanStringArray(plan.nice_to_have, 3),
+  ];
+  const keywordTerms = keywordTermsFromText(values.join("\n"));
+  const compactTerms = values
+    .flatMap((value) => cleanString(value).split(/[，,、/|；;：:\s]+/))
+    .map((term) => term.trim())
+    .filter((term) => term.length >= 2 && term.length <= 28)
+    .filter((term) => !/^(岗位职责|任职要求|加分项|排除项|你将|负责|要求|经验|以上)$/.test(term));
+  return uniqueStrings([...keywordTerms, ...compactTerms], 10);
+}
+
 function inferredMustHave(query) {
   const clean = cleanString(query);
+  const parsed = parseEditableBrief(clean);
+  if (parsed.must_have.length > 1 || parsed.nice_to_have.length || parsed.exclusions.length) return parsed.must_have;
   const items = [];
   if (/llm|large language model|inference|serving/i.test(clean)) items.push("LLM inference / serving experience");
   if (/vllm/i.test(clean)) items.push("vLLM experience");
@@ -286,10 +810,239 @@ function inferredMustHave(query) {
 
 function inferredExclusions(query) {
   const clean = cleanString(query);
+  const parsed = parseEditableBrief(clean);
+  if (parsed.exclusions.length) return parsed.exclusions;
   const items = [];
   if (/prompt[- ]?only|pure prompt|prompt engineering/i.test(clean)) items.push("prompt-only profiles");
   if (/exclude|not|avoid/i.test(clean)) items.push("profiles that only match keywords without public evidence");
   return uniqueStrings(items, 8);
+}
+
+function inferredNiceToHave(query) {
+  const parsed = parseEditableBrief(query);
+  return parsed.nice_to_have;
+}
+
+function searchIntakeCopy(locale, key) {
+  const copy = {
+    zh: {
+      locationQuestion: "先确认一下工作地点偏好：这个岗位希望候选人主要分布在哪里？",
+      locationReason: "地点会影响搜索关键词、公开履历筛选和候选人优先级。",
+      salaryQuestion: "接下来确认薪资范围：你能给到的月薪大概是？",
+      salaryReason: "薪资会影响候选人的资历判断和推荐排序。",
+      targetCountQuestion: "这次大概想看多少位候选人？",
+      targetCountReason: "候选数量会影响搜索深度和精选程度。",
+      evidenceQuestion: "最后确认证据偏好：你更希望优先看到哪类证据？",
+      evidenceReason: "证据偏好会影响来源优先级，但不会删除其他来源。",
+      searchInputTitle: "搜索前需求确认",
+      originalBrief: "原始需求：",
+      role: "岗位：",
+      mustHave: "必须条件：",
+      niceToHave: "加分条件：",
+      exclusions: "排除条件：",
+      location: "地点：",
+      salary: "薪资：",
+      targetCount: "目标候选数量：",
+      evidencePreference: "证据偏好：",
+      sourceDirection: "搜索方向：",
+      notSpecified: "未指定",
+      sourceDirectionText: "请基于上述招聘约束搜索候选人，并按匹配度、证据质量和风险排序。优先使用公开来源交叉验证，不要把弱证据包装成强结论。",
+    },
+    en: {
+      locationQuestion: "First, confirm location preference: where should candidates primarily be based?",
+      locationReason: "Location affects search keywords, public profile filtering, and candidate priority.",
+      salaryQuestion: "Next, confirm compensation range: what monthly salary range can you offer?",
+      salaryReason: "Compensation affects seniority fit and ranking.",
+      targetCountQuestion: "How many candidates do you want to review this round?",
+      targetCountReason: "Candidate count affects search depth and selectivity.",
+      evidenceQuestion: "Finally, confirm evidence preference: which evidence should be prioritized?",
+      evidenceReason: "Evidence preference affects source priority without removing other sources.",
+      searchInputTitle: "Pre-search requirement confirmation",
+      originalBrief: "Original brief:",
+      role: "Role:",
+      mustHave: "Must-have:",
+      niceToHave: "Nice-to-have:",
+      exclusions: "Exclusions:",
+      location: "Location:",
+      salary: "Salary:",
+      targetCount: "Target candidate count:",
+      evidencePreference: "Evidence preference:",
+      sourceDirection: "Search direction:",
+      notSpecified: "not specified",
+      sourceDirectionText: "Search candidates based on these hiring constraints, then rank by fit, evidence quality, and risk. Prioritize public-source cross-validation and do not present weak evidence as strong claims.",
+    },
+  };
+  const normalizedLocale = locale === "en" ? "en" : "zh";
+  return copy[normalizedLocale][key] ?? copy.zh[key] ?? "";
+}
+
+function searchIntakeOptions(locale, key) {
+  const zh = {
+    location: [
+      { label: "不限地点（全国/海外远程均可）", value: "remote_anywhere", effect: "扩大候选池，优先看远程协作证据。" },
+      { label: "北上广深一线城市", value: "tier1_cn", effect: "优先查找一线城市公开履历和公司经历。" },
+      { label: "杭州/成都/南京等新一线", value: "new_tier1_cn", effect: "增加新一线城市关键词和本地团队线索。" },
+      { label: "海外华人优先", value: "overseas_chinese", effect: "优先覆盖海外华人、远程和国际化背景。" },
+    ],
+    salary: [
+      { label: "20-30K", value: "20-30K", effect: "偏向早中期或高潜候选人。" },
+      { label: "30-50K", value: "30-50K", effect: "偏向成熟工程师和核心 contributor。" },
+      { label: "50K 以上", value: "50K+", effect: "偏向资深、负责人或稀缺人才。" },
+      { label: "面议/按能力定", value: "negotiable", effect: "不以薪资收窄候选池。" },
+    ],
+    target_count: [
+      { label: "3-5 位精选", value: "3-5", effect: "更严格筛选，优先高证据质量。" },
+      { label: "8-10 位", value: "8-10", effect: "平衡数量和精度。" },
+      { label: "15-20 位", value: "15-20", effect: "扩大覆盖，允许更多待复核候选。" },
+      { label: "越多越好", value: "many", effect: "最大化召回，再由证据排序。" },
+    ],
+    evidence_preference: [
+      { label: "开源项目优先", value: "open_source", effect: "提高 GitHub、Hugging Face 和项目证据优先级。" },
+      { label: "产品落地优先", value: "product_shipping", effect: "提高项目、公司页和案例证据优先级。" },
+      { label: "大厂/知名团队经历优先", value: "brand_team", effect: "提高公司、团队和公开履历证据优先级。" },
+      { label: "技术内容/公开表达优先", value: "public_voice", effect: "提高博客、演讲、播客和访谈证据优先级。" },
+    ],
+  };
+  const en = {
+    location: [
+      { label: "Any location or remote", value: "remote_anywhere", effect: "Expands the pool and prioritizes remote-work evidence." },
+      { label: "Major tech hubs", value: "major_hubs", effect: "Prioritizes public profiles in major tech hubs." },
+      { label: "China tier-1 cities", value: "tier1_cn", effect: "Adds China tier-1 city signals." },
+      { label: "Overseas Chinese preferred", value: "overseas_chinese", effect: "Prioritizes overseas Chinese and international profiles." },
+    ],
+    salary: [
+      { label: "20-30K", value: "20-30K", effect: "Biases toward early-mid or high-potential candidates." },
+      { label: "30-50K", value: "30-50K", effect: "Biases toward mature engineers and core contributors." },
+      { label: "50K+", value: "50K+", effect: "Biases toward senior or scarce talent." },
+      { label: "Negotiable", value: "negotiable", effect: "Avoids narrowing the pool by compensation." },
+    ],
+    target_count: [
+      { label: "3-5 curated", value: "3-5", effect: "Stricter screening and higher evidence quality." },
+      { label: "8-10 candidates", value: "8-10", effect: "Balances precision and coverage." },
+      { label: "15-20 candidates", value: "15-20", effect: "Expands coverage with more review-needed leads." },
+      { label: "As many as possible", value: "many", effect: "Maximizes recall, then ranks by evidence." },
+    ],
+    evidence_preference: [
+      { label: "Open-source first", value: "open_source", effect: "Prioritizes GitHub, Hugging Face, and project evidence." },
+      { label: "Shipped product first", value: "product_shipping", effect: "Prioritizes project, company, and case evidence." },
+      { label: "Known team experience first", value: "brand_team", effect: "Prioritizes company, team, and public profile evidence." },
+      { label: "Public voice first", value: "public_voice", effect: "Prioritizes blogs, talks, podcasts, and interviews." },
+    ],
+  };
+  return (locale === "en" ? en : zh)[key] ?? zh[key] ?? [];
+}
+
+function defaultIntakeUnknowns(draft) {
+  const source = isPlainObject(draft) ? draft : {};
+  const clarification = isPlainObject(source.clarification) ? source.clarification : {};
+  const skipped = new Set(Array.isArray(source.skipped_questions) ? source.skipped_questions.map(cleanString) : []);
+  return ["location", "salary", "target_count"].filter((key) => !cleanString(clarification[key]) && !skipped.has(key));
+}
+
+export function buildSearchIntakeDraft(query, { locale = "zh" } = {}) {
+  const originalQuery = cleanString(query);
+  const normalizedLocale = locale === "en" ? "en" : "zh";
+  const cleaned = cleanPastedJobBrief(originalQuery);
+  const parsed = parseEditableBrief(cleaned.cleaned_query || originalQuery);
+  const fallbackMustHave = cleaned.must_have.length ? cleaned.must_have : inferredMustHave(cleaned.cleaned_query || originalQuery);
+  const roleCategory = detectInternetRoleCategory(cleaned.cleaned_query || originalQuery);
+  const playbook = buildInternetRoleSearchPlaybook(cleaned.cleaned_query || originalQuery, { locale: normalizedLocale });
+  const roleTitle = cleaned.role_title || firstRoleLine(cleaned.cleaned_query || originalQuery) || fallbackMustHave[0] || (normalizedLocale === "en" ? "Internet role" : "互联网岗位");
+  const draft = {
+    original_query: originalQuery,
+    role_title: roleTitle,
+    role_category: roleCategory,
+    role_category_label: roleLabel(roleCategory, normalizedLocale),
+    employer_context: cleaned.employer_context,
+    candidate_requirements: cleaned.candidate_requirements.length ? cleaned.candidate_requirements : fallbackMustHave,
+    negative_constraints: cleaned.negative_constraints,
+    raw_noise: cleaned.raw_noise,
+    channel_plan: playbook.channel_plan,
+    query_clusters: playbook.query_clusters,
+    score_dimensions: playbook.score_dimensions,
+    must_have: cleaned.must_have.length ? cleaned.must_have : parsed.must_have.length ? parsed.must_have : fallbackMustHave,
+    nice_to_have: cleaned.nice_to_have.length ? cleaned.nice_to_have : parsed.nice_to_have,
+    exclusions: cleaned.exclusions.length ? cleaned.exclusions : parsed.exclusions.length ? parsed.exclusions : inferredExclusions(cleaned.cleaned_query || originalQuery),
+    unknowns: [],
+    clarification: {},
+    skipped_questions: [],
+  };
+  draft.unknowns = defaultIntakeUnknowns(draft);
+  return draft;
+}
+
+export function buildSearchIntakeQuestions(draft, { locale = "zh" } = {}) {
+  const source = isPlainObject(draft) ? draft : {};
+  const unknowns = Array.isArray(source.unknowns) && source.unknowns.length ? source.unknowns : defaultIntakeUnknowns(source);
+  const questionCopy = {
+    location: ["locationQuestion", "locationReason"],
+    salary: ["salaryQuestion", "salaryReason"],
+    target_count: ["targetCountQuestion", "targetCountReason"],
+    evidence_preference: ["evidenceQuestion", "evidenceReason"],
+  };
+  return unknowns
+    .filter((key) => Object.prototype.hasOwnProperty.call(questionCopy, key))
+    .map((key) => {
+      const [questionKey, reasonKey] = questionCopy[key];
+      return {
+        key,
+        question: searchIntakeCopy(locale, questionKey),
+        reason: searchIntakeCopy(locale, reasonKey),
+        options: searchIntakeOptions(locale, key),
+        allow_custom: true,
+        skippable: true,
+      };
+    });
+}
+
+export function answerSearchIntakeQuestion(draft, answer = {}) {
+  const source = isPlainObject(draft) ? draft : buildSearchIntakeDraft("");
+  const key = cleanString(answer.key);
+  if (!key) return source;
+  const skipped = Boolean(answer.skipped);
+  const label = cleanString(answer.label) || cleanString(answer.value);
+  const next = {
+    ...source,
+    clarification: { ...(isPlainObject(source.clarification) ? source.clarification : {}) },
+    skipped_questions: Array.isArray(source.skipped_questions) ? [...source.skipped_questions] : [],
+  };
+  if (skipped) {
+    if (!next.skipped_questions.includes(key)) next.skipped_questions.push(key);
+  } else if (label) {
+    next.clarification[key] = label;
+  }
+  next.unknowns = (Array.isArray(source.unknowns) ? source.unknowns : defaultIntakeUnknowns(source)).filter((item) => item !== key);
+  return next;
+}
+
+function intakeLine(label, value) {
+  const values = Array.isArray(value) ? cleanStringArray(value) : [cleanString(value)].filter(Boolean);
+  if (!values.length) return `${label}`;
+  return `${label}${values.join("; ")}`;
+}
+
+export function buildSearchInputFromSearchIntake({ draft, locale = "zh" } = {}) {
+  const normalizedLocale = locale === "en" ? "en" : "zh";
+  const source = isPlainObject(draft) ? draft : buildSearchIntakeDraft("");
+  const clarification = isPlainObject(source.clarification) ? source.clarification : {};
+  const emptyValue = searchIntakeCopy(normalizedLocale, "notSpecified");
+  const channelPlan = Array.isArray(source.channel_plan) ? source.channel_plan : [];
+  return [
+    searchIntakeCopy(normalizedLocale, "searchInputTitle"),
+    source.role_category ? `role_category: ${source.role_category}` : "",
+    intakeLine(searchIntakeCopy(normalizedLocale, "role"), source.role_title || emptyValue),
+    intakeLine(normalizedLocale === "en" ? "Role category:" : "岗位类别：", source.role_category_label || source.role_category || emptyValue),
+    intakeLine(normalizedLocale === "en" ? "Employer context:" : "雇主背景：", source.employer_context),
+    intakeLine(searchIntakeCopy(normalizedLocale, "mustHave"), source.must_have),
+    intakeLine(searchIntakeCopy(normalizedLocale, "niceToHave"), source.nice_to_have),
+    intakeLine(searchIntakeCopy(normalizedLocale, "exclusions"), source.exclusions),
+    intakeLine(normalizedLocale === "en" ? "Channel plan:" : "渠道计划：", channelPlan.map((item) => `${item.label || item.key} - ${item.target || ""}`)),
+    intakeLine(searchIntakeCopy(normalizedLocale, "location"), clarification.location || emptyValue),
+    intakeLine(searchIntakeCopy(normalizedLocale, "salary"), clarification.salary || emptyValue),
+    intakeLine(searchIntakeCopy(normalizedLocale, "targetCount"), clarification.target_count || emptyValue),
+    intakeLine(searchIntakeCopy(normalizedLocale, "evidencePreference"), clarification.evidence_preference || emptyValue),
+    intakeLine(searchIntakeCopy(normalizedLocale, "sourceDirection"), searchIntakeCopy(normalizedLocale, "sourceDirectionText")),
+  ].filter(Boolean).join("\n");
 }
 
 const EDITABLE_PLAN_COPY = {
@@ -316,37 +1069,14 @@ function editablePlanCopy(locale, key) {
 }
 
 function defaultEditableSourceStrategy(query, locale = "zh") {
-  const brief = { original_query: query, required_skills: inferredMustHave(query) };
-  return [
-    {
-      source_type: "code",
-      coverage_group: "practice",
-      target: "GitHub, Hugging Face, Papers with Code",
-      query: fallbackSourceQuery("code", brief),
-      reason: editablePlanCopy(locale, "codeReason"),
-    },
-    {
-      source_type: "paper",
-      coverage_group: "research",
-      target: "arXiv, OpenReview, Semantic Scholar",
-      query: fallbackSourceQuery("paper", brief),
-      reason: editablePlanCopy(locale, "paperReason"),
-    },
-    {
-      source_type: "company",
-      coverage_group: "work_history",
-      target: "company team pages, public profiles, speaker bios",
-      query: fallbackSourceQuery("company", brief),
-      reason: editablePlanCopy(locale, "companyReason"),
-    },
-    {
-      source_type: "blog",
-      coverage_group: "public_voice",
-      target: "technical blogs, talks, podcasts, interviews",
-      query: fallbackSourceQuery("blog", brief),
-      reason: editablePlanCopy(locale, "blogReason"),
-    },
-  ];
+  const playbook = buildInternetRoleSearchPlaybook(query, { locale });
+  return playbook.channels.slice(0, 4).map((item) => ({
+    source_type: item.source_types[0] || "profile",
+    coverage_group: item.coverage_group,
+    target: item.target,
+    query: item.query_variants[0] || fallbackSourceQuery(item.source_types[0], { original_query: query }),
+    reason: item.reason,
+  }));
 }
 
 function normalizeEvidenceGraph(graph = {}) {
@@ -653,6 +1383,7 @@ export function normalizeTalentSearchResult(data) {
     evidence_graph: normalizeEvidenceGraph(source.evidence_graph),
     talent_map: normalizeTalentMap(source.talent_map),
     candidates: (Array.isArray(source.candidates) ? source.candidates : []).map(normalizeCandidate),
+    ...(isPlainObject(source.agent_execution) ? { agent_execution: source.agent_execution } : {}),
   };
 }
 
@@ -1028,6 +1759,227 @@ export function buildCandidateReadingSummary({ result, candidate, locale = "zh" 
   };
 }
 
+const REVIEW_BRIEF_COPY = {
+  zh: {
+    title: "三问审阅摘要",
+    why: "为什么推荐？",
+    evidence: "证据够不够？",
+    next: "下一步做什么？",
+    whyBody: "{name} 当前匹配分 {score}，{role}；关键公开信号是：{signal}",
+    evidenceBody: "证据质量为 {quality}，已有 {sources} 个独立信源；已验证 {verified} 条，未确认 {unverified} 条，矛盾 {contradicted} 条。",
+    nextBackfill: "先补齐 {gap} 等薄弱证据，再决定是否推进。",
+    nextReview: "先人工复核：{risk}",
+    nextOutreach: "证据基础较完整，可以复核原始链接后加入候选池并起草外联。",
+    noRole: "公开资料",
+    noSignal: "仍需补充可验证的论文、代码、项目或工作经历证据。",
+  },
+  en: {
+    title: "Three-question review brief",
+    why: "Why recommend?",
+    evidence: "Is the evidence enough?",
+    next: "What next?",
+    whyBody: "{name} has a match score of {score}, {role}; key public signal: {signal}",
+    evidenceBody: "Evidence quality is {quality}, with {sources} independent sources; {verified} verified, {unverified} unverified, and {contradicted} contradicted claims.",
+    nextBackfill: "Backfill weak evidence such as {gap} before deciding whether to advance.",
+    nextReview: "Review this manually first: {risk}",
+    nextOutreach: "The evidence base is usable. Review original links, add to the pool, and draft outreach.",
+    noRole: "public profile",
+    noSignal: "more verifiable paper, code, project, or work-history evidence is needed.",
+  },
+};
+
+function reviewBriefCopy(locale, key, params = {}) {
+  let text = REVIEW_BRIEF_COPY[locale === "en" ? "en" : "zh"][key] ?? REVIEW_BRIEF_COPY.zh[key];
+  for (const [name, value] of Object.entries(params)) text = text.replace(`{${name}}`, String(value));
+  return text;
+}
+
+/**
+ * @param {{ result?: unknown; candidate?: unknown; locale?: "zh" | "en" }} input
+ */
+export function buildCandidateReviewBrief({ result, candidate, locale = "zh" } = {}) {
+  const normalizedLocale = locale === "en" ? "en" : "zh";
+  const normalizedResult = normalizeTalentSearchResult(result);
+  const suppliedCandidate = normalizeTalentSearchResult({ candidates: [candidate] }).candidates[0];
+  const suppliedName = cleanString(suppliedCandidate?.name);
+  const selected = normalizedResult.candidates.find((item) => item.name.toLowerCase() === suppliedName.toLowerCase()) || suppliedCandidate;
+  const audit = buildCandidateEvidenceAudit({ result: normalizedResult, candidate: selected });
+  const dossier = buildCandidateEvidenceDossier({ result: normalizedResult, candidate: selected, locale: normalizedLocale });
+  const name = candidateDisplayName(selected?.name, normalizedLocale);
+  const role = candidateRole(selected) || cleanString(selected?.headline) || reviewBriefCopy(normalizedLocale, "noRole");
+  const signal = cleanStringArray(selected?.strongest_signals, 1)[0]
+    || cleanStringArray(audit.strongest_evidence, 1)[0]
+    || reviewBriefCopy(normalizedLocale, "noSignal");
+  const risk = cleanStringArray(audit.risk_flags, 1)[0]
+    || cleanStringArray(audit.weakest_evidence, 1)[0]
+    || cleanStringArray(audit.single_source_claims, 1)[0]
+    || cleanStringArray(audit.unverified_claims, 1)[0]
+    || "";
+  const gap = dossier.verification_gaps[0] || "";
+  const nextBody = gap
+    ? reviewBriefCopy(normalizedLocale, "nextBackfill", { gap })
+    : risk
+      ? reviewBriefCopy(normalizedLocale, "nextReview", { risk })
+      : reviewBriefCopy(normalizedLocale, "nextOutreach");
+
+  return {
+    title: reviewBriefCopy(normalizedLocale, "title"),
+    sections: [
+      {
+        key: "why_recommended",
+        label: reviewBriefCopy(normalizedLocale, "why"),
+        body: reviewBriefCopy(normalizedLocale, "whyBody", {
+          name,
+          score: clampScore(selected?.match_score),
+          role,
+          signal,
+        }),
+      },
+      {
+        key: "evidence_strength",
+        label: reviewBriefCopy(normalizedLocale, "evidence"),
+        body: reviewBriefCopy(normalizedLocale, "evidenceBody", {
+          quality: evidenceQualityDisplay(audit.overall_evidence_quality, normalizedLocale),
+          sources: audit.independent_sources,
+          verified: audit.verified_count,
+          unverified: audit.unverified_count,
+          contradicted: audit.contradicted_count,
+        }),
+      },
+      {
+        key: "next_action",
+        label: reviewBriefCopy(normalizedLocale, "next"),
+        body: nextBody,
+      },
+    ],
+  };
+}
+
+function slugifyName(value) {
+  const slug = cleanString(value).toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+  return slug || "unknown-candidate";
+}
+
+function textForVerticalMatch(candidate) {
+  const claims = Array.isArray(candidate?.claims) ? candidate.claims : [];
+  const evidenceText = claims.flatMap((claim) => [
+    claim?.claim,
+    ...(Array.isArray(claim?.evidence) ? claim.evidence.flatMap((evidence) => [evidence?.note, evidence?.url, evidence?.source_type]) : []),
+  ]);
+  return [
+    candidate?.name,
+    candidate?.headline,
+    candidate?.current_role,
+    candidate?.current_company,
+    ...(candidate?.ai_directions ?? []),
+    ...(candidate?.strongest_signals ?? []),
+    ...(candidate?.uncertainties ?? []),
+    candidate?.summary,
+    ...evidenceText,
+  ].map(cleanString).filter(Boolean).join(" ").toLowerCase();
+}
+
+function inferVerticalTags(candidate) {
+  const haystack = textForVerticalMatch(candidate);
+  return AI_VERTICAL_TAXONOMY
+    .filter((vertical) => vertical.terms.some((term) => haystack.includes(term)))
+    .map((vertical) => vertical.tag);
+}
+
+function evidenceUrlsAndSourceTypes(candidate) {
+  const urls = new Set();
+  const sourceTypes = new Set();
+  const structuredSources = new Map();
+  for (const claim of Array.isArray(candidate?.claims) ? candidate.claims : []) {
+    for (const evidence of Array.isArray(claim?.evidence) ? claim.evidence : []) {
+      const url = cleanString(evidence?.url);
+      if (url && !isSearchUrl(url)) {
+        urls.add(url);
+        const parsed = parsePublicTalentSource(url);
+        if (parsed.source_type) sourceTypes.add(parsed.source_type);
+        structuredSources.set(url, parsed);
+      }
+      const sourceType = cleanString(evidence?.source_type).toLowerCase();
+      if (sourceType) sourceTypes.add(sourceType);
+    }
+  }
+  return {
+    evidence_urls: Array.from(urls).slice(0, 24),
+    source_types: Array.from(sourceTypes).slice(0, 16),
+    structured_sources: Array.from(structuredSources.values()).slice(0, 24),
+  };
+}
+
+/**
+ * @param {{ result?: unknown; candidate?: unknown }} input
+ */
+export function buildCandidateProfileCacheEntry({ result, candidate } = {}) {
+  const normalizedResult = normalizeTalentSearchResult(result);
+  const selected = normalizeTalentSearchResult({ candidates: [candidate] }).candidates[0];
+  const audit = buildCandidateEvidenceAudit({ result: normalizedResult, candidate: selected });
+  const evidenceDetails = evidenceUrlsAndSourceTypes(selected);
+  const verticalTags = inferVerticalTags(selected);
+  const searchText = uniqueStrings([
+    selected.name,
+    candidateRole(selected),
+    selected.headline,
+    normalizedResult.search_brief.original_query,
+    ...normalizedResult.search_brief.required_skills,
+    ...selected.ai_directions,
+    ...verticalTags,
+    ...selected.strongest_signals,
+    ...audit.strongest_evidence,
+  ], 40).join(" ");
+
+  return {
+    cache_key: slugifyName(selected.name),
+    name: selected.name,
+    role: candidateRole(selected),
+    ai_directions: selected.ai_directions,
+    vertical_tags: verticalTags,
+    match_score: selected.match_score,
+    confidence: audit.overall_evidence_quality,
+    independent_sources: audit.independent_sources,
+    evidence_urls: evidenceDetails.evidence_urls,
+    source_types: evidenceDetails.source_types,
+    structured_sources: evidenceDetails.structured_sources,
+    search_text: searchText,
+  };
+}
+
+/**
+ * @param {{ result?: unknown; candidate?: unknown; limit?: number }} input
+ */
+export function buildSimilarCandidateSuggestions({ result, candidate, limit = 4 } = {}) {
+  const normalized = normalizeTalentSearchResult(result);
+  const selected = buildCandidateProfileCacheEntry({ result: normalized, candidate });
+  const selectedTags = new Set(selected.vertical_tags);
+  const selectedSourceTypes = new Set(selected.source_types);
+  const selectedDirections = new Set(selected.ai_directions);
+
+  return normalized.candidates
+    .filter((item) => item.name !== selected.name)
+    .map((item) => {
+      const entry = buildCandidateProfileCacheEntry({ result: normalized, candidate: item });
+      const sharedVerticalTags = entry.vertical_tags.filter((tag) => selectedTags.has(tag));
+      const sharedSourceTypes = entry.source_types.filter((type) => selectedSourceTypes.has(type));
+      const sharedDirections = entry.ai_directions.filter((direction) => selectedDirections.has(direction));
+      const similarity_score = (sharedVerticalTags.length * 3) + (sharedDirections.length * 2) + sharedSourceTypes.length;
+      return {
+        name: entry.name,
+        role: entry.role,
+        match_score: entry.match_score,
+        shared_vertical_tags: sharedVerticalTags,
+        shared_source_types: sharedSourceTypes,
+        shared_directions: sharedDirections,
+        similarity_score,
+      };
+    })
+    .filter((item) => item.similarity_score > 0)
+    .sort((a, b) => b.similarity_score - a.similarity_score || b.match_score - a.match_score)
+    .slice(0, Math.max(0, normalizeCount(limit) || 4));
+}
+
 function dossierGroupLabel(locale, key) {
   return DOSSIER_GROUP_LABELS[locale === "en" ? "en" : "zh"][key] ?? key;
 }
@@ -1279,6 +2231,370 @@ export function buildShortlistDeliveryReport(result, { locale = "zh" } = {}) {
   };
 }
 
+const SEARCH_WORKSPACE_COPY = {
+  zh: {
+    complete: "搜索完成",
+    highConfidence: "高置信候选人",
+    highConfidenceDesc: "匹配度高且证据基础较完整，适合优先审阅和推进。",
+    needsVerification: "需要补证据",
+    needsVerificationDesc: "匹配方向可能成立，但来源偏薄、存在未确认信息或风险提示。",
+    adjacentPool: "相邻人才池",
+    adjacentPoolDesc: "方向接近，可作为扩展候选池或下一轮搜索种子。",
+    lowerConfidence: "低置信线索",
+    lowerConfidenceDesc: "暂不适合作为优先候选人，保留为搜索反馈或负向样本。",
+    noRisk: "暂无明显风险，仍建议打开原始来源复核。",
+    noReason: "需要结合原始来源进一步判断匹配度。",
+    summary: "共发现 {count} 位候选人，优先查看 {top}；证据覆盖 {covered}/{total}。",
+    summaryNoCandidates: "本轮搜索没有返回可审阅候选人，建议调整条件后重试。",
+    logSummary: "研究日志默认折叠，保留搜索计划、来源执行和补证据线索。",
+    emailReason: "商业化入口已预留：后续接入联系方式富集、扣点确认和合规来源记录。",
+  },
+  en: {
+    complete: "Search complete",
+    highConfidence: "High-confidence matches",
+    highConfidenceDesc: "Strong fit with a usable evidence base. Review and advance first.",
+    needsVerification: "Needs verification",
+    needsVerificationDesc: "Potential fit, but evidence is thin, unverified, or risky.",
+    adjacentPool: "Adjacent pool",
+    adjacentPoolDesc: "Nearby talent worth using as expansion seeds.",
+    lowerConfidence: "Lower-confidence leads",
+    lowerConfidenceDesc: "Keep as feedback or negative examples before prioritizing.",
+    noRisk: "No obvious risk yet. Still review original sources before acting.",
+    noReason: "Review original sources before judging fit.",
+    summary: "Found {count} candidates. Review {top} first; source coverage {covered}/{total}.",
+    summaryNoCandidates: "No reviewable candidates returned. Adjust the brief and try again.",
+    logSummary: "Research log is collapsed by default and keeps search plan, source execution, and backfill leads.",
+    emailReason: "Commercial entry reserved: contact enrichment, credit confirmation, and compliant source logging can attach here.",
+  },
+};
+
+function searchWorkspaceCopy(locale, key, params = {}) {
+  let text = SEARCH_WORKSPACE_COPY[locale === "en" ? "en" : "zh"][key] ?? SEARCH_WORKSPACE_COPY.zh[key];
+  for (const [name, value] of Object.entries(params)) text = text.replace(`{${name}}`, String(value));
+  return text;
+}
+
+function candidateInitials(name) {
+  const clean = cleanString(name);
+  if (!clean) return "?";
+  const asciiParts = clean.split(/\s+/).filter(Boolean);
+  if (asciiParts.length >= 2) return `${asciiParts[0][0]}${asciiParts[1][0]}`.toUpperCase();
+  const compact = Array.from(clean.replace(/\s+/g, ""));
+  return compact.slice(0, 2).join("").toUpperCase();
+}
+
+function candidateBucket({ candidate, audit }) {
+  const score = clampScore(candidate?.match_score);
+  const quality = cleanString(candidate?.evidence_audit?.overall_evidence_quality) || "medium";
+  const hasRisk = audit.contradicted_count > 0 || audit.identity_risks.length > 0 || audit.risk_flags.length > 0;
+  const thinEvidence = quality === "low" || audit.independent_sources < 2 || audit.unverified_count > 0 || audit.single_source_claims.length > 0;
+  if (score >= 75 && quality === "high" && !hasRisk && audit.independent_sources >= 2) return "high_confidence";
+  if (thinEvidence || hasRisk) return "needs_verification";
+  if (score >= 60) return "adjacent_pool";
+  return "lower_confidence";
+}
+
+function groupMeta(locale, key) {
+  const meta = {
+    high_confidence: ["highConfidence", "highConfidenceDesc"],
+    needs_verification: ["needsVerification", "needsVerificationDesc"],
+    adjacent_pool: ["adjacentPool", "adjacentPoolDesc"],
+    lower_confidence: ["lowerConfidence", "lowerConfidenceDesc"],
+  }[key];
+  return {
+    key,
+    label: searchWorkspaceCopy(locale, meta[0]),
+    description: searchWorkspaceCopy(locale, meta[1]),
+  };
+}
+
+function shortSlug(value) {
+  return cleanString(value)
+    .toLowerCase()
+    .replace(/[^a-z0-9\u4e00-\u9fa5]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 48);
+}
+
+function strategyTermsFromQuery(query) {
+  const clean = cleanString(query);
+  const keywords = keywordTermsFromText(clean);
+  const explicitTerms = clean
+    .split(/[，,、/|；;：:\s\n]+/g)
+    .map((term) => term.trim())
+    .filter((term) => term.length >= 2 && term.length <= 32)
+    .filter((term) => !/^(岗位|职责|要求|负责|候选人|经验|以上|不限|远程|薪资|工作|search|find|with|and|or|the|for)$/i.test(term));
+  return uniqueStrings([...keywords, ...explicitTerms], 8);
+}
+
+function strategyQuery(baseTerms, suffix) {
+  const terms = baseTerms.length ? baseTerms.join(" ") : "AI talent";
+  return `${terms} ${suffix}`.trim();
+}
+
+export function buildAgentSearchStrategy(query, { locale = "zh", cachedCandidateHints = [] } = {}) {
+  const normalizedLocale = locale === "en" ? "en" : "zh";
+  const playbook = buildInternetRoleSearchPlaybook(query, { locale: normalizedLocale });
+  const hintNames = (Array.isArray(cachedCandidateHints) ? cachedCandidateHints : [])
+    .map((hint) => cleanString(hint?.name))
+    .filter(Boolean)
+    .slice(0, 4);
+  return {
+    role_category: playbook.role_category,
+    role_category_label: playbook.role_category_label,
+    recall_mode: playbook.recall_mode,
+    summary: normalizedLocale === "en"
+      ? `Plan aggressive public-web sourcing for ${playbook.role_category_label} across ${playbook.channels.length} evidence routes before ranking candidates.`
+      : `先按 ${playbook.role_category_label} 的 ${playbook.channels.length} 条公开证据路线多渠道搜人，再按匹配度、证据质量和风险排序。`,
+    channels: playbook.channels,
+    channel_plan: playbook.channel_plan,
+    query_clusters: playbook.query_clusters,
+    score_dimensions: playbook.score_dimensions,
+    target_segments: playbook.target_segments,
+    evidence_priorities: [
+      normalizedLocale === "en" ? "Do not mark claims verified without concrete URLs." : "没有具体 URL 的 claim 不能标记为 verified。",
+      normalizedLocale === "en" ? "Prefer independent source count over keyword density." : "优先看独立来源数量，而不是关键词密度。",
+      normalizedLocale === "en" ? "Keep single-source candidates in verification buckets." : "单一来源候选人必须保留在待核验分组。",
+      normalizedLocale === "en" ? "Do not treat the hiring company or product as a candidate target." : "不要把招聘公司或产品当作候选人搜索目标。",
+      ...(hintNames.length ? [normalizedLocale === "en" ? `Re-check cached leads: ${hintNames.join(", ")}.` : `复核已见线索：${hintNames.join("、")}。`] : []),
+    ],
+  };
+}
+
+function normalizeAgentTrace(trace = []) {
+  return (Array.isArray(trace) ? trace : []).map((item, index) => {
+    const sourceType = cleanString(item?.source_type) || "other";
+    const status = cleanString(item?.status).toLowerCase();
+    return {
+      trace_id: cleanString(item?.trace_id) || `trace-${index + 1}-${sourceType}`,
+      tool: cleanString(item?.tool) || sourceType,
+      source_type: sourceType,
+      coverage_group: normalizeCoverageGroup(item?.coverage_group, sourceType),
+      query: cleanString(item?.query),
+      status: ["planned", "running", "completed", "partial", "failed"].includes(status) ? status : "planned",
+      candidates_found: normalizeCount(item?.candidates_found),
+      evidence_found: normalizeCount(item?.evidence_found),
+      duration_ms: normalizeCount(item?.duration_ms),
+      note: cleanString(item?.note),
+    };
+  }).filter((item) => item.query || item.note || item.evidence_found || item.candidates_found).slice(0, 24);
+}
+
+function traceFromSourceExecution(result) {
+  return buildSourceExecution(result).jobs.map((job, index) => ({
+    trace_id: `source-${index + 1}-${job.source_type}`,
+    tool: job.source_type,
+    source_type: job.source_type,
+    coverage_group: job.coverage_group,
+    query: job.query,
+    status: job.status,
+    candidates_found: job.candidate_leads.length,
+    evidence_found: job.evidence_found || job.urls_found,
+    duration_ms: 0,
+    note: job.next_action || job.error || job.source_urls.slice(0, 2).join(", "),
+  }));
+}
+
+function candidateSubmissionEvents(result, candidates) {
+  const existing = Array.isArray(result?.agent_execution?.candidate_submission_events)
+    ? result.agent_execution.candidate_submission_events
+    : [];
+  if (existing.length > 0) {
+    return existing.map((item, index) => ({
+      row_id: cleanString(item?.row_id) || `row-${index + 1}`,
+      candidate_index: normalizeCount(item?.candidate_index),
+      name: cleanString(item?.name) || "Unknown candidate",
+      role: cleanString(item?.role),
+      source: cleanString(item?.source) || "search",
+      match_score: clampScore(item?.match_score),
+      evidence_quality: EVIDENCE_QUALITY.includes(item?.evidence_quality) ? item.evidence_quality : "medium",
+      independent_sources: normalizeCount(item?.independent_sources),
+      reason: cleanString(item?.reason),
+      status: "submitted",
+    })).slice(0, 50);
+  }
+  return candidates.map((candidate, index) => {
+    const audit = buildCandidateEvidenceAudit({ result, candidate });
+    const source = audit.source_types[0] || candidate.links?.github && "github" || candidate.links?.linkedin && "linkedin" || "search";
+    return {
+      row_id: `candidate-${index + 1}-${shortSlug(candidate.name) || "unknown"}`,
+      candidate_index: index,
+      name: candidate.name,
+      role: candidateRole(candidate),
+      source,
+      match_score: clampScore(candidate.match_score),
+      evidence_quality: candidate.evidence_audit.overall_evidence_quality,
+      independent_sources: audit.independent_sources,
+      reason: cleanStringArray(candidate.strongest_signals, 1)[0] || candidate.summary || candidate.headline || "",
+      status: "submitted",
+    };
+  });
+}
+
+function buildDeliveryClusters(result, candidates, locale) {
+  const existing = Array.isArray(result?.agent_execution?.delivery_clusters) ? result.agent_execution.delivery_clusters : [];
+  if (existing.length > 0) {
+    return existing.map((item, index) => ({
+      key: cleanString(item?.key) || `cluster-${index + 1}`,
+      label: cleanString(item?.label) || `Cluster ${index + 1}`,
+      candidate_indices: (Array.isArray(item?.candidate_indices) ? item.candidate_indices : [])
+        .map((value) => normalizeCount(value))
+        .filter((value) => value < candidates.length),
+      rationale: cleanString(item?.rationale),
+      next_action: cleanString(item?.next_action),
+    })).filter((item) => item.candidate_indices.length > 0).slice(0, 8);
+  }
+  const bucketOrder = ["high_confidence", "needs_verification", "adjacent_pool", "lower_confidence"];
+  return bucketOrder.map((key) => {
+    const meta = groupMeta(locale, key);
+    const indices = candidates
+      .map((candidate, index) => ({ candidate, index, audit: buildCandidateEvidenceAudit({ result, candidate }) }))
+      .filter((item) => candidateBucket({ candidate: item.candidate, audit: item.audit }) === key)
+      .map((item) => item.index);
+    return {
+      key,
+      label: meta.label,
+      candidate_indices: indices,
+      rationale: meta.description,
+      next_action: key === "high_confidence"
+        ? (locale === "en" ? "Review first and draft outreach." : "优先审阅并起草外联。")
+        : key === "needs_verification"
+          ? (locale === "en" ? "Backfill evidence before outreach." : "先补证据，再决定是否触达。")
+          : (locale === "en" ? "Use as next-round search seeds." : "作为下一轮搜索种子。"),
+    };
+  }).filter((item) => item.candidate_indices.length > 0);
+}
+
+export function buildAgentExecutionLayer(result, { locale = "zh", stats = {}, durationMs = 0 } = {}) {
+  const normalizedLocale = locale === "en" ? "en" : "zh";
+  const source = isPlainObject(result) ? result : {};
+  const normalized = normalizeTalentSearchResult(source);
+  const existing = isPlainObject(source.agent_execution) ? source.agent_execution : {};
+  const searchStrategy = isPlainObject(existing.search_strategy)
+    ? existing.search_strategy
+    : buildAgentSearchStrategy(normalized.search_brief.original_query || normalized.search_plan.must_have.join(" "), { locale: normalizedLocale });
+  const executionTrace = normalizeAgentTrace(existing.execution_trace).length > 0
+    ? normalizeAgentTrace(existing.execution_trace)
+    : normalizeAgentTrace(traceFromSourceExecution(normalized));
+  const submissions = candidateSubmissionEvents(source, normalized.candidates);
+  const clusters = buildDeliveryClusters(source, normalized.candidates, normalizedLocale);
+  const sourceMix = normalized.evidence_graph.source_mix.length > 0
+    ? normalized.evidence_graph.source_mix
+    : Array.from(new Map(executionTrace.map((trace) => [trace.source_type, trace.evidence_found || trace.candidates_found || 1])).entries())
+      .map(([source_type, count]) => ({ source_type, count }));
+  return {
+    search_strategy: searchStrategy,
+    execution_trace: executionTrace,
+    candidate_submission_events: submissions,
+    delivery_clusters: clusters,
+    telemetry: {
+      duration_ms: normalizeCount(existing.telemetry?.duration_ms ?? durationMs ?? stats?.duration_ms ?? stats?.durationMs),
+      search_count: normalizeCount(existing.telemetry?.search_count ?? stats?.searches),
+      fetch_count: normalizeCount(existing.telemetry?.fetch_count ?? stats?.fetches),
+      tool_count: normalizeCount(existing.telemetry?.tool_count ?? executionTrace.length),
+      submitted_count: submissions.length,
+      source_mix: sourceMix,
+    },
+  };
+}
+
+export function buildSearchResultWorkspace(result, { locale = "zh", stats = {} } = {}) {
+  const normalizedLocale = locale === "en" ? "en" : "zh";
+  const source = isPlainObject(result) ? result : {};
+  const normalized = normalizeTalentSearchResult(result);
+  const agentExecution = buildAgentExecutionLayer(source, { locale: normalizedLocale, stats });
+  const coverage = buildEvidenceCoverage(normalized);
+  const coveredGroups = coverage.filter((group) => group.status === "covered");
+  const execution = buildSourceExecution(normalized);
+  const candidates = normalized.candidates.map((candidate, index) => {
+    const audit = buildCandidateEvidenceAudit({ result: normalized, candidate });
+    const bucket = candidateBucket({ candidate, audit });
+    const matchReason = cleanStringArray(candidate.strongest_signals, 1)[0]
+      || cleanStringArray(audit.strongest_evidence, 1)[0]
+      || candidate.summary
+      || candidate.headline
+      || searchWorkspaceCopy(normalizedLocale, "noReason");
+    const primaryRisk = cleanStringArray(audit.risk_flags, 1)[0]
+      || cleanStringArray(candidate.uncertainties, 1)[0]
+      || cleanStringArray(audit.weakest_evidence, 1)[0]
+      || cleanStringArray(audit.unverified_claims, 1)[0]
+      || searchWorkspaceCopy(normalizedLocale, "noRisk");
+    return {
+      index,
+      name: candidate.name,
+      initials: candidateInitials(candidate.name),
+      role: candidateRole(candidate) || candidate.headline,
+      match_score: clampScore(candidate.match_score),
+      evidence_quality: candidate.evidence_audit.overall_evidence_quality,
+      independent_sources: audit.independent_sources,
+      source_types: audit.source_types,
+      match_reason: matchReason,
+      primary_risk: primaryRisk,
+      bucket,
+      commercial_action: {
+        label: "Get email -10",
+        cost: 10,
+        enabled: true,
+        reason: searchWorkspaceCopy(normalizedLocale, "emailReason"),
+      },
+      submission: agentExecution.candidate_submission_events.find((event) => event.candidate_index === index) ?? null,
+    };
+  });
+  const bucketOrder = ["high_confidence", "needs_verification", "adjacent_pool", "lower_confidence"];
+  const groups = bucketOrder
+    .map((key) => {
+      const indexes = candidates.filter((candidate) => candidate.bucket === key).map((candidate) => candidate.index);
+      return { ...groupMeta(normalizedLocale, key), candidate_indices: indexes, count: indexes.length };
+    })
+    .filter((group) => group.count > 0);
+  const selected = candidates.find((candidate) => candidate.bucket === "high_confidence")
+    || candidates.find((candidate) => candidate.bucket === "needs_verification")
+    || candidates[0];
+  const toolCount = execution.jobs.length || normalized.search_plan.source_strategy.length;
+  const sourceCount = new Set([
+    ...execution.jobs.map((job) => job.source_type),
+    ...coverage.flatMap((group) => group.source_types),
+  ].filter(Boolean)).size;
+  const topName = selected?.name || (normalizedLocale === "en" ? "the top candidate" : "优先候选人");
+  const summary = candidates.length > 0
+    ? searchWorkspaceCopy(normalizedLocale, "summary", {
+      count: candidates.length,
+      top: topName,
+      covered: coveredGroups.length,
+      total: coverage.length,
+    })
+    : searchWorkspaceCopy(normalizedLocale, "summaryNoCandidates");
+  return {
+    completion: {
+      status: "complete",
+      label: searchWorkspaceCopy(normalizedLocale, "complete"),
+      candidate_count: candidates.length,
+      tool_count: toolCount,
+      source_count: sourceCount,
+      covered_group_count: coveredGroups.length,
+      coverage_group_count: coverage.length,
+      searches: normalizeCount(stats?.searches ?? agentExecution.telemetry.search_count),
+      fetches: normalizeCount(stats?.fetches ?? agentExecution.telemetry.fetch_count),
+      duration_seconds: normalizeCount(stats?.durationSeconds ?? stats?.duration_seconds ?? Math.round(agentExecution.telemetry.duration_ms / 1000)),
+      submitted_count: agentExecution.telemetry.submitted_count,
+      execution_trace_count: agentExecution.execution_trace.length,
+    },
+    summary,
+    candidates,
+    groups,
+    selected_candidate_index: selected?.index ?? null,
+    agent_execution: agentExecution,
+    delivery_clusters: agentExecution.delivery_clusters,
+    research_log: {
+      default_open: false,
+      summary: searchWorkspaceCopy(normalizedLocale, "logSummary"),
+      jobs: execution.jobs,
+      execution_trace: agentExecution.execution_trace,
+      coverage,
+    },
+  };
+}
+
 export function buildEvidenceCoverage(result) {
   const source = isPlainObject(result) ? result : {};
   const counts = sourceTypeCountsFromMix(source.evidence_graph?.source_mix, source.candidates);
@@ -1311,11 +2627,12 @@ export function buildEditableSearchPlanDraft(query, { locale = "zh" } = {}) {
     search_brief: {
       original_query: originalQuery,
       required_skills: inferredMustHave(originalQuery),
+      preferred_skills: inferredNiceToHave(originalQuery),
       exclusions: inferredExclusions(originalQuery),
     },
     search_plan: {
       must_have: inferredMustHave(originalQuery),
-      nice_to_have: [],
+      nice_to_have: inferredNiceToHave(originalQuery),
       exclusions: inferredExclusions(originalQuery),
       source_strategy: defaultEditableSourceStrategy(originalQuery, normalizedLocale),
       adjacent_pools: [

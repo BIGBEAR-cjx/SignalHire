@@ -11,6 +11,8 @@ import {
   updateProject,
   type ProjectStatus,
 } from "@/lib/projects";
+import { listSearchTasks } from "@/lib/search-tasks";
+import { listOutreachQueue } from "@/lib/outreach-threads";
 import { normalizeLocale, t } from "@/lib/i18n.mjs";
 import { getUser } from "@/lib/session";
 
@@ -25,14 +27,16 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
   const { id } = await ctx.params;
   if (!id) return Response.json({ error: t(locale, "api.error.missingId") }, { status: 400 });
 
-  const [project, breakdown, runs] = await Promise.all([
+  const [project, breakdown, runs, searchTasks, outreachQueue] = await Promise.all([
     getProject(user.id, id),
     projectCandidateBreakdown(user.id, id),
     projectRuns(user.id, id, 30),
+    listSearchTasks({ userId: user.id, projectId: id }),
+    listOutreachQueue({ userId: user.id, projectId: id }),
   ]);
   if (!project) return Response.json({ error: t(locale, "api.error.projectNotFound") }, { status: 404 });
 
-  return Response.json({ project, breakdown, runs });
+  return Response.json({ project, breakdown, runs, searchTasks, outreachQueue });
 }
 
 export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }> }) {

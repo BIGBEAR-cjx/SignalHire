@@ -1,6 +1,6 @@
 import { researchStream } from "@/lib/miro";
 import { findCachedSearch, flatten } from "@/lib/cache";
-import { findRun, findRunId, enqueue } from "@/lib/db";
+import { findCachedCandidateProfilesForSearch, findRun, findRunId, enqueue } from "@/lib/db";
 import { normalizeLocale, t } from "@/lib/i18n.mjs";
 import { getUser } from "@/lib/session";
 
@@ -43,6 +43,7 @@ export async function POST(req: Request) {
   if (dbHit) return researchStream({ cached: dbHit.result, runId: dbHit.id });
 
   // ③ 实时研究 → 入队, 由后台 worker 跑完, 前端轮询。
+  const cachedCandidateHints = await findCachedCandidateProfilesForSearch({ userId: user.id, query, limit: 5 });
   const jobId = await enqueue({
     kind: "search",
     flatKey: dbFlatKey,
@@ -51,6 +52,7 @@ export async function POST(req: Request) {
     userId: user.id,
     projectId: project_id ?? null,
     platformLanguage,
+    cachedCandidateHints,
   });
   if (!jobId) return Response.json({ error: t(locale, "api.error.queueUnavailableTrySample") }, { status: 503 });
   return Response.json({ queued: true, jobId });

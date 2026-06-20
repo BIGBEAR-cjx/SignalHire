@@ -5,7 +5,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { FiAlertTriangle, FiArrowLeft, FiCheckCircle, FiMail, FiRefreshCw, FiSearch, FiTrash2 } from "react-icons/fi";
+import { FiAlertTriangle, FiArrowLeft, FiCheckCircle, FiClock, FiMail, FiPauseCircle, FiPlay, FiRefreshCw, FiSearch, FiTrash2 } from "react-icons/fi";
 import { CandidateComparisonView, CandidateProfileView, EvidencePriorityPanel } from "@/components/result";
 import { useI18n } from "@/components/LanguageProvider";
 import OutreachModal from "@/components/OutreachModal";
@@ -233,7 +233,45 @@ interface ProjectDetail {
     updated_at: string;
     result?: unknown;
   }>;
+  searchTasks?: SearchTaskView[];
+  outreachQueue?: OutreachQueueView;
 }
+
+type SearchTaskView = {
+  id: string;
+  name: string;
+  brief: string;
+  frequency: "manual" | "daily" | "weekly";
+  status: "active" | "paused";
+  last_run_at: string | null;
+  next_run_at: string | null;
+  run_summary?: {
+    last_status: string;
+    last_run_at: string | null;
+    new_candidates: number;
+    updated_candidates: number;
+    discovery_items?: Array<{
+      candidate_index: number;
+      cache_key?: string;
+      name: string;
+      discovery_state: string;
+      evidence_updated: boolean;
+    }>;
+  };
+};
+
+type OutreachQueueView = {
+  summary: { due: number; drafted: number; active: number };
+  items: Array<{
+    id: string;
+    candidate_name: string;
+    status: string;
+    subject: string;
+    next_follow_up_at: string | null;
+    updated_at: string;
+    queue_state: "due" | "draft" | "scheduled" | "active";
+  }>;
+};
 
 interface ShortlistItem {
   id: string;
@@ -274,6 +312,307 @@ function candidateWithFeedback(candidate: unknown, feedback: CandidateFeedbackVa
 function isTalentShape(x: unknown): x is TalentCandidate {
   const c = asCandidate(x);
   return typeof c.match_score === "number" && Array.isArray(c.ai_directions);
+}
+
+function monitorCopy(locale: "zh" | "en") {
+  return locale === "en" ? {
+    title: "Talent Monitor",
+    desc: "Keep a recruiting agent running for this project. Each run creates a new research round and marks new or updated candidates.",
+    name: "Task name",
+    brief: "Hiring brief",
+    frequency: "Frequency",
+    manual: "Manual",
+    daily: "Daily",
+    weekly: "Weekly",
+    create: "Create monitor",
+    run: "Run now",
+    pause: "Pause",
+    resume: "Resume",
+    empty: "No monitors yet.",
+    last: "Last run",
+    next: "Next run",
+    newCandidates: "New",
+    updatedCandidates: "Updated",
+  } : {
+    title: "Talent Monitor",
+    desc: "让这个项目拥有持续运行的 AI Sourcer。每轮都会生成新的研究记录，并标记新增或证据更新的候选人。",
+    name: "任务名称",
+    brief: "招聘需求",
+    frequency: "频率",
+    manual: "手动",
+    daily: "每天",
+    weekly: "每周",
+    create: "创建监控",
+    run: "立即运行",
+    pause: "暂停",
+    resume: "恢复",
+    empty: "还没有持续搜人任务。",
+    last: "上次运行",
+    next: "下次运行",
+    newCandidates: "新增",
+    updatedCandidates: "更新",
+  };
+}
+
+function TalentMonitorPanel({
+  projectId,
+  projectBrief,
+  tasks,
+  locale,
+  onChanged,
+}: {
+  projectId: string;
+  projectBrief: string;
+  tasks: SearchTaskView[];
+  locale: "zh" | "en";
+  onChanged: () => void;
+}) {
+  const c = monitorCopy(locale);
+  const [open, setOpen] = useState(tasks.length === 0);
+  const [name, setName] = useState("");
+  const [brief, setBrief] = useState(projectBrief);
+  const [frequency, setFrequency] = useState<"manual" | "daily" | "weekly">("weekly");
+  const [busyId, setBusyId] = useState<string | null>(null);
+  const [creating, setCreating] = useState(false);
+
+  async function createTask() {
+    if (!brief.trim() || creating) return;
+    setCreating(true);
+    try {
+      const r = await fetch("/api/search-tasks", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ project_id: projectId, name, brief, frequency, locale }),
+      });
+      if (!r.ok) throw new Error();
+      setName("");
+      setBrief(projectBrief);
+      setOpen(false);
+      onChanged();
+    } finally {
+      setCreating(false);
+    }
+  }
+
+  async function runTask(id: string) {
+    setBusyId(id);
+    try {
+      await fetch(`/api/search-tasks/${id}/run`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ locale }),
+      });
+      onChanged();
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  async function toggleTask(task: SearchTaskView) {
+    setBusyId(task.id);
+    try {
+      await fetch(`/api/search-tasks/${task.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: task.status === "active" ? "paused" : "active", locale }),
+      });
+      onChanged();
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  return (
+    <Surface className="space-y-4 p-5">
+      <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+        <div>
+          <div className="flex items-center gap-2">
+            <FiClock className="h-4 w-4 text-[var(--sh-blue)]" aria-hidden="true" />
+            <h2 className="text-base font-semibold text-[var(--sh-ink)]">{c.title}</h2>
+          </div>
+          <p className="mt-1 max-w-3xl text-sm leading-6 text-[var(--sh-muted)]">{c.desc}</p>
+        </div>
+        <SecondaryAction onClick={() => setOpen((value) => !value)} className="min-h-9 px-3 py-2 text-xs">
+          {c.create}
+        </SecondaryAction>
+      </div>
+
+      {open && (
+        <div className="grid gap-3 rounded-2xl border border-black/10 bg-white/70 p-4 md:grid-cols-[220px_minmax(0,1fr)_130px_auto]">
+          <input
+            value={name}
+            onChange={(event) => setName(event.target.value)}
+            placeholder={c.name}
+            className="min-h-10 rounded-2xl border border-black/10 bg-white px-3 text-sm outline-none focus:border-[var(--sh-blue)]"
+          />
+          <input
+            value={brief}
+            onChange={(event) => setBrief(event.target.value)}
+            placeholder={c.brief}
+            className="min-h-10 rounded-2xl border border-black/10 bg-white px-3 text-sm outline-none focus:border-[var(--sh-blue)]"
+          />
+          <select
+            value={frequency}
+            onChange={(event) => setFrequency(event.target.value as "manual" | "daily" | "weekly")}
+            className="min-h-10 rounded-2xl border border-black/10 bg-white px-3 text-sm outline-none focus:border-[var(--sh-blue)]"
+            aria-label={c.frequency}
+          >
+            <option value="manual">{c.manual}</option>
+            <option value="daily">{c.daily}</option>
+            <option value="weekly">{c.weekly}</option>
+          </select>
+          <PrimaryAction onClick={createTask} disabled={creating || !brief.trim()} className="min-h-10 whitespace-nowrap px-4 py-2 text-xs">
+            {c.create}
+          </PrimaryAction>
+        </div>
+      )}
+
+      {tasks.length === 0 ? (
+        <p className="rounded-2xl border border-dashed border-black/10 bg-white/60 p-4 text-sm text-[var(--sh-muted)]">{c.empty}</p>
+      ) : (
+        <div className="grid gap-3 lg:grid-cols-2">
+          {tasks.map((task) => (
+            <div key={task.id} className="rounded-2xl border border-black/10 bg-white/80 p-4">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-semibold text-[var(--sh-ink)]">{task.name}</p>
+                  <p className="mt-1 line-clamp-2 text-xs leading-5 text-[var(--sh-muted)]">{task.brief}</p>
+                </div>
+                <StatusBadge
+                  label={task.status === "active" ? "Active" : "Paused"}
+                  dotClassName={task.status === "active" ? "bg-emerald-500" : "bg-amber-500"}
+                  className={task.status === "active" ? "bg-emerald-50 text-emerald-700 ring-emerald-200" : "bg-amber-50 text-amber-800 ring-amber-200"}
+                />
+              </div>
+              <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
+                <span className="rounded-xl bg-gray-50 px-3 py-2 ring-1 ring-black/5">{c.last}: {task.run_summary?.last_status ?? "-"}</span>
+                <span className="rounded-xl bg-gray-50 px-3 py-2 ring-1 ring-black/5">{c.next}: {task.next_run_at ? new Date(task.next_run_at).toLocaleDateString(locale === "en" ? "en-US" : "zh-CN") : "-"}</span>
+                <span className="rounded-xl bg-gray-50 px-3 py-2 ring-1 ring-black/5">{c.newCandidates}: {task.run_summary?.new_candidates ?? 0}</span>
+                <span className="rounded-xl bg-gray-50 px-3 py-2 ring-1 ring-black/5">{c.updatedCandidates}: {task.run_summary?.updated_candidates ?? 0}</span>
+              </div>
+              {(task.run_summary?.discovery_items?.length ?? 0) > 0 && (
+                <div className="mt-3 space-y-1.5">
+                  {task.run_summary?.discovery_items?.slice(0, 4).map((item) => (
+                    <div key={item.cache_key ?? `${item.candidate_index}:${item.name}`} className="flex items-center justify-between gap-2 rounded-xl bg-gray-50 px-3 py-2 text-xs ring-1 ring-black/5">
+                      <span className="min-w-0 truncate font-medium text-gray-800">{item.name}</span>
+                      <span className={`shrink-0 rounded-full px-2 py-0.5 font-semibold ${
+                        item.evidence_updated
+                          ? "bg-blue-50 text-blue-700 ring-1 ring-blue-100"
+                          : item.discovery_state === "new_candidate"
+                            ? "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-100"
+                            : "bg-gray-100 text-gray-600 ring-1 ring-gray-200"
+                      }`}>
+                        {item.evidence_updated ? (locale === "en" ? "Evidence updated" : "证据更新") : item.discovery_state === "new_candidate" ? (locale === "en" ? "New" : "新增") : (locale === "en" ? "Seen" : "已见")}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+              <div className="mt-3 flex flex-wrap gap-2">
+                <PrimaryAction onClick={() => runTask(task.id)} disabled={busyId === task.id || task.status !== "active"} className="min-h-9 px-3 py-2 text-xs">
+                  <FiPlay className="h-3.5 w-3.5" aria-hidden="true" />
+                  {c.run}
+                </PrimaryAction>
+                <SecondaryAction onClick={() => toggleTask(task)} disabled={busyId === task.id} className="min-h-9 px-3 py-2 text-xs">
+                  <FiPauseCircle className="h-3.5 w-3.5" aria-hidden="true" />
+                  {task.status === "active" ? c.pause : c.resume}
+                </SecondaryAction>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </Surface>
+  );
+}
+
+function OutreachQueuePanel({ queue, locale, onChanged }: { queue?: OutreachQueueView; locale: "zh" | "en"; onChanged: () => void }) {
+  const isEn = locale === "en";
+  const items = queue?.items ?? [];
+  const [busyId, setBusyId] = useState<string | null>(null);
+  async function updateOutreachThread(id: string, patch: { status?: string; next_follow_up_at?: string | null }) {
+    setBusyId(id);
+    try {
+      const r = await fetch(`/api/outreach-threads/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...patch, locale }),
+      });
+      if (r.ok) onChanged();
+    } finally {
+      setBusyId(null);
+    }
+  }
+  return (
+    <Surface className="space-y-4 p-5">
+      <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+        <div>
+          <div className="flex items-center gap-2">
+            <FiMail className="h-4 w-4 text-[var(--sh-blue)]" aria-hidden="true" />
+            <h2 className="text-base font-semibold text-[var(--sh-ink)]">{isEn ? "Outreach Queue" : "触达跟进队列"}</h2>
+          </div>
+          <p className="mt-1 text-sm leading-6 text-[var(--sh-muted)]">
+            {isEn ? "Saved drafts and follow-ups stay attached to this project. Email sending remains manual for v1." : "保存的触达草稿和跟进事项会归属到该项目；v1 仍保持手动复制发送。"}
+          </p>
+        </div>
+        <div className="flex gap-2 text-xs">
+          <span className="rounded-full bg-amber-50 px-3 py-1.5 font-semibold text-amber-800 ring-1 ring-amber-200">{isEn ? "Due" : "到期"} {queue?.summary?.due ?? 0}</span>
+          <span className="rounded-full bg-blue-50 px-3 py-1.5 font-semibold text-blue-700 ring-1 ring-blue-200">{isEn ? "Drafts" : "草稿"} {queue?.summary?.drafted ?? 0}</span>
+        </div>
+      </div>
+      {items.length === 0 ? (
+        <p className="rounded-2xl border border-dashed border-black/10 bg-white/60 p-4 text-sm text-[var(--sh-muted)]">
+          {isEn ? "No saved outreach threads yet." : "还没有保存的触达记录。"}
+        </p>
+      ) : (
+        <ul className="grid gap-2 lg:grid-cols-2">
+          {items.slice(0, 6).map((item) => (
+            <li key={item.id} className="rounded-2xl border border-black/10 bg-white/80 p-4">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-semibold text-[var(--sh-ink)]">{item.candidate_name}</p>
+                  <p className="mt-1 truncate text-xs text-[var(--sh-muted)]">{item.subject || (isEn ? "Untitled draft" : "未命名草稿")}</p>
+                </div>
+                <StatusBadge
+                  label={item.queue_state === "due" ? (isEn ? "Due" : "到期") : item.status}
+                  dotClassName={item.queue_state === "due" ? "bg-amber-500" : "bg-blue-500"}
+                  className={item.queue_state === "due" ? "bg-amber-50 text-amber-800 ring-amber-200" : "bg-blue-50 text-blue-700 ring-blue-200"}
+                />
+              </div>
+              <p className="mt-3 text-xs text-[var(--sh-muted)]">
+                {item.next_follow_up_at
+                  ? `${isEn ? "Follow up" : "跟进"}: ${new Date(item.next_follow_up_at).toLocaleDateString(isEn ? "en-US" : "zh-CN")}`
+                  : (isEn ? "No follow-up date" : "未设置跟进日期")}
+              </p>
+              <div className="mt-3 grid gap-2 sm:grid-cols-[minmax(0,1fr)_150px]">
+                <select
+                  value={item.status}
+                  disabled={busyId === item.id}
+                  onChange={(event) => updateOutreachThread(item.id, { status: event.target.value })}
+                  className="min-h-9 rounded-xl border border-black/10 bg-white px-2 text-xs text-[var(--sh-ink)] outline-none focus:border-[var(--sh-blue)]"
+                  aria-label={isEn ? "Outreach status" : "触达状态"}
+                >
+                  {["drafted", "contacted", "follow_up_due", "replied", "interviewing", "rejected", "hired"].map((status) => (
+                    <option key={status} value={status}>{status}</option>
+                  ))}
+                </select>
+                <input
+                  type="date"
+                  disabled={busyId === item.id}
+                  value={item.next_follow_up_at ? item.next_follow_up_at.slice(0, 10) : ""}
+                  onChange={(event) => updateOutreachThread(item.id, {
+                    next_follow_up_at: event.target.value ? `${event.target.value}T09:00:00.000Z` : null,
+                  })}
+                  className="min-h-9 rounded-xl border border-black/10 bg-white px-2 text-xs text-[var(--sh-ink)] outline-none focus:border-[var(--sh-blue)]"
+                  aria-label={isEn ? "Next follow-up date" : "下次跟进日期"}
+                />
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
+    </Surface>
+  );
 }
 
 export default function ProjectDetailPage() {
@@ -480,6 +819,16 @@ export default function ProjectDetailPage() {
         showBrief={showSearchConsoleBrief}
       />
 
+      <TalentMonitorPanel
+        projectId={id}
+        projectBrief={briefForSearch}
+        tasks={detail.searchTasks ?? []}
+        locale={locale}
+        onChanged={reloadDetail}
+      />
+
+      <OutreachQueuePanel queue={detail.outreachQueue} locale={locale} onChanged={reloadDetail} />
+
       {showKpiStrip && (
         <section className="grid grid-cols-2 gap-3 sm:grid-cols-5">
           <KpiCard label={t("projects.detail.kpi.candidates")} value={p.candidates_total} sub={t("projects.detail.kpi.people")} />
@@ -566,6 +915,7 @@ export default function ProjectDetailPage() {
                   <CandidateDetailPanel
                     key={selectedItem.id}
                     item={selectedItem}
+                    relatedCandidates={(items ?? []).map((it) => it.candidate)}
                     locale={locale}
                     onChanged={(patch) => {
                       setItems((prev) => prev?.map((it) => it.id === selectedItem.id ? { ...it, ...patch } : it) ?? prev);
@@ -1227,8 +1577,8 @@ function ProjectEvidenceMatrixPanel({
   selectedItemId: string | null;
   onOpenCandidate: (itemId: string) => void;
 }) {
-  if (matrix.empty) return null;
   const { t } = useI18n();
+  if (matrix.empty) return null;
   const summary = [
     { label: t("projects.evidenceMatrix.summary.total"), value: matrix.summary.total },
     { label: t("projects.evidenceMatrix.summary.active"), value: matrix.summary.active },
@@ -1464,9 +1814,10 @@ function CandidateItem({ item, locale, selected, onClick }: { item: ShortlistIte
 }
 
 function CandidateDetailPanel({
-  item, onChanged, onDeleted, onUnassigned, locale,
+  item, relatedCandidates, onChanged, onDeleted, onUnassigned, locale,
 }: {
   item: ShortlistItem;
+  relatedCandidates: unknown[];
   onChanged: (patch: Partial<ShortlistItem>) => void;
   onDeleted: () => void;
   onUnassigned: () => void;
@@ -1611,6 +1962,9 @@ function CandidateDetailPanel({
         onClose={() => setOutreachOpen(false)}
         candidate={candidate}
         candidateName={asCandidate(candidate).name}
+        shortlistItemId={item.id}
+        projectId={item.project_id}
+        onSaved={() => onChanged({})}
       />
 
       {/* 备注 */}
@@ -1632,7 +1986,7 @@ function CandidateDetailPanel({
 
       <div className="border-t border-gray-100 pt-4">
         {isTalent ? (
-          <CandidateProfileView candidate={candidate as TalentCandidate} locale={locale} />
+          <CandidateProfileView candidate={candidate as TalentCandidate} relatedCandidates={relatedCandidates} locale={locale} />
         ) : (
           <LegacyCandidateView candidate={candidate} />
         )}

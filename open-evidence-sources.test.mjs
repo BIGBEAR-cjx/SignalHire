@@ -13,6 +13,11 @@ import {
   isUrlAllowedByRobots,
   parseRobotsTxt,
 } from "./worker/public-evidence-crawler.mjs";
+import {
+  extractMaigretAliasesFromText,
+  normalizeMaigretResults,
+  runMaigretProvider,
+} from "./worker/maigret-provider.mjs";
 
 test("builds open-source evidence provider requests for an AI talent brief", () => {
   const requests = buildOpenEvidenceSourceRequests("vLLM inference engineer");
@@ -51,11 +56,12 @@ test("expands AI talent briefs into bounded free-source discovery queries", () =
   assert.equal(queries.length, 4);
   assert.deepEqual(queries, [
     "vLLM inference engineer",
+    "vLLM inference engineer LinkedIn public profile",
     "vLLM inference engineer GitHub contributor",
     "vLLM inference engineer paper benchmark",
-    "vLLM inference engineer Hugging Face model",
   ]);
-  assert.doesNotMatch(queries.join(" "), /linkedin|email|phone/i);
+  assert.match(queries.join(" "), /LinkedIn public profile/);
+  assert.doesNotMatch(queries.join(" "), /email|phone|private contact/i);
 });
 
 test("adds free provider credentials without requiring them", () => {
@@ -132,6 +138,77 @@ test("normalizes open-source evidence responses into candidate leads", () => {
   assert.equal(leads[5].family, "anysearch_github");
 });
 
+test("extracts Maigret aliases only from explicit public profile URLs", () => {
+  const aliases = extractMaigretAliasesFromText(`
+    Candidate links:
+    GitHub: https://github.com/woosukkwon/vllm
+    Hugging Face: https://huggingface.co/meta-llama/Llama-3.1-8B
+    Portfolio: https://example.dev/about
+    LinkedIn: https://www.linkedin.com/in/private-session-profile
+    Search for Ada Lovelace platform engineer
+  `);
+
+  assert.deepEqual(aliases, [
+    { alias: "woosukkwon", source: "github", url: "https://github.com/woosukkwon/vllm" },
+    { alias: "meta-llama", source: "huggingface", url: "https://huggingface.co/meta-llama/Llama-3.1-8B" },
+  ]);
+});
+
+test("normalizes Maigret output into open evidence profile leads", () => {
+  const leads = normalizeMaigretResults(`
+{"site_name":"GitHub","url_user":"https://github.com/woosukkwon","username":"woosukkwon","status":"Claimed","ids_data":{"fullname":"Woosuk Kwon","bio":"vLLM maintainer"}}
+{"site_name":"Reddit","url_user":"https://www.reddit.com/user/woosukkwon","username":"woosukkwon","status":"Claimed","ids_data":{"location":"San Francisco"}}
+{"site_name":"Example","url_user":"https://example.com/missing","username":"woosukkwon","status":"Available"}
+`, { alias: "woosukkwon" });
+
+  assert.equal(leads.length, 2);
+  assert.equal(leads[0].provider, "maigret");
+  assert.equal(leads[0].family, "maigret_github");
+  assert.equal(leads[0].coverage_group, "public_voice");
+  assert.equal(leads[0].source_type, "code");
+  assert.equal(leads[0].candidate_name, "woosukkwon");
+  assert.equal(leads[0].title, "GitHub - Woosuk Kwon");
+  assert.equal(leads[0].url, "https://github.com/woosukkwon");
+  assert.equal(leads[1].source_type, "community");
+});
+
+test("runs Maigret provider only when explicitly enabled and keeps failures isolated", async () => {
+  const disabled = await runMaigretProvider("GitHub https://github.com/woosukkwon/vllm", {
+    enabled: false,
+    execFileImpl: async () => {
+      throw new Error("should not run");
+    },
+  });
+
+  assert.deepEqual(disabled.leads, []);
+  assert.equal(disabled.provider_stats.maigret.status, "disabled");
+
+  const executed = await runMaigretProvider("GitHub https://github.com/woosukkwon/vllm", {
+    enabled: true,
+    execFileImpl: async (_file, args) => {
+      assert.deepEqual(args.slice(0, 5), ["woosukkwon", "--top-sites", "200", "--tags", "coding,global,us"]);
+      return { stdout: "{\"site_name\":\"GitHub\",\"url_user\":\"https://github.com/woosukkwon\",\"username\":\"woosukkwon\",\"status\":\"Claimed\"}\n" };
+    },
+    nowImpl: () => 1000,
+  });
+
+  assert.equal(executed.leads.length, 1);
+  assert.equal(executed.provider_stats.maigret.status, "ok");
+  assert.equal(executed.provider_stats.maigret.requests, 1);
+  assert.equal(executed.provider_stats.maigret.lead_count, 1);
+
+  const failed = await runMaigretProvider("GitHub https://github.com/woosukkwon/vllm", {
+    enabled: true,
+    execFileImpl: async () => {
+      throw new Error("maigret not installed");
+    },
+  });
+
+  assert.deepEqual(failed.leads, []);
+  assert.equal(failed.errors[0].provider, "maigret");
+  assert.match(failed.provider_stats.maigret.error, /maigret not installed/);
+});
+
 test("builds a compact worker prompt block for open evidence sources", () => {
   const block = buildOpenEvidenceSourcePromptBlock("vLLM inference engineer");
 
@@ -186,6 +263,37 @@ test("runs open-source evidence precheck with optional provider keys and tolerat
   assert.deepEqual(result.leads.map((lead) => lead.candidate_name), ["vllm-project", "meta-llama"]);
   assert.equal(result.responses.github.items.length, 1);
   assert.equal(result.responses.semantic_scholar, undefined);
+});
+
+test("optionally merges Maigret profile leads into open evidence precheck", async () => {
+  const fetchImpl = async (url) => {
+    const payload = url.includes("github")
+      ? { items: [] }
+      : url.includes("huggingface")
+        ? []
+        : url.includes("openalex")
+          ? { results: [] }
+          : url.includes("semanticscholar")
+            ? { data: [] }
+            : url.includes("anysearch")
+              ? { data: { results: [] } }
+              : { notes: [] };
+    return { ok: true, status: 200, json: async () => payload };
+  };
+
+  const result = await runOpenEvidenceSourcePrecheck("Backfill candidate GitHub https://github.com/woosukkwon/vllm", {
+    fetchImpl,
+    sleepImpl: async () => {},
+    maigret: {
+      enabled: true,
+      execFileImpl: async () => ({ stdout: "{\"site_name\":\"GitHub\",\"url_user\":\"https://github.com/woosukkwon\",\"username\":\"woosukkwon\",\"status\":\"Claimed\"}\n" }),
+      nowImpl: () => 1000,
+    },
+  });
+
+  assert.equal(result.provider_stats.maigret.status, "ok");
+  assert.equal(result.provider_stats.maigret.lead_count, 1);
+  assert.equal(result.leads.some((lead) => lead.provider === "maigret" && lead.url === "https://github.com/woosukkwon"), true);
 });
 
 test("runs multiple expanded free-source queries with provider caps and Hugging Face token", async () => {

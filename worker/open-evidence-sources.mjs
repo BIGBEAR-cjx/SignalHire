@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { runMaigretProvider } from "./maigret-provider.mjs";
 
 const PROVIDERS = [
   {
@@ -65,15 +66,34 @@ function compactQuery(value) {
   return cleanString(value).replace(/\s+/g, " ").slice(0, 160);
 }
 
-export function buildOpenEvidenceSearchQueries(query, { maxQueries = 4 } = {}) {
+function strategyQueries(searchStrategy) {
+  const channels = Array.isArray(searchStrategy?.channels) ? searchStrategy.channels : [];
+  const clusterQueries = Array.isArray(searchStrategy?.query_clusters)
+    ? searchStrategy.query_clusters.flatMap((cluster) => Array.isArray(cluster?.query_variants) ? cluster.query_variants : [])
+    : [];
+  return [
+    ...channels.flatMap((channel) => Array.isArray(channel?.query_variants) ? channel.query_variants : []),
+    ...clusterQueries,
+  ].map(compactQuery).filter(Boolean);
+}
+
+export function buildOpenEvidenceSearchQueries(query, { maxQueries = 4, searchStrategy = null } = {}) {
   const base = compactQuery(query);
   if (!base) return [];
-  const variants = [
-    base,
-    `${base} GitHub contributor`,
-    `${base} paper benchmark`,
-    `${base} Hugging Face model`,
-  ];
+  const roleAwareQueries = strategyQueries(searchStrategy);
+  const variants = roleAwareQueries.length > 0
+    ? [
+      `${base} LinkedIn public profile`,
+      `${base} case study 公开案例`,
+      ...roleAwareQueries,
+    ]
+    : [
+      base,
+      `${base} LinkedIn public profile`,
+      `${base} GitHub contributor`,
+      `${base} paper benchmark`,
+      `${base} Hugging Face model`,
+    ];
   const seen = new Set();
   return variants
     .map(compactQuery)
@@ -81,7 +101,7 @@ export function buildOpenEvidenceSearchQueries(query, { maxQueries = 4 } = {}) {
       const key = item.toLowerCase();
       if (!item || seen.has(key)) return false;
       seen.add(key);
-      return !/\b(linkedin|email|phone|contact)\b/i.test(item);
+      return !/\b(email|phone|private contact|guess email|邮箱猜测|手机号)\b/i.test(item);
     })
     .slice(0, Math.max(1, Math.min(8, Number(maxQueries) || 1)));
 }
@@ -149,8 +169,8 @@ function anysearchBody(query) {
   };
 }
 
-export function buildOpenEvidenceSourceRequests(query, { apiKeys = {}, maxQueries = 1 } = {}) {
-  return buildOpenEvidenceSearchQueries(query, { maxQueries }).flatMap((sourceQuery) => PROVIDERS.map((provider) => ({
+export function buildOpenEvidenceSourceRequests(query, { apiKeys = {}, maxQueries = 1, searchStrategy = null } = {}) {
+  return buildOpenEvidenceSearchQueries(query, { maxQueries, searchStrategy }).flatMap((sourceQuery) => PROVIDERS.map((provider) => ({
       ...provider,
       method: provider.provider === "anysearch" ? "POST" : "GET",
       source_query: sourceQuery,
@@ -404,12 +424,14 @@ export async function runOpenEvidenceSourcePrecheck(query, {
   sleepImpl = sleep,
   nowImpl = () => Date.now(),
   maxQueries = 1,
+  searchStrategy = null,
+  maigret = null,
 } = {}) {
   const responses = {};
   const errors = [];
   const provider_stats = {};
   const leads = [];
-  for (const request of buildOpenEvidenceSourceRequests(query, { apiKeys, maxQueries })) {
+  for (const request of buildOpenEvidenceSourceRequests(query, { apiKeys, maxQueries, searchStrategy })) {
     const started = nowImpl();
     let attempts = 0;
     let lastStatus = 0;
@@ -473,6 +495,12 @@ export async function runOpenEvidenceSourcePrecheck(query, {
       await sleepImpl(request.retry.backoff_ms * attempt);
     }
   }
+  if (maigret && typeof maigret === "object") {
+    const maigretResult = await runMaigretProvider(query, maigret);
+    leads.push(...maigretResult.leads);
+    errors.push(...maigretResult.errors);
+    Object.assign(provider_stats, maigretResult.provider_stats);
+  }
   return {
     responses,
     leads,
@@ -481,8 +509,8 @@ export async function runOpenEvidenceSourcePrecheck(query, {
   };
 }
 
-export function buildOpenEvidenceSourcePromptBlock(query) {
-  const lines = buildOpenEvidenceSourceRequests(query)
+export function buildOpenEvidenceSourcePromptBlock(query, searchStrategy = null) {
+  const lines = buildOpenEvidenceSourceRequests(query, { searchStrategy })
     .map((request) => `- ${request.label}: ${request.url}`)
     .join("\n");
   return `OPEN-SOURCE EVIDENCE ENRICHMENT PLAN:

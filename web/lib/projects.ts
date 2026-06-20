@@ -204,6 +204,8 @@ export async function updateProject(input: {
 export async function deleteProject(userId: string, id: string): Promise<boolean> {
   await runSQL(`UPDATE shortlist_items SET project_id = NULL WHERE project_id = $1 AND user_id = $2`, [id, userId]);
   await runSQL(`UPDATE research_runs SET project_id = NULL WHERE project_id = $1 AND user_id = $2`, [id, userId]);
+  await runSQL(`UPDATE search_tasks SET project_id = NULL WHERE project_id = $1 AND user_id = $2`, [id, userId]);
+  await runSQL(`UPDATE outreach_threads SET project_id = NULL WHERE project_id = $1 AND user_id = $2`, [id, userId]);
   if (!client) return false;
   try {
     const { data, error } = await client.database

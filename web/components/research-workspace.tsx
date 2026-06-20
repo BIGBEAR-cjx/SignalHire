@@ -162,6 +162,7 @@ export function ResearchInputStage({
   onInputChange,
   onRun,
   onCreatePlan,
+  onJdUpload,
   onResumeUpload,
   onSupportingMaterialUpload,
   activeUploadKind = "resume",
@@ -176,9 +177,10 @@ export function ResearchInputStage({
   onInputChange: (value: string) => void;
   onRun: () => void;
   onCreatePlan?: () => void;
+  onJdUpload?: (file: File) => void;
   onResumeUpload?: (file: File) => void;
   onSupportingMaterialUpload?: (file: File) => void;
-  activeUploadKind?: "resume" | "supportingMaterial";
+  activeUploadKind?: "jd" | "resume" | "supportingMaterial";
   loading: boolean;
   resumeUploading?: boolean;
   resumeUploadMessage?: string;
@@ -188,19 +190,28 @@ export function ResearchInputStage({
   const { t } = useI18n();
   const isSearch = mode === "search";
   const uploadDisabled = loading || resumeUploading;
-  function handleFileInput(event: ChangeEvent<HTMLInputElement>, kind: "resume" | "supportingMaterial") {
+  function handleFileInput(event: ChangeEvent<HTMLInputElement>, kind: "jd" | "resume" | "supportingMaterial") {
     const file = event.target.files?.[0];
     event.target.value = "";
-    const handler = kind === "supportingMaterial" ? onSupportingMaterialUpload : onResumeUpload;
+    const handler = kind === "jd" ? onJdUpload : kind === "supportingMaterial" ? onSupportingMaterialUpload : onResumeUpload;
     if (file && handler && !uploadDisabled) handler(file);
   }
-  function handleDrop(event: DragEvent<HTMLDivElement>, kind: "resume" | "supportingMaterial") {
+  function handleDrop(event: DragEvent<HTMLDivElement>, kind: "jd" | "resume" | "supportingMaterial") {
     event.preventDefault();
     const file = event.dataTransfer.files?.[0];
-    const handler = kind === "supportingMaterial" ? onSupportingMaterialUpload : onResumeUpload;
+    const handler = kind === "jd" ? onJdUpload : kind === "supportingMaterial" ? onSupportingMaterialUpload : onResumeUpload;
     if (file && handler && !uploadDisabled) handler(file);
   }
   const uploadItems = [
+    {
+      kind: "jd" as const,
+      onUpload: onJdUpload,
+      dropKey: "research.jdUploadDrop",
+      supportedKey: "research.jdUploadSupported",
+      buttonKey: "research.jdUploadButton",
+      uploadingKey: "research.jdUploading",
+      tone: "bg-blue-50 text-blue-700 ring-blue-100",
+    },
     {
       kind: "resume" as const,
       onUpload: onResumeUpload,
@@ -237,9 +248,9 @@ export function ResearchInputStage({
             {isSearch ? t("research.searchBadge") : t("research.verifyBadge")}
           </span>
         </div>
-        {!isSearch && onResumeUpload && (
-          <div className="mt-5 grid gap-3 lg:grid-cols-2">
-            {uploadItems.filter((item) => item.onUpload).map((item) => {
+        {((isSearch && onJdUpload) || (!isSearch && onResumeUpload)) && (
+          <div className={`mt-5 grid gap-3 ${isSearch ? "" : "lg:grid-cols-2"}`}>
+            {uploadItems.filter((item) => item.onUpload && (isSearch ? item.kind === "jd" : item.kind !== "jd")).map((item) => {
               const isActive = activeUploadKind === item.kind;
               const isUploadingThis = resumeUploading && isActive;
               return (

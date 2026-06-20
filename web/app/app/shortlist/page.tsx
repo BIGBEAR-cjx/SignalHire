@@ -33,6 +33,7 @@ const STATUSES: { value: Status; labelKey: string; chipCls: string; dotCls: stri
 interface Item {
   id: string;
   source_run_id: string | null;
+  project_id: string | null;
   candidate: unknown;
   status: Status;
   notes: string | null;
@@ -165,6 +166,7 @@ export default function ShortlistPage() {
               <DetailPanel
                 key={selected.id}
                 item={selected}
+                relatedCandidates={items.map((it) => it.candidate)}
                 onChanged={(patch) => {
                   setItems((prev) => prev?.map((it) => it.id === selected.id ? { ...it, ...patch } : it) ?? prev);
                 }}
@@ -233,10 +235,12 @@ function ItemCard({ item, locale, selected, onClick }: { item: Item; locale: "zh
 
 function DetailPanel({
   item,
+  relatedCandidates,
   onChanged,
   onDeleted,
 }: {
   item: Item;
+  relatedCandidates: unknown[];
   onChanged: (patch: Partial<Item>) => void;
   onDeleted: () => void;
 }) {
@@ -331,6 +335,8 @@ function DetailPanel({
         onClose={() => setOutreachOpen(false)}
         candidate={candidate}
         candidateName={asCandidate(candidate).name}
+        shortlistItemId={item.id}
+        projectId={item.project_id}
       />
 
       {/* 备注 */}
@@ -361,7 +367,7 @@ function DetailPanel({
       {/* 候选人画像 */}
       <div className="border-t border-gray-100 pt-4">
         {isTalent ? (
-          <CandidateProfileView candidate={candidate as TalentCandidate} locale={locale} />
+          <CandidateProfileView candidate={candidate as TalentCandidate} relatedCandidates={relatedCandidates} locale={locale} />
         ) : (
           <LegacyCandidateView candidate={candidate} />
         )}

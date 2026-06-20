@@ -30,6 +30,7 @@ const REQUIRED_COLUMNS = [
   "locked_at",
   "started_at",
   "finished_at",
+  "search_task_id",
   "created_at",
   "updated_at",
 ];

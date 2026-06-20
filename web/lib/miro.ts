@@ -1,7 +1,7 @@
 // lib/miro.ts —— 调 MiroMind 流式接口 (服务端用)。两个 API route 共享。
 // 必须 stream:true: 非流式几分钟不传数据会被网络代理掐断。
 
-import { isTalentSearchResult, normalizeTalentSearchResult } from "./talent-profile.mjs";
+import { buildAgentSearchStrategy, isTalentSearchResult, normalizeTalentSearchResult } from "./talent-profile.mjs";
 
 type StepKind = "search" | "fetch" | "think";
 export type OnStep = (kind: StepKind, info?: string) => void;
@@ -201,49 +201,90 @@ function outputLanguageRules(platformLanguage = DEFAULT_PLATFORM_LANGUAGE) {
 - Do not paste raw source passages as the answer. Summarize or translate source evidence into the platform language.`;
 }
 
-export const searchPrompt = (query: string, platformLanguage = DEFAULT_PLATFORM_LANGUAGE) => `You are SignalHire, an AI talent sourcing and evidence-audit agent for HR teams and headhunters.
+function openEvidenceSourcePromptBlock(query: string, strategy?: any) {
+  const encoded = encodeURIComponent(query.trim().replace(/\s+/g, " ").slice(0, 160));
+  const strategyLines = Array.isArray(strategy?.channels)
+    ? strategy.channels.slice(0, 5).flatMap((channel: any) => Array.isArray(channel?.query_variants) ? channel.query_variants.slice(0, 2) : [])
+      .map((item: string) => `- Role-aware public web query: ${item}`)
+      .join("\n")
+    : "";
+  return `OPEN-SOURCE EVIDENCE ENRICHMENT PLAN:
+Use these public API/source families as first-class source_strategy options before paid enrichment. Treat returned people as leads only; verify identity and claims with concrete source URLs.
+${strategyLines ? `${strategyLines}\n` : ""}- Aggressive public web recall may use LinkedIn/X/GitHub/portfolio/content-platform/company-page search-result leads, but do not scrape login-gated pages or guess private contacts.
+- GitHub repository search: https://api.github.com/search/repositories?q=${encoded}%20in%3Aname%2Cdescription%2Creadme&sort=stars&order=desc&per_page=10
+- Hugging Face model search: https://huggingface.co/api/models?search=${encoded}&limit=10&sort=downloads&direction=-1
+- OpenAlex works search: https://api.openalex.org/works?search=${encoded}&per-page=10&sort=relevance_score%3Adesc
+- Semantic Scholar paper search: https://api.semanticscholar.org/graph/v1/paper/search?query=${encoded}&limit=10&fields=title%2Curl%2Cyear%2Cauthors%2CcitationCount
+- OpenReview note search: https://api2.openreview.net/notes/search?term=${encoded}&limit=10`;
+}
+
+function agentSearchStrategyBlock(query: string) {
+  const strategy = buildAgentSearchStrategy(query, { locale: platformLocale(query) });
+  const channels = Array.isArray(strategy.channels) ? strategy.channels : [];
+  const channelLines = channels.slice(0, 8).map((channel: any) => {
+    const queries = Array.isArray(channel.query_variants) ? channel.query_variants.slice(0, 2).join(" | ") : "";
+    return `- ${channel.key}: ${channel.label} · coverage=${channel.coverage_group} · source_types=${(channel.source_types || []).join(", ")} · queries=${queries}`;
+  }).join("\n");
+  const scoreLines = Array.isArray(strategy.score_dimensions)
+    ? strategy.score_dimensions.map((item: any) => `- ${item.key}: ${item.label} (${item.weight})`).join("\n")
+    : "";
+  const clusterLines = Array.isArray(strategy.query_clusters)
+    ? strategy.query_clusters.map((item: any) => `- ${item.key}: ${item.label}`).join("\n")
+    : "";
+  return { strategy, block: `INTERNET ROLE STRATEGY:
+role_category: ${strategy.role_category || "software_engineering"}
+role_category_label: ${strategy.role_category_label || ""}
+recall_mode: ${strategy.recall_mode || "aggressive_public_web_recall"}
+Channels:
+${channelLines}
+Query clusters:
+${clusterLines}
+Score dimensions:
+${scoreLines}
+Use the channel plan to create source mix, candidate clusters, top candidates, and next search recommendations.
+Do not treat the hiring company or product as a candidate target.` };
+}
+
+function platformLocale(query: string) {
+  return /[\u3400-\u9fff]/.test(query) ? "zh" : "en";
+}
+
+export const searchPrompt = (query: string, platformLanguage = DEFAULT_PLATFORM_LANGUAGE) => {
+  const { strategy, block } = agentSearchStrategyBlock(query);
+  return `You are SignalHire, an internet-role sourcing and evidence-audit agent for HR teams and headhunters.
 
 TASK:
-Search globally for 10 to 15 real AI talent candidates for this hiring brief:
+Search globally for 10 to 50 public-web candidate leads, then submit the best 10 to 15 real named people for this hiring brief:
 "${query}"
 
 The result must feel like a high-quality hiring shortlist, not raw search results.
 
+${block}
+
 SEARCH STRATEGY:
 - Prefer public, verifiable achievement signals over resume keywords.
-- Search broadly across papers, arXiv, OpenReview, Semantic Scholar, conference pages, patents, datasets, benchmarks, GitHub, Hugging Face, Papers with Code, personal sites, technical blogs, company engineering blogs, project pages, talks, podcasts, interviews, communities, and public profile pages.
-- Group candidates by AI talent direction.
+- Search broadly across role-specific public sources: public profiles, company pages, GitHub, portfolios, product pages, content platforms, community/event pages, case studies, media, blogs, talks, papers, datasets, benchmarks, and search-visible LinkedIn/X/social profile leads.
+- Group candidates by role-aware candidate clusters.
 - Include primary matches and adjacent transferable candidates when useful.
 - Every candidate must be a single real named person.
 - Never return teams, organizations, unnamed contributors, or collectives.
 - Do not guess private email addresses.
 - Track evidence coverage in four groups: research | practice | work_history | public_voice.
 
-AI DIRECTIONS:
-- AI Infrastructure / LLM Systems
-- AI Research / Applied Science
-- Applied AI / Agents
-- ML Platform / MLOps
-- Data / Evaluation / Safety
-- AI Product / Solutions
-- Founder / Builder
-
 SCORING:
 Return match_score from 0 to 100.
-Use this weighting:
-- achievement_signals: 40
-- skill_match: 25
-- work_history: 20
-- evidence_quality: 15
+Use the role-specific score_dimensions above, then map them into the existing score_breakdown fields for compatibility.
 
 EVIDENCE RULES:
 - Key claims need specific source URLs.
 - A search-results URL is not evidence.
-- Source types should use: paper | code | profile | company | talk | blog | project | community | patent | dataset | benchmark | other.
+- Source types should use: paper | code | repository | profile | social_profile | company | company_profile | talk | blog | project | portfolio | case_study | content_platform | community | event | media | patent | dataset | benchmark | other.
 - "verified" means public evidence clearly supports the claim.
 - "contradicted" means public evidence conflicts with the claim.
 - "unverified" means the claim is plausible but not supported by clear public evidence.
 - If a claim has no concrete evidence URL, use "unverified".
+
+${openEvidenceSourcePromptBlock(query, strategy)}
 
 ${outputLanguageRules(platformLanguage)}
 
@@ -255,6 +296,7 @@ Use exactly this shape:
 {
   "search_brief": {
     "original_query": "string",
+    "role_category": "software_engineering | ai_ml_data | product_management | design_creative | growth_marketing | operations_community | sales_bd_gtm | customer_success_support | security_infra_devops | business_strategy_ops | people_finance_admin | executive_founder_leadership",
     "target_directions": ["string"],
     "required_skills": ["string"],
     "preferred_skills": ["string"],
@@ -281,7 +323,15 @@ Use exactly this shape:
         "pool": "adjacent candidate pool worth exploring",
         "reason": "why this pool may transfer into the role"
       }
-    ]
+    ],
+    "query_clusters": ["role-aware search clusters used"],
+    "score_dimensions": ["role-aware scoring dimensions used"]
+  },
+  "candidate_pool_summary": {
+    "source mix": "short source mix summary",
+    "clusters": ["candidate clusters with counts"],
+    "top_candidates": ["top names before final shortlist"],
+    "next_search_recommendations": ["follow-up search suggestions"]
   },
   "source_execution": {
     "summary": "short audit of which source jobs were executed, which were thin, and where follow-up is needed",
@@ -319,7 +369,7 @@ Use exactly this shape:
   },
   "talent_map": [
     {
-      "direction": "AI Infrastructure / LLM Systems",
+      "direction": "role-aware candidate cluster",
       "fit": "primary | adjacent | high_potential",
       "candidate_count": 0,
       "rationale": "string"
@@ -357,7 +407,7 @@ Use exactly this shape:
       "location": "city, region, country or null",
       "current_role": "string or null",
       "current_company": "string or null",
-      "ai_directions": ["AI Infrastructure / LLM Systems"],
+      "ai_directions": ["role-aware fit tags"],
       "match_score": 0,
       "score_breakdown": {
         "achievement_signals": 0,
@@ -398,6 +448,7 @@ Use exactly this shape:
     }
   ]
 }`;
+};
 
 export const verifyPrompt = (bio: string, platformLanguage = DEFAULT_PLATFORM_LANGUAGE) => `You are a candidate fact-checking agent. Below is a candidate's SELF-DESCRIBED profile.
 Extract each distinct factual claim and CROSS-VERIFY it against MULTIPLE independent

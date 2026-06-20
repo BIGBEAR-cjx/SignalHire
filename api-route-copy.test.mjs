@@ -13,6 +13,127 @@ test("search and verify API error responses stay locale-keyed", () => {
   }
 });
 
+test("search enqueue includes cached candidate hints for next-round recall", () => {
+  const source = readFileSync("web/app/api/search/route.ts", "utf8");
+
+  assert.match(source, /findCachedCandidateProfilesForSearch/);
+  assert.match(source, /const cachedCandidateHints = await findCachedCandidateProfilesForSearch/);
+  assert.match(source, /cachedCandidateHints,/);
+});
+
+test("worker runs open evidence precheck before search prompt", () => {
+  const source = readFileSync("worker/index.mjs", "utf8");
+
+  assert.match(source, /runOpenEvidenceSourcePrecheck/);
+  assert.match(source, /openEvidenceLeads/);
+  assert.match(source, /searchPrompt\(queryText, platformLanguage, candidateHints, openEvidenceLeads, agentSearchStrategy\)/);
+});
+
+test("search queue and worker persist agent execution layer", () => {
+  const dbSource = readFileSync("web/lib/db.ts", "utf8");
+  const workerSource = readFileSync("worker/index.mjs", "utf8");
+  const workerLibSource = readFileSync("worker/lib.mjs", "utf8");
+
+  assert.match(dbSource, /buildAgentSearchStrategy/);
+  assert.match(dbSource, /progress:[\s\S]{0,220}agent_execution/);
+  assert.match(workerLibSource, /AGENT EXECUTION STRATEGY/);
+  assert.match(workerSource, /agentSearchStrategy/);
+  assert.match(workerSource, /buildFallbackAgentSearchStrategy/);
+  assert.match(workerSource, /executionTraceFromProgress/);
+  assert.match(workerSource, /attachAgentExecutionLayer/);
+  assert.match(workerSource, /candidate_submission_events/);
+  assert.match(workerSource, /delivery_clusters/);
+  assert.match(workerSource, /duration_ms/);
+});
+
+test("worker persists open evidence precheck leads before model identity resolution", () => {
+  const source = readFileSync("worker/index.mjs", "utf8");
+
+  assert.match(source, /OPEN_EVIDENCE_LEAD_TABLE = "open_evidence_leads"/);
+  assert.match(source, /buildOpenEvidenceLeadRowsForRun/);
+  assert.match(source, /upsertOpenEvidenceLeadsForRun/);
+  assert.match(source, /sourceRunId: job\.id/);
+});
+
+test("worker logs open evidence provider stats for crawler observability", () => {
+  const source = readFileSync("worker/index.mjs", "utf8");
+
+  assert.match(source, /formatOpenEvidenceProviderStats/);
+  assert.match(source, /result\.provider_stats/);
+  assert.match(source, /开放证据预检统计/);
+});
+
+test("schema verification covers AI talent cache tables", () => {
+  const pkg = readFileSync("web/package.json", "utf8");
+  const source = readFileSync("web/scripts/check-ai-talent-cache-schema.mjs", "utf8");
+  const researchRunsSource = readFileSync("web/scripts/check-research-runs-schema.mjs", "utf8");
+
+  assert.match(pkg, /"verify:schema": "node --env-file-if-exists=\.env\.local scripts\/check-research-runs-schema\.mjs && node --env-file-if-exists=\.env\.local scripts\/check-ai-talent-cache-schema\.mjs"/);
+  assert.match(source, /candidate_profiles/);
+  assert.match(source, /candidate_evidence_sources/);
+  assert.match(source, /open_evidence_leads/);
+  assert.match(source, /search_tasks/);
+  assert.match(source, /outreach_threads/);
+  assert.match(source, /source_run_id/);
+  assert.match(source, /cache_key/);
+  assert.match(researchRunsSource, /search_task_id/);
+});
+
+test("AI talent cache migration can be applied without jq", () => {
+  const pkg = readFileSync("web/package.json", "utf8");
+  const source = readFileSync("web/scripts/apply-ai-talent-cache-migration.mjs", "utf8");
+
+  assert.match(pkg, /"migrate:ai-cache": "node --env-file-if-exists=\.env\.local scripts\/apply-ai-talent-cache-migration\.mjs"/);
+  assert.match(source, /20260612110000_candidate-profile-cache\.sql/);
+  assert.match(source, /20260615100000_dinq-recruiting-agent-mvp\.sql/);
+  assert.match(source, /advance\/rawsql/);
+  assert.match(source, /INSFORGE_API_BASE_URL/);
+  assert.doesNotMatch(source, /jq/);
+});
+
+test("DINQ recruiting UI wires follow-up controls and related talent context", () => {
+  const projectDetail = readFileSync("web/app/app/projects/[id]/page.tsx", "utf8");
+  const shortlist = readFileSync("web/app/app/shortlist/page.tsx", "utf8");
+  const outreachModal = readFileSync("web/components/OutreachModal.tsx", "utf8");
+
+  assert.match(projectDetail, /function OutreachQueuePanel/);
+  assert.match(projectDetail, /updateOutreachThread/);
+  assert.match(projectDetail, /next_follow_up_at/);
+  assert.match(projectDetail, /discovery_items/);
+  assert.match(projectDetail, /Evidence updated/);
+  assert.match(projectDetail, /relatedCandidates=\{\(items \?\? \[\]\)\.map\(\(it\) => it\.candidate\)/);
+  assert.match(shortlist, /relatedCandidates=\{items\.map\(\(it\) => it\.candidate\)\}/);
+  assert.match(shortlist, /relatedCandidates=\{relatedCandidates\}/);
+  assert.match(outreachModal, /nextFollowUpAt/);
+  assert.match(outreachModal, /status,/);
+  assert.match(outreachModal, /saveThread\("contacted"\)/);
+  assert.match(outreachModal, /next_follow_up_at:[\s\S]{0,120}nextFollowUpAt/);
+});
+
+test("DINQ recruiting APIs validate tenant-scoped relationships", () => {
+  const searchTasksRoute = readFileSync("web/app/api/search-tasks/route.ts", "utf8");
+  const outreachRoute = readFileSync("web/app/api/outreach-threads/route.ts", "utf8");
+  const searchTasksLib = readFileSync("web/lib/search-tasks.ts", "utf8");
+  const outreachLib = readFileSync("web/lib/outreach-threads.ts", "utf8");
+
+  assert.match(searchTasksRoute, /ensureSearchTaskProjectAccess/);
+  assert.match(searchTasksLib, /ensureSearchTaskProjectAccess/);
+  assert.match(searchTasksLib, /from\("projects"\)[\s\S]{0,260}\.eq\("user_id", userId\)/);
+  assert.match(outreachRoute, /ensureOutreachRelationshipAccess/);
+  assert.match(outreachLib, /ensureOutreachRelationshipAccess/);
+  assert.match(outreachLib, /from\("shortlist_items"\)[\s\S]{0,320}\.eq\("user_id", input\.userId\)/);
+  assert.match(outreachLib, /shortlistProjectId !== \(input\.projectId \?\? null\)/);
+});
+
+test("Vercel cron triggers due Talent Monitor tasks", () => {
+  const config = readFileSync("web/vercel.json", "utf8");
+  const cronRoute = readFileSync("web/app/api/cron/search-tasks/route.ts", "utf8");
+
+  assert.match(config, /"path": "\/api\/cron\/search-tasks"/);
+  assert.match(cronRoute, /enqueueDueSearchTasks\(10\)/);
+  assert.match(cronRoute, /CRON_SECRET/);
+});
+
 test("backfill API user-facing copy stays locale-keyed", () => {
   for (const file of ["web/app/api/backfill/route.ts", "web/app/api/backfill/merge/route.ts"]) {
     const source = readFileSync(file, "utf8");
@@ -39,6 +160,8 @@ test("verify workspace exposes resume and supporting material uploads", () => {
 
   assert.match(source, /research\.resumeUploadDrop/);
   assert.match(source, /research\.supportingMaterialUploadDrop/);
+  assert.match(source, /research\.jdUploadDrop/);
+  assert.match(source, /research\.jdUploadButton/);
   assert.match(source, /supportingMaterialUploadButton/);
   assert.doesNotMatch(source, /educationMaterialUploadDrop|educationMaterialUploadButton/);
 });
@@ -52,7 +175,7 @@ test("claims expose a unified supplement-material entry", () => {
   assert.doesNotMatch(source, /educationMaterialPrefillHeader|result\.education\.supplementAction/);
 });
 
-test("smart search results default to a guided candidate review flow", () => {
+test("smart search results default to the search result workspace flow", () => {
   const researchTool = readFileSync("web/components/ResearchTool.tsx", "utf8");
   const resultComponents = readFileSync("web/components/result.tsx", "utf8");
   const shortlistCard = resultComponents.slice(
@@ -60,15 +183,41 @@ test("smart search results default to a guided candidate review flow", () => {
     resultComponents.indexOf("function AuditStat"),
   );
 
-  assert.match(researchTool, /function CandidateReviewCommand/);
-  assert.match(researchTool, /function CandidateReviewFlow/);
   assert.match(researchTool, /function AdvancedResultDetails/);
-  assert.match(researchTool, /<CandidateReviewCommand[\s\S]{0,900}<CandidateReviewFlow/);
+  assert.match(researchTool, /<SearchResultWorkspaceView/);
   assert.match(researchTool, /<details[\s\S]{0,600}result\.reviewFlow\.advancedTitle/);
   assert.match(researchTool, /<AdvancedResultDetails[\s\S]*<SearchPlanView result=\{result\}/);
   assert.match(researchTool, /<AdvancedResultDetails[\s\S]*<CandidateComparisonView result=\{result\}/);
-  assert.match(researchTool, /setSelectedCandidateIndex\(0\)/);
+  assert.match(researchTool, /const activeCandidateIndex = isTalentSearchResult\(result\)/);
+  assert.match(researchTool, /selectedIndex=\{selectedCandidateIndex\}/);
+  assert.match(resultComponents, /const requestedIndex = selectedIndex \?\? workspace\.selected_candidate_index \?\? 0/);
+  assert.match(resultComponents, /export function SearchResultWorkspaceView/);
+  assert.match(resultComponents, /workspace\.agent_execution\.telemetry\.source_mix/);
   assert.doesNotMatch(shortlistCard, /resultCopy\(locale, "viewDetails"\)|resultCopy\(locale, "addToPool"\)|resultCopy\(locale, "removeFromPool"\)/);
+});
+
+test("started search flow hides the editable setup panels", () => {
+  const researchTool = readFileSync("web/components/ResearchTool.tsx", "utf8");
+
+  assert.match(researchTool, /const showSearchSetup = !isSearch \|\| \(!searchRunStarted && !searchIntakeDraft\);/);
+  assert.doesNotMatch(researchTool, /const searchInputStage = \(/);
+  assert.match(researchTool, /\{showSearchSetup \? \(\s*<ResearchInputStage/);
+  assert.doesNotMatch(researchTool, /function CollapsedSearchSetup|<CollapsedSearchSetup|searchRunStarted \? \(/);
+});
+
+test("root html tolerates browser extension hydration attributes", () => {
+  const source = readFileSync("web/app/layout.tsx", "utf8");
+
+  assert.match(source, /<html[\s\S]{0,160}suppressHydrationWarning/);
+});
+
+test("public search reports hide internal search process details", () => {
+  const source = readFileSync("web/app/r/[id]/page.tsx", "utf8");
+  const talentBranch = source.slice(source.indexOf("talentResult ?"), source.indexOf(": legacyCandidates.length"));
+
+  assert.match(talentBranch, /<ShortlistDeliveryReportView result=\{talentResult\} locale=\{locale\} \/>/);
+  assert.match(talentBranch, /<CandidateProfileView candidate=\{candidate\} result=\{talentResult\} locale=\{locale\} \/>/);
+  assert.doesNotMatch(talentBranch, /<SearchPlanView|<SourceExecutionView|<CoverageBackfillView|<TalentMapView/);
 });
 
 test("project evidence detail buttons scroll to the candidate detail panel", () => {
@@ -123,9 +272,10 @@ test("feedback API error responses stay locale-keyed", () => {
 });
 
 test("feedback requests include the active locale", () => {
-  const source = readFileSync("web/components/ResearchTool.tsx", "utf8");
+  const source = readFileSync("web/app/api/feedback/route.ts", "utf8");
 
-  assert.match(source, /run_id: runId,[\s\S]{0,220}locale,[\s\S]{0,220}feedback: searchFeedback/);
+  assert.match(source, /const locale = normalizeLocale\(body\.locale\)/);
+  assert.match(source, /saveSearchFeedback\(\{[\s\S]{0,220}locale,[\s\S]{0,220}feedback/);
 });
 
 test("projects collection API error responses stay locale-keyed", () => {
