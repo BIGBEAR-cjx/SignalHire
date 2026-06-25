@@ -41,9 +41,9 @@ import {
   buildBackfillMergeSummary,
   buildCoverageBackfillPlan,
   buildEditableSearchPlanDraft,
+  buildRoleBriefDraft,
   buildSearchInputFromEditablePlan,
   buildSearchInputFromSearchIntake,
-  buildSearchIntakeDraft,
   buildSearchIntakeQuestions,
 } from "@/lib/talent-profile.mjs";
 import type { BackfillMergeSummary, CoverageBackfillJob, TalentCandidate, TalentSearchResult } from "@/lib/talent-profile.mjs";
@@ -114,10 +114,14 @@ type SearchIntakeDraft = {
   unknowns: Array<SearchIntakeQuestion["key"]>;
   clarification: Partial<Record<SearchIntakeQuestion["key"], string>>;
   skipped_questions: SearchIntakeQuestion["key"][];
+  search_plan_preview?: Array<{ key: string; label: string; value: string }>;
+  source_extraction?: { status: string; url?: string; error?: string };
 };
 type CandidateDecision = "saved" | "needs_evidence" | "passed";
+type RoleIntakeSourceType = "natural_language" | "jd_file" | "job_url" | "linkedin_url" | "similar_profile" | "existing_brief";
 type SearchConstraintEditorView = ReturnType<typeof buildSearchConstraintEditor>;
 const buildIntakeSearchInput = buildSearchInputFromSearchIntake as (input: { draft: SearchIntakeDraft; locale: string }) => string;
+const buildRoleBrief = buildRoleBriefDraft as (value: string, options: { locale: string; sourceType: RoleIntakeSourceType }) => SearchIntakeDraft;
 
 const WORKER_DELAY_MS = 2 * 60 * 1000;
 const JOB_TIMEOUT_MS = 15 * 60 * 1000;
@@ -179,6 +183,8 @@ function SearchIntakePanel({
   const roleCategoryLabel = draft.role_category_label || draft.role_category || "";
   const employerContext = Array.isArray(draft.employer_context) ? draft.employer_context : [];
   const channelPlan = Array.isArray(draft.channel_plan) ? draft.channel_plan : [];
+  const searchPlanPreview = Array.isArray(draft.search_plan_preview) ? draft.search_plan_preview : [];
+  const sourceExtraction = draft.source_extraction;
 
   function submitCustom() {
     if (!currentQuestion || !customValue.trim()) return;
@@ -221,11 +227,28 @@ function SearchIntakePanel({
             {t("research.intake.parsed")}
           </span>
         </div>
+        {sourceExtraction?.status === "fallback" && (
+          <p className="mt-3 rounded-xl bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-800 ring-1 ring-amber-100">
+            {locale === "en"
+              ? "The source page could not be fully read. This draft was generated from the URL/title fallback, so confirm the constraints before search."
+              : "来源页面未能完整读取。本画像基于 URL/标题 fallback 生成，请先确认约束再搜索。"}
+          </p>
+        )}
         <div className="mt-4 grid gap-3 md:grid-cols-3">
           <IntakeList title={t("research.intake.mustHave")} tone="emerald" items={draft.must_have} fallback={t("research.intake.empty")} />
           <IntakeList title={t("research.intake.niceToHave")} tone="blue" items={draft.nice_to_have} fallback={t("research.intake.empty")} />
           <IntakeList title={t("research.intake.exclusions")} tone="red" items={draft.exclusions} fallback={t("research.intake.empty")} />
         </div>
+        {searchPlanPreview.length > 0 && (
+          <div className="mt-4 grid gap-3 md:grid-cols-3">
+            {searchPlanPreview.map((item) => (
+              <div key={item.key} className="rounded-2xl border border-black/10 bg-white p-3">
+                <p className="text-xs font-semibold text-[var(--sh-muted)]">{item.label}</p>
+                <p className="mt-2 text-sm leading-6 text-[var(--sh-ink)]">{item.value}</p>
+              </div>
+            ))}
+          </div>
+        )}
         {(employerContext.length > 0 || channelPlan.length > 0) && (
           <div className="mt-4 grid gap-3 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
             {employerContext.length > 0 && (
@@ -390,13 +413,14 @@ export default function ResearchTool({
   const { locale, t } = useI18n();
   const [input, setInput] = useState(initialInput);
   const [loading, setLoading] = useState(false);
+  const [roleIntakeLoading, setRoleIntakeLoading] = useState(false);
   const [error, setError] = useState("");
   const [result, setResult] = useState<AppResult | null>(null);
   const [selectedCandidateIndex, setSelectedCandidateIndex] = useState<number | null>(null);
   const [shortlist, setShortlist] = useState<number[]>([]); // 已收藏的 candidate_index 集合
   const [savingIdx, setSavingIdx] = useState<Set<number>>(new Set()); // 正在写 API 的 index (防重复点击)
   const [outreachOpen, setOutreachOpen] = useState(false); // AI 外联弹窗
-  const [contactIntentMessage, setContactIntentMessage] = useState("");
+  const [handoffMessage, setHandoffMessage] = useState("");
   const [stats, setStats] = useState<RunStats | null>(null);
   const [feed, setFeed] = useState<FeedItem[]>([]);
   const [live, setLive] = useState<{ searches: number; fetches: number } | null>(null);
@@ -518,6 +542,7 @@ export default function ResearchTool({
     setFeed([]); setLive(null); setRunId(null); setCurrentJobId(null);
     setJobStatus(null); setCopied(false); setBackfillContext(null); setBackfillMergeSummary(null);
     setMergingBackfill(false); setMergedOriginalRunId(null);
+    setHandoffMessage("");
     setCandidateDecisions({});
     setAdvancedDetailsOpen(false);
     if (!options.preserveInput) {
@@ -699,7 +724,7 @@ export default function ResearchTool({
         return;
       }
       setInput(text);
-      createSearchIntake(text);
+      void createSearchIntake(text, "jd_file");
       setResumeUploadMessage(t("research.jdUploadSelected", { name: fileName }));
       setResumeUploadWarning(warning);
     } catch {
@@ -717,8 +742,25 @@ export default function ResearchTool({
     return items.join("\n");
   }
 
-  function createSearchIntake(value: string) {
-    const draft = buildSearchIntakeDraft(value, { locale }) as SearchIntakeDraft;
+  async function createSearchIntake(value: string, sourceType: RoleIntakeSourceType = "natural_language") {
+    if (!value.trim() || roleIntakeLoading) return;
+    setRoleIntakeLoading(true);
+    setError("");
+    let draft: SearchIntakeDraft;
+    try {
+      const response = await fetch("/api/role-intake", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ value, sourceType, locale }),
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok || !payload.draft) throw new Error(payload.error || `HTTP ${response.status}`);
+      draft = payload.draft as SearchIntakeDraft;
+    } catch {
+      draft = buildRoleBrief(value, { locale, sourceType });
+    } finally {
+      setRoleIntakeLoading(false);
+    }
     setSearchIntakeDraft(draft);
     setEditablePlan(buildEditablePlanFromIntake(draft));
     setAdvancedPlanOpen(false);
@@ -772,7 +814,13 @@ export default function ResearchTool({
       runSearchIntake();
       return;
     }
-    createSearchIntake(input);
+    void createSearchIntake(input);
+  }
+
+  function createSearchIntakeFromSource(sourceType: Exclude<RoleIntakeSourceType, "natural_language" | "jd_file">, value: string) {
+    if (!value.trim()) return;
+    setInput(value);
+    void createSearchIntake(value, sourceType);
   }
 
   function updateResearchInput(value: string) {
@@ -1058,11 +1106,11 @@ export default function ResearchTool({
     setCandidateDecisions((current) => ({ ...current, [index]: "passed" }));
   }
 
-  function requestCandidateEmail(index: number, candidate: TalentCandidate) {
+  function shareCandidateEvidenceBrief(index: number, candidate: TalentCandidate) {
     setSelectedCandidateIndex(index);
-    setContactIntentMessage(locale === "en"
-      ? `Contact enrichment entry reserved for ${candidate.name}. The next commercial release can connect credits, compliant source logging, and email enrichment here without inventing an address.`
-      : `已为 ${candidate.name} 预留联系方式富集入口。下一版可在这里接入点数扣减、合规来源记录和邮箱富集，不会猜测或展示未验证邮箱。`);
+    setHandoffMessage(locale === "en"
+      ? `${candidate.name}'s evidence brief is ready for hiring-manager review. Use the share report action above for the full shortlist handoff.`
+      : `${candidate.name} 的证据摘要已准备好给 hiring manager 审阅。可使用上方分享报告动作交付完整候选名单。`);
   }
 
   const isSearch = mode === "search";
@@ -1111,7 +1159,8 @@ export default function ResearchTool({
           onRun={isSearch ? runSearchFlow : () => run()}
           onCreatePlan={undefined}
           onJdUpload={mode === "search" ? uploadSearchBriefFile : undefined}
-          loading={loading}
+          onRoleSource={mode === "search" ? createSearchIntakeFromSource : undefined}
+          loading={loading || roleIntakeLoading}
           onResumeUpload={mode === "verify" ? (file) => uploadVerificationFile(file, "resume") : undefined}
           onSupportingMaterialUpload={mode === "verify" ? (file) => uploadVerificationFile(file, "supportingMaterial") : undefined}
           activeUploadKind={mode === "search" ? "jd" : verifyUploadKind}
@@ -1332,13 +1381,13 @@ export default function ResearchTool({
                     shortlist={shortlist}
                     decisions={candidateDecisions}
                     loading={loading}
-                    commercialNotice={contactIntentMessage}
+                    handoffNotice={handoffMessage}
                     onOpenCandidate={openCandidateForReview}
                     onAddToPool={addCandidateToPool}
                     onNeedEvidence={needEvidenceForCandidate}
                     onPass={passCandidate}
                     onOutreach={() => setOutreachOpen(true)}
-                    onGetEmail={requestCandidateEmail}
+                    onShareEvidenceBrief={shareCandidateEvidenceBrief}
                     onShowProcess={() => setAdvancedDetailsOpen(true)}
                     locale={locale}
                   />

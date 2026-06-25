@@ -24,7 +24,7 @@ declare module "@/lib/talent-profile.mjs" {
 import type { BackfillMergeSummary, CandidateComparisonRow, CandidateEvidenceAuditSummary, CandidateEvidenceMatrix, CandidateProfileCacheEntry, CandidateReadingSummary, CandidateReviewBrief, CandidateEvidenceDossier, CoverageBackfillJob, EvidenceCoverageGroup, SearchResultWorkspace, ShortlistDeliveryReport, SimilarCandidateSuggestion, SourceExecutionJob, SourceQueryPlanItem, TalentCandidate, TalentSearchResult } from "@/lib/talent-profile.mjs";
 import { buildCandidateComparisonRows, buildCandidateEvidenceAudit, buildCandidateEvidenceMatrix, buildCandidateProfileCacheEntry, buildCandidateReadingSummary, buildCandidateReviewBrief, buildCandidateEvidenceDossier, buildCoverageBackfillPlan, buildEvidenceCoverage, buildSearchResultWorkspace, buildShortlistDeliveryReport, buildSimilarCandidateSuggestions, buildSourceExecution, buildSourceQueryPlan } from "@/lib/talent-profile.mjs";
 import type { IconType } from "react-icons";
-import { FiCheckCircle, FiChevronDown, FiClock, FiExternalLink, FiFlag, FiHelpCircle, FiInfo, FiMail, FiLink2, FiRefreshCw, FiUploadCloud, FiXCircle } from "react-icons/fi";
+import { FiCheckCircle, FiChevronDown, FiClock, FiExternalLink, FiFlag, FiHelpCircle, FiInfo, FiLink2, FiRefreshCw, FiShare2, FiUploadCloud, FiXCircle } from "react-icons/fi";
 import { t as translate } from "@/lib/i18n.mjs";
 import { buildRelatedTalentView, buildTalentIntelligenceReport } from "@/lib/talent-intelligence.mjs";
 import {
@@ -1228,6 +1228,12 @@ function workspaceUiCopy(locale: Locale | undefined, key: string) {
   const zh: Record<string, string> = {
     completionMeta: "完成态",
     candidatesFound: "候选人",
+    highConfidence: "高可信候选人",
+    needsVerification: "需核验证据",
+    sourceCoverage: "来源覆盖",
+    majorGaps: "主要证据缺口",
+    noMajorGaps: "暂无主要缺口",
+    claimCounts: "Claims",
     sourceTools: "来源任务",
     coverage: "证据覆盖",
     stats: "搜索统计",
@@ -1255,11 +1261,17 @@ function workspaceUiCopy(locale: Locale | undefined, key: string) {
     researchLog: "Research Log",
     researchLogDesc: "默认折叠，保留可追溯的搜索计划和来源执行。",
     showProcess: "查看完整搜索过程",
-    noticeTitle: "商业化入口",
+    noticeTitle: "证据交付",
   };
   const en: Record<string, string> = {
     completionMeta: "Completion",
     candidatesFound: "Candidates",
+    highConfidence: "High confidence",
+    needsVerification: "Needs verification",
+    sourceCoverage: "Source coverage",
+    majorGaps: "Major gaps",
+    noMajorGaps: "No major gaps",
+    claimCounts: "Claims",
     sourceTools: "Source tasks",
     coverage: "Coverage",
     stats: "Stats",
@@ -1287,7 +1299,7 @@ function workspaceUiCopy(locale: Locale | undefined, key: string) {
     researchLog: "Research Log",
     researchLogDesc: "Collapsed by default with traceable search plan and source execution.",
     showProcess: "View full search process",
-    noticeTitle: "Commercial entry",
+    noticeTitle: "Evidence handoff",
   };
   return (locale === "en" ? en : zh)[key] ?? zh[key] ?? key;
 }
@@ -1353,8 +1365,11 @@ function WorkspaceCandidateRow({
             <span className="rounded-full bg-[var(--sh-canvas)] px-2 py-0.5 text-xs font-semibold text-[var(--sh-muted)] ring-1 ring-black/10">
               {status}
             </span>
+            <span className="rounded-full bg-white px-2 py-0.5 text-xs font-semibold text-[var(--sh-muted)] ring-1 ring-black/10">
+              V {row.claim_counts.verified} / U {row.claim_counts.unverified} / C {row.claim_counts.contradicted}
+            </span>
             <span className="rounded-full bg-neutral-950 px-2 py-0.5 text-xs font-semibold text-white">
-              {row.commercial_action.label}
+              {row.handoff_action.label}
             </span>
           </div>
           {submission && (
@@ -1400,13 +1415,13 @@ export function SearchResultWorkspaceView({
   shortlist,
   decisions,
   loading,
-  commercialNotice,
+  handoffNotice,
   onOpenCandidate,
   onAddToPool,
   onNeedEvidence,
   onPass,
   onOutreach,
-  onGetEmail,
+  onShareEvidenceBrief,
   onShowProcess,
   locale,
 }: {
@@ -1416,13 +1431,13 @@ export function SearchResultWorkspaceView({
   shortlist: number[];
   decisions: Record<number, string>;
   loading: boolean;
-  commercialNotice?: string;
+  handoffNotice?: string;
   onOpenCandidate: (index: number) => void;
   onAddToPool: (index: number, candidate: TalentCandidate) => void;
   onNeedEvidence: (index: number, candidate: TalentCandidate, job?: CoverageBackfillJob) => void;
   onPass: (index: number) => void;
   onOutreach: () => void;
-  onGetEmail: (index: number, candidate: TalentCandidate) => void;
+  onShareEvidenceBrief: (index: number, candidate: TalentCandidate) => void;
   onShowProcess: () => void;
 } & ResultLocaleProps) {
   const workspace = buildSearchResultWorkspace(result, { locale, stats: stats ?? undefined }) as SearchResultWorkspace;
@@ -1432,6 +1447,10 @@ export function SearchResultWorkspaceView({
   const selectedRow = workspace.candidates.find((row) => row.index === safeSelectedIndex) ?? workspace.candidates[0];
   if (!selectedCandidate || !selectedRow) return null;
   const saved = shortlist.includes(safeSelectedIndex);
+  const highConfidenceCount = workspace.groups.find((group) => group.key === "high_confidence")?.count ?? 0;
+  const needsVerificationCount = workspace.groups.find((group) => group.key === "needs_verification")?.count ?? 0;
+  const missingCoverage = workspace.research_log.coverage.filter((group) => group.status === "missing");
+  const majorGapLabel = missingCoverage.slice(0, 2).map((group) => group.label).join(" / ") || workspaceUiCopy(locale, "noMajorGaps");
 
   return (
     <section className="space-y-4">
@@ -1450,10 +1469,10 @@ export function SearchResultWorkspaceView({
           </button>
         </div>
         <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          <WorkspaceMetric label={workspaceUiCopy(locale, "candidatesFound")} value={workspace.completion.candidate_count} />
-          <WorkspaceMetric label={workspaceUiCopy(locale, "submitted")} value={workspace.completion.submitted_count} />
-          <WorkspaceMetric label={workspaceUiCopy(locale, "trace")} value={workspace.completion.execution_trace_count || workspace.completion.tool_count || workspace.completion.source_count} />
-          <WorkspaceMetric label={workspaceUiCopy(locale, "coverage")} value={`${workspace.completion.covered_group_count}/${workspace.completion.coverage_group_count}`} />
+          <WorkspaceMetric label={workspaceUiCopy(locale, "highConfidence")} value={highConfidenceCount} />
+          <WorkspaceMetric label={workspaceUiCopy(locale, "needsVerification")} value={needsVerificationCount} />
+          <WorkspaceMetric label={workspaceUiCopy(locale, "sourceCoverage")} value={`${workspace.completion.covered_group_count}/${workspace.completion.coverage_group_count}`} />
+          <WorkspaceMetric label={workspaceUiCopy(locale, "majorGaps")} value={missingCoverage.length} detail={majorGapLabel} />
         </div>
         <div className="mt-3 grid gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(240px,0.45fr)]">
           {workspace.delivery_clusters.length > 0 && (
@@ -1564,13 +1583,13 @@ export function SearchResultWorkspaceView({
             <div className="mt-4 grid gap-2 sm:grid-cols-2">
               <button
                 type="button"
-                onClick={() => onGetEmail(safeSelectedIndex, selectedCandidate)}
-                disabled={!selectedRow.commercial_action.enabled}
-                title={selectedRow.commercial_action.reason}
+                onClick={() => onShareEvidenceBrief(safeSelectedIndex, selectedCandidate)}
+                disabled={!selectedRow.handoff_action.enabled}
+                title={selectedRow.handoff_action.reason}
                 className="inline-flex min-h-10 items-center justify-center gap-2 rounded-full bg-[var(--sh-ink)] px-4 py-2 text-sm font-semibold text-white transition hover:bg-black disabled:cursor-not-allowed disabled:opacity-50"
               >
-                <FiMail aria-hidden="true" />
-                {selectedRow.commercial_action.label}
+                <FiShare2 aria-hidden="true" />
+                {selectedRow.handoff_action.label}
               </button>
               <button
                 type="button"
@@ -1606,10 +1625,10 @@ export function SearchResultWorkspaceView({
                 {workspaceUiCopy(locale, "pass")}
               </button>
             </div>
-            {commercialNotice && (
+            {handoffNotice && (
               <div className="mt-3 rounded-2xl border border-blue-100 bg-blue-50/70 p-3 text-sm leading-6 text-blue-900">
                 <p className="font-semibold">{workspaceUiCopy(locale, "noticeTitle")}</p>
-                <p className="mt-1">{commercialNotice}</p>
+                <p className="mt-1">{handoffNotice}</p>
               </div>
             )}
           </div>

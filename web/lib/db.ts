@@ -31,6 +31,12 @@ import {
   parsePublicTalentSource,
 } from "./talent-profile.mjs";
 import { mergeSearchFeedbackIntoResult } from "./research-loop.mjs";
+import {
+  buildHistoryRunView,
+  historyRangeStart,
+  matchesHistoryEvidenceFilter,
+  normalizeHistoryFilters,
+} from "./history.mjs";
 
 const BASE = process.env.INSFORGE_API_BASE_URL;
 const KEY = process.env.INSFORGE_API_KEY; // 服务端 access key, 绝不进 NEXT_PUBLIC
@@ -155,11 +161,34 @@ export interface SaveRunInput {
 }
 
 export interface RecentRun {
+  id: string;
   kind: RunKind;
+  status: string;
+  status_label?: string;
   label: string;
   summary: string;
   query_text: string;
+  project_id?: string | null;
+  project_name?: string | null;
+  search_task_id?: string | null;
+  created_at?: string;
   updated_at: string;
+  finished_at?: string | null;
+  next_action?: {
+    label: string;
+    href: string;
+    kind: string;
+  };
+  evidence_summary?: {
+    candidate_count: number;
+    high_confidence_count: number;
+    needs_verification_count: number;
+    low_evidence_count: number;
+    primary_gaps: string[];
+    has_gaps: boolean;
+    shortlist_ready: boolean;
+  };
+  needs_action?: boolean;
 }
 
 export interface RunStatus {
@@ -887,23 +916,79 @@ export async function cancelRun(id: string, userId: string): Promise<RunStatus |
   }
 }
 
-// 历史面板: 最近的运行 (按更新时间倒序)。只显示已完成的 (status=done)。
+export interface HistoryRunFilters {
+  q?: string;
+  kind?: string;
+  status?: string;
+  projectId?: string;
+  range?: string;
+  evidence?: string;
+  needsAction?: boolean;
+  limit?: number;
+  cursor?: string;
+}
+
+export interface HistoryRunsResult {
+  runs: RecentRun[];
+  nextCursor: string | null;
+}
+
+// 历史面板: 可筛选的运行记录。历史页是工作入口, 不只显示已完成记录。
 // 多租户: 必须传 userId, 只返该用户的。
-export async function recentRuns(userId: string, limit = 20): Promise<RecentRun[]> {
-  if (!client) return [];
-  try {
-    const { data, error } = await client.database
-      .from(TABLE)
-      .select("kind,label,summary,query_text,updated_at")
-      .eq("status", "done")
-      .eq("user_id", userId)
-      .order("updated_at", { ascending: false })
-      .limit(limit);
-    if (error || !data) return [];
-    return data as RecentRun[];
-  } catch {
-    return [];
+export async function historyRuns(userId: string, filters: HistoryRunFilters | URLSearchParams = {}, locale = "zh"): Promise<HistoryRunsResult> {
+  const normalized = normalizeHistoryFilters(filters);
+  const where = ["r.user_id = $1"];
+  const params: unknown[] = [userId];
+  const addParam = (value: unknown) => {
+    params.push(value);
+    return `$${params.length}`;
+  };
+  if (normalized.kind !== "all") where.push(`r.kind = ${addParam(normalized.kind)}`);
+  if (normalized.status !== "all") where.push(`r.status = ${addParam(normalized.status)}`);
+  if (normalized.projectId) where.push(`r.project_id = ${addParam(normalized.projectId)}`);
+  const rangeStart = historyRangeStart(normalized.range);
+  if (rangeStart) where.push(`r.updated_at >= ${addParam(rangeStart)}`);
+  if (normalized.cursor) where.push(`r.updated_at < ${addParam(normalized.cursor)}`);
+  if (normalized.q) {
+    const query = `%${normalized.q}%`;
+    where.push(`(
+      r.label ILIKE ${addParam(query)}
+      OR r.summary ILIKE ${addParam(query)}
+      OR r.query_text ILIKE ${addParam(query)}
+      OR p.name ILIKE ${addParam(query)}
+    )`);
   }
+
+  const needsDerivedFilter = normalized.evidence !== "all" || normalized.needsAction;
+  const rawLimit = needsDerivedFilter ? Math.min(120, normalized.limit * 4) : normalized.limit + 1;
+  const rows = await runSQL<Record<string, unknown>>(
+    `SELECT
+        r.id, r.kind, r.status, r.label, r.summary, r.query_text, r.project_id, r.search_task_id,
+        r.created_at, r.updated_at, r.finished_at, r.result,
+        p.name AS project_name
+      FROM research_runs r
+      LEFT JOIN projects p ON p.id = r.project_id AND p.user_id = r.user_id
+      WHERE ${where.join(" AND ")}
+      ORDER BY r.updated_at DESC
+      LIMIT ${addParam(rawLimit)}`,
+    params,
+  );
+  if (!rows) return { runs: [], nextCursor: null };
+  const views = rows
+    .map((row) => buildHistoryRunView(row, { locale }) as RecentRun)
+    .filter((run) => matchesHistoryEvidenceFilter(run, normalized.evidence))
+    .filter((run) => !normalized.needsAction || run.needs_action)
+    .slice(0, normalized.limit);
+  const nextCursor = rows.length > views.length && views.length > 0
+    ? views[views.length - 1].updated_at
+    : null;
+  return { runs: views, nextCursor };
+}
+
+// Backward-compatible helper for existing callers.
+export async function recentRuns(userId: string, limit = 20): Promise<RecentRun[]> {
+  const result = await historyRuns(userId, { status: "done", limit });
+  return result.runs;
 }
 
 async function healthRows(status: string): Promise<WorkerHealthJob[]> {

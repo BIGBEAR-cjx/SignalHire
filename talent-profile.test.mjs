@@ -561,7 +561,7 @@ test("builds editable search plan by decomposing a pasted JD instead of copying 
   assert.equal(sourceQueries.some((query) => query.length > 180), false);
 });
 
-test("builds a search result workspace with completion metrics, candidate groups, and commercial email entry", () => {
+test("builds a search result workspace with completion metrics, candidate groups, and evidence handoff", () => {
   assert.equal(typeof buildSearchResultWorkspace, "function");
 
   const result = normalizeTalentSearchResult({
@@ -649,18 +649,24 @@ test("builds a search result workspace with completion metrics, candidate groups
   assert.equal(workspace.completion.duration_seconds, 218);
   assert.equal(workspace.selected_candidate_index, 0);
   assert.equal(workspace.candidates[0].name, "Ada Chen");
-  assert.equal(workspace.candidates[0].commercial_action.label, "Get email -10");
-  assert.equal(workspace.candidates[0].commercial_action.cost, 10);
+  assert.equal(workspace.candidates[0].handoff_action.label, "分享证据摘要");
+  assert.equal(workspace.candidates[0].handoff_action.enabled, true);
+  assert.equal(workspace.candidates[0].next_interview_questions.length > 0, true);
+  assert.ok(workspace.candidates[0].strongest_evidence.some((item) => /LangChain/.test(item)));
   assert.equal(workspace.candidates[0].bucket, "high_confidence");
   assert.equal(workspace.candidates[1].bucket, "needs_verification");
+  assert.ok(workspace.candidates[1].risk_flags.some((item) => /Only one public profile/.test(item)));
   assert.ok(workspace.candidates[1].primary_risk.includes("Only one public profile"));
   assert.deepEqual(workspace.groups.map((group) => group.key), ["high_confidence", "needs_verification"]);
   assert.equal(workspace.research_log.default_open, false);
   assert.equal(workspace.research_log.jobs.length, 2);
   assert.ok(workspace.summary.includes("2 位候选人"));
+  assert.equal(workspace.delivery_report.title, "Evidence-qualified shortlist");
+  assert.equal(workspace.delivery_report.ready_for_hiring_manager, true);
 });
 
 test("builds search intake draft and clarification questions from a pasted JD", () => {
+  assert.equal(typeof talentProfile.buildRoleBriefDraft, "function");
   assert.equal(typeof talentProfile.buildSearchIntakeDraft, "function");
   assert.equal(typeof talentProfile.buildSearchIntakeQuestions, "function");
   assert.equal(typeof talentProfile.answerSearchIntakeQuestion, "function");
@@ -720,6 +726,30 @@ test("builds search intake draft and clarification questions from a pasted JD", 
   assert.match(input, /薪资：20-30K/);
   assert.match(input, /目标候选数量：越多越好/);
   assert.doesNotMatch(input, /岗位职责/);
+});
+
+test("builds role brief drafts from low-friction intake sources without running search", () => {
+  const jobUrlDraft = talentProfile.buildRoleBriefDraft("https://jobs.example.com/roles/ai-growth-lead", {
+    locale: "zh",
+    sourceType: "job_url",
+  });
+  assert.equal(jobUrlDraft.intake_source.type, "job_url");
+  assert.equal(jobUrlDraft.intake_source.label, "Job URL");
+  assert.match(jobUrlDraft.original_query, /Job URL/);
+  assert.match(jobUrlDraft.original_query, /https:\/\/jobs\.example\.com\/roles\/ai-growth-lead/);
+  assert.equal(jobUrlDraft.confirmation.required_before_search, true);
+  assert.ok(jobUrlDraft.confirmation.summary.includes("先确认岗位理解"));
+  assert.ok(jobUrlDraft.search_plan_preview.some((item) => /渠道|Channel/i.test(item.label)));
+
+  const similarDraft = talentProfile.buildRoleBriefDraft("https://www.linkedin.com/in/example-person", {
+    locale: "en",
+    sourceType: "similar_profile",
+  });
+  assert.equal(similarDraft.intake_source.type, "similar_profile");
+  assert.equal(similarDraft.intake_source.label, "Similar profile");
+  assert.match(similarDraft.original_query, /Similar profile/);
+  assert.equal(similarDraft.confirmation.primary_action, "Confirm role brief and start deep research");
+  assert.ok(similarDraft.confirmation.summary.includes("Confirm this role brief before deep research"));
 });
 
 test("keeps skipped search intake questions out of the clarification queue", () => {

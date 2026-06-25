@@ -4,7 +4,7 @@
 //   DELETE ?run=X&idx=Y → 按来源 + index 取消收藏 (搜索结果页 toggle 用)
 //
 // 所有操作需登录, 自动按 user.id 隔离。
-import { addItem, listItems, listIndicesForRun, deleteByDedupKey, dedupKeyFor } from "@/lib/shortlist";
+import { addItem, listItems, listIndicesForRun, deleteByDedupKey, dedupKeyFor, ingestProjectRunCandidates } from "@/lib/shortlist";
 import { normalizeLocale, t } from "@/lib/i18n.mjs";
 import { getUser } from "@/lib/session";
 
@@ -52,6 +52,7 @@ export async function POST(req: Request) {
     candidateIndex: idx,
     candidate: body.candidate,
     projectId: body.project_id === undefined ? undefined : (body.project_id ?? null),
+    status: "shortlisted",
   });
   if (!id) return Response.json({ error: t(locale, "api.error.shortlistSaveFailed") }, { status: 500 });
   return Response.json({ id });

@@ -7,6 +7,9 @@
 // 单项目读 / 写 / 删走 SDK CRUD 一致。
 
 import { createClient } from "@insforge/sdk";
+import { buildCandidateGraph } from "./candidate-graph.mjs";
+import { buildPeopleProviderConfig, providerRowsToSourceLeads } from "./people-providers.mjs";
+import { listItems } from "./shortlist";
 
 const BASE = process.env.INSFORGE_API_BASE_URL;
 const KEY = process.env.INSFORGE_API_KEY;
@@ -72,7 +75,7 @@ export async function listProjects(userId: string): Promise<ProjectWithKpi[]> {
      LEFT JOIN (
        SELECT project_id,
          COUNT(*) AS candidates_total,
-         COUNT(*) FILTER (WHERE status NOT IN ('hired','rejected')) AS candidates_active
+         COUNT(*) FILTER (WHERE status NOT IN ('passed','hired','rejected')) AS candidates_active
        FROM shortlist_items WHERE user_id = $1 AND project_id IS NOT NULL
        GROUP BY project_id
      ) s ON s.project_id = p.id
@@ -124,7 +127,7 @@ export async function getProject(userId: string, id: string): Promise<ProjectWit
      LEFT JOIN (
        SELECT project_id,
          COUNT(*) AS candidates_total,
-         COUNT(*) FILTER (WHERE status NOT IN ('hired','rejected')) AS candidates_active
+         COUNT(*) FILTER (WHERE status NOT IN ('passed','hired','rejected')) AS candidates_active
        FROM shortlist_items WHERE user_id = $1 AND project_id = $2
        GROUP BY project_id
      ) s ON s.project_id = p.id
@@ -224,22 +227,22 @@ export async function deleteProject(userId: string, id: string): Promise<boolean
 // 单项目候选人按状态分布 (详情页 KPI 用)。
 export interface ProjectCandidateBreakdown {
   new: number;
-  contacted: number;
-  interviewing: number;
-  hired: number;
-  rejected: number;
+  shortlisted: number;
+  needs_evidence: number;
+  outreach_drafted: number;
+  passed: number;
 }
 export async function projectCandidateBreakdown(userId: string, projectId: string): Promise<ProjectCandidateBreakdown> {
-  const zero: ProjectCandidateBreakdown = { new: 0, contacted: 0, interviewing: 0, hired: 0, rejected: 0 };
+  const zero: ProjectCandidateBreakdown = { new: 0, shortlisted: 0, needs_evidence: 0, outreach_drafted: 0, passed: 0 };
   const rows = await runSQL<{
-    new: string; contacted: string; interviewing: string; hired: string; rejected: string;
+    new: string; shortlisted: string; needs_evidence: string; outreach_drafted: string; passed: string;
   }>(
     `SELECT
        COUNT(*) FILTER (WHERE status='new')          AS new,
-       COUNT(*) FILTER (WHERE status='contacted')    AS contacted,
-       COUNT(*) FILTER (WHERE status='interviewing') AS interviewing,
-       COUNT(*) FILTER (WHERE status='hired')        AS hired,
-       COUNT(*) FILTER (WHERE status='rejected')     AS rejected
+       COUNT(*) FILTER (WHERE status IN ('shortlisted','interviewing','hired')) AS shortlisted,
+       COUNT(*) FILTER (WHERE status='needs_evidence') AS needs_evidence,
+       COUNT(*) FILTER (WHERE status IN ('outreach_drafted','contacted')) AS outreach_drafted,
+       COUNT(*) FILTER (WHERE status IN ('passed','rejected')) AS passed
      FROM shortlist_items WHERE user_id = $1 AND project_id = $2`,
     [userId, projectId],
   );
@@ -247,10 +250,10 @@ export async function projectCandidateBreakdown(userId: string, projectId: strin
   if (!r) return zero;
   return {
     new: Number(r.new),
-    contacted: Number(r.contacted),
-    interviewing: Number(r.interviewing),
-    hired: Number(r.hired),
-    rejected: Number(r.rejected),
+    shortlisted: Number(r.shortlisted),
+    needs_evidence: Number(r.needs_evidence),
+    outreach_drafted: Number(r.outreach_drafted),
+    passed: Number(r.passed),
   };
 }
 
@@ -280,4 +283,74 @@ export async function projectRuns(userId: string, projectId: string, limit = 50)
   } catch {
     return [];
   }
+}
+
+export interface ProjectCandidateGraphView {
+  provider_status: Array<{ provider: "apollo" | "pdl"; enabled: boolean; reason: string }>;
+  summary: {
+    candidate_count: number;
+    ready_for_outreach_count: number;
+    needs_verification_count: number;
+    interview_ready_count: number;
+    source_count: number;
+    contactable_count: number;
+    contact_coverage_percent: number;
+  };
+  source_mix: Array<{ source_type: string; count: number }>;
+  candidates: Array<{
+    candidate_id: string;
+    canonical_name: string;
+    current_title: string;
+    current_company: string;
+    readiness: "sourced" | "needs_verification" | "ready_for_outreach";
+    source_count: number;
+    source_types: string[];
+    evidence_quality: string;
+    contactability_score: number;
+    merge_keys: string[];
+  }>;
+}
+
+function providerCandidateRowsFromCandidates(candidates: unknown[]) {
+  return candidates.filter((candidate): candidate is Record<string, unknown> => (
+    Boolean(candidate && typeof candidate === "object" && !Array.isArray(candidate) && "provider" in candidate)
+  ));
+}
+
+export async function buildProjectCandidateGraphView(userId: string, projectId: string): Promise<ProjectCandidateGraphView> {
+  const items = await listItems(userId, projectId);
+  const candidates = items.map((item) => item.candidate);
+  const providerRows = providerCandidateRowsFromCandidates(candidates);
+  const graph = buildCandidateGraph({
+    candidates,
+    sourceLeads: providerRowsToSourceLeads(providerRows as never),
+  });
+  const providerStatus = buildPeopleProviderConfig().providers as ProjectCandidateGraphView["provider_status"];
+  const candidateGraph: ProjectCandidateGraphView = {
+    provider_status: providerStatus,
+    summary: graph.summary,
+    source_mix: graph.source_mix,
+    candidates: graph.candidates.map((candidate) => {
+      const contactProfile = candidate.contact_profile as { contactability_score?: number } | null;
+      const readiness = String(candidate.readiness);
+      const sourceTypes: string[] = Array.from(new Set<string>(
+        Array.isArray(candidate.source_nodes)
+          ? candidate.source_nodes.map((node: { source_type?: unknown }) => String(node.source_type ?? "")).filter(Boolean)
+          : [],
+      ));
+      return {
+        candidate_id: String(candidate.candidate_id ?? ""),
+        canonical_name: String(candidate.canonical_name ?? ""),
+        current_title: String(candidate.current_title ?? ""),
+        current_company: String(candidate.current_company ?? ""),
+        readiness: (["sourced", "needs_verification", "ready_for_outreach"].includes(readiness) ? readiness : "sourced") as ProjectCandidateGraphView["candidates"][number]["readiness"],
+        source_count: Array.isArray(candidate.source_nodes) ? candidate.source_nodes.length : 0,
+        source_types: sourceTypes,
+        evidence_quality: String(candidate.evidence_summary.quality ?? "low"),
+        contactability_score: Number(contactProfile?.contactability_score ?? 0),
+        merge_keys: Array.isArray(candidate.merge_keys) ? candidate.merge_keys.map((key: unknown) => String(key)) : [],
+      };
+    }),
+  };
+  return candidateGraph;
 }

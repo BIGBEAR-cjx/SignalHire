@@ -5,7 +5,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { FiAlertTriangle, FiArrowLeft, FiCheckCircle, FiClock, FiMail, FiPauseCircle, FiPlay, FiRefreshCw, FiSearch, FiTrash2 } from "react-icons/fi";
+import { FiAlertTriangle, FiArrowLeft, FiCheckCircle, FiClock, FiMail, FiPauseCircle, FiPlay, FiRefreshCw, FiSearch, FiSend, FiTrash2 } from "react-icons/fi";
 import { CandidateComparisonView, CandidateProfileView, EvidencePriorityPanel } from "@/components/result";
 import { useI18n } from "@/components/LanguageProvider";
 import OutreachModal from "@/components/OutreachModal";
@@ -24,7 +24,8 @@ import { buildCandidateDecisionSignal, buildEvidencePriorityView, buildProjectEv
 import type { TalentCandidate } from "@/lib/talent-profile.mjs";
 
 type ProjectStatus = "open" | "paused" | "closed";
-type ShortlistStatus = "new" | "contacted" | "interviewing" | "hired" | "rejected";
+type ShortlistStatus = "new" | "shortlisted" | "needs_evidence" | "outreach_drafted" | "passed" | "contacted" | "interviewing" | "hired" | "rejected";
+type CandidateDisplayStatus = "new" | "shortlisted" | "needs_evidence" | "outreach_drafted" | "passed";
 type ProjectNextStepsView = {
   locale: string;
   title: string;
@@ -203,13 +204,47 @@ const PROJ_STATUS_META: Record<ProjectStatus, { labelKey: string; chip: string; 
   closed: { labelKey: "projects.detail.status.closed", chip: "bg-gray-100 text-gray-600 ring-gray-200",       dot: "bg-gray-400" },
 };
 
-const SHORT_STATUS: { value: ShortlistStatus; labelKey: string; chip: string; dot: string }[] = [
+const SHORT_STATUS: { value: CandidateDisplayStatus; labelKey: string; chip: string; dot: string }[] = [
   { value: "new",          labelKey: "projects.detail.candidateStatus.new",          chip: "bg-gray-100 text-gray-700 ring-gray-200",        dot: "bg-gray-400" },
-  { value: "contacted",    labelKey: "projects.detail.candidateStatus.contacted",    chip: "bg-blue-50 text-blue-700 ring-blue-200",         dot: "bg-blue-500" },
-  { value: "interviewing", labelKey: "projects.detail.candidateStatus.interviewing", chip: "bg-amber-50 text-amber-800 ring-amber-200",      dot: "bg-amber-500" },
-  { value: "hired",        labelKey: "projects.detail.candidateStatus.hired",        chip: "bg-emerald-50 text-emerald-700 ring-emerald-200", dot: "bg-emerald-500" },
-  { value: "rejected",     labelKey: "projects.detail.candidateStatus.rejected",     chip: "bg-rose-50 text-rose-700 ring-rose-200",         dot: "bg-rose-400" },
+  { value: "shortlisted",  labelKey: "projects.detail.candidateStatus.shortlisted",  chip: "bg-emerald-50 text-emerald-700 ring-emerald-200", dot: "bg-emerald-500" },
+  { value: "needs_evidence", labelKey: "projects.detail.candidateStatus.needsEvidence", chip: "bg-amber-50 text-amber-800 ring-amber-200", dot: "bg-amber-500" },
+  { value: "outreach_drafted", labelKey: "projects.detail.candidateStatus.outreachDrafted", chip: "bg-blue-50 text-blue-700 ring-blue-200", dot: "bg-blue-500" },
+  { value: "passed",       labelKey: "projects.detail.candidateStatus.passed",       chip: "bg-rose-50 text-rose-700 ring-rose-200",         dot: "bg-rose-400" },
 ];
+
+function candidateDisplayStatus(status: ShortlistStatus): CandidateDisplayStatus {
+  if (status === "contacted") return "outreach_drafted";
+  if (status === "interviewing" || status === "hired") return "shortlisted";
+  if (status === "rejected") return "passed";
+  if (status === "shortlisted" || status === "needs_evidence" || status === "outreach_drafted" || status === "passed") return status;
+  return "new";
+}
+
+type CandidateGraphView = {
+  provider_status: Array<{ provider: "apollo" | "pdl"; enabled: boolean; reason: string }>;
+  summary: {
+    candidate_count: number;
+    ready_for_outreach_count: number;
+    needs_verification_count: number;
+    interview_ready_count: number;
+    source_count: number;
+    contactable_count: number;
+    contact_coverage_percent: number;
+  };
+  source_mix: Array<{ source_type: string; count: number }>;
+  candidates: Array<{
+    candidate_id: string;
+    canonical_name: string;
+    current_title: string;
+    current_company: string;
+    readiness: "sourced" | "needs_verification" | "ready_for_outreach";
+    source_count: number;
+    source_types: string[];
+    evidence_quality: string;
+    contactability_score: number;
+    merge_keys: string[];
+  }>;
+};
 
 interface ProjectDetail {
   project: {
@@ -222,7 +257,7 @@ interface ProjectDetail {
     runs_total: number;
     runs_active: number;
   };
-  breakdown: Record<ShortlistStatus, number>;
+  breakdown: Record<CandidateDisplayStatus, number>;
   runs: Array<{
     id: string;
     kind: "search" | "verify";
@@ -235,6 +270,8 @@ interface ProjectDetail {
   }>;
   searchTasks?: SearchTaskView[];
   outreachQueue?: OutreachQueueView;
+  inboxQueue?: InboxQueueView;
+  candidateGraph?: CandidateGraphView;
 }
 
 type SearchTaskView = {
@@ -267,10 +304,72 @@ type OutreachQueueView = {
     candidate_name: string;
     status: string;
     subject: string;
+    body?: string;
+    contact_profile?: ContactProfileView;
+    sequence_messages?: OutreachSequenceMessage[];
+    approved_at?: string | null;
+    sent_at?: string | null;
+    gmail_message_id?: string;
+    gmail_thread_id?: string;
+    send_error?: string;
     next_follow_up_at: string | null;
     updated_at: string;
     queue_state: "due" | "draft" | "scheduled" | "active";
   }>;
+};
+
+type InboxQueueView = {
+  summary: { total: number; interested: number; needs_human_reply: number };
+  items: Array<{
+    id: string;
+    candidate_name: string;
+    classification: string;
+    classification_reason: string;
+    last_message_excerpt: string;
+    suggested_reply: string;
+    updated_at: string;
+    gmail_thread_id?: string;
+    outreach_thread_id?: string;
+  }>;
+  interested_candidates: Array<{
+    id: string;
+    candidate_name: string;
+    classification: string;
+    classification_reason: string;
+    last_message_excerpt: string;
+    suggested_reply: string;
+    updated_at: string;
+    readiness: "needs_scheduling";
+    recommended_next_step: string;
+  }>;
+};
+
+type ContactProfileView = {
+  emails?: Array<{
+    value: string;
+    source: string;
+    confidence: "high" | "medium" | "low" | string;
+    deliverability_status?: string;
+  }>;
+  phones?: Array<{ value: string; source: string; confidence: string }>;
+  linkedin_url?: string;
+  contactability_score?: number;
+};
+
+type OutreachSequenceMessage = {
+  step: number;
+  subject: string;
+  body: string;
+  evidence_hooks?: string[];
+};
+
+type GmailStatusView = {
+  configured: boolean;
+  connected: boolean;
+  gmail_address: string;
+  scope: string;
+  can_read_inbox?: boolean;
+  expires_at: string | null;
 };
 
 interface ShortlistItem {
@@ -352,6 +451,222 @@ function monitorCopy(locale: "zh" | "en") {
     newCandidates: "新增",
     updatedCandidates: "更新",
   };
+}
+
+function autonomousCopy(locale: "zh" | "en") {
+  return locale === "en" ? {
+    title: "Autonomous sourcing",
+    desc: "Multi-source candidate graph for this role. External people APIs stay optional until keys are configured.",
+    sourced: "Sourced",
+    ready: "Ready for outreach",
+    needsVerification: "Needs verification",
+    contactCoverage: "Contact coverage",
+    enabled: "Enabled",
+    disabled: "Disabled",
+    sourceMix: "Source mix",
+    candidateReadiness: "Candidate readiness",
+    empty: "No candidates in this role yet.",
+    sources: "sources",
+    pullApollo: "Pull Apollo candidates",
+    pullOpenJobs: "Pull OpenJobs candidates",
+    apolloEmpty: "Apollo is connected, but this plan/workspace returned no candidates. Upgrade Apollo People API access or add contacts to Apollo.",
+    apolloSaved: "Apollo saved {count} candidates for evidence review.",
+    openJobsEmpty: "OpenJobs Mira returned no candidates for this brief.",
+    openJobsSaved: "OpenJobs saved {count} candidates for evidence review.",
+    openJobsAuthError: "OpenJobs Mira key is invalid or inactive. Update MIRA_KEY before pulling candidates.",
+  } : {
+    title: "Autonomous sourcing",
+    desc: "这个岗位的多来源候选人图谱。外部 people API 未配置时，仍会使用候选池和公开证据降级展示。",
+    sourced: "已发现",
+    ready: "可进入外联",
+    needsVerification: "需补证据",
+    contactCoverage: "联系方式覆盖",
+    enabled: "已启用",
+    disabled: "未启用",
+    sourceMix: "来源构成",
+    candidateReadiness: "候选人推进状态",
+    empty: "这个岗位还没有候选人。",
+    sources: "个来源",
+    pullApollo: "拉取 Apollo 候选人",
+    pullOpenJobs: "拉取 OpenJobs 候选人",
+    apolloEmpty: "Apollo 已连接，但当前套餐/工作区没有返回候选人。升级 People API 权限，或先把 contacts 加到 Apollo。",
+    apolloSaved: "Apollo 已保存 {count} 位候选人，等待证据核验。",
+    openJobsEmpty: "OpenJobs Mira 没有为当前岗位返回候选人。",
+    openJobsSaved: "OpenJobs 已保存 {count} 位候选人，等待证据核验。",
+    openJobsAuthError: "OpenJobs Mira key 无效或未激活。请更新 MIRA_KEY 后再拉取候选人。",
+  };
+}
+
+function readinessLabel(readiness: CandidateGraphView["candidates"][number]["readiness"], locale: "zh" | "en") {
+  if (locale === "en") return readiness.replace(/_/g, " ");
+  if (readiness === "ready_for_outreach") return "可外联";
+  if (readiness === "needs_verification") return "需补证据";
+  return "已发现";
+}
+
+function AutonomousSourcingPanel({
+  graph,
+  projectId,
+  projectBrief,
+  locale,
+  onChanged,
+}: {
+  graph?: CandidateGraphView;
+  projectId: string;
+  projectBrief: string;
+  locale: "zh" | "en";
+  onChanged: () => void;
+}) {
+  const c = autonomousCopy(locale);
+  const [apolloBusy, setApolloBusy] = useState(false);
+  const [openJobsBusy, setOpenJobsBusy] = useState(false);
+  const [apolloMessage, setApolloMessage] = useState("");
+  if (!graph) return null;
+  const apolloEnabled = graph.provider_status.some((provider) => provider.provider === "apollo" && provider.enabled);
+
+  async function pullApolloCandidates() {
+    setApolloBusy(true);
+    setApolloMessage("");
+    try {
+      const r = await fetch("/api/providers/apollo/search", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ project_id: projectId, brief: projectBrief, limit: 10, locale }),
+      });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(j.error || (locale === "en" ? "Apollo pull failed." : "Apollo 拉取失败。"));
+      setApolloMessage(Number(j.saved) > 0 ? c.apolloSaved.replace("{count}", String(j.saved)) : c.apolloEmpty);
+      if (Number(j.saved) > 0) onChanged();
+    } catch (e) {
+      setApolloMessage((e as Error).message);
+    } finally {
+      setApolloBusy(false);
+    }
+  }
+
+  async function pullOpenJobsCandidates() {
+    setOpenJobsBusy(true);
+    setApolloMessage("");
+    try {
+      const r = await fetch("/api/providers/openjobs/search", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ project_id: projectId, brief: projectBrief, limit: 20, locale }),
+      });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok || j.ok === false) {
+        const raw = String(j.error ?? "");
+        throw new Error(/invalid api key/i.test(raw) ? c.openJobsAuthError : (j.error || (locale === "en" ? "OpenJobs pull failed." : "OpenJobs 拉取失败。")));
+      }
+      setApolloMessage(Number(j.saved) > 0 ? c.openJobsSaved.replace("{count}", String(j.saved)) : c.openJobsEmpty);
+      if (Number(j.saved) > 0) onChanged();
+    } catch (e) {
+      setApolloMessage((e as Error).message);
+    } finally {
+      setOpenJobsBusy(false);
+    }
+  }
+
+  return (
+    <Surface className="space-y-4 p-5">
+      <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+        <div>
+          <div className="flex items-center gap-2">
+            <FiSearch className="h-4 w-4 text-[var(--sh-blue)]" aria-hidden="true" />
+            <h2 className="text-base font-semibold text-[var(--sh-ink)]">{c.title}</h2>
+          </div>
+          <p className="mt-1 max-w-3xl text-sm leading-6 text-[var(--sh-muted)]">{c.desc}</p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <SecondaryAction onClick={pullApolloCandidates} disabled={!apolloEnabled || apolloBusy} className="min-h-9 px-3 py-2 text-xs">
+            {c.pullApollo}
+          </SecondaryAction>
+          <SecondaryAction onClick={pullOpenJobsCandidates} disabled={openJobsBusy} className="min-h-9 px-3 py-2 text-xs">
+            {c.pullOpenJobs}
+          </SecondaryAction>
+          {graph.provider_status.map((provider) => (
+            <StatusBadge
+              key={provider.provider}
+              label={`${provider.provider.toUpperCase()} · ${provider.enabled ? c.enabled : c.disabled}`}
+              dotClassName={provider.enabled ? "bg-emerald-500" : "bg-gray-400"}
+              className={provider.enabled ? "bg-emerald-50 text-emerald-700 ring-emerald-200" : "bg-gray-100 text-gray-600 ring-gray-200"}
+            />
+          ))}
+        </div>
+      </div>
+      {apolloMessage && (
+        <p className="rounded-xl bg-amber-50 px-3 py-2 text-xs text-amber-800 ring-1 ring-amber-100">{apolloMessage}</p>
+      )}
+
+      <div className="grid gap-3 md:grid-cols-4">
+        <div className="rounded-2xl border border-black/10 bg-white/80 p-4">
+          <p className="text-xs text-[var(--sh-muted)]">{c.sourced}</p>
+          <p className="mt-1 text-2xl font-semibold text-[var(--sh-ink)]">{graph.summary.candidate_count}</p>
+        </div>
+        <div className="rounded-2xl border border-black/10 bg-white/80 p-4">
+          <p className="text-xs text-[var(--sh-muted)]">{c.ready}</p>
+          <p className="mt-1 text-2xl font-semibold text-emerald-700">{graph.summary.ready_for_outreach_count}</p>
+        </div>
+        <div className="rounded-2xl border border-black/10 bg-white/80 p-4">
+          <p className="text-xs text-[var(--sh-muted)]">{c.needsVerification}</p>
+          <p className="mt-1 text-2xl font-semibold text-amber-700">{graph.summary.needs_verification_count}</p>
+        </div>
+        <div className="rounded-2xl border border-black/10 bg-white/80 p-4">
+          <p className="text-xs text-[var(--sh-muted)]">{c.contactCoverage}</p>
+          <p className="mt-1 text-2xl font-semibold text-[var(--sh-ink)]">{graph.summary.contact_coverage_percent}%</p>
+        </div>
+      </div>
+
+      <div className="grid gap-3 lg:grid-cols-[280px_minmax(0,1fr)]">
+        <div className="rounded-2xl border border-black/10 bg-white/80 p-4">
+          <p className="text-sm font-semibold text-[var(--sh-ink)]">{c.sourceMix}</p>
+          <div className="mt-3 space-y-2">
+            {graph.source_mix.length === 0 ? (
+              <p className="text-sm text-[var(--sh-muted)]">{c.empty}</p>
+            ) : graph.source_mix.map((source) => (
+              <div key={source.source_type} className="flex items-center justify-between rounded-xl bg-gray-50 px-3 py-2 text-xs ring-1 ring-black/5">
+                <span className="font-medium text-gray-800">{source.source_type.replace(/_/g, " ")}</span>
+                <span className="text-gray-500">{source.count}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+        <div className="rounded-2xl border border-black/10 bg-white/80 p-4">
+          <p className="text-sm font-semibold text-[var(--sh-ink)]">{c.candidateReadiness}</p>
+          <div className="mt-3 grid gap-2">
+            {graph.candidates.length === 0 ? (
+              <p className="text-sm text-[var(--sh-muted)]">{c.empty}</p>
+            ) : graph.candidates.slice(0, 6).map((candidate) => (
+              <div key={candidate.candidate_id} className="grid gap-2 rounded-xl bg-gray-50 px-3 py-2 text-xs ring-1 ring-black/5 md:grid-cols-[minmax(0,1fr)_120px_100px]">
+                <div className="min-w-0">
+                  <p className="truncate font-semibold text-gray-900">{candidate.canonical_name || "Unnamed candidate"}</p>
+                  <p className="truncate text-gray-500">{[candidate.current_title, candidate.current_company].filter(Boolean).join(" · ") || "-"}</p>
+                  {candidate.source_types.length > 0 && (
+                    <div className="mt-1 flex flex-wrap gap-1">
+                      {candidate.source_types.slice(0, 3).map((sourceType) => (
+                        <span key={sourceType} className="rounded-full bg-white px-2 py-0.5 text-[11px] font-medium text-gray-600 ring-1 ring-black/10">
+                          {sourceType.replace(/_/g, " ")}
+                        </span>
+                      ))}
+                      {candidate.source_types.length > 3 && (
+                        <span className="rounded-full bg-white px-2 py-0.5 text-[11px] font-medium text-gray-500 ring-1 ring-black/10">
+                          +{candidate.source_types.length - 3}
+                        </span>
+                      )}
+                    </div>
+                  )}
+                </div>
+                <span className="self-center rounded-full bg-white px-2 py-1 text-center font-medium text-gray-700 ring-1 ring-black/10">
+                  {readinessLabel(candidate.readiness, locale)}
+                </span>
+                <span className="self-center text-right text-gray-500">{candidate.source_count} {c.sources}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </Surface>
+  );
 }
 
 function TalentMonitorPanel({
@@ -526,11 +841,45 @@ function TalentMonitorPanel({
   );
 }
 
-function OutreachQueuePanel({ queue, locale, onChanged }: { queue?: OutreachQueueView; locale: "zh" | "en"; onChanged: () => void }) {
+function primaryEmail(contactProfile?: ContactProfileView) {
+  const emails = contactProfile?.emails ?? [];
+  return emails.find((email) => (email.confidence === "high" || email.confidence === "medium") && email.deliverability_status !== "bounced") ?? null;
+}
+
+function fallbackSequence(item: OutreachQueueView["items"][number]): OutreachSequenceMessage[] {
+  const existing = Array.isArray(item.sequence_messages) ? item.sequence_messages : [];
+  if (existing.length > 0) return existing;
+  return [
+    { step: 1, subject: item.subject || "Following up", body: item.body || "", evidence_hooks: [] },
+    { step: 2, subject: `Re: ${item.subject || "Following up"}`, body: `Hi ${item.candidate_name}, quick follow-up on my note above.`, evidence_hooks: [] },
+    { step: 3, subject: `Re: ${item.subject || "Following up"}`, body: "Last note from me. If now is not the right time, I can close the loop.", evidence_hooks: [] },
+  ];
+}
+
+function GmailOutreachPanel({ queue, locale, onChanged }: { queue?: OutreachQueueView; locale: "zh" | "en"; onChanged: () => void }) {
   const isEn = locale === "en";
   const items = queue?.items ?? [];
   const [busyId, setBusyId] = useState<string | null>(null);
-  async function updateOutreachThread(id: string, patch: { status?: string; next_follow_up_at?: string | null }) {
+  const [gmail, setGmail] = useState<GmailStatusView | null>(null);
+  const [editing, setEditing] = useState<Record<string, { subject: string; body: string }>>({});
+  const [bulkBusy, setBulkBusy] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function loadGmail() {
+      try {
+        const r = await fetch(`/api/integrations/gmail/status?locale=${locale}`);
+        const j = await r.json();
+        if (!cancelled && r.ok) setGmail(j as GmailStatusView);
+      } catch {
+        if (!cancelled) setGmail({ configured: false, connected: false, gmail_address: "", scope: "", expires_at: null });
+      }
+    }
+    void loadGmail();
+    return () => { cancelled = true; };
+  }, [locale]);
+
+  async function updateOutreachThread(id: string, patch: { status?: string; subject?: string; body?: string; sequence_messages?: OutreachSequenceMessage[]; next_follow_up_at?: string | null }) {
     setBusyId(id);
     try {
       const r = await fetch(`/api/outreach-threads/${id}`, {
@@ -543,21 +892,69 @@ function OutreachQueuePanel({ queue, locale, onChanged }: { queue?: OutreachQueu
       setBusyId(null);
     }
   }
+  async function approveOutreachThread(item: OutreachQueueView["items"][number]) {
+    await updateOutreachThread(item.id, { status: "approved", sequence_messages: fallbackSequence(item) });
+  }
+  async function sendOutreachThread(id: string) {
+    setBusyId(id);
+    try {
+      const r = await fetch(`/api/outreach-threads/${id}/send`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ locale }),
+      });
+      if (r.ok) onChanged();
+    } finally {
+      setBusyId(null);
+    }
+  }
+  async function approveReadyDrafts() {
+    const targets = items.filter((item) => item.status === "drafted" && primaryEmail(item.contact_profile));
+    setBulkBusy(true);
+    try {
+      for (const item of targets) {
+        await fetch(`/api/outreach-threads/${item.id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ status: "approved", sequence_messages: fallbackSequence(item), locale }),
+        });
+      }
+      onChanged();
+    } finally {
+      setBulkBusy(false);
+    }
+  }
   return (
     <Surface className="space-y-4 p-5">
       <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
         <div>
           <div className="flex items-center gap-2">
             <FiMail className="h-4 w-4 text-[var(--sh-blue)]" aria-hidden="true" />
-            <h2 className="text-base font-semibold text-[var(--sh-ink)]">{isEn ? "Outreach Queue" : "触达跟进队列"}</h2>
+            <h2 className="text-base font-semibold text-[var(--sh-ink)]">{isEn ? "Gmail Outreach Sequence" : "Gmail 外联序列"}</h2>
           </div>
           <p className="mt-1 text-sm leading-6 text-[var(--sh-muted)]">
-            {isEn ? "Saved drafts and follow-ups stay attached to this project. Email sending remains manual for v1." : "保存的触达草稿和跟进事项会归属到该项目；v1 仍保持手动复制发送。"}
+            {isEn ? "Approve sourced drafts, verify contact provenance, and send the first email from Gmail. Follow-ups stay drafted for review." : "审核候选人联系方式来源，批准草稿后从 Gmail 发送首封邮件；跟进邮件先保留为草稿。"}
           </p>
+          <div className="mt-2 flex flex-wrap gap-2 text-xs">
+            <span className={`rounded-full px-3 py-1.5 font-semibold ring-1 ${
+              gmail?.connected ? "bg-emerald-50 text-emerald-700 ring-emerald-200" : "bg-amber-50 text-amber-800 ring-amber-200"
+            }`}>
+              {gmail?.connected ? `${isEn ? "Gmail connected" : "Gmail 已连接"} · ${gmail.gmail_address}` : (isEn ? "Gmail not connected" : "Gmail 未连接")}
+            </span>
+            {gmail && !gmail.configured && (
+              <span className="rounded-full bg-gray-100 px-3 py-1.5 font-semibold text-gray-600 ring-1 ring-gray-200">
+                {isEn ? "Ask an admin to configure Google OAuth" : "请管理员配置 Google OAuth"}
+              </span>
+            )}
+          </div>
         </div>
-        <div className="flex gap-2 text-xs">
-          <span className="rounded-full bg-amber-50 px-3 py-1.5 font-semibold text-amber-800 ring-1 ring-amber-200">{isEn ? "Due" : "到期"} {queue?.summary?.due ?? 0}</span>
-          <span className="rounded-full bg-blue-50 px-3 py-1.5 font-semibold text-blue-700 ring-1 ring-blue-200">{isEn ? "Drafts" : "草稿"} {queue?.summary?.drafted ?? 0}</span>
+        <div className="flex flex-wrap gap-2">
+          <SecondaryAction href="/api/integrations/gmail/connect" disabled={gmail?.connected || gmail?.configured === false} className="min-h-9 px-3 py-2 text-xs">
+            {isEn ? "Connect Gmail" : "连接 Gmail"}
+          </SecondaryAction>
+          <PrimaryAction onClick={approveReadyDrafts} disabled={bulkBusy || items.every((item) => item.status !== "drafted" || !primaryEmail(item.contact_profile))} className="min-h-9 px-3 py-2 text-xs">
+            {isEn ? "Approve ready drafts" : "批量批准可发送草稿"}
+          </PrimaryAction>
         </div>
       </div>
       {items.length === 0 ? (
@@ -565,7 +962,7 @@ function OutreachQueuePanel({ queue, locale, onChanged }: { queue?: OutreachQueu
           {isEn ? "No saved outreach threads yet." : "还没有保存的触达记录。"}
         </p>
       ) : (
-        <ul className="grid gap-2 lg:grid-cols-2">
+        <ul className="grid gap-3 lg:grid-cols-2">
           {items.slice(0, 6).map((item) => (
             <li key={item.id} className="rounded-2xl border border-black/10 bg-white/80 p-4">
               <div className="flex items-start justify-between gap-3">
@@ -579,11 +976,64 @@ function OutreachQueuePanel({ queue, locale, onChanged }: { queue?: OutreachQueu
                   className={item.queue_state === "due" ? "bg-amber-50 text-amber-800 ring-amber-200" : "bg-blue-50 text-blue-700 ring-blue-200"}
                 />
               </div>
+              <div className="mt-3 rounded-xl bg-gray-50 px-3 py-2 text-xs ring-1 ring-black/5">
+                {(item.contact_profile?.emails?.length ?? 0) > 0 ? (
+                  <div className="space-y-1.5">
+                    {item.contact_profile?.emails?.slice(0, 3).map((email) => (
+                      <div key={`${email.value}:${email.source}`} className="flex flex-wrap items-center gap-2">
+                        <span className={`break-all font-semibold ${primaryEmail(item.contact_profile)?.value === email.value ? "text-gray-800" : "text-amber-700"}`}>{email.value}</span>
+                        <span className="rounded-full bg-white px-2 py-0.5 font-medium text-gray-600 ring-1 ring-black/10">
+                          source: {email.source}
+                        </span>
+                        <span className="rounded-full bg-white px-2 py-0.5 font-medium text-gray-600 ring-1 ring-black/10">
+                          confidence: {email.confidence}
+                        </span>
+                        {primaryEmail(item.contact_profile)?.value !== email.value && (
+                          <span className="rounded-full bg-amber-50 px-2 py-0.5 font-semibold text-amber-700 ring-1 ring-amber-100">
+                            {isEn ? "review only" : "仅供审核"}
+                          </span>
+                        )}
+                      </div>
+                    ))}
+                    <span className="inline-flex rounded-full bg-white px-2 py-0.5 font-medium text-gray-600 ring-1 ring-black/10">
+                      contactability_score: {item.contact_profile?.contactability_score ?? 0}
+                    </span>
+                  </div>
+                ) : (
+                  <p className="text-amber-700">{isEn ? "No sourced, medium-or-higher confidence email. Sending disabled." : "没有带来源且中高置信度的邮箱，不能发送。"}</p>
+                )}
+              </div>
+              <div className="mt-3 grid gap-2">
+                <input
+                  value={editing[item.id]?.subject ?? item.subject ?? ""}
+                  onChange={(event) => setEditing((prev) => ({ ...prev, [item.id]: { subject: event.target.value, body: prev[item.id]?.body ?? item.body ?? "" } }))}
+                  className="min-h-9 rounded-xl border border-black/10 bg-white px-3 text-xs text-[var(--sh-ink)] outline-none focus:border-[var(--sh-blue)]"
+                  aria-label={isEn ? "First email subject" : "首封邮件标题"}
+                />
+                <textarea
+                  value={editing[item.id]?.body ?? item.body ?? ""}
+                  onChange={(event) => setEditing((prev) => ({ ...prev, [item.id]: { subject: prev[item.id]?.subject ?? item.subject ?? "", body: event.target.value } }))}
+                  className="min-h-[88px] resize-y rounded-xl border border-black/10 bg-white px-3 py-2 text-xs leading-5 text-[var(--sh-ink)] outline-none focus:border-[var(--sh-blue)]"
+                  aria-label={isEn ? "First email body" : "首封邮件正文"}
+                />
+              </div>
+              <div className="mt-3 rounded-xl border border-black/10 bg-white px-3 py-2">
+                <p className="text-xs font-semibold text-[var(--sh-muted)]">{isEn ? "Sequence" : "外联序列"}</p>
+                <div className="mt-2 space-y-1.5">
+                  {fallbackSequence(item).slice(0, 3).map((message) => (
+                    <div key={message.step} className="rounded-lg bg-gray-50 px-2 py-1.5 text-xs ring-1 ring-black/5">
+                      <span className="font-semibold text-gray-800">#{message.step}</span>
+                      <span className="ml-2 text-gray-600">{message.subject}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
               <p className="mt-3 text-xs text-[var(--sh-muted)]">
                 {item.next_follow_up_at
                   ? `${isEn ? "Follow up" : "跟进"}: ${new Date(item.next_follow_up_at).toLocaleDateString(isEn ? "en-US" : "zh-CN")}`
                   : (isEn ? "No follow-up date" : "未设置跟进日期")}
               </p>
+              {item.send_error && <p className="mt-2 rounded-xl bg-rose-50 px-3 py-2 text-xs text-rose-700 ring-1 ring-rose-100">{item.send_error}</p>}
               <div className="mt-3 grid gap-2 sm:grid-cols-[minmax(0,1fr)_150px]">
                 <select
                   value={item.status}
@@ -592,7 +1042,18 @@ function OutreachQueuePanel({ queue, locale, onChanged }: { queue?: OutreachQueu
                   className="min-h-9 rounded-xl border border-black/10 bg-white px-2 text-xs text-[var(--sh-ink)] outline-none focus:border-[var(--sh-blue)]"
                   aria-label={isEn ? "Outreach status" : "触达状态"}
                 >
-                  {["drafted", "contacted", "follow_up_due", "replied", "interviewing", "rejected", "hired"].map((status) => (
+                  {[
+                    ...(item.status === "sent" ? ["sent"] : []),
+                    "drafted",
+                    "approved",
+                    "follow_up_scheduled",
+                    "replied",
+                    "bounced",
+                    "stopped",
+                    "interviewing",
+                    "rejected",
+                    "hired",
+                  ].map((status) => (
                     <option key={status} value={status}>{status}</option>
                   ))}
                 </select>
@@ -607,10 +1068,174 @@ function OutreachQueuePanel({ queue, locale, onChanged }: { queue?: OutreachQueu
                   aria-label={isEn ? "Next follow-up date" : "下次跟进日期"}
                 />
               </div>
+              <div className="mt-3 flex flex-wrap gap-2">
+                <SecondaryAction
+                  onClick={() => updateOutreachThread(item.id, {
+                    subject: editing[item.id]?.subject ?? item.subject,
+                    body: editing[item.id]?.body ?? item.body ?? "",
+                    sequence_messages: fallbackSequence({ ...item, subject: editing[item.id]?.subject ?? item.subject, body: editing[item.id]?.body ?? item.body }),
+                  })}
+                  disabled={busyId === item.id}
+                  className="min-h-9 px-3 py-2 text-xs"
+                >
+                  {isEn ? "Save edits" : "保存修改"}
+                </SecondaryAction>
+                <PrimaryAction onClick={() => approveOutreachThread(item)} disabled={busyId === item.id || !primaryEmail(item.contact_profile) || item.status !== "drafted"} className="min-h-9 px-3 py-2 text-xs">
+                  {isEn ? "Approve" : "批准"}
+                </PrimaryAction>
+                <PrimaryAction onClick={() => sendOutreachThread(item.id)} disabled={busyId === item.id || !gmail?.connected || !primaryEmail(item.contact_profile) || item.status !== "approved"} className="min-h-9 px-3 py-2 text-xs">
+                  <FiSend className="h-3.5 w-3.5" aria-hidden="true" />
+                  {isEn ? "Send" : "发送"}
+                </PrimaryAction>
+                <SecondaryAction onClick={() => updateOutreachThread(item.id, { status: "stopped" })} disabled={busyId === item.id} className="min-h-9 px-3 py-2 text-xs">
+                  {isEn ? "Skip" : "跳过"}
+                </SecondaryAction>
+              </div>
             </li>
           ))}
         </ul>
       )}
+    </Surface>
+  );
+}
+
+function InboxAgentPanel({
+  queue,
+  projectId,
+  projectBrief,
+  locale,
+  onChanged,
+}: {
+  queue?: InboxQueueView;
+  projectId: string;
+  projectBrief: string;
+  locale: "zh" | "en";
+  onChanged: () => void;
+}) {
+  const isEn = locale === "en";
+  const items = queue?.items ?? [];
+  const interested = queue?.interested_candidates ?? [];
+  const [syncing, setSyncing] = useState(false);
+  const [error, setError] = useState("");
+
+  function inboxSyncErrorLabel(value: unknown) {
+    const key = typeof value === "string" ? value : "";
+    if (key === "gmail_not_connected_or_readonly_missing") {
+      return isEn
+        ? "Connect Gmail or re-authorize Gmail read access before syncing replies."
+        : "请先连接 Gmail，或重新授权 Gmail 读取权限后再同步回复。";
+    }
+    return isEn ? "Gmail sync unavailable." : "Gmail 回复同步暂时不可用。";
+  }
+
+  async function syncReplies() {
+    setSyncing(true);
+    setError("");
+    try {
+      const r = await fetch("/api/inbox/gmail/sync", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ project_id: projectId, role_brief: projectBrief, locale }),
+      });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(inboxSyncErrorLabel(j.error || j.skipped));
+      onChanged();
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setSyncing(false);
+    }
+  }
+
+  return (
+    <Surface className="space-y-4 p-5">
+      <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+        <div>
+          <div className="flex items-center gap-2">
+            <FiRefreshCw className="h-4 w-4 text-[var(--sh-blue)]" aria-hidden="true" />
+            <h2 className="text-base font-semibold text-[var(--sh-ink)]">Inbox Agent</h2>
+          </div>
+          <p className="mt-1 max-w-3xl text-sm leading-6 text-[var(--sh-muted)]">
+            {isEn
+              ? "Reads only Gmail threads created by SignalHire outreach for this role, then classifies replies into review and interview-ready queues."
+              : "只读取这个岗位由 SignalHire 外联创建的 Gmail 线程，并把候选人回复分类到待处理和可约面队列。"}
+          </p>
+        </div>
+        <PrimaryAction onClick={syncReplies} disabled={syncing} className="min-h-9 px-3 py-2 text-xs">
+          <FiRefreshCw className={`h-3.5 w-3.5 ${syncing ? "animate-spin" : ""}`} aria-hidden="true" />
+          {isEn ? "Sync Gmail replies" : "同步 Gmail 回复"}
+        </PrimaryAction>
+      </div>
+
+      {error && <p className="rounded-xl bg-amber-50 px-3 py-2 text-xs text-amber-800 ring-1 ring-amber-100">{error}</p>}
+
+      <div className="grid gap-3 sm:grid-cols-3">
+        <div className="rounded-2xl border border-black/10 bg-white/80 p-4">
+          <p className="text-xs text-[var(--sh-muted)]">{isEn ? "Classified replies" : "已分类回复"}</p>
+          <p className="mt-1 text-2xl font-semibold text-[var(--sh-ink)]">{queue?.summary.total ?? 0}</p>
+        </div>
+        <div className="rounded-2xl border border-black/10 bg-white/80 p-4">
+          <p className="text-xs text-[var(--sh-muted)]">{isEn ? "Interested" : "有兴趣"}</p>
+          <p className="mt-1 text-2xl font-semibold text-emerald-700">{queue?.summary.interested ?? 0}</p>
+        </div>
+        <div className="rounded-2xl border border-black/10 bg-white/80 p-4">
+          <p className="text-xs text-[var(--sh-muted)]">{isEn ? "Needs human reply" : "需人工回复"}</p>
+          <p className="mt-1 text-2xl font-semibold text-amber-700">{queue?.summary.needs_human_reply ?? 0}</p>
+        </div>
+      </div>
+
+      <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_320px]">
+        <div className="rounded-2xl border border-black/10 bg-white/80 p-4">
+          <p className="text-sm font-semibold text-[var(--sh-ink)]">{isEn ? "Inbox Queue" : "回复队列"}</p>
+          {items.length === 0 ? (
+            <p className="mt-3 rounded-xl border border-dashed border-black/10 bg-gray-50 p-3 text-sm text-[var(--sh-muted)]">
+              {isEn ? "No synced replies yet." : "还没有同步到候选人回复。"}
+            </p>
+          ) : (
+            <div className="mt-3 space-y-2">
+              {items.slice(0, 6).map((item) => (
+                <div key={item.id} className="rounded-xl bg-gray-50 px-3 py-2 text-xs ring-1 ring-black/5">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <p className="font-semibold text-gray-900">{item.candidate_name}</p>
+                    <span className={`rounded-full px-2 py-0.5 font-semibold ring-1 ${
+                      item.classification === "interested"
+                        ? "bg-emerald-50 text-emerald-700 ring-emerald-100"
+                        : item.classification === "not_interested" || item.classification === "bounced"
+                          ? "bg-rose-50 text-rose-700 ring-rose-100"
+                          : "bg-amber-50 text-amber-800 ring-amber-100"
+                    }`}>
+                      {item.classification.replace(/_/g, " ")}
+                    </span>
+                  </div>
+                  <p className="mt-1 line-clamp-2 text-gray-600">{item.last_message_excerpt || item.classification_reason}</p>
+                  {item.suggested_reply && (
+                    <p className="mt-2 rounded-lg bg-white px-2 py-1.5 text-gray-600 ring-1 ring-black/5">{item.suggested_reply}</p>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div className="rounded-2xl border border-black/10 bg-white/80 p-4">
+          <p className="text-sm font-semibold text-[var(--sh-ink)]">{isEn ? "Interested Candidate Queue" : "可约面候选人队列"}</p>
+          {interested.length === 0 ? (
+            <p className="mt-3 rounded-xl border border-dashed border-black/10 bg-gray-50 p-3 text-sm text-[var(--sh-muted)]">
+              {isEn ? "No interview-ready replies yet." : "还没有可约面的候选人回复。"}
+            </p>
+          ) : (
+            <div className="mt-3 space-y-2">
+              {interested.slice(0, 5).map((candidate) => (
+                <div key={candidate.id} className="rounded-xl bg-emerald-50 px-3 py-2 text-xs text-emerald-900 ring-1 ring-emerald-100">
+                  <p className="font-semibold">{candidate.candidate_name}</p>
+                  <p className="mt-1">{candidate.last_message_excerpt}</p>
+                  <p className="mt-2 font-medium">{candidate.recommended_next_step}</p>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
     </Surface>
   );
 }
@@ -624,7 +1249,7 @@ export default function ProjectDetailPage() {
   const [detail, setDetail] = useState<ProjectDetail | null>(null);
   const [items, setItems] = useState<ShortlistItem[] | null>(null);
   const [error, setError] = useState("");
-  const [statusFilter, setStatusFilter] = useState<ShortlistStatus | "all">("all");
+  const [statusFilter, setStatusFilter] = useState<CandidateDisplayStatus | "all">("all");
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
   const candidateDetailRef = useRef<HTMLDivElement | null>(null);
   const openCandidateDetail = useCallback((itemId: string) => {
@@ -649,13 +1274,13 @@ export default function ProjectDetailPage() {
     let cancelled = false;
     async function load() {
       try {
-        const [detailRes, itemsRes] = await Promise.all([
-          fetch(`/api/projects/${id}?locale=${locale}`),
-          fetch(`/api/shortlist?project=${encodeURIComponent(id)}&locale=${locale}`),
-        ]);
-        const [detailJson, itemsJson] = await Promise.all([detailRes.json(), itemsRes.json()]);
+        const detailRes = await fetch(`/api/projects/${id}?locale=${locale}`);
+        const detailJson = await detailRes.json();
         if (cancelled) return;
         if (!detailRes.ok) throw new Error(detailJson.error || t("projects.detail.error.loadProject"));
+        const itemsRes = await fetch(`/api/shortlist?project=${encodeURIComponent(id)}&locale=${locale}`);
+        const itemsJson = await itemsRes.json();
+        if (cancelled) return;
         if (!itemsRes.ok) throw new Error(itemsJson.error || t("projects.detail.error.loadCandidates"));
         setDetail(detailJson as ProjectDetail);
         setItems((itemsJson.items ?? []) as ShortlistItem[]);
@@ -671,7 +1296,7 @@ export default function ProjectDetailPage() {
   const filteredItems = useMemo(() => {
     if (!items) return [];
     if (statusFilter === "all") return items;
-    return items.filter((it) => it.status === statusFilter);
+    return items.filter((it) => candidateDisplayStatus(it.status) === statusFilter);
   }, [items, statusFilter]);
 
   const selectedItem = useMemo(() => (items ?? []).find((it) => it.id === selectedItemId) ?? null, [items, selectedItemId]);
@@ -819,6 +1444,14 @@ export default function ProjectDetailPage() {
         showBrief={showSearchConsoleBrief}
       />
 
+      <AutonomousSourcingPanel
+        graph={detail.candidateGraph}
+        projectId={id}
+        projectBrief={briefForSearch}
+        locale={locale}
+        onChanged={reloadDetail}
+      />
+
       <TalentMonitorPanel
         projectId={id}
         projectBrief={briefForSearch}
@@ -827,7 +1460,15 @@ export default function ProjectDetailPage() {
         onChanged={reloadDetail}
       />
 
-      <OutreachQueuePanel queue={detail.outreachQueue} locale={locale} onChanged={reloadDetail} />
+      <GmailOutreachPanel queue={detail.outreachQueue} locale={locale} onChanged={reloadDetail} />
+
+      <InboxAgentPanel
+        queue={detail.inboxQueue}
+        projectId={id}
+        projectBrief={briefForSearch}
+        locale={locale}
+        onChanged={reloadDetail}
+      />
 
       {showKpiStrip && (
         <section className="grid grid-cols-2 gap-3 sm:grid-cols-5">
@@ -1289,10 +1930,10 @@ function StatusFunnel({
   current,
   onClick,
 }: {
-  breakdown: Record<ShortlistStatus, number>;
+  breakdown: Record<CandidateDisplayStatus, number>;
   total: number;
-  current: ShortlistStatus | "all";
-  onClick: (v: ShortlistStatus | "all") => void;
+  current: CandidateDisplayStatus | "all";
+  onClick: (v: CandidateDisplayStatus | "all") => void;
 }) {
   const { t } = useI18n();
   if (total === 0) return null;
@@ -1779,7 +2420,8 @@ function CandidateItem({ item, locale, selected, onClick }: { item: ShortlistIte
   const { t } = useI18n();
   const c = asCandidate(item.candidate);
   const subtitle = [c.current_role, c.current_company].filter(Boolean).join(" · ") || c.headline || "";
-  const status = SHORT_STATUS.find((s) => s.value === item.status) ?? SHORT_STATUS[0];
+  const displayStatus = candidateDisplayStatus(item.status);
+  const status = SHORT_STATUS.find((s) => s.value === displayStatus) ?? SHORT_STATUS[0];
   const signal = buildCandidateDecisionSignal({ candidate: item.candidate, locale, status: item.status });
   return (
     <li>

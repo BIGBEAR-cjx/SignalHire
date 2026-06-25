@@ -6,8 +6,9 @@
 // dedup_key 防重: 同一个 user + 同一次 search + 同一个 candidate_index 只能存一行。
 // 用 user 切换收藏开关时, 命中 dedup_key → upsert 更新 (或直接报告已在), 不会建重复。
 //
-// status 状态机 (简单线性, v1 不可配):
-//   new → contacted → interviewing → hired / rejected
+// status 状态机:
+//   new → shortlisted / needs_evidence → outreach_drafted → passed
+// 兼容旧值: contacted / interviewing / hired / rejected。
 // 备注 (notes) 自由文本。
 
 import { createClient } from "@insforge/sdk";
@@ -18,8 +19,8 @@ const client = BASE && KEY ? createClient({ baseUrl: BASE, anonKey: KEY, isServe
 
 const TABLE = "shortlist_items";
 
-export type ShortlistStatus = "new" | "contacted" | "interviewing" | "hired" | "rejected";
-export const STATUSES: ShortlistStatus[] = ["new", "contacted", "interviewing", "hired", "rejected"];
+export type ShortlistStatus = "new" | "shortlisted" | "needs_evidence" | "outreach_drafted" | "passed" | "contacted" | "interviewing" | "hired" | "rejected";
+export const STATUSES: ShortlistStatus[] = ["new", "shortlisted", "needs_evidence", "outreach_drafted", "passed", "contacted", "interviewing", "hired", "rejected"];
 
 export interface ShortlistItem {
   id: string;
@@ -43,6 +44,32 @@ export type ProjectFilter = string | null | "all";
 // 单列 UNIQUE, 因为 Insforge 不支持复合 unique 约束。
 function makeDedupKey(userId: string, sourceRunId: string | null, candidateIndex: number): string {
   return `${userId}:${sourceRunId ?? "external"}:${candidateIndex}`;
+}
+
+function cleanKeyPart(value: unknown) {
+  return String(value ?? "")
+    .toLowerCase()
+    .replace(/https?:\/\//g, "")
+    .replace(/[^a-z0-9\u4e00-\u9fff]+/g, " ")
+    .trim()
+    .replace(/\s+/g, "-")
+    .slice(0, 120);
+}
+
+function candidateIdentityKey(candidate: unknown, fallbackIndex: number) {
+  const source = isPlainObject(candidate) ? candidate : {};
+  const links = isPlainObject(source.links) ? source.links : {};
+  const link = cleanKeyPart(links.linkedin || links.github || links.website || links.other);
+  if (link) return `link:${link}`;
+  const name = cleanKeyPart(source.name);
+  const company = cleanKeyPart(source.current_company);
+  const role = cleanKeyPart(source.current_role || source.headline);
+  if (name && (company || role)) return `person:${name}:${company}:${role}`;
+  return `idx:${fallbackIndex}`;
+}
+
+function makeProjectCandidateDedupKey(userId: string, projectId: string, candidate: unknown, candidateIndex: number) {
+  return `${userId}:project:${projectId}:${candidateIdentityKey(candidate, candidateIndex)}`;
 }
 
 // 列出当前用户的候选池条目, 可按项目过滤。
@@ -94,9 +121,11 @@ export async function addItem(input: {
   candidateIndex: number;
   candidate: unknown;
   projectId?: string | null; // 在某项目上下文里收藏 → 自动归项目
+  status?: ShortlistStatus;
+  dedupKey?: string;
 }): Promise<string | null> {
   if (!client) return null;
-  const dedup_key = makeDedupKey(input.userId, input.sourceRunId, input.candidateIndex);
+  const dedup_key = input.dedupKey ?? makeDedupKey(input.userId, input.sourceRunId, input.candidateIndex);
   try {
     const row: Record<string, unknown> = {
       user_id: input.userId,
@@ -106,6 +135,7 @@ export async function addItem(input: {
       updated_at: new Date().toISOString(),
     };
     if (input.projectId !== undefined) row.project_id = input.projectId;
+    if (input.status !== undefined) row.status = input.status;
     await client.database.from(TABLE).upsert(row, { onConflict: "dedup_key" });
     const { data } = await client.database
       .from(TABLE)
@@ -116,6 +146,71 @@ export async function addItem(input: {
   } catch {
     return null;
   }
+}
+
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return Boolean(value && typeof value === "object" && !Array.isArray(value));
+}
+
+function withCandidateSourceNodes(candidate: unknown): unknown {
+  if (!isPlainObject(candidate)) return candidate;
+  const links = isPlainObject(candidate.links) ? candidate.links : {};
+  const sourceNodes: Array<Record<string, unknown>> = Array.isArray(candidate.source_nodes)
+    ? [...candidate.source_nodes as Array<Record<string, unknown>>]
+    : [];
+  if (typeof links.linkedin === "string" && links.linkedin.trim()) {
+    sourceNodes.push({ source_type: "linkedin_seed", source_url: links.linkedin.trim(), confidence: "medium" });
+  }
+  const claims = Array.isArray(candidate.claims) ? candidate.claims : [];
+  for (const claim of claims) {
+    if (!isPlainObject(claim) || !Array.isArray(claim.evidence)) continue;
+    for (const evidence of claim.evidence) {
+      if (!isPlainObject(evidence) || typeof evidence.url !== "string" || !evidence.url.trim()) continue;
+      sourceNodes.push({
+        source_type: "public_web",
+        source_url: evidence.url.trim(),
+        confidence: claim.verdict === "verified" ? "high" : "low",
+        extracted_fields: { source_type: evidence.source_type ?? "" },
+      });
+    }
+  }
+  return { ...candidate, source_nodes: sourceNodes };
+}
+
+function candidateStatusFromEvidence(candidate: unknown): ShortlistStatus {
+  const source = isPlainObject(candidate) ? candidate : {};
+  const audit = isPlainObject(source.evidence_audit) ? source.evidence_audit : {};
+  const quality = String(audit.overall_evidence_quality ?? "").toLowerCase();
+  const unverified = Array.isArray(audit.unverified_claims) ? audit.unverified_claims.length : 0;
+  const contradicted = Array.isArray(audit.contradicted_claims) ? audit.contradicted_claims.length : 0;
+  if (quality === "low" || contradicted > 0 || unverified > 2) return "needs_evidence";
+  return "new";
+}
+
+export async function ingestProjectRunCandidates(input: {
+  userId: string;
+  projectId: string;
+  sourceRunId: string;
+  result: unknown;
+}): Promise<number> {
+  const result = isPlainObject(input.result) ? input.result : {};
+  const candidates = Array.isArray(result.candidates) ? result.candidates : [];
+  let count = 0;
+  for (let index = 0; index < candidates.length; index += 1) {
+    const candidate = withCandidateSourceNodes(candidates[index]);
+    const dedup_key = makeProjectCandidateDedupKey(input.userId, input.projectId, candidate, index);
+    const id = await addItem({
+      userId: input.userId,
+      sourceRunId: input.sourceRunId,
+      candidateIndex: index,
+      candidate,
+      projectId: input.projectId,
+      status: candidateStatusFromEvidence(candidate),
+      dedupKey: dedup_key,
+    });
+    if (id) count += 1;
+  }
+  return count;
 }
 
 // 改状态/备注/归属项目。可选字段都可单独传, 都为 undefined 当 no-op。

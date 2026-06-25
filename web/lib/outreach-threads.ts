@@ -4,6 +4,7 @@ import {
   buildOutreachThreadDraft,
   normalizeOutreachThreadPatch,
 } from "./outreach-threads.mjs";
+import { buildContactProfile } from "./contact-profile.mjs";
 
 const BASE = process.env.INSFORGE_API_BASE_URL;
 const KEY = process.env.INSFORGE_API_KEY;
@@ -23,6 +24,13 @@ export interface OutreachThread {
   body: string;
   status: string;
   notes: string;
+  contact_profile: unknown;
+  sequence_messages: unknown;
+  approved_at: string | null;
+  sent_at: string | null;
+  gmail_message_id: string;
+  gmail_thread_id: string;
+  send_error: string;
   last_contacted_at: string | null;
   next_follow_up_at: string | null;
   created_at: string;
@@ -90,6 +98,22 @@ export async function listOutreachQueue(input: { userId: string; projectId?: str
   return buildOutreachQueue({ threads: threads as never[] });
 }
 
+export async function getOutreachThread(input: { userId: string; id: string }): Promise<OutreachThread | null> {
+  if (!client) return null;
+  try {
+    const { data, error } = await client.database
+      .from(TABLE)
+      .select("*")
+      .eq("id", input.id)
+      .eq("user_id", input.userId)
+      .limit(1);
+    if (error || !data || data.length === 0) return null;
+    return (data as OutreachThread[])[0];
+  } catch {
+    return null;
+  }
+}
+
 export async function createOutreachThread(input: {
   userId: string;
   projectId?: string | null;
@@ -108,8 +132,11 @@ export async function createOutreachThread(input: {
     projectId: input.projectId,
     shortlistItemId: input.shortlistItemId,
   }))) return null;
+  const candidate = typeof input.candidate === "object" && input.candidate !== null
+    ? { ...(input.candidate as Record<string, unknown>), contact_profile: buildContactProfile(input.candidate as never) }
+    : { contact_profile: buildContactProfile(input.candidate as never) };
   const draft = buildOutreachThreadDraft({
-    candidate: input.candidate,
+    candidate,
     shortlistItemId: input.shortlistItemId ?? null,
     projectId: input.projectId ?? null,
     tone: input.tone ?? "professional",
@@ -137,8 +164,15 @@ export async function updateOutreachThread(input: {
   subject?: string;
   body?: string;
   notes?: string;
+  contact_profile?: unknown;
+  sequence_messages?: unknown;
   next_follow_up_at?: string | null;
   last_contacted_at?: string | null;
+  approved_at?: string | null;
+  sent_at?: string | null;
+  gmail_message_id?: string;
+  gmail_thread_id?: string;
+  send_error?: string;
 }): Promise<OutreachThread | null> {
   if (!client) return null;
   const patch = normalizeOutreachThreadPatch(input);

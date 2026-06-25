@@ -7,12 +7,17 @@ import {
   normalizeOutreachThreadPatch,
 } from "./web/lib/outreach-threads.mjs";
 
-test("defines recruiting follow-up statuses without email sending", () => {
+test("defines recruiting follow-up statuses with controlled Gmail sending", () => {
   assert.deepEqual(OUTREACH_THREAD_STATUSES, [
     "drafted",
+    "approved",
+    "sent",
+    "follow_up_scheduled",
     "contacted",
     "follow_up_due",
     "replied",
+    "bounced",
+    "stopped",
     "interviewing",
     "rejected",
     "hired",

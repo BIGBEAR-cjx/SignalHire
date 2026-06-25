@@ -1,0 +1,492 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=1920, height=1080" />
+    <title>SignalHire Demo</title>
+    <script src="./node_modules/gsap/dist/gsap.min.js"></script>
+    <style>
+      * { box-sizing: border-box; }
+      html, body {
+        margin: 0;
+        width: 1920px;
+        height: 1080px;
+        overflow: hidden;
+        background: #f6f7f9;
+        color: #111827;
+        font-family: Arial, sans-serif;
+      }
+      #root {
+        position: relative;
+        width: 1920px;
+        height: 1080px;
+        overflow: hidden;
+        background:
+          radial-gradient(circle at 76% 24%, rgba(0, 95, 204, 0.11), transparent 26%),
+          radial-gradient(circle at 13% 82%, rgba(16, 185, 129, 0.11), transparent 24%),
+          linear-gradient(135deg, #fbfcfd 0%, #f2f5f8 54%, #ecf1f6 100%);
+      }
+      .clip {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+      }
+      .scene {
+        opacity: 0;
+        padding: 84px 112px;
+        display: grid;
+        align-items: center;
+        gap: 48px;
+      }
+      #scene-hook { opacity: 1; }
+      .scene-left { grid-template-columns: 0.82fr 1.18fr; }
+      .scene-right { grid-template-columns: 1.1fr 0.9fr; }
+      .brand {
+        position: absolute;
+        left: 96px;
+        top: 54px;
+        display: inline-flex;
+        align-items: center;
+        gap: 12px;
+        font-weight: 750;
+        font-size: 25px;
+        color: #111827;
+      }
+      .mark {
+        width: 28px;
+        height: 28px;
+        border: 3px solid #111827;
+        border-radius: 999px;
+        position: relative;
+      }
+      .mark::before {
+        content: "";
+        position: absolute;
+        inset: 6px;
+        border: 3px solid #111827;
+        border-radius: 999px;
+      }
+      .mark::after {
+        content: "";
+        position: absolute;
+        left: 10px;
+        top: 10px;
+        width: 8px;
+        height: 8px;
+        border-radius: 999px;
+        background: #00a86b;
+      }
+      h1, h2, h3, p { margin: 0; }
+      .eyebrow {
+        margin: 0 0 18px;
+        color: #005fcc;
+        font-size: 19px;
+        font-weight: 800;
+        letter-spacing: 0.13em;
+        text-transform: uppercase;
+      }
+      .headline {
+        max-width: 900px;
+        font-size: 88px;
+        line-height: 0.96;
+        font-weight: 800;
+        color: #111827;
+      }
+      .title {
+        max-width: 760px;
+        font-size: 56px;
+        line-height: 1.02;
+        font-weight: 780;
+        color: #111827;
+      }
+      .body {
+        max-width: 690px;
+        margin-top: 26px;
+        color: #4b5563;
+        font-size: 26px;
+        line-height: 1.42;
+        font-weight: 450;
+      }
+      .pill-row {
+        display: flex;
+        gap: 12px;
+        flex-wrap: wrap;
+        margin-top: 32px;
+      }
+      .pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 9px;
+        border: 1px solid rgba(17, 24, 39, 0.09);
+        background: rgba(255, 255, 255, 0.82);
+        border-radius: 999px;
+        padding: 10px 16px;
+        color: #374151;
+        font-size: 18px;
+        font-weight: 680;
+        box-shadow: 0 10px 30px rgba(15, 23, 42, 0.05);
+      }
+      .dot {
+        display: block;
+        width: 10px;
+        height: 10px;
+        border-radius: 999px;
+        background: #00a86b;
+      }
+      .blue-dot { background: #005fcc; }
+      .amber-dot { background: #f59e0b; }
+      .shot-wrap {
+        position: relative;
+        border-radius: 34px;
+        overflow: hidden;
+        background: white;
+        box-shadow: 0 34px 90px rgba(15, 23, 42, 0.16);
+        border: 1px solid rgba(17, 24, 39, 0.09);
+      }
+      .shot-wrap img {
+        display: block;
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+      }
+      .home-shot { height: 600px; }
+      .report-shot { height: 760px; }
+      .zoom-home img { object-position: center 18%; }
+      .zoom-report img { object-position: center top; }
+      .floating-card {
+        position: absolute;
+        border: 1px solid rgba(17, 24, 39, 0.1);
+        border-radius: 24px;
+        background: rgba(255, 255, 255, 0.94);
+        box-shadow: 0 22px 62px rgba(15, 23, 42, 0.15);
+        padding: 26px;
+      }
+      .brief-card {
+        width: 650px;
+        right: 124px;
+        bottom: 112px;
+      }
+      .brief-label {
+        color: #4b5563;
+        font-size: 18px;
+        font-weight: 740;
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+      }
+      .brief-text {
+        margin-top: 16px;
+        color: #111827;
+        font-size: 27px;
+        line-height: 1.35;
+        font-weight: 660;
+      }
+      .pipeline {
+        display: grid;
+        grid-template-columns: repeat(5, 1fr);
+        gap: 18px;
+        margin-top: 38px;
+      }
+      .node {
+        min-height: 176px;
+        border: 1px solid rgba(17, 24, 39, 0.1);
+        border-radius: 26px;
+        background: rgba(255, 255, 255, 0.88);
+        padding: 22px;
+        box-shadow: 0 18px 54px rgba(15, 23, 42, 0.08);
+      }
+      .node strong {
+        display: block;
+        font-size: 24px;
+        line-height: 1.08;
+        color: #111827;
+      }
+      .node span {
+        display: block;
+        margin-top: 14px;
+        color: #4b5563;
+        font-size: 18px;
+        line-height: 1.34;
+      }
+      .status-panel {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 22px;
+        margin-top: 30px;
+      }
+      .metric-card {
+        border-radius: 24px;
+        border: 1px solid rgba(17, 24, 39, 0.1);
+        background: rgba(255, 255, 255, 0.9);
+        padding: 23px;
+      }
+      .metric-number {
+        display: block;
+        color: #111827;
+        font-size: 48px;
+        line-height: 1;
+        font-weight: 800;
+      }
+      .metric-label {
+        display: block;
+        margin-top: 8px;
+        color: #4b5563;
+        font-size: 18px;
+        font-weight: 650;
+      }
+      .progress {
+        margin-top: 17px;
+        height: 10px;
+        border-radius: 999px;
+        background: #e5e7eb;
+        overflow: hidden;
+      }
+      .bar {
+        display: block;
+        width: 100%;
+        height: 100%;
+        border-radius: 999px;
+        background: linear-gradient(90deg, #005fcc, #00a86b);
+        transform-origin: left center;
+        transform: scaleX(0);
+      }
+      .feedback-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 22px;
+        margin-top: 34px;
+      }
+      .feedback-card {
+        min-height: 150px;
+        border: 1px solid rgba(17, 24, 39, 0.1);
+        border-radius: 26px;
+        background: white;
+        padding: 24px;
+        box-shadow: 0 18px 54px rgba(15, 23, 42, 0.07);
+      }
+      .feedback-card strong {
+        display: block;
+        color: #111827;
+        font-size: 25px;
+        line-height: 1.14;
+      }
+      .feedback-card span {
+        display: block;
+        margin-top: 12px;
+        color: #4b5563;
+        font-size: 19px;
+        line-height: 1.35;
+      }
+      .caption {
+        position: absolute;
+        inset: auto auto 48px 50%;
+        left: 50%;
+        bottom: 48px;
+        transform: translateX(-50%);
+        width: min(1180px, calc(100% - 220px));
+        height: auto;
+        background: transparent;
+        color: #111827;
+        text-align: center;
+        font-size: 28px;
+        line-height: 1.28;
+        font-weight: 760;
+        text-shadow:
+          0 1px 0 rgba(255, 255, 255, 0.98),
+          0 0 18px rgba(255, 255, 255, 0.96),
+          0 10px 28px rgba(15, 23, 42, 0.18);
+      }
+      .caption .accent { color: #005fcc; }
+      .final-card {
+        width: 960px;
+        margin: 0 auto;
+        border-radius: 38px;
+        border: 1px solid rgba(17, 24, 39, 0.1);
+        background: rgba(255, 255, 255, 0.92);
+        box-shadow: 0 34px 90px rgba(15, 23, 42, 0.14);
+        padding: 68px 76px;
+        text-align: center;
+      }
+      .final-card h2 {
+        font-size: 64px;
+        line-height: 1.02;
+        color: #111827;
+      }
+      .final-card p {
+        margin: 24px auto 0;
+        max-width: 720px;
+        color: #4b5563;
+        font-size: 27px;
+        line-height: 1.38;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="main" data-start="0" data-duration="60" data-width="1920" data-height="1080" data-fps="30">
+      <audio id="narration" src="assets/narration.wav" data-start="0" data-duration="59.4" data-track-index="100" data-volume="1"></audio>
+
+      <section id="scene-hook" class="clip scene scene-left" data-start="0" data-duration="7.2" data-track-index="1">
+        <div class="brand"><span class="mark"></span>SignalHire</div>
+        <div>
+          <p class="eyebrow">Evidence-first recruiting</p>
+          <h1 class="headline">Find AI talent by evidence, not resumes.</h1>
+          <p class="body">SignalHire turns public work into a review-ready talent report.</p>
+          <div class="pill-row">
+            <span class="pill"><span class="dot"></span>Public-source coverage</span>
+            <span class="pill"><span class="dot amber-dot"></span>Evidence risks flagged</span>
+            <span class="pill"><span class="dot blue-dot"></span>Shareable report</span>
+          </div>
+        </div>
+        <div class="shot-wrap home-shot zoom-home">
+          <img src="assets/screens/local-home-en.png" alt="SignalHire homepage" />
+        </div>
+      </section>
+
+      <section id="scene-brief" class="clip scene scene-right" data-start="7" data-duration="9" data-track-index="2">
+        <div class="shot-wrap home-shot zoom-home">
+          <img src="assets/screens/local-home-brief.png" alt="SignalHire search input" />
+        </div>
+        <div>
+          <p class="eyebrow">Start with the role</p>
+          <h2 class="title">A hiring brief becomes a structured research task.</h2>
+          <p class="body">The team defines role, seniority, region, must-have signals, and evidence preferences.</p>
+        </div>
+        <div class="floating-card brief-card">
+          <p class="brief-label">Brief example</p>
+          <p class="brief-text">Senior AI infrastructure engineer with vLLM, Triton, Kubernetes, open-source work, and production inference experience.</p>
+        </div>
+      </section>
+
+      <section id="scene-pipeline" class="clip scene" data-start="15" data-duration="12" data-track-index="3">
+        <div>
+          <p class="eyebrow">Dynamic backend</p>
+          <h2 class="title">Uncached work is queued, researched, and normalized.</h2>
+          <p class="body">SignalHire shows the research pipeline instead of pretending deep search is instant.</p>
+          <div class="pipeline">
+            <div class="node"><strong>Next.js app</strong><span>Receives the brief and checks cache/history first.</span></div>
+            <div class="node"><strong>InsForge queue</strong><span>Creates a durable research_runs job.</span></div>
+            <div class="node"><strong>Worker</strong><span>Claims the job outside serverless timeouts.</span></div>
+            <div class="node"><strong>MiroMind</strong><span>Searches, fetches, and cross-checks public sources.</span></div>
+            <div class="node"><strong>Normalized report</strong><span>Returns ranked candidates and auditable claims.</span></div>
+          </div>
+          <div class="status-panel">
+            <div class="metric-card">
+              <span class="metric-number">42</span>
+              <span class="metric-label">searches across GitHub, papers, company pages, and web</span>
+              <div class="progress"><span class="bar" id="bar-search"></span></div>
+            </div>
+            <div class="metric-card">
+              <span class="metric-number">118</span>
+              <span class="metric-label">fetches inspected before a shortlist is produced</span>
+              <div class="progress"><span class="bar" id="bar-fetch"></span></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="scene-results" class="clip scene scene-left" data-start="26" data-duration="12" data-track-index="4">
+        <div>
+          <p class="eyebrow">Stable delivery</p>
+          <h2 class="title">The final output is a ranked shortlist with proof.</h2>
+          <p class="body">For demo reliability, this scene uses the cached public report while preserving the real result shape.</p>
+          <div class="pill-row">
+            <span class="pill"><span class="dot"></span>13 candidates</span>
+            <span class="pill"><span class="dot blue-dot"></span>86 average match</span>
+            <span class="pill"><span class="dot amber-dot"></span>Risk notes included</span>
+          </div>
+        </div>
+        <div class="shot-wrap report-shot zoom-report">
+          <img src="assets/screens/local-report-top.png" alt="SignalHire delivery summary" />
+        </div>
+      </section>
+
+      <section id="scene-evidence" class="clip scene scene-right" data-start="37" data-duration="11" data-track-index="5">
+        <div class="shot-wrap report-shot zoom-report">
+          <img src="assets/screens/local-report-mid.png" alt="SignalHire candidate shortlist" />
+        </div>
+        <div>
+          <p class="eyebrow">Evidence audit</p>
+          <h2 class="title">Every recommendation carries quality labels and review risks.</h2>
+          <p class="body">Recruiters can see why someone ranks high, what the public sources support, and which claims still need human review.</p>
+          <div class="pill-row">
+            <span class="pill"><span class="dot"></span>Strong evidence</span>
+            <span class="pill"><span class="dot amber-dot"></span>Single-source claims</span>
+            <span class="pill"><span class="dot blue-dot"></span>Suggested next steps</span>
+          </div>
+        </div>
+      </section>
+
+      <section id="scene-iterate" class="clip scene scene-left" data-start="47" data-duration="8" data-track-index="6">
+        <div>
+          <p class="eyebrow">Review loop</p>
+          <h2 class="title">Decisions feed the next search instead of disappearing.</h2>
+          <p class="body">Feedback on precision, evidence strength, seniority, and geography becomes a better follow-up brief.</p>
+          <div class="feedback-grid">
+            <div class="feedback-card"><strong>Feedback choices</strong><span>Too broad, weak evidence, wrong seniority, or expand sources.</span></div>
+            <div class="feedback-card"><strong>Optimization preview</strong><span>SignalHire converts the choices into next-round constraints.</span></div>
+            <div class="feedback-card"><strong>Project memory</strong><span>Candidate pool, rounds, and notes stay attached to the role.</span></div>
+            <div class="feedback-card"><strong>Share report</strong><span>Send a review-ready page to hiring managers or investors.</span></div>
+          </div>
+        </div>
+        <div class="shot-wrap report-shot zoom-report">
+          <img src="assets/screens/local-report-evidence.png" alt="SignalHire candidate comparison" />
+        </div>
+      </section>
+
+      <section id="scene-close" class="clip scene" data-start="54" data-duration="6" data-track-index="7">
+        <div class="final-card">
+          <div class="brand" style="position: static; justify-content: center; margin-bottom: 28px;"><span class="mark"></span>SignalHire</div>
+          <h2>Build auditable AI talent shortlists from public evidence.</h2>
+          <p>Search deeper, explain every recommendation, and keep the hiring team aligned on what the evidence actually supports.</p>
+        </div>
+      </section>
+
+      <div id="caption-1" class="clip caption" data-start="0.1" data-duration="5.8" data-track-index="21">SignalHire finds AI talent by <span class="accent">evidence</span>, not resumes.</div>
+      <div id="caption-2" class="clip caption" data-start="6.2" data-duration="7.4" data-track-index="22">Start with a hiring brief: role, seniority, region, and the public signals you trust.</div>
+      <div id="caption-3" class="clip caption" data-start="14.0" data-duration="11.5" data-track-index="23">Uncached searches move through InsForge, a worker, and MiroMind before a normalized result is written back.</div>
+      <div id="caption-4" class="clip caption" data-start="26.0" data-duration="9.4" data-track-index="24">The report ranks candidates with match scores, strongest signals, source links, and risks.</div>
+      <div id="caption-5" class="clip caption" data-start="36.0" data-duration="10.0" data-track-index="25">Recruiters can compare candidates and review weak claims before outreach.</div>
+      <div id="caption-6" class="clip caption" data-start="46.5" data-duration="6.6" data-track-index="26">Feedback becomes the next search, not a lost note.</div>
+      <div id="caption-7" class="clip caption" data-start="53.4" data-duration="6.3" data-track-index="27">Build auditable AI talent shortlists from public evidence.</div>
+    </div>
+
+    <script>
+      window.__timelines = window.__timelines || {};
+      const tl = gsap.timeline({ paused: true });
+
+      function sceneIn(selector, time) {
+        tl.fromTo(selector, { opacity: 0, y: 28 }, { opacity: 1, y: 0, duration: 0.7, ease: "power3.out" }, time);
+      }
+      function sceneOut(selector, time) {
+        tl.to(selector, { opacity: 0, y: -18, duration: 0.55, ease: "power2.in" }, time);
+      }
+
+      sceneOut("#scene-hook", 6.5);
+      tl.set("#scene-hook", { opacity: 0 }, 7.05);
+      [
+        ["#scene-brief", 7.15, 15.2],
+        ["#scene-pipeline", 15.25, 26.2],
+        ["#scene-results", 26.2, 37.3],
+        ["#scene-evidence", 37.3, 47.2],
+        ["#scene-iterate", 47.2, 54.2],
+      ].forEach(([selector, start, end]) => {
+        sceneIn(selector, start);
+        sceneOut(selector, end);
+      });
+      sceneIn("#scene-close", 54.2);
+
+      tl.fromTo(".shot-wrap", { opacity: 0, y: 30, scale: 0.96 }, { opacity: 1, y: 0, scale: 1, duration: 0.9, ease: "power3.out", stagger: 0.08 }, 0.7);
+      tl.fromTo(".pill", { opacity: 0, y: 14 }, { opacity: 1, y: 0, duration: 0.5, ease: "power2.out", stagger: 0.06 }, 1.2);
+      tl.fromTo(".brief-card", { opacity: 0, y: 26, scale: 0.97 }, { opacity: 1, y: 0, scale: 1, duration: 0.75, ease: "power3.out" }, 9.8);
+      tl.fromTo(".node", { opacity: 0, y: 24 }, { opacity: 1, y: 0, duration: 0.55, ease: "power3.out", stagger: 0.17 }, 17.1);
+      tl.to("#bar-search", { scaleX: 1, duration: 5.8, ease: "power1.inOut" }, 18.2);
+      tl.to("#bar-fetch", { scaleX: 1, duration: 6.4, ease: "power1.inOut" }, 18.8);
+      tl.fromTo(".metric-card", { opacity: 0, y: 24 }, { opacity: 1, y: 0, duration: 0.55, stagger: 0.1, ease: "power2.out" }, 18.0);
+      tl.fromTo(".feedback-card", { opacity: 0, y: 22 }, { opacity: 1, y: 0, duration: 0.55, ease: "power2.out", stagger: 0.1 }, 49.0);
+      tl.fromTo(".final-card", { opacity: 0, scale: 0.96, y: 22 }, { opacity: 1, scale: 1, y: 0, duration: 0.8, ease: "power3.out" }, 54.4);
+      tl.to("#narration", { volume: 0.94, duration: 0.1 }, 0);
+
+      window.__timelines["main"] = tl;
+    </script>
+  </body>
+</html>

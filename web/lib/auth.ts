@@ -10,6 +10,7 @@ import {
 
 const BASE = process.env.NEXT_PUBLIC_INSFORGE_API_BASE_URL;
 const client = createClient({ baseUrl: BASE });
+const CURRENT_USER_TIMEOUT_MS = 3000;
 
 // 把 token 写进服务端 httpOnly cookie, 供服务端路由读取登录态。
 async function setSession(accessToken: string, locale: string) {
@@ -72,7 +73,7 @@ export async function logout() {
 
 export async function currentUser(locale = "zh"): Promise<{ email: string } | null> {
   try {
-    const { data } = await client.auth.getCurrentUser();
+    const { data } = await withTimeout(client.auth.getCurrentUser(), CURRENT_USER_TIMEOUT_MS);
     if (!data?.user) return await currentUserFromCookie(locale);
     // 同步 cookie: SDK 内部刚刚可能用 refresh_token 续了 accessToken,
     // 而 /api/auth/session 写的 sh_token cookie 还是旧的 JWT (已过期 → API 401)。
@@ -83,6 +84,13 @@ export async function currentUser(locale = "zh"): Promise<{ email: string } | nu
   } catch {
     return await currentUserFromCookie(locale);
   }
+}
+
+async function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
+  return await Promise.race([
+    promise,
+    new Promise<T>((_, reject) => setTimeout(() => reject(new Error("auth current user timeout")), ms)),
+  ]);
 }
 
 async function currentUserFromCookie(locale: string): Promise<{ email: string } | null> {

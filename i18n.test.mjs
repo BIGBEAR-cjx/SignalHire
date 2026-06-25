@@ -429,7 +429,7 @@ test("translates guided smart-search review flow labels", () => {
     ["result.reviewFlow.outreach", "起草外联", "Draft outreach"],
     ["result.reviewFlow.feedbackTitle", "这轮结果怎么样？优化下一轮搜索", "How was this round? Optimize the next search"],
     ["result.reviewFlow.empty", "这次没有找到可审阅的候选人。可以展开搜索过程，调整需求后再试一次。", "No reviewable candidates were found this time. Open the search process, adjust the brief, and try again."],
-    ["research.advancedPlanToggle", "高级：先调整搜索计划", "Advanced: adjust search plan first"],
+    ["research.advancedPlanToggle", "生成需求确认", "Generate search brief"],
   ];
 
   for (const [key, zh, en, zhParams, enParams] of keys) {
@@ -480,7 +480,11 @@ test("translates project detail status labels", () => {
     ["projects.detail.status.open", "进行中", "Open"],
     ["projects.detail.status.paused", "暂停", "Paused"],
     ["projects.detail.status.closed", "已关闭", "Closed"],
-    ["projects.detail.candidateStatus.new", "待联系", "New"],
+    ["projects.detail.candidateStatus.new", "新候选人", "New"],
+    ["projects.detail.candidateStatus.shortlisted", "已入围", "Shortlisted"],
+    ["projects.detail.candidateStatus.needsEvidence", "需补证据", "Needs evidence"],
+    ["projects.detail.candidateStatus.outreachDrafted", "外联草稿", "Outreach drafted"],
+    ["projects.detail.candidateStatus.passed", "已 pass", "Passed"],
     ["projects.detail.candidateStatus.contacted", "已联系", "Contacted"],
     ["projects.detail.candidateStatus.interviewing", "面试中", "Interviewing"],
     ["projects.detail.candidateStatus.hired", "已 hire", "Hired"],

@@ -971,6 +971,72 @@ export function buildSearchIntakeDraft(query, { locale = "zh" } = {}) {
   return draft;
 }
 
+const ROLE_BRIEF_SOURCE_LABELS = {
+  natural_language: "Natural language",
+  jd_file: "JD file",
+  job_url: "Job URL",
+  linkedin_url: "LinkedIn URL",
+  similar_profile: "Similar profile",
+  existing_brief: "Existing brief",
+};
+
+function normalizeRoleBriefSourceType(sourceType, value) {
+  const explicit = cleanString(sourceType).toLowerCase();
+  if (Object.prototype.hasOwnProperty.call(ROLE_BRIEF_SOURCE_LABELS, explicit)) return explicit;
+  const text = cleanString(value);
+  if (/linkedin\.com\/(in|pub|company|jobs)\//i.test(text)) return "linkedin_url";
+  if (/^https?:\/\//i.test(text)) return "job_url";
+  return "natural_language";
+}
+
+function roleBriefSourcePrefix(type, value, locale) {
+  if (type === "natural_language") return cleanString(value);
+  const label = ROLE_BRIEF_SOURCE_LABELS[type] ?? ROLE_BRIEF_SOURCE_LABELS.natural_language;
+  const prefix = locale === "en" ? `${label}:` : `${label}：`;
+  return `${prefix} ${cleanString(value)}`.trim();
+}
+
+export function buildRoleBriefDraft(value, { locale = "zh", sourceType } = {}) {
+  const normalizedLocale = locale === "en" ? "en" : "zh";
+  const type = normalizeRoleBriefSourceType(sourceType, value);
+  const query = roleBriefSourcePrefix(type, value, normalizedLocale);
+  const draft = buildSearchIntakeDraft(query, { locale: normalizedLocale });
+  const channelPreview = (draft.channel_plan ?? []).slice(0, 4).map((item) => item.label || item.key).filter(Boolean);
+  return {
+    ...draft,
+    intake_source: {
+      type,
+      label: ROLE_BRIEF_SOURCE_LABELS[type] ?? ROLE_BRIEF_SOURCE_LABELS.natural_language,
+      value: cleanString(value),
+    },
+    confirmation: {
+      required_before_search: true,
+      summary: normalizedLocale === "en"
+        ? "Confirm this role brief before deep research so the search does not run from unreviewed input."
+        : "先确认岗位理解，再启动深度搜索，避免把未复核的输入直接当成搜索任务。",
+      primary_action: normalizedLocale === "en" ? "Confirm role brief and start deep research" : "确认岗位画像并开始深度搜索",
+      secondary_action: normalizedLocale === "en" ? "Adjust role brief" : "继续调整岗位画像",
+    },
+    search_plan_preview: [
+      {
+        key: "must_have",
+        label: normalizedLocale === "en" ? "Must-have constraints" : "必须条件",
+        value: draft.must_have.join("; "),
+      },
+      {
+        key: "evidence_channels",
+        label: normalizedLocale === "en" ? "Channel plan" : "渠道计划",
+        value: channelPreview.join("; "),
+      },
+      {
+        key: "ranking",
+        label: normalizedLocale === "en" ? "Ranking signals" : "排序依据",
+        value: (draft.score_dimensions ?? []).slice(0, 3).map((item) => item.label).join("; "),
+      },
+    ].filter((item) => item.value),
+  };
+}
+
 export function buildSearchIntakeQuestions(draft, { locale = "zh" } = {}) {
   const source = isPlainObject(draft) ? draft : {};
   const unknowns = Array.isArray(source.unknowns) && source.unknowns.length ? source.unknowns : defaultIntakeUnknowns(source);
@@ -2247,7 +2313,10 @@ const SEARCH_WORKSPACE_COPY = {
     summary: "共发现 {count} 位候选人，优先查看 {top}；证据覆盖 {covered}/{total}。",
     summaryNoCandidates: "本轮搜索没有返回可审阅候选人，建议调整条件后重试。",
     logSummary: "研究日志默认折叠，保留搜索计划、来源执行和补证据线索。",
-    emailReason: "商业化入口已预留：后续接入联系方式富集、扣点确认和合规来源记录。",
+    handoffReason: "生成可分享的证据摘要，给 hiring manager 做人工审阅。",
+    interviewQuestion: "面试时请复核：{risk}",
+    evidenceQuestion: "请候选人补充能证明「{claim}」的公开来源或案例。",
+    strengthQuestion: "请候选人展开说明：{signal}",
   },
   en: {
     complete: "Search complete",
@@ -2264,7 +2333,10 @@ const SEARCH_WORKSPACE_COPY = {
     summary: "Found {count} candidates. Review {top} first; source coverage {covered}/{total}.",
     summaryNoCandidates: "No reviewable candidates returned. Adjust the brief and try again.",
     logSummary: "Research log is collapsed by default and keeps search plan, source execution, and backfill leads.",
-    emailReason: "Commercial entry reserved: contact enrichment, credit confirmation, and compliant source logging can attach here.",
+    handoffReason: "Create a shareable evidence brief for hiring-manager review.",
+    interviewQuestion: "In interview, verify: {risk}",
+    evidenceQuestion: "Ask the candidate for public evidence or examples supporting: {claim}.",
+    strengthQuestion: "Ask the candidate to walk through this evidence-backed signal: {signal}.",
   },
 };
 
@@ -2519,6 +2591,24 @@ export function buildSearchResultWorkspace(result, { locale = "zh", stats = {} }
       || cleanStringArray(audit.weakest_evidence, 1)[0]
       || cleanStringArray(audit.unverified_claims, 1)[0]
       || searchWorkspaceCopy(normalizedLocale, "noRisk");
+    const riskFlags = uniqueStrings([
+      ...cleanStringArray(audit.risk_flags, 4),
+      ...cleanStringArray(candidate.uncertainties, 4),
+      ...cleanStringArray(audit.identity_risks, 4),
+      ...cleanStringArray(audit.recency_notes, 4),
+    ], 6);
+    const unverifiedClaims = cleanStringArray(audit.unverified_claims, 6);
+    const strongestEvidence = uniqueStrings([
+      ...cleanStringArray(audit.strongest_evidence, 4),
+      ...cleanStringArray(candidate.strongest_signals, 4),
+    ], 5);
+    const nextInterviewQuestions = uniqueStrings([
+      primaryRisk && primaryRisk !== searchWorkspaceCopy(normalizedLocale, "noRisk")
+        ? searchWorkspaceCopy(normalizedLocale, "interviewQuestion", { risk: primaryRisk })
+        : "",
+      ...unverifiedClaims.slice(0, 2).map((claim) => searchWorkspaceCopy(normalizedLocale, "evidenceQuestion", { claim })),
+      strongestEvidence[0] ? searchWorkspaceCopy(normalizedLocale, "strengthQuestion", { signal: strongestEvidence[0] }) : "",
+    ], 3);
     return {
       index,
       name: candidate.name,
@@ -2530,12 +2620,21 @@ export function buildSearchResultWorkspace(result, { locale = "zh", stats = {} }
       source_types: audit.source_types,
       match_reason: matchReason,
       primary_risk: primaryRisk,
+      strongest_evidence: strongestEvidence,
+      risk_flags: riskFlags,
+      unverified_claims: unverifiedClaims,
+      claim_counts: {
+        verified: audit.verified_count,
+        unverified: audit.unverified_count,
+        contradicted: audit.contradicted_count,
+      },
+      next_interview_questions: nextInterviewQuestions,
+      outreach_angle: candidate.outreach_angle || matchReason,
       bucket,
-      commercial_action: {
-        label: "Get email -10",
-        cost: 10,
+      handoff_action: {
+        label: normalizedLocale === "en" ? "Share evidence brief" : "分享证据摘要",
         enabled: true,
-        reason: searchWorkspaceCopy(normalizedLocale, "emailReason"),
+        reason: searchWorkspaceCopy(normalizedLocale, "handoffReason"),
       },
       submission: agentExecution.candidate_submission_events.find((event) => event.candidate_index === index) ?? null,
     };
@@ -2583,6 +2682,12 @@ export function buildSearchResultWorkspace(result, { locale = "zh", stats = {} }
     candidates,
     groups,
     selected_candidate_index: selected?.index ?? null,
+    delivery_report: {
+      title: "Evidence-qualified shortlist",
+      ready_for_hiring_manager: candidates.length > 0,
+      summary,
+      next_steps: buildShortlistDeliveryReport(normalized, { locale: normalizedLocale }).next_steps,
+    },
     agent_execution: agentExecution,
     delivery_clusters: agentExecution.delivery_clusters,
     research_log: {

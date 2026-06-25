@@ -14,6 +14,8 @@ if (!BASE || !KEY) {
 const migrations = [
   "20260612110000_candidate-profile-cache.sql",
   "20260615100000_dinq-recruiting-agent-mvp.sql",
+  "20260624170000_autonomous_recruiter_p1a_gmail_outreach.sql",
+  "20260624190000_autonomous_recruiter_p2a_inbox_agent.sql",
 ];
 
 async function applyMigration(fileName) {

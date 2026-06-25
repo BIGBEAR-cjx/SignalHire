@@ -3,6 +3,7 @@
 //   PATCH { name?, brief?, status?, color? } → 编辑
 //   DELETE → 删除 (关联候选人/历史 project_id 置 NULL, 不删除)
 import {
+  buildProjectCandidateGraphView,
   deleteProject,
   getProject,
   projectCandidateBreakdown,
@@ -13,6 +14,8 @@ import {
 } from "@/lib/projects";
 import { listSearchTasks } from "@/lib/search-tasks";
 import { listOutreachQueue } from "@/lib/outreach-threads";
+import { buildProjectInboxQueueView } from "@/lib/inbox";
+import { ingestProjectRunCandidates } from "@/lib/shortlist";
 import { normalizeLocale, t } from "@/lib/i18n.mjs";
 import { getUser } from "@/lib/session";
 
@@ -35,8 +38,28 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
     listOutreachQueue({ userId: user.id, projectId: id }),
   ]);
   if (!project) return Response.json({ error: t(locale, "api.error.projectNotFound") }, { status: 404 });
+  await Promise.all(runs
+    .filter((run) => run.kind === "search" && run.status === "done" && run.result)
+    .map((run) => ingestProjectRunCandidates({
+      userId: user.id,
+      projectId: id,
+      sourceRunId: run.id,
+      result: run.result,
+    })));
+  const [freshProject, freshBreakdown] = await Promise.all([
+    getProject(user.id, id),
+    projectCandidateBreakdown(user.id, id),
+  ]);
 
-  return Response.json({ project, breakdown, runs, searchTasks, outreachQueue });
+  return Response.json({
+    project: freshProject ?? project,
+    breakdown: freshBreakdown ?? breakdown,
+    runs,
+    searchTasks,
+    outreachQueue,
+    inboxQueue: await buildProjectInboxQueueView(user.id, id),
+    candidateGraph: await buildProjectCandidateGraphView(user.id, id),
+  });
 }
 
 export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }> }) {

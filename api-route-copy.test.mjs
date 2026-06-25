@@ -86,6 +86,8 @@ test("AI talent cache migration can be applied without jq", () => {
   assert.match(pkg, /"migrate:ai-cache": "node --env-file-if-exists=\.env\.local scripts\/apply-ai-talent-cache-migration\.mjs"/);
   assert.match(source, /20260612110000_candidate-profile-cache\.sql/);
   assert.match(source, /20260615100000_dinq-recruiting-agent-mvp\.sql/);
+  assert.match(source, /20260624170000_autonomous_recruiter_p1a_gmail_outreach\.sql/);
+  assert.match(source, /20260624190000_autonomous_recruiter_p2a_inbox_agent\.sql/);
   assert.match(source, /advance\/rawsql/);
   assert.match(source, /INSFORGE_API_BASE_URL/);
   assert.doesNotMatch(source, /jq/);
@@ -96,7 +98,7 @@ test("DINQ recruiting UI wires follow-up controls and related talent context", (
   const shortlist = readFileSync("web/app/app/shortlist/page.tsx", "utf8");
   const outreachModal = readFileSync("web/components/OutreachModal.tsx", "utf8");
 
-  assert.match(projectDetail, /function OutreachQueuePanel/);
+  assert.match(projectDetail, /function GmailOutreachPanel/);
   assert.match(projectDetail, /updateOutreachThread/);
   assert.match(projectDetail, /next_follow_up_at/);
   assert.match(projectDetail, /discovery_items/);
@@ -164,6 +166,59 @@ test("verify workspace exposes resume and supporting material uploads", () => {
   assert.match(source, /research\.jdUploadButton/);
   assert.match(source, /supportingMaterialUploadButton/);
   assert.doesNotMatch(source, /educationMaterialUploadDrop|educationMaterialUploadButton/);
+});
+
+test("search intake exposes low-friction role inputs and avoids contact unlock", () => {
+  const researchTool = readFileSync("web/components/ResearchTool.tsx", "utf8");
+  const workspace = readFileSync("web/components/research-workspace.tsx", "utf8");
+  const resultComponents = readFileSync("web/components/result.tsx", "utf8");
+  const roleIntakeRoute = readFileSync("web/app/api/role-intake/route.ts", "utf8");
+
+  assert.match(researchTool, /buildRoleBriefDraft/);
+  assert.match(researchTool, /\/api\/role-intake/);
+  assert.match(researchTool, /"job_url"/);
+  assert.match(researchTool, /"linkedin_url"/);
+  assert.match(researchTool, /"similar_profile"/);
+  assert.match(researchTool, /"existing_brief"/);
+  assert.match(workspace, /roleSourceValues/);
+  assert.match(workspace, /placeholderKey/);
+  assert.match(workspace, /research\.roleIntake\.jobUrl/);
+  assert.match(workspace, /research\.roleIntake\.similarProfile/);
+  assert.doesNotMatch(workspace, /onRoleSource\(item\.key,\s*input\)/);
+  assert.match(roleIntakeRoute, /fetchRoleSourceText/);
+  assert.match(roleIntakeRoute, /source_extraction/);
+  assert.match(resultComponents, /handoff_action/);
+  assert.doesNotMatch(`${researchTool}\n${resultComponents}`, /Get email -10|contact enrichment|联系方式富集|commercial_action/);
+});
+
+test("role workspace exposes PRD candidate statuses and run candidate ingestion", () => {
+  const shortlist = readFileSync("web/lib/shortlist.ts", "utf8");
+  const projects = readFileSync("web/lib/projects.ts", "utf8");
+  const projectPage = readFileSync("web/app/app/projects/[id]/page.tsx", "utf8");
+  const route = readFileSync("web/app/api/shortlist/route.ts", "utf8");
+
+  assert.match(shortlist, /"shortlisted"/);
+  assert.match(shortlist, /"needs_evidence"/);
+  assert.match(shortlist, /"outreach_drafted"/);
+  assert.match(shortlist, /"passed"/);
+  assert.match(shortlist, /ingestProjectRunCandidates/);
+  assert.match(shortlist, /makeProjectCandidateDedupKey/);
+  assert.match(projects, /status IN \('shortlisted','interviewing','hired'\)/);
+  assert.match(projects, /status IN \('outreach_drafted','contacted'\)/);
+  assert.match(projectPage, /candidateStatus\.needsEvidence/);
+  assert.match(projectPage, /candidateDisplayStatus/);
+  assert.match(route, /ingestProjectRunCandidates/);
+});
+
+test("evidence-qualified workspace shows delivery summary and claim counts", () => {
+  const resultComponents = readFileSync("web/components/result.tsx", "utf8");
+  const talentProfile = readFileSync("web/lib/talent-profile.mjs", "utf8");
+
+  assert.match(resultComponents, /highConfidenceCount/);
+  assert.match(resultComponents, /needsVerificationCount/);
+  assert.match(resultComponents, /majorGapLabel/);
+  assert.match(resultComponents, /row\.claim_counts\.verified/);
+  assert.match(talentProfile, /claim_counts/);
 });
 
 test("claims expose a unified supplement-material entry", () => {
@@ -329,7 +384,8 @@ test("dashboard account requests include the active locale", () => {
   const settings = readFileSync("web/app/app/settings/page.tsx", "utf8");
 
   assert.match(overview, /fetch\(`\/api\/overview\?locale=\$\{locale\}`\)/);
-  assert.match(history, /fetch\(`\/api\/history\?locale=\$\{locale\}`\)/);
+  assert.match(history, /fetch\(`\/api\/history\?\$\{filtersToParams\(filters, locale, cursor\)\.toString\(\)\}`\)/);
+  assert.match(history, /new URLSearchParams\(\{ locale, limit: "30" \}\)/);
   assert.match(settings, /fetch\(`\/api\/whoami\?locale=\$\{locale\}`\)/);
 });
 
@@ -395,4 +451,142 @@ test("shortlist item requests include the active locale", () => {
   assert.match(projectPage, /JSON\.stringify\(\{ \.\.\.body, locale \}\)/);
   assert.match(projectPage, /fetch\(`\/api\/shortlist\/\$\{item\.id\}\?locale=\$\{locale\}`,\s*\{ method: "DELETE" \}\)/);
   assert.match(projectPage, /JSON\.stringify\(\{ project_id: null, locale \}\)/);
+});
+
+test("project detail API returns autonomous sourcing candidate graph", () => {
+  const route = readFileSync("web/app/api/projects/[id]/route.ts", "utf8");
+  const projects = readFileSync("web/lib/projects.ts", "utf8");
+
+  assert.match(projects, /buildProjectCandidateGraphView/);
+  assert.match(projects, /buildCandidateGraph/);
+  assert.match(projects, /candidateGraph/);
+  assert.match(route, /candidateGraph: await buildProjectCandidateGraphView/);
+});
+
+test("role workspace renders autonomous sourcing graph panel", () => {
+  const page = readFileSync("web/app/app/projects/[id]/page.tsx", "utf8");
+
+  assert.match(page, /AutonomousSourcingPanel/);
+  assert.match(page, /candidateGraph/);
+  assert.match(page, /ready_for_outreach_count/);
+  assert.match(page, /needs_verification_count/);
+  assert.match(page, /source_mix/);
+  assert.match(page, /candidate\.source_types/);
+});
+
+test("project run ingestion preserves candidate source nodes", () => {
+  const shortlist = readFileSync("web/lib/shortlist.ts", "utf8");
+
+  assert.match(shortlist, /withCandidateSourceNodes/);
+  assert.match(shortlist, /source_nodes/);
+  assert.match(shortlist, /source_type: "public_web"/);
+  assert.match(shortlist, /source_type: "linkedin_seed"/);
+});
+
+test("Gmail integration routes and send route stay server-side and scope-limited", () => {
+  const statusRoute = readFileSync("web/app/api/integrations/gmail/status/route.ts", "utf8");
+  const connectRoute = readFileSync("web/app/api/integrations/gmail/connect/route.ts", "utf8");
+  const callbackRoute = readFileSync("web/app/api/integrations/gmail/callback/route.ts", "utf8");
+  const disconnectRoute = readFileSync("web/app/api/integrations/gmail/disconnect/route.ts", "utf8");
+  const sendRoute = readFileSync("web/app/api/outreach-threads/[id]/send/route.ts", "utf8");
+  const gmailLib = readFileSync("web/lib/gmail.ts", "utf8");
+  const pureLib = readFileSync("web/lib/gmail-outreach.mjs", "utf8");
+
+  assert.match(statusRoute, /getGmailConnectionStatus/);
+  assert.match(connectRoute, /buildConnectUrl/);
+  assert.match(callbackRoute, /exchangeGmailCodeForTokens/);
+  assert.match(disconnectRoute, /disconnectGmail/);
+  assert.match(sendRoute, /sendApprovedOutreachThread/);
+  assert.match(gmailLib, /send_state_update_failed/);
+  assert.match(gmailLib, /if \(!updated\)/);
+  assert.match(gmailLib, /GOOGLE_CLIENT_SECRET/);
+  assert.match(gmailLib, /GMAIL_TOKEN_ENCRYPTION_KEY/);
+  assert.match(gmailLib, /buildGmailAuthUrl/);
+  assert.match(pureLib, /gmail\.send/);
+  assert.match(pureLib, /gmail\.readonly/);
+  assert.doesNotMatch(pureLib, /gmail\.modify/);
+});
+
+test("outreach schema migration adds Gmail connection and send lifecycle fields", () => {
+  const migration = readFileSync("migrations/20260624170000_autonomous_recruiter_p1a_gmail_outreach.sql", "utf8");
+
+  assert.match(migration, /create table if not exists public\.gmail_connections/);
+  assert.match(migration, /encrypted_token_bundle/);
+  assert.match(migration, /alter table public\.outreach_threads/);
+  assert.match(migration, /add column if not exists contact_profile jsonb/);
+  assert.match(migration, /add column if not exists sequence_messages jsonb/);
+  assert.match(migration, /gmail_message_id/);
+  assert.match(migration, /gmail_thread_id/);
+});
+
+test("role workspace exposes controlled Gmail outreach actions", () => {
+  const page = readFileSync("web/app/app/projects/[id]/page.tsx", "utf8");
+
+  assert.match(page, /GmailOutreachPanel/);
+  assert.match(page, /\/api\/integrations\/gmail\/status/);
+  assert.match(page, /\/api\/integrations\/gmail\/connect/);
+  assert.match(page, /approveOutreachThread/);
+  assert.match(page, /sendOutreachThread/);
+  assert.match(page, /contactability_score/);
+  assert.match(page, /confidence/);
+  assert.match(page, /source/);
+});
+
+test("Gmail inbox agent persists only role-related threads and renders queues", () => {
+  const migration = readFileSync("migrations/20260624190000_autonomous_recruiter_p2a_inbox_agent.sql", "utf8");
+  const inboxLib = readFileSync("web/lib/inbox.ts", "utf8");
+  const inboxAgent = readFileSync("web/lib/inbox-agent.mjs", "utf8");
+  const syncRoute = readFileSync("web/app/api/inbox/gmail/sync/route.ts", "utf8");
+  const projectRoute = readFileSync("web/app/api/projects/[id]/route.ts", "utf8");
+  const projectPage = readFileSync("web/app/app/projects/[id]/page.tsx", "utf8");
+
+  assert.match(migration, /create table if not exists public\.inbox_threads/);
+  assert.match(migration, /classification/);
+  assert.match(inboxLib, /listRoleRelatedOutreachThreads/);
+  assert.match(inboxLib, /gmail_thread_id/);
+  assert.match(inboxLib, /latestCandidateMessage/);
+  assert.match(inboxLib, /status\.gmail_address/);
+  assert.match(inboxAgent, /classifyInboxReply/);
+  assert.match(syncRoute, /syncGmailInboxForProject/);
+  assert.match(projectRoute, /inboxQueue: await buildProjectInboxQueueView/);
+  assert.match(projectPage, /InboxAgentPanel/);
+  assert.match(projectPage, /Interested Candidate Queue/);
+});
+
+test("Apollo provider pull is tenant-scoped and writes low-evidence project candidates", () => {
+  const route = readFileSync("web/app/api/providers/apollo/search/route.ts", "utf8");
+  const providers = readFileSync("web/lib/people-providers.mjs", "utf8");
+  const projectPage = readFileSync("web/app/app/projects/[id]/page.tsx", "utf8");
+
+  assert.match(route, /getUser/);
+  assert.match(route, /getProject\(user\.id, projectId\)/);
+  assert.match(route, /searchApolloPeople/);
+  assert.match(route, /apolloRowsToShortlistCandidates/);
+  assert.match(route, /addItem/);
+  assert.match(route, /status: "needs_evidence"/);
+  assert.match(providers, /buildApolloContactsSearchRequest/);
+  assert.match(providers, /mixed_people\/api_search/);
+  assert.match(providers, /contacts\/search/);
+  assert.match(projectPage, /pullApolloCandidates/);
+  assert.match(projectPage, /Apollo/);
+});
+
+test("OpenJobs Mira provider pull is tenant-scoped and writes low-evidence project candidates", () => {
+  const route = readFileSync("web/app/api/providers/openjobs/search/route.ts", "utf8");
+  const routeCore = readFileSync("web/lib/openjobs-route.mjs", "utf8");
+  const provider = readFileSync("web/lib/openjobs-provider.mjs", "utf8");
+  const projectPage = readFileSync("web/app/app/projects/[id]/page.tsx", "utf8");
+
+  assert.match(route, /getUser/);
+  assert.match(route, /runOpenJobsProviderSearch/);
+  assert.match(route, /getProject/);
+  assert.match(route, /searchMiraPeople/);
+  assert.match(route, /miraProfilesToShortlistCandidates/);
+  assert.match(route, /addItem/);
+  assert.match(routeCore, /getProject\(user\.id, projectId\)/);
+  assert.match(routeCore, /status: "needs_evidence"/);
+  assert.match(provider, /people-search/);
+  assert.match(provider, /detail-by-id/);
+  assert.match(projectPage, /pullOpenJobsCandidates/);
+  assert.match(projectPage, /OpenJobs/);
 });
