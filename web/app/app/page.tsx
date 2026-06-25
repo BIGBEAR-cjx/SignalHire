@@ -18,6 +18,7 @@ import {
   SecondaryAction,
   Surface,
 } from "@/components/ui/signal-ui";
+import { buildResearchRunHref } from "@/lib/research-polling.mjs";
 
 interface Kpi {
   searches_this_month: number;
@@ -32,6 +33,7 @@ interface ActiveJob {
   label: string;
   status: string;
   updated_at: string | null;
+  project_id: string | null;
 }
 interface RecentRun {
   kind: "search" | "verify";
@@ -216,12 +218,14 @@ export default function Overview() {
           {data && data.active_jobs.length > 0 && (
             <ul className="mt-5 space-y-2">
               {data.active_jobs.map((j) => (
-                <li key={j.id} className="flex items-start justify-between gap-3 rounded-2xl bg-white/80 p-3.5 ring-1 ring-black/5">
+                <li key={j.id}>
+                  <Link href={buildResearchRunHref({ kind: j.kind, id: j.id, projectId: j.project_id })} className="flex items-start justify-between gap-3 rounded-2xl bg-white/80 p-3.5 ring-1 ring-black/5 transition hover:bg-white">
                   <span className="flex min-w-0 flex-1 items-start gap-2">
                     <KindBadge kind={j.kind} />
                     <span className="min-w-0 truncate text-sm text-[var(--sh-ink)]" title={j.label}>{j.label}</span>
                   </span>
                   <StatusDot status={j.status} />
+                  </Link>
                 </li>
               ))}
             </ul>

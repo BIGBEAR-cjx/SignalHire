@@ -48,6 +48,7 @@ import {
 } from "@/lib/talent-profile.mjs";
 import type { BackfillMergeSummary, CoverageBackfillJob, TalentCandidate, TalentSearchResult } from "@/lib/talent-profile.mjs";
 import { buildResearchLoopView, buildSearchConstraintEditor, buildSearchInputFromConstraintEditor } from "@/lib/research-loop.mjs";
+import { nextResearchPollDelayMs, RESEARCH_POLL_SLOW_AFTER_MS } from "@/lib/research-polling.mjs";
 import { buildEvidencePriorityView } from "@/lib/evidence-priority.mjs";
 import { extractPdfTextFromFile } from "@/lib/client-resume-extract";
 import { MAX_RESUME_FILE_BYTES, detectSupportedResumeFileType } from "@/lib/resume-upload-constraints.mjs";
@@ -124,7 +125,6 @@ const buildIntakeSearchInput = buildSearchInputFromSearchIntake as (input: { dra
 const buildRoleBrief = buildRoleBriefDraft as (value: string, options: { locale: string; sourceType: RoleIntakeSourceType }) => SearchIntakeDraft;
 
 const WORKER_DELAY_MS = 2 * 60 * 1000;
-const JOB_TIMEOUT_MS = 15 * 60 * 1000;
 
 function isVerifyReport(result: AppResult): result is VerifyReport {
   return "claims" in result;
@@ -379,6 +379,13 @@ function IntakeList({
 }
 
 function userFacingStatus(view: JobStatusView, elapsedMs: number, t: (key: string, params?: Record<string, string | number>) => string): JobStatusView {
+  if ((view.phase === "queued" || view.phase === "running") && elapsedMs >= RESEARCH_POLL_SLOW_AFTER_MS) {
+    return {
+      ...view,
+      label: t("research.status.background.label"),
+      detail: t("research.status.background.detail"),
+    };
+  }
   if (view.phase === "queued" && elapsedMs > WORKER_DELAY_MS) {
     return {
       ...view,
@@ -444,11 +451,14 @@ export default function ResearchTool({
   const [advancedDetailsOpen, setAdvancedDetailsOpen] = useState(false);
   const idRef = useRef(0);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const pollGenerationRef = useRef(0);
   const abortRef = useRef<AbortController | null>(null);
   const runTokenRef = useRef(0);
+  const ranAuto = useRef(false);
   const appliedPreferenceRef = useRef("");
 
   function stopPolling() {
+    pollGenerationRef.current += 1;
     if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null; }
   }
   useEffect(() => stopPolling, []);
@@ -465,23 +475,27 @@ export default function ResearchTool({
     });
   }, [initialInput, mode, projectFeedbackPreference?.optimizedInput]);
 
+  function syncRunParam(jobId: string | null) {
+    if (typeof window === "undefined") return;
+    const url = new URL(window.location.href);
+    if (jobId) url.searchParams.set("run", jobId);
+    else url.searchParams.delete("run");
+    window.history.replaceState(null, "", `${url.pathname}${url.search}${url.hash}`);
+  }
+
   function beginPolling(jobId: string, context?: BackfillContext, token = runTokenRef.current) {
     stopPolling();
+    const generation = pollGenerationRef.current + 1;
+    pollGenerationRef.current = generation;
     const startedAt = Date.now();
     let pollFailures = 0;
-    pollRef.current = setInterval(async () => {
-      if (token !== runTokenRef.current) return;
+    const poll = async () => {
+      if (token !== runTokenRef.current || generation !== pollGenerationRef.current) return;
       const elapsedMs = Date.now() - startedAt;
-      if (elapsedMs > JOB_TIMEOUT_MS) {
-        stopPolling();
-        setError(t("research.status.timeout"));
-        setLoading(false);
-        return;
-      }
       try {
         const r = await fetch(`/api/status?id=${encodeURIComponent(jobId)}&locale=${locale}`);
         const j: StatusResponse = await r.json();
-        if (token !== runTokenRef.current) return;
+        if (token !== runTokenRef.current || generation !== pollGenerationRef.current) return;
         pollFailures = 0;
         if (j.status_view) setJobStatus(userFacingStatus(j.status_view, elapsedMs, t));
         const p = j.progress;
@@ -504,10 +518,12 @@ export default function ResearchTool({
           setStats(p ? { searches: p.searches ?? 0, fetches: p.fetches ?? 0 } : null);
           setRunId(j.runId ?? jobId);
           setLoading(false);
+          syncRunParam(null);
         } else if (j.status === "canceled") {
           stopPolling();
           if (j.status_view) setJobStatus(j.status_view);
           setLoading(false);
+          syncRunParam(null);
         } else if (j.status === "error") {
           stopPolling();
           setError(j.error || t("research.error.failed"));
@@ -523,8 +539,13 @@ export default function ResearchTool({
             canRetry: false,
           });
         }
+      } finally {
+        if (token === runTokenRef.current && generation === pollGenerationRef.current) {
+          pollRef.current = setTimeout(poll, nextResearchPollDelayMs(Date.now() - startedAt));
+        }
       }
-    }, 2000);
+    };
+    pollRef.current = setTimeout(poll, 0);
   }
 
   async function run(override?: string, options: { preserveInput?: boolean } = {}) {
@@ -541,6 +562,7 @@ export default function ResearchTool({
     setSelectedCandidateIndex(null); setShortlist([]);
     setFeed([]); setLive(null); setRunId(null); setCurrentJobId(null);
     setJobStatus(null); setCopied(false); setBackfillContext(null); setBackfillMergeSummary(null);
+    syncRunParam(null);
     setMergingBackfill(false); setMergedOriginalRunId(null);
     setHandoffMessage("");
     setCandidateDecisions({});
@@ -600,6 +622,7 @@ export default function ResearchTool({
         if (!res.ok) { setError(j.error ?? `HTTP ${res.status}`); setLoading(false); return; }
         if (j.queued && j.jobId) {
           setCurrentJobId(j.jobId);
+          syncRunParam(j.jobId);
           setJobStatus({ phase: "queued", label: t("research.status.queued.label"), detail: t("research.status.queued.detail"), canRetry: false });
           beginPolling(j.jobId, undefined, token);
         } else {
@@ -923,6 +946,7 @@ export default function ResearchTool({
       canRetry: false,
     });
     setCurrentJobId(null);
+    syncRunParam(null);
     if (jobId) {
       fetch("/api/cancel", {
         method: "POST",
@@ -946,6 +970,7 @@ export default function ResearchTool({
       const j: StatusResponse & { retried?: boolean } = await res.json().catch(() => ({}));
       if (!res.ok) { setError(j.error || `HTTP ${res.status}`); setLoading(false); return; }
       if (j.status_view) setJobStatus(j.status_view);
+      syncRunParam(currentJobId);
       beginPolling(currentJobId);
     } catch (e) {
       setError((e as Error).message);
@@ -959,6 +984,7 @@ export default function ResearchTool({
     setLoading(true); setError(""); setStats(null); setFeed([]); setLive(null);
     setJobStatus({ phase: "queued", label: t("research.status.backfillQueued.label"), detail: t("research.status.backfillQueued.detail"), canRetry: false });
     setCurrentJobId(null);
+    syncRunParam(null);
     const context = { originalResult: result, originalRunId: runId, job };
     setBackfillContext(context);
     setBackfillMergeSummary(null);
@@ -979,6 +1005,7 @@ export default function ResearchTool({
       if (!res.ok) { setError(j.error ?? `HTTP ${res.status}`); setLoading(false); return; }
       if (j.queued && j.jobId) {
         setCurrentJobId(j.jobId);
+        syncRunParam(j.jobId);
         beginPolling(j.jobId, context);
       } else {
         setError(j.error ?? t("research.error.backfillQueued")); setLoading(false);
@@ -1019,8 +1046,26 @@ export default function ResearchTool({
     }
   }
 
+  // URL 带 run 时直接恢复轮询 (刷新/总览跳回进行中任务)
+  useEffect(() => {
+    if (typeof window === "undefined" || ranAuto.current) return;
+    const jobId = new URL(window.location.href).searchParams.get("run")?.trim();
+    if (!jobId) return;
+    ranAuto.current = true;
+    setLoading(true);
+    setError("");
+    setResult(null);
+    setStats(null);
+    setFeed([]);
+    setLive(null);
+    setRunId(null);
+    setCurrentJobId(jobId);
+    setJobStatus({ phase: "queued", label: t("research.status.requeued.label"), detail: t("research.status.requeued.detail"), canRetry: false });
+    beginPolling(jobId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // 进页面就自动跑 (hero 跳过来 / 历史回放)
-  const ranAuto = useRef(false);
   useEffect(() => {
     if (autoRun && initialInput && !ranAuto.current) {
       ranAuto.current = true;

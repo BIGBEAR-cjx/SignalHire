@@ -1091,6 +1091,7 @@ export interface ActiveJob {
   label: string;
   status: string;
   updated_at: string | null;
+  project_id: string | null;
 }
 
 // 一次性聚合 4 个 KPI: 本月搜人 / 总核验 / 总收藏 / 总红旗 (verify 中 overall_trust=low)。
@@ -1128,7 +1129,7 @@ export async function activeJobs(userId: string, limit = 10): Promise<ActiveJob[
   try {
     const { data, error } = await client.database
       .from(TABLE)
-      .select("id,kind,label,status,updated_at")
+      .select("id,kind,label,status,updated_at,project_id")
       .eq("user_id", userId)
       .in("status", ["queued", "running", "retrying"])
       .order("updated_at", { ascending: false })

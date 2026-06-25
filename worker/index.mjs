@@ -11,6 +11,7 @@ import { createClient } from "@insforge/sdk";
 import { streamResearch, parseJson, normalizeResult, searchPrompt, verifyPrompt } from "./lib.mjs";
 import { buildOpenEvidenceLeadRowsForRun, runOpenEvidenceSourcePrecheck } from "./open-evidence-sources.mjs";
 import { fillWorkerPool, normalizeWorkerConcurrency, waitForWorkerPool } from "./pool.mjs";
+import { startRunHeartbeat } from "./run-heartbeat.mjs";
 import { buildCandidateEvidenceSourceRowsForRun, buildCandidateProfileRowsForRun } from "./talent-profile.mjs";
 import {
   buildRunFailureUpdate,
@@ -537,6 +538,8 @@ async function runOpenEvidencePrecheck(queryText, searchStrategy = null) {
 
 async function runJob(job) {
   console.log(`[${new Date().toISOString()}] 认领任务 ${job.id} (${job.kind})`);
+  const stopHeartbeat = startRunHeartbeat({ db, table: TABLE, jobId: job.id });
+  try {
   const queryText = typeof job.progress?.original_query === "string" ? job.progress.original_query : job.query_text;
   const platformLanguage = typeof job.progress?.platform_language === "string" ? job.progress.platform_language : undefined;
   const candidateHints = Array.isArray(job.progress?.candidate_profile_hints) ? job.progress.candidate_profile_hints : [];
@@ -674,6 +677,9 @@ async function runJob(job) {
       await sleep(1500);
     }
     console.error(`[${new Date().toISOString()}] 任务 ${job.id} ${failureRow.status === "retrying" ? "等待重试" : "失败"}:`, failureRow.last_error);
+  }
+  } finally {
+    stopHeartbeat();
   }
 }
 
