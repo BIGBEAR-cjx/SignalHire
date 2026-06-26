@@ -83,6 +83,34 @@ function listFrom(value, limit = 3) {
   return Array.isArray(value) ? value.map(cleanString).filter(Boolean).slice(0, limit) : [];
 }
 
+function validIso(value) {
+  const clean = cleanString(value);
+  if (!clean) return "";
+  const date = new Date(clean);
+  return Number.isFinite(date.getTime()) ? date.toISOString() : "";
+}
+
+function sequenceMessages(value) {
+  return Array.isArray(value) ? value.filter(isRecord) : [];
+}
+
+function followUpDraft(item) {
+  const messages = sequenceMessages(item.sequence_messages);
+  const sequenced = messages.find((message) => Number(message.step) === 2 || Number(message.step) === 3);
+  const sequencedBody = cleanString(sequenced?.body);
+  if (sequencedBody) return sequencedBody;
+
+  const snapshot = isRecord(item.candidate_snapshot) ? item.candidate_snapshot : {};
+  const candidateName = cleanString(item.candidate_name) || "there";
+  const hooks = [
+    ...listFrom(snapshot.strongest_evidence || snapshot.strongest_signals, 2),
+    cleanString(snapshot.outreach_angle),
+    cleanString(item.role_brief),
+  ].filter(Boolean);
+  const hook = hooks[0] || "your recent work";
+  return `Hi ${candidateName}, quick follow-up because ${hook} looked relevant to the role. Would it be worth a short conversation?`;
+}
+
 function actionForClassification(item) {
   const classification = cleanString(item.classification) || "needs_human_reply";
   if (classification === "interested") {
@@ -92,6 +120,15 @@ function actionForClassification(item) {
       priority: "high",
       reply_draft: "",
       scheduling_prompt: "Confirm interest, share interview context, and propose 2-3 time windows.",
+    };
+  }
+  if (classification === "no_reply_follow_up") {
+    return {
+      next_action: "save_follow_up_draft",
+      action_label: "Save follow-up draft",
+      priority: "medium",
+      reply_draft: followUpDraft(item),
+      scheduling_prompt: "",
     };
   }
   if (classification === "ask_for_details") {
@@ -178,6 +215,8 @@ export function buildInboxQueue({ threads = [] } = {}) {
         last_message_excerpt: cleanString(thread.last_message_excerpt),
         suggested_reply: cleanString(thread.suggested_reply),
         candidate_snapshot: isRecord(thread.candidate_snapshot) ? thread.candidate_snapshot : {},
+        sequence_messages: sequenceMessages(thread.sequence_messages),
+        role_brief: cleanString(thread.role_brief),
         updated_at: cleanString(thread.updated_at),
         gmail_thread_id: cleanString(thread.gmail_thread_id),
         outreach_thread_id: cleanString(thread.outreach_thread_id),
@@ -205,6 +244,7 @@ export function buildInboxQueue({ threads = [] } = {}) {
       needs_human_reply: items.filter(needsHumanReply).length,
       needs_scheduling: items.filter((item) => item.next_action === "schedule" && item.action_status !== "interview_ready").length,
       needs_reply: items.filter((item) => item.next_action === "reply" && item.action_status === "pending").length,
+      due_follow_up: items.filter((item) => item.next_action === "save_follow_up_draft" && item.action_status === "pending").length,
       follow_up_later: items.filter((item) => item.next_action === "follow_up_later" && item.action_status !== "scheduled").length,
       stopped: items.filter((item) => item.action_status === "stopped").length,
       review_required: items.filter((item) => item.next_action === "review" && item.action_status === "pending").length,
@@ -212,4 +252,53 @@ export function buildInboxQueue({ threads = [] } = {}) {
     items,
     interested_candidates,
   };
+}
+
+const FOLLOW_UP_ACTIVE_STATUSES = new Set(["sent", "contacted", "follow_up_scheduled", "follow_up_due"]);
+const FOLLOW_UP_STOPPED_STATUSES = new Set(["stopped", "bounced", "rejected", "hired"]);
+
+function followUpIsDue(thread, now) {
+  const status = cleanString(thread?.status);
+  if (FOLLOW_UP_STOPPED_STATUSES.has(status)) return false;
+  if (!cleanString(thread?.gmail_thread_id)) return false;
+  if (status === "follow_up_due") return true;
+  if (!FOLLOW_UP_ACTIVE_STATUSES.has(status)) return false;
+  const dueAt = validIso(thread?.next_follow_up_at);
+  return Boolean(dueAt && new Date(dueAt).getTime() <= now.getTime());
+}
+
+export function mergeInboxThreadsWithDueFollowUps({
+  inboxThreads = [],
+  outreachThreads = [],
+  now = new Date(),
+} = {}) {
+  const repliedOutreachIds = new Set(
+    inboxThreads.map((thread) => cleanString(thread.outreach_thread_id)).filter(Boolean),
+  );
+  const repliedGmailThreadIds = new Set(
+    inboxThreads.map((thread) => cleanString(thread.gmail_thread_id)).filter(Boolean),
+  );
+  const followUps = outreachThreads
+    .filter((thread) => followUpIsDue(thread, now))
+    .filter((thread) => !repliedOutreachIds.has(cleanString(thread.id)))
+    .filter((thread) => !repliedGmailThreadIds.has(cleanString(thread.gmail_thread_id)))
+    .map((thread) => ({
+      id: `followup-${cleanString(thread.id)}`,
+      candidate_name: cleanString(thread.candidate_name) || "Unknown candidate",
+      classification: "no_reply_follow_up",
+      classification_reason: "No candidate reply before the scheduled follow-up.",
+      last_message_excerpt: "No candidate reply yet; follow-up is due.",
+      suggested_reply: "",
+      candidate_snapshot: isRecord(thread.candidate_snapshot) ? thread.candidate_snapshot : {},
+      sequence_messages: sequenceMessages(thread.sequence_messages),
+      role_brief: cleanString(thread.role_brief),
+      updated_at: validIso(thread.next_follow_up_at) || cleanString(thread.updated_at),
+      gmail_thread_id: cleanString(thread.gmail_thread_id),
+      outreach_thread_id: cleanString(thread.id),
+      outreach_status: "follow_up_due",
+      original_outreach_status: cleanString(thread.status),
+      notes: cleanString(thread.notes),
+    }));
+
+  return [...inboxThreads, ...followUps];
 }

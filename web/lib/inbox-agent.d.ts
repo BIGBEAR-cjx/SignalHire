@@ -1,4 +1,4 @@
-export type InboxClassification = "interested" | "ask_for_details" | "not_interested" | "later" | "out_of_office" | "bounced" | "needs_human_reply";
+export type InboxClassification = "interested" | "ask_for_details" | "not_interested" | "later" | "out_of_office" | "bounced" | "needs_human_reply" | "no_reply_follow_up";
 
 export type InboxQueueItem = {
   id: string;
@@ -13,7 +13,7 @@ export type InboxQueueItem = {
 };
 
 export type InboxQueueView = {
-  summary: { total: number; interested: number; needs_human_reply: number };
+  summary: { total: number; interested: number; needs_human_reply: number; due_follow_up?: number };
   items: InboxQueueItem[];
   interested_candidates: Array<InboxQueueItem & {
     readiness: "needs_scheduling";
@@ -43,4 +43,5 @@ export function classifyInboxReply(input?: { text?: string; candidateName?: stri
   suggested_reply: string;
 };
 export function shouldStopFollowUp(classification: string): boolean;
+export function mergeInboxThreadsWithDueFollowUps(input?: { inboxThreads?: unknown[]; outreachThreads?: unknown[]; now?: Date }): unknown[];
 export function buildInboxQueue(input?: { threads?: unknown[] }): InboxQueueView;

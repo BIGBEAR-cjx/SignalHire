@@ -1,4 +1,4 @@
-export const INBOX_ACTIONS = ["schedule", "reply", "follow_up_later", "stop", "review"];
+export const INBOX_ACTIONS = ["schedule", "reply", "save_follow_up_draft", "follow_up_later", "stop", "review"];
 export const INBOX_ACTION_STATUSES = ["pending", "draft_saved", "scheduled", "interview_ready", "stopped", "reviewed"];
 
 const ACTION_MARKER = "signalhire-inbox-action";
@@ -87,6 +87,7 @@ export function buildInboxActionPatch({
     action_status: {
       schedule: "interview_ready",
       reply: "draft_saved",
+      save_follow_up_draft: "draft_saved",
       follow_up_later: "scheduled",
       stop: "stopped",
       review: "reviewed",
@@ -103,13 +104,14 @@ export function buildInboxActionPatch({
       status: {
         schedule: "replied",
         reply: "replied",
+        save_follow_up_draft: "follow_up_due",
         follow_up_later: "follow_up_scheduled",
         stop: "stopped",
         review: "replied",
       }[cleanAction],
       notes: mergeInboxActionNotes(notes, state),
       next_follow_up_at: cleanAction === "follow_up_later" ? followUpAt : undefined,
-      body: cleanAction === "reply" && state.reply_draft ? state.reply_draft : undefined,
+      body: (cleanAction === "reply" || cleanAction === "save_follow_up_draft") && state.reply_draft ? state.reply_draft : undefined,
     },
   };
 }

@@ -327,6 +327,7 @@ type InboxQueueView = {
     needs_human_reply: number;
     needs_scheduling?: number;
     needs_reply?: number;
+    due_follow_up?: number;
     follow_up_later?: number;
     stopped?: number;
     review_required?: number;
@@ -338,7 +339,7 @@ type InboxQueueView = {
     classification_reason: string;
     last_message_excerpt: string;
     suggested_reply: string;
-    next_action?: "schedule" | "reply" | "follow_up_later" | "stop" | "review";
+    next_action?: "schedule" | "reply" | "save_follow_up_draft" | "follow_up_later" | "stop" | "review";
     action_label?: string;
     priority?: "high" | "medium" | "low";
     reply_draft?: string;
@@ -362,7 +363,7 @@ type InboxQueueView = {
     classification_reason: string;
     last_message_excerpt: string;
     suggested_reply: string;
-    next_action?: "schedule" | "reply" | "follow_up_later" | "stop" | "review";
+    next_action?: "schedule" | "reply" | "save_follow_up_draft" | "follow_up_later" | "stop" | "review";
     action_label?: string;
     priority?: "high" | "medium" | "low";
     reply_draft?: string;
@@ -998,10 +999,22 @@ function inboxActionButtonLabel(item: InboxActionItemView, locale: "zh" | "en") 
   if (item.action_status && item.action_status !== "pending") return inboxActionStatusLabel(item.action_status, locale);
   if (item.next_action === "schedule") return isEn ? "Mark interview-ready" : "标记可约面";
   if (item.next_action === "reply") return isEn ? "Save suggested draft" : "保存建议草稿";
+  if (item.next_action === "save_follow_up_draft") return isEn ? "Save follow-up draft" : "保存跟进草稿";
   if (item.next_action === "follow_up_later") return isEn ? "Schedule follow-up" : "安排稍后跟进";
   if (item.next_action === "stop") return isEn ? "Stop follow-up" : "停止跟进";
   if (item.next_action === "review") return isEn ? "Mark reviewed" : "标记已复核";
   return isEn ? "Apply action" : "执行动作";
+}
+
+function inboxActionDisplayLabel(item: InboxActionItemView, locale: "zh" | "en") {
+  const isEn = locale === "en";
+  if (item.next_action === "schedule") return isEn ? "Prepare scheduling handoff" : "准备约面交付包";
+  if (item.next_action === "reply") return isEn ? "Reply with role details" : "回复岗位细节";
+  if (item.next_action === "save_follow_up_draft") return isEn ? "Save follow-up draft" : "保存到期跟进草稿";
+  if (item.next_action === "follow_up_later") return isEn ? "Follow up later" : "稍后跟进";
+  if (item.next_action === "stop") return isEn ? "Stop follow-up" : "停止跟进";
+  if (item.next_action === "review") return isEn ? "Review manually" : "人工复核";
+  return item.action_label || (isEn ? "Apply action" : "执行动作");
 }
 
 function defaultFollowUpIso() {
@@ -1032,6 +1045,7 @@ function inboxActionSuccessLabel(item: InboxActionItemView, locale: "zh" | "en")
   const isEn = locale === "en";
   if (item.next_action === "schedule") return isEn ? "Handoff marked interview-ready." : "交付包已标记为可约面。";
   if (item.next_action === "reply") return isEn ? "Suggested reply draft saved." : "建议回复草稿已保存。";
+  if (item.next_action === "save_follow_up_draft") return isEn ? "Follow-up draft saved for review." : "跟进草稿已保存，等待确认发送。";
   if (item.next_action === "follow_up_later") {
     const date = formatShortDate(item.action_state?.follow_up_at, locale);
     return isEn ? `Follow-up scheduled${date ? ` for ${date}` : ""}.` : `已安排稍后跟进${date ? `：${date}` : ""}。`;
@@ -1044,10 +1058,12 @@ function inboxActionSuccessLabel(item: InboxActionItemView, locale: "zh" | "en")
 function inboxPriorityLine(summary: InboxQueueView["summary"] | undefined, locale: "zh" | "en") {
   const isEn = locale === "en";
   const scheduling = summary?.needs_scheduling ?? summary?.interested ?? 0;
+  const dueFollowUp = summary?.due_follow_up ?? 0;
   const reply = summary?.needs_reply ?? 0;
   const review = summary?.review_required ?? summary?.needs_human_reply ?? 0;
   const later = summary?.follow_up_later ?? 0;
   if (scheduling > 0) return isEn ? `Start with ${scheduling} scheduling handoff${scheduling > 1 ? "s" : ""}.` : `优先处理 ${scheduling} 个可约面交付包。`;
+  if (dueFollowUp > 0) return isEn ? `Save ${dueFollowUp} due follow-up draft${dueFollowUp > 1 ? "s" : ""}.` : `优先保存 ${dueFollowUp} 个到期跟进草稿。`;
   if (reply > 0) return isEn ? `Next, save ${reply} suggested reply draft${reply > 1 ? "s" : ""}.` : `下一步保存 ${reply} 个建议回复草稿。`;
   if (review > 0) return isEn ? `Review ${review} unclear repl${review > 1 ? "ies" : "y"}.` : `需要复核 ${review} 条不明确回复。`;
   if (later > 0) return isEn ? `Schedule ${later} later follow-up${later > 1 ? "s" : ""}.` : `安排 ${later} 个稍后跟进。`;
@@ -1612,10 +1628,14 @@ function InboxAgentPanel({
 
       {error && <p className="rounded-xl bg-amber-50 px-3 py-2 text-xs text-amber-800 ring-1 ring-amber-100">{error}</p>}
 
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-6">
         <div className="rounded-2xl border border-black/10 bg-white/80 p-4">
           <p className="text-xs text-[var(--sh-muted)]">{isEn ? "Needs scheduling" : "待约面"}</p>
           <p className="mt-1 text-2xl font-semibold text-emerald-700">{queue?.summary.needs_scheduling ?? queue?.summary.interested ?? 0}</p>
+        </div>
+        <div className="rounded-2xl border border-black/10 bg-white/80 p-4">
+          <p className="text-xs text-[var(--sh-muted)]">{isEn ? "Due follow-up" : "到期跟进"}</p>
+          <p className="mt-1 text-2xl font-semibold text-blue-700">{queue?.summary.due_follow_up ?? 0}</p>
         </div>
         <div className="rounded-2xl border border-black/10 bg-white/80 p-4">
           <p className="text-xs text-[var(--sh-muted)]">{isEn ? "Needs reply" : "待回复"}</p>
@@ -1661,7 +1681,7 @@ function InboxAgentPanel({
                   <p className="mt-1 line-clamp-2 break-words text-gray-600">{item.last_message_excerpt || item.classification_reason}</p>
                   {item.action_label && (
                     <div className="mt-2 flex flex-wrap items-center gap-2">
-                      <p className="inline-flex rounded-full bg-white px-2 py-1 font-semibold text-gray-700 ring-1 ring-black/5">{item.action_label}</p>
+                      <p className="inline-flex rounded-full bg-white px-2 py-1 font-semibold text-gray-700 ring-1 ring-black/5">{inboxActionDisplayLabel(item, locale)}</p>
                       <p className="inline-flex rounded-full bg-white px-2 py-1 font-semibold text-gray-500 ring-1 ring-black/5">
                         {inboxActionStatusLabel(item.action_status, locale)}
                       </p>
@@ -1686,6 +1706,15 @@ function InboxAgentPanel({
                         className="rounded-full bg-white px-2.5 py-1 font-semibold text-gray-700 ring-1 ring-black/10"
                       >
                         {isEn ? "Copy scheduling ask" : "复制约面话术"}
+                      </button>
+                    )}
+                    {item.next_action === "save_follow_up_draft" && (
+                      <button
+                        type="button"
+                        onClick={() => navigator.clipboard?.writeText(item.reply_draft || item.suggested_reply || "")}
+                        className="rounded-full bg-white px-2.5 py-1 font-semibold text-gray-700 ring-1 ring-black/10"
+                      >
+                        {isEn ? "Copy follow-up draft" : "复制跟进草稿"}
                       </button>
                     )}
                   </div>

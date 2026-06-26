@@ -53,6 +53,52 @@ test("schedule action persists scheduling message as interview-ready state", () 
   assert.equal(result.action_state.scheduling_message, "Hi Ada, could you share 2-3 time windows?");
 });
 
+test("save follow-up draft persists body without sending", () => {
+  const now = new Date("2026-06-26T10:00:00.000Z");
+  const result = buildInboxActionPatch({
+    action: "save_follow_up_draft",
+    reply_draft: "Hi Ada, quick follow-up because your vLLM work looked relevant.",
+    now,
+  });
+
+  assert.equal(result.ok, true);
+  assert.equal(result.patch.status, "follow_up_due");
+  assert.equal(result.patch.body, "Hi Ada, quick follow-up because your vLLM work looked relevant.");
+  assert.equal(result.patch.sent_at, undefined);
+  assert.equal(result.action_state.action_status, "draft_saved");
+  assert.equal(result.action_state.reply_draft, "Hi Ada, quick follow-up because your vLLM work looked relevant.");
+});
+
+test("runInboxAction saves follow-up draft through the authorized outreach thread", async () => {
+  const calls = [];
+  const deps = {
+    user: { id: "user-1" },
+    getOutreachThread: async (input) => {
+      calls.push(["get", input]);
+      return { id: input.id, user_id: input.userId, notes: "Existing" };
+    },
+    updateOutreachThread: async (input) => {
+      calls.push(["update", input]);
+      return { id: input.id, status: input.status, body: input.body, notes: input.notes };
+    },
+    now: new Date("2026-06-26T10:00:00.000Z"),
+  };
+
+  const result = await runInboxAction({
+    body: {
+      outreach_thread_id: "t1",
+      action: "save_follow_up_draft",
+      reply_draft: "Follow-up draft",
+    },
+    ...deps,
+  });
+
+  assert.equal(result.status, 200);
+  assert.equal(result.body.action_state.action_status, "draft_saved");
+  assert.equal(calls.at(-1)[1].status, "follow_up_due");
+  assert.equal(calls.at(-1)[1].body, "Follow-up draft");
+});
+
 test("runInboxAction checks auth, ownership lookup, invalid action, and update", async () => {
   const calls = [];
   const deps = {
