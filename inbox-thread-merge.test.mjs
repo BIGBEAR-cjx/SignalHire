@@ -98,3 +98,25 @@ test("treats due scheduled follow-up threads as pending actionable drafts", () =
   assert.equal(queue.items[0].next_action, "save_follow_up_draft");
   assert.equal(queue.items[0].action_status, "pending");
 });
+
+test("treats follow_up_later threads as due when reminder time arrives", () => {
+  const merged = mergeInboxThreadsWithDueFollowUps({
+    now: new Date("2026-06-26T10:00:00.000Z"),
+    inboxThreads: [],
+    outreachThreads: [
+      {
+        id: "thread-later",
+        candidate_name: "Ada",
+        gmail_thread_id: "gmail-2",
+        status: "follow_up_later",
+        next_follow_up_at: "2026-06-25T10:00:00.000Z",
+        sequence_messages: [{ step: 2, body: "Hi Ada, quick follow-up." }],
+      },
+    ],
+  });
+  const queue = buildInboxQueue({ threads: merged });
+
+  assert.equal(merged[0].classification, "no_reply_follow_up");
+  assert.equal(queue.summary.due_follow_up, 1);
+  assert.equal(queue.items[0].next_action, "save_follow_up_draft");
+});

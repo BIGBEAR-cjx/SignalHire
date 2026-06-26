@@ -355,7 +355,10 @@ type InboxQueueView = {
     updated_at: string;
     gmail_thread_id?: string;
     outreach_thread_id?: string;
+    today_rank?: number;
+    today_reason?: string;
   }>;
+  today_queue?: Array<Record<string, unknown>>;
   interested_candidates: Array<{
     id: string;
     candidate_name: string;
@@ -378,6 +381,8 @@ type InboxQueueView = {
     } | null;
     outreach_thread_id?: string;
     updated_at: string;
+    today_rank?: number;
+    today_reason?: string;
     readiness: "needs_scheduling";
     recommended_next_step: string;
     scheduling_packet?: {
@@ -399,6 +404,18 @@ type InboxQueueView = {
 };
 
 type InboxActionItemView = InboxQueueView["items"][number] | InboxQueueView["interested_candidates"][number];
+
+type InboxSyncResultView = {
+  ok: boolean;
+  connected?: boolean;
+  can_read_inbox?: boolean;
+  synced?: number;
+  scanned?: number;
+  skipped?: string;
+  skipped_reason?: string;
+  last_synced_at?: string;
+  errors?: Array<{ outreach_thread_id: string; error: string }>;
+};
 
 type ContactProfileView = {
   emails?: Array<{
@@ -1055,6 +1072,33 @@ function inboxActionSuccessLabel(item: InboxActionItemView, locale: "zh" | "en")
   return isEn ? "Action saved." : "动作已保存。";
 }
 
+function inboxSyncErrorLabel(value: unknown, locale: "zh" | "en") {
+  const isEn = locale === "en";
+  const key = typeof value === "string" ? value : "";
+  if (key === "gmail_not_connected" || key === "gmail_not_connected_or_readonly_missing") {
+    return isEn ? "Gmail is not connected. Connect Gmail before syncing replies." : "Gmail 未连接。请先连接 Gmail 后再同步回复。";
+  }
+  if (key === "gmail_readonly_scope_missing") {
+    return isEn ? "Reconnect Gmail inbox access to sync candidate replies." : "请重新授权 Gmail inbox 读取权限后再同步候选人回复。";
+  }
+  if (key === "gmail_reconnect_required") {
+    return isEn ? "Reconnect Gmail. The saved Gmail token can no longer refresh inbox access." : "请重新连接 Gmail。当前保存的 Gmail token 已无法刷新 inbox 权限。";
+  }
+  return isEn ? "Gmail sync unavailable." : "Gmail 回复同步暂时不可用。";
+}
+
+function inboxSyncSummaryLabel(result: InboxSyncResultView | null, locale: "zh" | "en") {
+  const isEn = locale === "en";
+  if (!result) return "";
+  if (result.skipped_reason || result.skipped) return inboxSyncErrorLabel(result.skipped_reason || result.skipped, locale);
+  const scanned = result.scanned ?? 0;
+  const synced = result.synced ?? 0;
+  const errors = result.errors?.length ?? 0;
+  return isEn
+    ? `Scanned ${scanned} thread${scanned === 1 ? "" : "s"}, synced ${synced} repl${synced === 1 ? "y" : "ies"}${errors ? `, ${errors} failed` : ""}.`
+    : `已扫描 ${scanned} 个线程，同步 ${synced} 条回复${errors ? `，${errors} 条失败` : ""}。`;
+}
+
 function inboxPriorityLine(summary: InboxQueueView["summary"] | undefined, locale: "zh" | "en") {
   const isEn = locale === "en";
   const scheduling = summary?.needs_scheduling ?? summary?.interested ?? 0;
@@ -1540,21 +1584,13 @@ function InboxAgentPanel({
   const isEn = locale === "en";
   const items = queue?.items ?? [];
   const interested = queue?.interested_candidates ?? [];
+  const todayQueue = (queue?.today_queue ?? []) as InboxActionItemView[];
   const [syncing, setSyncing] = useState(false);
   const [error, setError] = useState("");
+  const [syncResult, setSyncResult] = useState<InboxSyncResultView | null>(null);
   const [busyActionId, setBusyActionId] = useState("");
   const [actionErrors, setActionErrors] = useState<Record<string, string>>({});
   const [successMessages, setSuccessMessages] = useState<Record<string, string>>({});
-
-  function inboxSyncErrorLabel(value: unknown) {
-    const key = typeof value === "string" ? value : "";
-    if (key === "gmail_not_connected_or_readonly_missing") {
-      return isEn
-        ? "Connect Gmail or re-authorize Gmail read access before syncing replies."
-        : "请先连接 Gmail，或重新授权 Gmail 读取权限后再同步回复。";
-    }
-    return isEn ? "Gmail sync unavailable." : "Gmail 回复同步暂时不可用。";
-  }
 
   async function syncReplies() {
     setSyncing(true);
@@ -1566,7 +1602,11 @@ function InboxAgentPanel({
         body: JSON.stringify({ project_id: projectId, role_brief: projectBrief, locale }),
       });
       const j = await r.json().catch(() => ({}));
-      if (!r.ok) throw new Error(inboxSyncErrorLabel(j.error || j.skipped));
+      setSyncResult(j as InboxSyncResultView);
+      if (!r.ok) {
+        setError(inboxSyncErrorLabel(j.skipped_reason || j.skipped || j.error, locale));
+        return;
+      }
       onChanged();
     } catch (e) {
       setError((e as Error).message);
@@ -1627,6 +1667,26 @@ function InboxAgentPanel({
       </div>
 
       {error && <p className="rounded-xl bg-amber-50 px-3 py-2 text-xs text-amber-800 ring-1 ring-amber-100">{error}</p>}
+      {syncResult && (
+        <div className={`rounded-2xl px-4 py-3 text-xs leading-5 ring-1 ${
+          syncResult.ok ? "bg-emerald-50 text-emerald-900 ring-emerald-100" : "bg-amber-50 text-amber-900 ring-amber-100"
+        }`}>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <p className="font-semibold">{isEn ? "Sync result" : "同步结果"}</p>
+            {syncResult.last_synced_at && (
+              <p className="text-[var(--sh-muted)]">
+                {isEn ? "Last synced" : "上次同步"}: {new Date(syncResult.last_synced_at).toLocaleString(isEn ? "en-US" : "zh-CN")}
+              </p>
+            )}
+          </div>
+          <p className="mt-1">{inboxSyncSummaryLabel(syncResult, locale)}</p>
+          {(syncResult.skipped_reason === "gmail_readonly_scope_missing" || syncResult.skipped_reason === "gmail_not_connected" || syncResult.skipped_reason === "gmail_reconnect_required") && (
+            <SecondaryAction href="/api/integrations/gmail/connect" className="mt-2 min-h-8 px-3 py-1.5 text-xs">
+              {isEn ? "Reconnect Gmail inbox access" : "重新授权 Gmail inbox 读取权限"}
+            </SecondaryAction>
+          )}
+        </div>
+      )}
 
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-6">
         <div className="rounded-2xl border border-black/10 bg-white/80 p-4">
@@ -1654,6 +1714,36 @@ function InboxAgentPanel({
           <p className="mt-1 text-2xl font-semibold text-rose-700">{queue?.summary.stopped ?? 0}</p>
         </div>
       </div>
+
+      {todayQueue.length > 0 && (
+        <div className="rounded-2xl border border-black/10 bg-white/80 p-4">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <p className="text-sm font-semibold text-[var(--sh-ink)]">{isEn ? "Today priority queue" : "今日优先处理"}</p>
+            <p className="text-xs text-[var(--sh-muted)]">{isEn ? "Suggested next steps only. Nothing is sent automatically." : "仅建议下一步，不会自动发送。"}</p>
+          </div>
+          <div className="mt-3 grid gap-2 md:grid-cols-2 xl:grid-cols-4">
+            {todayQueue.slice(0, 8).map((item) => (
+              <div key={`today:${item.id}`} className="min-w-0 rounded-xl bg-gray-50 px-3 py-2 text-xs ring-1 ring-black/5">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <p className="min-w-0 break-words font-semibold text-gray-900">{item.candidate_name}</p>
+                  <span className="rounded-full bg-white px-2 py-0.5 font-semibold text-gray-700 ring-1 ring-black/10">
+                    #{item.today_rank ?? "-"}
+                  </span>
+                </div>
+                <p className="mt-1 break-words text-gray-600">{item.today_reason || inboxActionDisplayLabel(item, locale)}</p>
+                <div className="mt-2 flex flex-wrap items-center gap-2">
+                  <span className="rounded-full bg-white px-2 py-0.5 font-semibold text-gray-700 ring-1 ring-black/10">
+                    {inboxActionDisplayLabel(item, locale)}
+                  </span>
+                  <span className="rounded-full bg-white px-2 py-0.5 font-semibold text-gray-500 ring-1 ring-black/10">
+                    {inboxActionStatusLabel(item.action_status, locale)}
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_320px]">
         <div className="rounded-2xl border border-black/10 bg-white/80 p-4">

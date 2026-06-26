@@ -491,6 +491,7 @@ test("Gmail integration routes and send route stay server-side and scope-limited
   const sendRoute = readFileSync("web/app/api/outreach-threads/[id]/send/route.ts", "utf8");
   const gmailLib = readFileSync("web/lib/gmail.ts", "utf8");
   const pureLib = readFileSync("web/lib/gmail-outreach.mjs", "utf8");
+  const tokenLib = readFileSync("web/lib/gmail-token.mjs", "utf8");
 
   assert.match(statusRoute, /getGmailConnectionStatus/);
   assert.match(connectRoute, /buildConnectUrl/);
@@ -502,10 +503,14 @@ test("Gmail integration routes and send route stay server-side and scope-limited
   assert.match(gmailLib, /if \(!updated\)/);
   assert.match(gmailLib, /GOOGLE_CLIENT_SECRET/);
   assert.match(gmailLib, /GMAIL_TOKEN_ENCRYPTION_KEY/);
+  assert.match(gmailLib, /refreshGmailTokenBundle/);
+  assert.match(gmailLib, /encryptTokenBundle\(refreshedBundle/);
   assert.match(gmailLib, /buildGmailAuthUrl/);
   assert.match(pureLib, /gmail\.send/);
   assert.match(pureLib, /gmail\.readonly/);
   assert.doesNotMatch(pureLib, /gmail\.modify/);
+  assert.match(tokenLib, /gmail_reconnect_required/);
+  assert.doesNotMatch(tokenLib, /console\.log|console\.error/);
 });
 
 test("outreach schema migration adds Gmail connection and send lifecycle fields", () => {
@@ -537,6 +542,7 @@ test("role workspace exposes controlled Gmail outreach actions", () => {
 test("Gmail inbox agent persists only role-related threads and renders queues", () => {
   const migration = readFileSync("migrations/20260624190000_autonomous_recruiter_p2a_inbox_agent.sql", "utf8");
   const inboxLib = readFileSync("web/lib/inbox.ts", "utf8");
+  const inboxSyncCore = readFileSync("web/lib/inbox-sync-core.mjs", "utf8");
   const inboxAgent = readFileSync("web/lib/inbox-agent.mjs", "utf8");
   const inboxActions = readFileSync("web/lib/inbox-actions.mjs", "utf8");
   const inboxActionsRoute = readFileSync("web/app/api/inbox/actions/route.ts", "utf8");
@@ -548,12 +554,20 @@ test("Gmail inbox agent persists only role-related threads and renders queues", 
   assert.match(migration, /classification/);
   assert.match(inboxLib, /listRoleRelatedOutreachThreads/);
   assert.match(inboxLib, /gmail_thread_id/);
-  assert.match(inboxLib, /latestCandidateMessage/);
-  assert.match(inboxLib, /status\.gmail_address/);
+  assert.match(inboxLib, /syncGmailInboxForProjectCore/);
+  assert.match(inboxSyncCore, /latestCandidateMessage/);
+  assert.match(inboxSyncCore, /status\.gmail_address/);
+  assert.match(inboxSyncCore, /gmail_readonly_scope_missing/);
+  assert.match(inboxSyncCore, /gmail_reconnect_required/);
+  assert.match(inboxSyncCore, /last_synced_at/);
+  assert.match(inboxSyncCore, /needs_reply/);
+  assert.match(inboxSyncCore, /follow_up_later/);
   assert.match(inboxAgent, /classifyInboxReply/);
   assert.match(inboxAgent, /action_status/);
   assert.match(inboxAgent, /no_reply_follow_up/);
   assert.match(inboxAgent, /due_follow_up/);
+  assert.match(inboxAgent, /today_queue/);
+  assert.match(inboxAgent, /today_rank/);
   assert.match(inboxActions, /buildInboxActionPatch/);
   assert.match(inboxActions, /save_follow_up_draft/);
   assert.match(inboxActions, /signalhire-inbox-action/);
@@ -564,6 +578,11 @@ test("Gmail inbox agent persists only role-related threads and renders queues", 
   assert.match(projectRoute, /inboxQueue: await buildProjectInboxQueueView/);
   assert.match(projectPage, /InboxAgentPanel/);
   assert.match(projectPage, /\/api\/inbox\/actions/);
+  assert.match(projectPage, /Last synced/);
+  assert.match(projectPage, /today_queue/);
+  assert.match(projectPage, /Today priority queue/);
+  assert.match(projectPage, /Reconnect Gmail inbox access/);
+  assert.match(projectPage, /Sync result/);
   assert.match(projectPage, /inboxPriorityLine/);
   assert.match(projectPage, /Mark interview-ready/);
   assert.match(projectPage, /Copy candidate reply/);

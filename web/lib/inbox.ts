@@ -1,6 +1,6 @@
 import { createClient } from "@insforge/sdk";
-import { buildInboxQueue, classifyInboxReply, mergeInboxThreadsWithDueFollowUps, shouldStopFollowUp } from "./inbox-agent.mjs";
-import { buildInboxActionPatch } from "./inbox-actions.mjs";
+import { buildInboxQueue, mergeInboxThreadsWithDueFollowUps } from "./inbox-agent.mjs";
+import { syncGmailInboxForProjectCore } from "./inbox-sync-core.mjs";
 import { getGmailConnectionStatus, getGmailThreadMessages, type GmailThreadMessage } from "./gmail";
 import { listOutreachThreads, updateOutreachThread, type OutreachThread } from "./outreach-threads";
 
@@ -31,15 +31,6 @@ function cleanString(value: unknown) {
   return typeof value === "string" ? value.trim() : "";
 }
 
-function latestCandidateMessage(messages: GmailThreadMessage[], senderEmail: string) {
-  const ownEmail = cleanString(senderEmail).toLowerCase();
-  for (const message of [...messages].reverse()) {
-    const from = cleanString(message.from).toLowerCase();
-    if (!ownEmail || !from.includes(ownEmail)) return message;
-  }
-  return null;
-}
-
 export async function listRoleRelatedOutreachThreads(input: { userId: string; projectId: string }): Promise<OutreachThread[]> {
   const threads = await listOutreachThreads({ userId: input.userId, projectId: input.projectId });
   return threads.filter((thread) => cleanString(thread.gmail_thread_id));
@@ -66,7 +57,12 @@ async function saveInboxThread(input: {
   projectId: string;
   outreachThread: OutreachThread;
   message: GmailThreadMessage;
-  classification: ReturnType<typeof classifyInboxReply>;
+  classification: {
+    classification: string;
+    classification_reason: string;
+    last_message_excerpt: string;
+    suggested_reply: string;
+  };
 }) {
   if (!client) return null;
   const row = {
@@ -138,50 +134,14 @@ export async function buildProjectInboxQueueView(userId: string, projectId: stri
 }
 
 export async function syncGmailInboxForProject(input: { userId: string; projectId: string; roleBrief?: string }) {
-  const status = await getGmailConnectionStatus(input.userId);
-  if (!status.connected || !status.can_read_inbox) {
-    return { ok: false, synced: 0, skipped: "gmail_not_connected_or_readonly_missing" };
-  }
-  const threads = await listRoleRelatedOutreachThreads({ userId: input.userId, projectId: input.projectId });
-  let synced = 0;
-  const errors: Array<{ outreach_thread_id: string; error: string }> = [];
-  for (const thread of threads) {
-    try {
-      const messages = await getGmailThreadMessages({ userId: input.userId, threadId: thread.gmail_thread_id });
-      const message = latestCandidateMessage(messages, status.gmail_address);
-      if (!message) continue;
-      const classification = classifyInboxReply({
-        text: message.bodyText || message.snippet,
-        candidateName: thread.candidate_name,
-        roleBrief: input.roleBrief || thread.role_brief,
-      });
-      const saved = await saveInboxThread({
-        userId: input.userId,
-        projectId: input.projectId,
-        outreachThread: thread,
-        message,
-        classification,
-      });
-      if (!saved) continue;
-      synced += 1;
-      if (classification.classification === "interested") {
-        await updateOutreachThread({ userId: input.userId, id: thread.id, status: "replied" });
-      } else if (shouldStopFollowUp(classification.classification)) {
-        const stopPatch = buildInboxActionPatch({
-          action: "stop",
-          notes: thread.notes,
-          now: new Date(),
-        });
-        await updateOutreachThread({
-          userId: input.userId,
-          id: thread.id,
-          ...(stopPatch.ok ? stopPatch.patch : {}),
-          status: classification.classification === "bounced" ? "bounced" : "stopped",
-        });
-      }
-    } catch (error) {
-      errors.push({ outreach_thread_id: thread.id, error: error instanceof Error ? error.message : "sync_failed" });
-    }
-  }
-  return { ok: errors.length === 0, synced, scanned: threads.length, errors };
+  return syncGmailInboxForProjectCore(({
+    userId: input.userId,
+    projectId: input.projectId,
+    roleBrief: input.roleBrief,
+    getGmailConnectionStatus,
+    listRoleRelatedOutreachThreads,
+    getGmailThreadMessages,
+    saveInboxThread,
+    updateOutreachThread,
+  }) as never);
 }
