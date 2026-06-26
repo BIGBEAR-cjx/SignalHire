@@ -543,9 +543,37 @@ test("Gmail integration routes and send route stay server-side and scope-limited
   assert.match(gmailLib, /buildGmailAuthUrl/);
   assert.match(pureLib, /gmail\.send/);
   assert.match(pureLib, /gmail\.readonly/);
+  assert.match(pureLib, /calendar\.freebusy/);
+  assert.match(gmailLib, /can_read_calendar/);
   assert.doesNotMatch(pureLib, /gmail\.modify/);
   assert.match(tokenLib, /gmail_reconnect_required/);
   assert.doesNotMatch(tokenLib, /console\.log|console\.error/);
+});
+
+test("calendar availability route stays server-side and Role Workspace renders scheduling draft controls", () => {
+  const route = readFileSync("web/app/api/integrations/calendar/availability/route.ts", "utf8");
+  const calendarLib = readFileSync("web/lib/calendar-availability.mjs", "utf8");
+  const gmailLib = readFileSync("web/lib/gmail.ts", "utf8");
+  const projectPage = readFileSync("web/app/app/projects/[id]/page.tsx", "utf8");
+
+  assert.match(route, /getUser/);
+  assert.match(route, /getCalendarAvailability/);
+  assert.match(route, /project_id/);
+  assert.match(calendarLib, /buildCalendarFreeBusyRequest/);
+  assert.match(calendarLib, /slotsFromFreeBusy/);
+  assert.match(calendarLib, /buildCalendarSchedulingDraft/);
+  assert.match(gmailLib, /CALENDAR_FREEBUSY_URL/);
+  assert.match(gmailLib, /calendar_scope_missing/);
+  assert.match(projectPage, /calendarAvailabilityById/);
+  assert.match(projectPage, /generateCalendarSchedulingDraft/);
+  assert.match(projectPage, /Generate scheduling draft/);
+  assert.match(projectPage, /生成可约时间草稿/);
+  assert.match(projectPage, /Reconnect Google Calendar/);
+  assert.match(projectPage, /重新授权 Google Calendar/);
+  assert.match(projectPage, /No calendar invite or email is sent/);
+  assert.match(projectPage, /不会自动发送日历邀请或邮件/);
+  assert.doesNotMatch(route, /GOOGLE_CLIENT_SECRET|GMAIL_TOKEN_ENCRYPTION_KEY|access_token|refresh_token/);
+  assert.doesNotMatch(projectPage.match(/async function generateCalendarSchedulingDraft[\s\S]*?\n  }/)?.[0] ?? "", /\/send|\/api\/inbox\/actions\/send|\/api\/outreach-threads\/\$\{[^}]+\}\/send/);
 });
 
 test("outreach schema migration adds Gmail connection and send lifecycle fields", () => {

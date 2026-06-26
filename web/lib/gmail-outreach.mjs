@@ -3,6 +3,7 @@ import { primarySendableEmail } from "./contact-profile.mjs";
 
 export const GMAIL_SEND_SCOPE = "https://www.googleapis.com/auth/gmail.send";
 export const GMAIL_READONLY_SCOPE = "https://www.googleapis.com/auth/gmail.readonly";
+export const GOOGLE_CALENDAR_FREEBUSY_SCOPE = "https://www.googleapis.com/auth/calendar.freebusy";
 
 function cleanString(value) {
   return typeof value === "string" ? value.trim() : "";
@@ -58,7 +59,7 @@ export function buildGmailAuthUrl({ clientId, redirectUri, state }) {
   url.searchParams.set("client_id", cleanString(clientId));
   url.searchParams.set("redirect_uri", cleanString(redirectUri));
   url.searchParams.set("response_type", "code");
-  url.searchParams.set("scope", `${GMAIL_SEND_SCOPE} ${GMAIL_READONLY_SCOPE}`);
+  url.searchParams.set("scope", `${GMAIL_SEND_SCOPE} ${GMAIL_READONLY_SCOPE} ${GOOGLE_CALENDAR_FREEBUSY_SCOPE}`);
   url.searchParams.set("access_type", "offline");
   url.searchParams.set("prompt", "consent");
   url.searchParams.set("state", cleanString(state));

@@ -1,4 +1,5 @@
 import { createClient } from "@insforge/sdk";
+import { buildCalendarFreeBusyRequest, calendarScopeStatus, slotsFromFreeBusy } from "./calendar-availability.mjs";
 import { buildGmailAuthUrl, buildGmailRawMessage, buildGmailSendPayload, decryptTokenBundle, encryptTokenBundle, validateInboxDraftSend, validateOutreachSend } from "./gmail-outreach.mjs";
 import { refreshGmailTokenBundle } from "./gmail-token.mjs";
 import { buildInboxDraftSentPatch } from "./inbox-actions.mjs";
@@ -11,6 +12,7 @@ const TABLE = "gmail_connections";
 const GMAIL_TOKEN_URL = "https://oauth2.googleapis.com/token";
 const GMAIL_SEND_URL = "https://gmail.googleapis.com/gmail/v1/users/me/messages/send";
 const GMAIL_THREAD_URL = "https://gmail.googleapis.com/gmail/v1/users/me/threads";
+const CALENDAR_FREEBUSY_URL = "https://www.googleapis.com/calendar/v3/freeBusy";
 
 type GmailTokenBundle = {
   access_token?: string;
@@ -113,12 +115,14 @@ async function saveConnection(input: {
 export async function getGmailConnectionStatus(userId: string) {
   const configured = Boolean(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET && process.env.GOOGLE_REDIRECT_URI && process.env.GMAIL_TOKEN_ENCRYPTION_KEY);
   const connection = await findConnection(userId);
+  const calendar = calendarScopeStatus(connection?.scope ?? "");
   return {
     configured,
     connected: Boolean(connection),
     gmail_address: connection?.gmail_address ?? "",
     scope: connection?.scope ?? "",
     can_read_inbox: Boolean(connection?.scope?.includes("gmail.readonly")),
+    can_read_calendar: calendar.can_read_calendar,
     expires_at: connection?.expires_at ?? null,
   };
 }
@@ -261,6 +265,49 @@ export async function getGmailThreadMessages(input: { userId: string; threadId: 
       bodyText: bodyTextFromPayload(payload),
     };
   }).filter((message) => message.id || message.snippet || message.bodyText);
+}
+
+export async function getCalendarAvailability(input: {
+  userId: string;
+  timeMin: string;
+  timeMax: string;
+  durationMinutes?: number;
+  maxSlots?: number;
+  locale?: "zh" | "en";
+  timeZone?: string;
+}) {
+  const connection = await findConnection(input.userId);
+  if (!connection) return { ok: false, skipped_reason: "gmail_not_connected", slots: [] };
+  const scope = calendarScopeStatus(connection.scope);
+  if (!scope.can_read_calendar) return { ok: false, skipped_reason: scope.missing_reason || "calendar_scope_missing", slots: [] };
+  try {
+    const request = buildCalendarFreeBusyRequest({
+      accessToken: await accessTokenFor(connection),
+      timeMin: input.timeMin,
+      timeMax: input.timeMax,
+      url: CALENDAR_FREEBUSY_URL,
+    });
+    const response = await fetch(request.url, {
+      method: request.method,
+      headers: request.headers,
+      body: request.body,
+    });
+    const json = await response.json().catch(() => ({}));
+    if (!response.ok) return { ok: false, skipped_reason: "calendar_freebusy_failed", slots: [] };
+    const slots = slotsFromFreeBusy({
+      response: json,
+      timeMin: input.timeMin,
+      timeMax: input.timeMax,
+      durationMinutes: input.durationMinutes,
+      maxSlots: input.maxSlots,
+      locale: input.locale,
+      timeZone: input.timeZone,
+    });
+    return { ok: true, skipped_reason: "", slots };
+  } catch (error) {
+    const reason = error instanceof Error && error.message === "gmail_reconnect_required" ? "gmail_reconnect_required" : "calendar_freebusy_failed";
+    return { ok: false, skipped_reason: reason, slots: [] };
+  }
 }
 
 export async function sendApprovedOutreachThread(input: { userId: string; threadId: string }) {

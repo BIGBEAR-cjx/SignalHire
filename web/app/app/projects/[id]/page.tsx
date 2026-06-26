@@ -419,6 +419,13 @@ type InboxSyncResultView = {
   errors?: Array<{ outreach_thread_id: string; error: string }>;
 };
 
+type CalendarSchedulingResultView = {
+  ok: boolean;
+  skipped_reason?: string;
+  slots: Array<{ start: string; end: string; label: string }>;
+  draft: { subject: string; body: string; slots: string[] };
+};
+
 type ProjectInboxSyncSummaryView = {
   source?: string;
   ok?: boolean;
@@ -457,6 +464,7 @@ type GmailStatusView = {
   gmail_address: string;
   scope: string;
   can_read_inbox?: boolean;
+  can_read_calendar?: boolean;
   expires_at: string | null;
 };
 
@@ -1122,6 +1130,24 @@ function inboxSyncErrorLabel(value: unknown, locale: "zh" | "en") {
   return isEn ? "Gmail sync unavailable." : "Gmail 回复同步暂时不可用。";
 }
 
+function calendarAvailabilityLabel(value: unknown, locale: "zh" | "en") {
+  const isEn = locale === "en";
+  const key = typeof value === "string" ? value : "";
+  if (key === "calendar_scope_missing") {
+    return isEn ? "Reconnect Google Calendar availability access." : "请重新授权 Google Calendar 可用时间读取权限。";
+  }
+  if (key === "gmail_not_connected") {
+    return isEn ? "Connect Google before generating scheduling windows." : "请先连接 Google，再生成可约时间。";
+  }
+  if (key === "gmail_reconnect_required") {
+    return isEn ? "Google connection needs to be refreshed." : "Google 连接需要重新授权。";
+  }
+  if (key === "calendar_freebusy_failed") {
+    return isEn ? "Calendar availability lookup failed." : "Calendar 可用时间读取失败。";
+  }
+  return isEn ? "Calendar availability unavailable." : "Calendar 可用时间不可用。";
+}
+
 function inboxSyncSummaryLabel(result: InboxSyncResultView | null, locale: "zh" | "en") {
   const isEn = locale === "en";
   if (!result) return "";
@@ -1781,6 +1807,23 @@ function InboxAgentPanel({
   const [busyActionId, setBusyActionId] = useState("");
   const [actionErrors, setActionErrors] = useState<Record<string, string>>({});
   const [successMessages, setSuccessMessages] = useState<Record<string, string>>({});
+  const [gmail, setGmail] = useState<GmailStatusView | null>(null);
+  const [calendarAvailabilityById, setCalendarAvailabilityById] = useState<Record<string, CalendarSchedulingResultView>>({});
+
+  useEffect(() => {
+    let cancelled = false;
+    async function loadGoogleStatus() {
+      try {
+        const r = await fetch(`/api/integrations/gmail/status?locale=${locale}`);
+        const j = await r.json();
+        if (!cancelled && r.ok) setGmail(j as GmailStatusView);
+      } catch {
+        if (!cancelled) setGmail({ configured: false, connected: false, gmail_address: "", scope: "", can_read_calendar: false, expires_at: null });
+      }
+    }
+    void loadGoogleStatus();
+    return () => { cancelled = true; };
+  }, [locale]);
 
   async function syncReplies() {
     setSyncing(true);
@@ -1856,6 +1899,32 @@ function InboxAgentPanel({
       onChanged();
     } catch (e) {
       setActionErrors((prev) => ({ ...prev, [item.id]: (e as Error).message }));
+    } finally {
+      setBusyActionId("");
+    }
+  }
+
+  async function generateCalendarSchedulingDraft(candidate: InboxQueueView["interested_candidates"][number]) {
+    setBusyActionId(`calendar:${candidate.id}`);
+    setActionErrors((prev) => ({ ...prev, [candidate.id]: "" }));
+    try {
+      const r = await fetch("/api/integrations/calendar/availability", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          project_id: projectId,
+          candidate_name: candidate.candidate_name,
+          scheduling_packet: candidate.scheduling_packet,
+          locale,
+          max_slots: 3,
+          duration_minutes: 30,
+        }),
+      });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(j.error || calendarAvailabilityLabel(j.skipped_reason, locale));
+      setCalendarAvailabilityById((prev) => ({ ...prev, [candidate.id]: j as CalendarSchedulingResultView }));
+    } catch (e) {
+      setActionErrors((prev) => ({ ...prev, [candidate.id]: (e as Error).message }));
     } finally {
       setBusyActionId("");
     }
@@ -2114,6 +2183,44 @@ function InboxAgentPanel({
                             {isEn ? "Copy manager handoff" : "复制面试官交付包"}
                           </button>
                         </div>
+                      </div>
+                      <div className="mt-2 rounded-lg bg-emerald-50 px-2 py-2 ring-1 ring-emerald-100">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => generateCalendarSchedulingDraft(candidate)}
+                            disabled={busyActionId === `calendar:${candidate.id}` || !gmail?.connected || !gmail?.can_read_calendar}
+                            className="rounded-full bg-emerald-700 px-2.5 py-1 font-semibold text-white disabled:cursor-not-allowed disabled:bg-emerald-200"
+                          >
+                            {busyActionId === `calendar:${candidate.id}` ? (isEn ? "Generating..." : "生成中...") : (isEn ? "Generate scheduling draft" : "生成可约时间草稿")}
+                          </button>
+                          {(!gmail?.connected || !gmail?.can_read_calendar) && (
+                            <SecondaryAction href="/api/integrations/gmail/connect" className="min-h-7 px-2 py-1 text-xs">
+                              {isEn ? "Reconnect Google Calendar" : "重新授权 Google Calendar"}
+                            </SecondaryAction>
+                          )}
+                        </div>
+                        <p className="mt-1 break-words text-[11px] leading-5 text-emerald-800">
+                          {isEn ? "No calendar invite or email is sent. Suggested windows stay as a recruiter-reviewed draft." : "不会自动发送日历邀请或邮件；可约时间只会生成待确认草稿。"}
+                        </p>
+                        {calendarAvailabilityById[candidate.id] && (
+                          <div className="mt-2 rounded-lg bg-white px-2 py-1.5 text-xs ring-1 ring-emerald-100">
+                            {!calendarAvailabilityById[candidate.id].ok && (
+                              <p className="mb-1 font-semibold text-amber-800">
+                                {calendarAvailabilityLabel(calendarAvailabilityById[candidate.id].skipped_reason, locale)}
+                              </p>
+                            )}
+                            <p className="break-words font-semibold">{calendarAvailabilityById[candidate.id].draft.subject}</p>
+                            <p className="mt-1 whitespace-pre-wrap break-words">{calendarAvailabilityById[candidate.id].draft.body}</p>
+                            <button
+                              type="button"
+                              onClick={() => navigator.clipboard?.writeText(calendarAvailabilityById[candidate.id].draft.body)}
+                              className="mt-2 rounded-full bg-white px-2 py-0.5 font-semibold text-emerald-800 ring-1 ring-emerald-100"
+                            >
+                              {isEn ? "Copy calendar-aware draft" : "复制可约时间草稿"}
+                            </button>
+                          </div>
+                        )}
                       </div>
                       <p className="mt-1 break-words">{candidate.scheduling_packet.candidate_reply || candidate.scheduling_packet.suggested_scheduling_message}</p>
                       <p className="mt-1 break-words font-semibold">{candidate.scheduling_packet.claim_status_summary}</p>

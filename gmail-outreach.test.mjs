@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
+  GOOGLE_CALENDAR_FREEBUSY_SCOPE,
   buildGmailAuthUrl,
   buildGmailRawMessage,
   buildGmailSendPayload,
@@ -33,7 +34,12 @@ test("gmail auth URL requests send and readonly without modify for P2a inbox syn
 
   assert.match(url, /scope=https%3A%2F%2Fwww.googleapis.com%2Fauth%2Fgmail.send/);
   assert.match(url, /gmail.readonly/);
+  assert.match(url, /calendar.freebusy/);
+  assert.equal(GOOGLE_CALENDAR_FREEBUSY_SCOPE, "https://www.googleapis.com/auth/calendar.freebusy");
   assert.doesNotMatch(url, /gmail.modify/);
+  assert.doesNotMatch(url, /calendar.events/);
+  assert.doesNotMatch(url, /calendar.readonly/);
+  assert.doesNotMatch(decodeURIComponent(url), /https:\/\/www\.googleapis\.com\/auth\/calendar(?!\.freebusy)/);
   assert.match(url, /access_type=offline/);
 });
 
