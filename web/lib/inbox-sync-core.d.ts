@@ -25,5 +25,6 @@ export function syncGmailInboxForProjectCore(input?: {
   getGmailThreadMessages: (input: { userId: string; threadId: string }) => Promise<Array<Record<string, unknown>>>;
   saveInboxThread: (input: Record<string, unknown>) => Promise<unknown>;
   updateOutreachThread: (input: Record<string, unknown>) => Promise<unknown>;
+  maxThreads?: number;
   now?: Date;
 }): Promise<GmailSyncSummary>;

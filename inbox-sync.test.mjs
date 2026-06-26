@@ -142,3 +142,30 @@ test("gmail reconnect required is returned as top-level sync skipped reason", as
   assert.equal(result.skipped_reason, "gmail_reconnect_required");
   assert.equal(result.errors[0].error, "gmail_reconnect_required");
 });
+
+test("gmail sync does not scan inactive outreach threads inside an active project", async () => {
+  const scannedThreadIds = [];
+  const result = await syncGmailInboxForProjectCore({
+    userId: "u1",
+    projectId: "p1",
+    ...baseDeps({
+      listRoleRelatedOutreachThreads: async () => [
+        { id: "active", candidate_name: "Ada", gmail_thread_id: "g-active", status: "sent", notes: "", role_brief: "AI role" },
+        { id: "stopped", candidate_name: "Stopped", gmail_thread_id: "g-stopped", status: "stopped", notes: "", role_brief: "AI role" },
+        { id: "bounced", candidate_name: "Bounced", gmail_thread_id: "g-bounced", status: "bounced", notes: "", role_brief: "AI role" },
+        { id: "rejected", candidate_name: "Rejected", gmail_thread_id: "g-rejected", status: "rejected", notes: "", role_brief: "AI role" },
+        { id: "hired", candidate_name: "Hired", gmail_thread_id: "g-hired", status: "hired", notes: "", role_brief: "AI role" },
+      ],
+      getGmailThreadMessages: async ({ threadId }) => {
+        scannedThreadIds.push(threadId);
+        return [
+          { id: `${threadId}-m1`, threadId, from: "Candidate <candidate@example.com>", snippet: "Happy to chat.", bodyText: "Happy to chat." },
+        ];
+      },
+    }),
+  });
+
+  assert.equal(result.ok, true);
+  assert.equal(result.scanned, 1);
+  assert.deepEqual(scannedThreadIds, ["g-active"]);
+});

@@ -5,6 +5,12 @@ function cleanString(value) {
   return typeof value === "string" ? value.trim() : "";
 }
 
+const INACTIVE_OUTREACH_STATUSES = new Set(["stopped", "bounced", "rejected", "hired"]);
+
+function isSyncableOutreachThread(thread) {
+  return !INACTIVE_OUTREACH_STATUSES.has(cleanString(thread?.status));
+}
+
 function latestCandidateMessage(messages, senderEmail) {
   const ownEmail = cleanString(senderEmail).toLowerCase();
   for (const message of [...messages].reverse()) {
@@ -68,6 +74,7 @@ export async function syncGmailInboxForProjectCore({
   getGmailThreadMessages,
   saveInboxThread,
   updateOutreachThread,
+  maxThreads = 0,
   now = new Date(),
 } = {}) {
   const lastSyncedAt = now.toISOString();
@@ -87,7 +94,8 @@ export async function syncGmailInboxForProjectCore({
     };
   }
 
-  const threads = await listRoleRelatedOutreachThreads({ userId, projectId });
+  const listedThreads = (await listRoleRelatedOutreachThreads({ userId, projectId })).filter(isSyncableOutreachThread);
+  const threads = Number(maxThreads) > 0 ? listedThreads.slice(0, Number(maxThreads)) : listedThreads;
   let synced = 0;
   const errors = [];
   let skippedReason = "";
