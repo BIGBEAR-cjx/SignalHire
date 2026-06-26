@@ -78,7 +78,7 @@ test("confirms the server session cookie after writing it", async () => {
   ]);
 });
 
-test("rejects a written cookie that the server cannot use", async () => {
+test("does not block login when cookie confirmation fails after a successful write", async () => {
   const calls = [];
 
   const didSync = await writeAndConfirmSessionCookie(
@@ -90,11 +90,44 @@ test("rejects a written cookie that the server cannot use", async () => {
     "zh",
   );
 
-  assert.equal(didSync, false);
+  assert.equal(didSync, true);
   assert.deepEqual(calls, [
     { url: "/api/auth/session", body: JSON.stringify({ accessToken: "fresh-token", locale: "zh" }) },
     { url: "/api/whoami?locale=zh", body: undefined },
   ]);
+});
+
+test("does not block login when cookie confirmation times out", async () => {
+  const calls = [];
+
+  const didSync = await writeAndConfirmSessionCookie(
+    "fresh-token",
+    async (url, init) => {
+      calls.push({ url, body: init?.body });
+      if (url === "/api/whoami?locale=zh") {
+        return new Promise(() => {});
+      }
+      return { ok: true };
+    },
+    "zh",
+    5,
+  );
+
+  assert.equal(didSync, true);
+  assert.deepEqual(calls, [
+    { url: "/api/auth/session", body: JSON.stringify({ accessToken: "fresh-token", locale: "zh" }) },
+    { url: "/api/whoami?locale=zh", body: undefined },
+  ]);
+});
+
+test("rejects a failed cookie write", async () => {
+  const didSync = await writeAndConfirmSessionCookie(
+    "fresh-token",
+    async () => ({ ok: false }),
+    "zh",
+  );
+
+  assert.equal(didSync, false);
 });
 
 test("confirms an existing server session cookie", async () => {

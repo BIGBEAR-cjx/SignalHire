@@ -1,6 +1,7 @@
 export function confirmSessionCookie(
   fetchImpl?: typeof fetch,
   locale?: string,
+  timeoutMs?: number,
 ): Promise<boolean>;
 
 export function syncSessionCookieFromTokenManager(
@@ -13,4 +14,5 @@ export function writeAndConfirmSessionCookie(
   accessToken: string,
   fetchImpl?: typeof fetch,
   locale?: string,
+  confirmTimeoutMs?: number,
 ): Promise<boolean>;

@@ -2,16 +2,23 @@ function whoamiUrl(locale = "zh") {
   return `/api/whoami?locale=${encodeURIComponent(locale)}`;
 }
 
-export async function confirmSessionCookie(fetchImpl = globalThis.fetch, locale = "zh") {
+function timeoutResult(ms) {
+  return new Promise((resolve) => setTimeout(() => resolve(false), ms));
+}
+
+export async function confirmSessionCookie(fetchImpl = globalThis.fetch, locale = "zh", timeoutMs = 1200) {
   try {
-    const response = await fetchImpl(whoamiUrl(locale));
+    const response = await Promise.race([
+      fetchImpl(whoamiUrl(locale)),
+      timeoutResult(timeoutMs),
+    ]);
     return Boolean(response?.ok);
   } catch {
     return false;
   }
 }
 
-export async function writeAndConfirmSessionCookie(accessToken, fetchImpl = globalThis.fetch, locale = "zh") {
+export async function writeAndConfirmSessionCookie(accessToken, fetchImpl = globalThis.fetch, locale = "zh", confirmTimeoutMs = 1200) {
   try {
     const token = typeof accessToken === "string" ? accessToken.trim() : "";
     if (!token) return false;
@@ -21,7 +28,8 @@ export async function writeAndConfirmSessionCookie(accessToken, fetchImpl = glob
       body: JSON.stringify({ accessToken: token, locale }),
     });
     if (!response?.ok) return false;
-    return await confirmSessionCookie(fetchImpl, locale);
+    await confirmSessionCookie(fetchImpl, locale, confirmTimeoutMs);
+    return true;
   } catch {
     return false;
   }
