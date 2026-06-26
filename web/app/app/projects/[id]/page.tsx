@@ -429,6 +429,25 @@ type ContactProviderStatusView = {
   reason: string;
 };
 
+type BulkContactResolutionView = {
+  status: string;
+  provider: string;
+  reason: string;
+  summary: {
+    resolved: number;
+    skipped: number;
+    failed: number;
+    cost_units: number;
+  };
+  items?: Array<{
+    id: string;
+    status: string;
+    reason: string;
+    can_send: boolean;
+    cost_units: number;
+  }>;
+};
+
 interface ShortlistItem {
   id: string;
   source_run_id: string | null;
@@ -869,7 +888,52 @@ function TalentMonitorPanel({
 
 function primaryEmail(contactProfile?: ContactProfileView) {
   const emails = contactProfile?.emails ?? [];
-  return emails.find((email) => (email.confidence === "high" || email.confidence === "medium") && email.deliverability_status !== "bounced") ?? null;
+  return emails.find((email) => Boolean(email.source) && (email.confidence === "high" || email.confidence === "medium") && email.deliverability_status !== "bounced") ?? null;
+}
+
+function contactResolutionReasonLabel(reason: string, locale: "zh" | "en") {
+  const labels: Record<string, { en: string; zh: string }> = {
+    already_sendable: {
+      en: "Already has a sendable sourced email.",
+      zh: "已有带来源且可发送的邮箱。",
+    },
+    recent_not_found: {
+      en: "Recently checked: no contact found.",
+      zh: "近期已查找过，暂未找到联系方式。",
+    },
+    cost_guard_limit: {
+      en: "Skipped by cost guard for this run.",
+      zh: "本次被成本护栏跳过。",
+    },
+    no_contact_found: {
+      en: "No contact found from the provider.",
+      zh: "联系方式服务未找到邮箱。",
+    },
+    provider_rate_limited: {
+      en: "Provider is rate limited. Try again later.",
+      zh: "联系方式服务被限流，请稍后重试。",
+    },
+    provider_quota_exceeded: {
+      en: "Provider quota is exhausted.",
+      zh: "联系方式服务额度已用完。",
+    },
+    provider_auth_error: {
+      en: "Provider credentials need admin attention.",
+      zh: "联系方式服务凭证需要管理员处理。",
+    },
+    provider_error: {
+      en: "Provider failed. Existing contacts were preserved.",
+      zh: "联系方式服务失败，已保留现有联系方式。",
+    },
+  };
+  const match = labels[reason] ?? { en: reason || "Contact status unavailable.", zh: reason || "联系方式状态不可用。" };
+  return locale === "en" ? match.en : match.zh;
+}
+
+function contactProviderDisabledText(locale: "zh" | "en") {
+  return locale === "en"
+    ? "Hunter contact provider is not configured. Ask an admin to add Hunter credentials."
+    : "Hunter 联系方式服务尚未配置。请管理员添加 Hunter 凭证。";
 }
 
 function sendDisabledReason(item: OutreachQueueView["items"][number], gmail?: GmailStatusView | null, locale: "zh" | "en" = "zh") {
@@ -992,7 +1056,7 @@ function fallbackSequence(item: OutreachQueueView["items"][number]): OutreachSeq
   ];
 }
 
-function GmailOutreachPanel({ queue, locale, onChanged }: { queue?: OutreachQueueView; locale: "zh" | "en"; onChanged: () => void }) {
+function GmailOutreachPanel({ queue, projectId, locale, onChanged }: { queue?: OutreachQueueView; projectId: string; locale: "zh" | "en"; onChanged: () => void }) {
   const isEn = locale === "en";
   const items = queue?.items ?? [];
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -1001,6 +1065,8 @@ function GmailOutreachPanel({ queue, locale, onChanged }: { queue?: OutreachQueu
   const [editing, setEditing] = useState<Record<string, { subject: string; body: string }>>({});
   const [sendErrors, setSendErrors] = useState<Record<string, string>>({});
   const [bulkBusy, setBulkBusy] = useState(false);
+  const [contactBulkBusy, setContactBulkBusy] = useState(false);
+  const [bulkContactResult, setBulkContactResult] = useState<BulkContactResolutionView | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -1101,6 +1167,31 @@ function GmailOutreachPanel({ queue, locale, onChanged }: { queue?: OutreachQueu
       setBusyId(null);
     }
   }
+  async function resolveMissingContacts() {
+    setContactBulkBusy(true);
+    setBulkContactResult(null);
+    try {
+      const r = await fetch("/api/contact-resolution/bulk", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ project_id: projectId, locale }),
+      });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok) {
+        setBulkContactResult({
+          status: "error",
+          provider: contactProvider?.provider || "hunter",
+          reason: String(j.error || (isEn ? "Contact resolution failed." : "联系方式解析失败。")),
+          summary: { resolved: 0, skipped: 0, failed: 1, cost_units: 0 },
+        });
+        return;
+      }
+      setBulkContactResult(j as BulkContactResolutionView);
+      onChanged();
+    } finally {
+      setContactBulkBusy(false);
+    }
+  }
   async function approveReadyDrafts() {
     const targets = items.filter((item) => item.status === "drafted" && primaryEmail(item.contact_profile));
     setBulkBusy(true);
@@ -1141,7 +1232,7 @@ function GmailOutreachPanel({ queue, locale, onChanged }: { queue?: OutreachQueu
             )}
             {contactProvider && !contactProvider.enabled && (
               <span className="rounded-full bg-amber-50 px-3 py-1.5 font-semibold text-amber-800 ring-1 ring-amber-200">
-                {isEn ? "Provider not connected" : "联系方式服务未连接"}
+                {contactProviderDisabledText(locale)}
               </span>
             )}
           </div>
@@ -1150,11 +1241,66 @@ function GmailOutreachPanel({ queue, locale, onChanged }: { queue?: OutreachQueu
           <SecondaryAction href="/api/integrations/gmail/connect" disabled={gmail?.connected || gmail?.configured === false} className="min-h-9 px-3 py-2 text-xs">
             {isEn ? "Connect Gmail" : "连接 Gmail"}
           </SecondaryAction>
+          <SecondaryAction
+            onClick={resolveMissingContacts}
+            disabled={contactBulkBusy || contactProvider?.enabled === false || items.length === 0}
+            className="min-h-9 px-3 py-2 text-xs"
+          >
+            {isEn ? "Resolve missing contacts" : "批量解析缺失联系方式"}
+          </SecondaryAction>
           <PrimaryAction onClick={approveReadyDrafts} disabled={bulkBusy || items.every((item) => item.status !== "drafted" || !primaryEmail(item.contact_profile))} className="min-h-9 px-3 py-2 text-xs">
             {isEn ? "Approve ready drafts" : "批量批准可发送草稿"}
           </PrimaryAction>
         </div>
       </div>
+      {bulkContactResult && (
+        <div className="rounded-2xl bg-blue-50 px-4 py-3 text-xs leading-5 text-blue-900 ring-1 ring-blue-100">
+          <p className="font-semibold">
+            {isEn ? "Contact resolution summary" : "联系方式解析汇总"}
+          </p>
+          <p className="mt-1">
+            {bulkContactResult.status === "disabled"
+              ? contactProviderDisabledText(locale)
+              : (isEn
+                ? `${bulkContactResult.summary.resolved} resolved, ${bulkContactResult.summary.skipped} skipped, ${bulkContactResult.summary.failed} failed. Credits used: ${bulkContactResult.summary.cost_units}.`
+                : `已解析 ${bulkContactResult.summary.resolved} 个，跳过 ${bulkContactResult.summary.skipped} 个，失败 ${bulkContactResult.summary.failed} 个。消耗 credits：${bulkContactResult.summary.cost_units}。`)}
+          </p>
+          <p className="mt-1 text-blue-800">
+            {isEn ? "Cost guard: at most 10 provider lookups per bulk run. Already sendable or recently not-found candidates are skipped." : "成本护栏：每次批量最多调用 10 个 provider 查询；已有可发送邮箱或近期未找到的人会跳过。"}
+          </p>
+          {(bulkContactResult.items?.length ?? 0) > 0 && (
+            <div className="mt-3 grid max-h-80 gap-2 overflow-y-auto pr-1 md:grid-cols-2">
+              {bulkContactResult.items?.map((resultItem) => {
+                const sourceItem = items.find((queueItem) => queueItem.id === resultItem.id);
+                return (
+                  <div key={resultItem.id} className="min-w-0 rounded-xl bg-white/80 px-3 py-2 ring-1 ring-blue-100">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <span className="min-w-0 truncate font-semibold text-blue-950">
+                        {sourceItem?.candidate_name || resultItem.id}
+                      </span>
+                      <span className={`shrink-0 rounded-full px-2 py-0.5 font-semibold ring-1 ${
+                        resultItem.status === "resolved"
+                          ? "bg-emerald-50 text-emerald-700 ring-emerald-100"
+                          : resultItem.status === "error"
+                            ? "bg-rose-50 text-rose-700 ring-rose-100"
+                            : "bg-gray-50 text-gray-700 ring-gray-200"
+                      }`}>
+                        {resultItem.status}
+                      </span>
+                    </div>
+                    <p className="mt-1 text-blue-800">{contactResolutionReasonLabel(resultItem.reason, locale)}</p>
+                    <p className="mt-1 text-blue-700">
+                      {isEn
+                        ? `${resultItem.can_send ? "Can send" : "Cannot send yet"} · Credits: ${resultItem.cost_units}`
+                        : `${resultItem.can_send ? "可发送" : "暂不可发送"} · Credits：${resultItem.cost_units}`}
+                    </p>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
       {items.length === 0 ? (
         <p className="rounded-2xl border border-dashed border-black/10 bg-white/60 p-4 text-sm text-[var(--sh-muted)]">
           {isEn ? "No saved outreach threads yet." : "还没有保存的触达记录。"}
@@ -1239,7 +1385,7 @@ function GmailOutreachPanel({ queue, locale, onChanged }: { queue?: OutreachQueu
                       disabled={busyId === item.id || contactProvider?.enabled === false}
                       className="inline-flex rounded-full bg-white px-2 py-0.5 font-semibold text-gray-700 ring-1 ring-black/10 hover:bg-gray-100 disabled:opacity-50"
                     >
-                      {contactProvider?.enabled === false ? (isEn ? "Provider not connected" : "联系方式服务未连接") : (isEn ? "Resolve contact" : "解析联系方式")}
+                      {contactProvider?.enabled === false ? contactProviderDisabledText(locale) : (isEn ? "Resolve contact" : "解析联系方式")}
                     </button>
                   </div>
                 )}
@@ -1839,7 +1985,7 @@ export default function ProjectDetailPage() {
         onChanged={reloadDetail}
       />
 
-      <GmailOutreachPanel queue={detail.outreachQueue} locale={locale} onChanged={reloadDetail} />
+      <GmailOutreachPanel queue={detail.outreachQueue} projectId={detail.project.id} locale={locale} onChanged={reloadDetail} />
 
       <InboxAgentPanel
         queue={detail.inboxQueue}

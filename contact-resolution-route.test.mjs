@@ -85,3 +85,115 @@ test("contact resolution route core writes back resolved contact profile", async
   assert.equal(updates[0].contact_profile.emails[0].value, "ada@example.ai");
   assert.equal(updates[0].send_error, "");
 });
+
+test("contact resolution route skips provider when existing email is sendable", async () => {
+  let providerCalled = false;
+  let updateCalled = false;
+  const result = await runContactResolution({
+    body: { outreach_thread_id: "thread-1" },
+    user: { id: "user-1" },
+    getOutreachThread: async () => ({
+      candidate_snapshot: { name: "Ada", company_domain: "example.ai" },
+      contact_profile: {
+        emails: [{ value: "ada@example.ai", source: "internal_resume", confidence: "high", deliverability_status: "valid" }],
+      },
+    }),
+    buildContactProviderConfig: () => ({ provider: "hunter", enabled: true, reason: "" }),
+    resolveHunterContact: async () => {
+      providerCalled = true;
+      return {};
+    },
+    updateOutreachThread: async () => {
+      updateCalled = true;
+      return {};
+    },
+  });
+
+  assert.equal(result.status, 200);
+  assert.equal(result.body.status, "skipped");
+  assert.equal(result.body.reason, "already_sendable");
+  assert.equal(providerCalled, false);
+  assert.equal(updateCalled, false);
+});
+
+test("contact resolution force refresh calls provider even with existing email", async () => {
+  let providerCalled = false;
+  const result = await runContactResolution({
+    body: { outreach_thread_id: "thread-1", force_refresh: true },
+    user: { id: "user-1" },
+    getOutreachThread: async () => ({
+      candidate_snapshot: { name: "Ada", company_domain: "example.ai" },
+      contact_profile: {
+        emails: [{ value: "ada@example.ai", source: "internal_resume", confidence: "high", deliverability_status: "valid" }],
+      },
+    }),
+    buildContactProviderConfig: () => ({ provider: "hunter", enabled: true, reason: "" }),
+    resolveHunterContact: async () => {
+      providerCalled = true;
+      return {
+        contact_profile: {
+          emails: [{ value: "ada.new@example.ai", source: "hunter", confidence: "high", deliverability_status: "valid" }],
+        },
+      };
+    },
+    updateOutreachThread: async (input) => input,
+  });
+
+  assert.equal(result.status, 200);
+  assert.equal(result.body.status, "resolved");
+  assert.equal(providerCalled, true);
+});
+
+test("contact resolution route normalizes provider errors", async () => {
+  const updates = [];
+  const result = await runContactResolution({
+    body: { outreach_thread_id: "thread-1", force_refresh: true },
+    user: { id: "user-1" },
+    getOutreachThread: async () => ({
+      candidate_snapshot: { name: "Ada", company_domain: "example.ai" },
+      contact_profile: { emails: [], phones: [] },
+    }),
+    buildContactProviderConfig: () => ({ provider: "hunter", enabled: true, reason: "" }),
+    resolveHunterContact: async () => {
+      throw Object.assign(new Error("hunter_429"), { status: 429 });
+    },
+    updateOutreachThread: async (input) => {
+      updates.push(input);
+      return input;
+    },
+  });
+
+  assert.equal(result.status, 200);
+  assert.equal(result.body.status, "error");
+  assert.equal(result.body.reason, "provider_rate_limited");
+  assert.equal(updates.length, 1);
+  assert.equal(updates[0].contact_profile.resolution.status, "error");
+  assert.equal(updates[0].contact_profile.resolution.reason, "provider_rate_limited");
+  assert.equal(updates[0].send_error, "provider_rate_limited");
+});
+
+test("contact resolution route normalizes provider auth and quota errors", async () => {
+  const cases = [
+    [Object.assign(new Error("hunter_401"), { status: 401 }), "provider_auth_error"],
+    [Object.assign(new Error("payment required"), { status: 402 }), "provider_quota_exceeded"],
+  ];
+
+  for (const [error, reason] of cases) {
+    const result = await runContactResolution({
+      body: { outreach_thread_id: "thread-1", force_refresh: true },
+      user: { id: "user-1" },
+      getOutreachThread: async () => ({
+        candidate_snapshot: { name: "Ada", company_domain: "example.ai" },
+        contact_profile: { emails: [], phones: [] },
+      }),
+      buildContactProviderConfig: () => ({ provider: "hunter", enabled: true, reason: "" }),
+      resolveHunterContact: async () => {
+        throw error;
+      },
+      updateOutreachThread: async (input) => input,
+    });
+
+    assert.equal(result.body.status, "error");
+    assert.equal(result.body.reason, reason);
+  }
+});

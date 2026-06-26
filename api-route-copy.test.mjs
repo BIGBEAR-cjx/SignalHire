@@ -570,6 +570,7 @@ test("Gmail inbox agent persists only role-related threads and renders queues", 
 
 test("contact resolution route uses server-only provider config and Role Workspace renders review actions", () => {
   const route = readFileSync("web/app/api/contact-resolution/resolve/route.ts", "utf8");
+  const bulkRoute = readFileSync("web/app/api/contact-resolution/bulk/route.ts", "utf8");
   const routeCore = readFileSync("web/lib/contact-resolution-route.mjs", "utf8");
   const statusRoute = readFileSync("web/app/api/contact-resolution/status/route.ts", "utf8");
   const providers = readFileSync("web/lib/contact-providers.mjs", "utf8");
@@ -582,6 +583,11 @@ test("contact resolution route uses server-only provider config and Role Workspa
   assert.match(routeCore, /getOutreachThread\(\{ userId: user\.id, id \}\)/);
   assert.match(routeCore, /resolveHunterContact/);
   assert.match(routeCore, /updateOutreachThread/);
+  assert.match(routeCore, /runBulkContactResolution/);
+  assert.match(routeCore, /maxProviderCalls = 10/);
+  assert.match(bulkRoute, /runBulkContactResolution/);
+  assert.match(bulkRoute, /listOutreachThreads/);
+  assert.match(bulkRoute, /process\.env/);
   assert.match(statusRoute, /buildContactProviderConfig\(process\.env\)/);
   assert.match(providers, /HUNTER_API_KEY/);
   assert.match(providers, /https:\/\/api\.hunter\.io\/v2\/email-finder/);
@@ -590,7 +596,14 @@ test("contact resolution route uses server-only provider config and Role Workspa
   assert.match(projectPage, /resolveContact/);
   assert.match(projectPage, /Review contact/);
   assert.match(projectPage, /Resolve contact/);
-  assert.match(projectPage, /Provider not connected/);
+  assert.match(projectPage, /resolveMissingContacts/);
+  assert.match(projectPage, /Resolve missing contacts/);
+  assert.match(projectPage, /Contact resolution summary/);
+  assert.match(projectPage, /contactResolutionReasonLabel/);
+  assert.match(projectPage, /bulkContactResult\.items/);
+  assert.doesNotMatch(projectPage, /bulkContactResult\.items\?\.slice/);
+  assert.match(projectPage, /Already has a sendable sourced email/);
+  assert.match(projectPage, /Hunter contact provider is not configured/);
   assert.match(projectPage, /sendDisabledReason/);
   assert.match(projectPage, /contactRiskWarning/);
   assert.match(projectPage, /deliverability_status/);
