@@ -1,6 +1,9 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { buildContactResolutionResult } from "./web/lib/contact-resolution.mjs";
+import {
+  buildContactResolutionResult,
+  contactResolutionEligibility,
+} from "./web/lib/contact-resolution.mjs";
 
 const now = new Date("2026-06-26T10:00:00.000Z");
 
@@ -121,4 +124,66 @@ test("provider errors preserve existing contact profile", () => {
   assert.equal(result.status, "error");
   assert.equal(result.reason, "provider timeout");
   assert.equal(result.contact_profile.emails[0].value, "existing@example.ai");
+});
+
+test("sendable existing email is skipped unless force refresh is requested", () => {
+  const candidate = {
+    contact_profile: {
+      emails: [{ value: "existing@example.ai", source: "internal_resume", confidence: "high", deliverability_status: "valid" }],
+    },
+  };
+
+  assert.deepEqual(contactResolutionEligibility({ candidate }), {
+    eligible: false,
+    status: "skipped",
+    reason: "already_sendable",
+  });
+  assert.deepEqual(contactResolutionEligibility({ candidate, forceRefresh: true }), {
+    eligible: true,
+    status: "eligible",
+    reason: "",
+  });
+});
+
+test("recent not-found resolution is skipped without force refresh", () => {
+  const candidate = {
+    contact_profile: {
+      emails: [],
+      resolution: {
+        provider: "hunter",
+        status: "not_found",
+        reason: "no_contact_found",
+        searched_at: "2026-06-26T09:30:00.000Z",
+        cost_units: 1,
+      },
+    },
+  };
+
+  const result = contactResolutionEligibility({ candidate, now });
+
+  assert.equal(result.eligible, false);
+  assert.equal(result.status, "skipped");
+  assert.equal(result.reason, "recent_not_found");
+});
+
+test("provider result writes resolution metadata", () => {
+  const result = buildContactResolutionResult({
+    candidateId: "c7",
+    candidate: { name: "Ada", company_domain: "example.ai" },
+    provider: "hunter",
+    enabled: true,
+    providerResult: {
+      contact_profile: {
+        emails: [{ value: "ada@example.ai", source: "hunter", confidence: "high", deliverability_status: "valid" }],
+      },
+      cost_units: 1,
+      raw_reference: "https://example.ai/team",
+    },
+    now,
+  });
+
+  assert.equal(result.contact_profile.resolution.provider, "hunter");
+  assert.equal(result.contact_profile.resolution.status, "resolved");
+  assert.equal(result.contact_profile.resolution.cost_units, 1);
+  assert.equal(result.contact_profile.resolution.raw_reference, "https://example.ai/team");
 });
