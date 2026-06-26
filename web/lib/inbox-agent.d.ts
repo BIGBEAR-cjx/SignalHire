@@ -18,6 +18,21 @@ export type InboxQueueView = {
   interested_candidates: Array<InboxQueueItem & {
     readiness: "needs_scheduling";
     recommended_next_step: string;
+    scheduling_packet?: {
+      candidate_summary: string;
+      reply_excerpt: string;
+      strongest_evidence?: string[];
+      risk_flags?: string[];
+      unverified_claims?: string[];
+      claim_status_summary: string;
+      handoff_title: string;
+      hiring_manager_note: string;
+      verified_summary: string;
+      risk_summary: string;
+      candidate_reply: string;
+      suggested_scheduling_message: string;
+      interview_questions: string[];
+    };
   }>;
 };
 

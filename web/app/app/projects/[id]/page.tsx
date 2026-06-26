@@ -386,6 +386,11 @@ type InboxQueueView = {
       risk_flags?: string[];
       unverified_claims?: string[];
       claim_status_summary?: string;
+      handoff_title?: string;
+      hiring_manager_note?: string;
+      verified_summary?: string;
+      risk_summary?: string;
+      candidate_reply?: string;
       suggested_scheduling_message: string;
       interview_questions: string[];
     };
@@ -963,14 +968,16 @@ function handoffText(candidate: InboxQueueView["interested_candidates"][number])
   const packet = candidate.scheduling_packet;
   if (!packet) return `${candidate.candidate_name}\n${candidate.last_message_excerpt}`;
   return [
+    packet.handoff_title || `Interview-ready handoff for ${candidate.candidate_name}`,
     packet.candidate_summary,
+    packet.hiring_manager_note ? `Manager note: ${packet.hiring_manager_note}` : "",
     `Reply: ${packet.reply_excerpt}`,
-    `Evidence: ${(packet.strongest_evidence ?? []).join("; ") || "Not verified yet"}`,
-    `Risks: ${(packet.risk_flags ?? []).join("; ") || "None recorded"}`,
+    `Evidence: ${packet.verified_summary || (packet.strongest_evidence ?? []).join("; ") || "Not verified yet"}`,
+    `Risks: ${packet.risk_summary || (packet.risk_flags ?? []).join("; ") || "None recorded"}`,
     `Unverified: ${(packet.unverified_claims ?? []).join("; ") || "None recorded"}`,
-    `Scheduling: ${packet.suggested_scheduling_message}`,
+    `Candidate reply: ${packet.candidate_reply || packet.suggested_scheduling_message}`,
     `Questions:\n- ${packet.interview_questions.join("\n- ")}`,
-  ].join("\n");
+  ].filter(Boolean).join("\n");
 }
 
 function inboxActionStatusLabel(status: InboxActionStatus | undefined, locale: "zh" | "en") {
@@ -1011,12 +1018,13 @@ function formatShortDate(value: string | undefined, locale: "zh" | "en") {
 }
 
 function inboxActionPayload(item: InboxActionItemView) {
+  const packet = "scheduling_packet" in item ? item.scheduling_packet : undefined;
   return {
     outreach_thread_id: item.outreach_thread_id,
     action: item.next_action,
     reply_draft: item.reply_draft || item.suggested_reply || "",
     follow_up_at: item.next_action === "follow_up_later" ? defaultFollowUpIso() : "",
-    scheduling_message: item.scheduling_prompt || "",
+    scheduling_message: packet?.candidate_reply || item.scheduling_prompt || "",
   };
 }
 
@@ -1728,22 +1736,34 @@ function InboxAgentPanel({
                   {candidate.scheduling_packet && (
                     <div className="mt-2 rounded-lg bg-white/80 px-2 py-1.5 text-emerald-950 ring-1 ring-emerald-100">
                       <div className="flex flex-wrap items-center justify-between gap-2">
-                        <p className="break-words font-semibold">{candidate.scheduling_packet.candidate_summary}</p>
-                        <button
-                          type="button"
-                          onClick={() => navigator.clipboard?.writeText(handoffText(candidate))}
-                          className="rounded-full bg-emerald-50 px-2 py-0.5 font-semibold text-emerald-800 ring-1 ring-emerald-100"
-                        >
-                          {isEn ? "Copy handoff" : "复制交付包"}
-                        </button>
+                        <p className="break-words font-semibold">{candidate.scheduling_packet.handoff_title || candidate.scheduling_packet.candidate_summary}</p>
+                        <div className="flex flex-wrap gap-2">
+                          <button
+                            type="button"
+                            onClick={() => navigator.clipboard?.writeText(candidate.scheduling_packet?.candidate_reply || candidate.scheduling_packet?.suggested_scheduling_message || "")}
+                            className="rounded-full bg-emerald-50 px-2 py-0.5 font-semibold text-emerald-800 ring-1 ring-emerald-100"
+                          >
+                            {isEn ? "Copy candidate reply" : "复制候选人回复"}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => navigator.clipboard?.writeText(handoffText(candidate))}
+                            className="rounded-full bg-white px-2 py-0.5 font-semibold text-emerald-800 ring-1 ring-emerald-100"
+                          >
+                            {isEn ? "Copy manager handoff" : "复制面试官交付包"}
+                          </button>
+                        </div>
                       </div>
-                      <p className="mt-1 break-words">{candidate.scheduling_packet.suggested_scheduling_message}</p>
+                      <p className="mt-1 break-words">{candidate.scheduling_packet.candidate_reply || candidate.scheduling_packet.suggested_scheduling_message}</p>
                       <p className="mt-1 break-words font-semibold">{candidate.scheduling_packet.claim_status_summary}</p>
                       <p className="mt-1 break-words">
-                        {isEn ? "Evidence" : "证据"}: {(candidate.scheduling_packet.strongest_evidence ?? []).join("; ") || (isEn ? "not verified yet" : "尚未验证")}
+                        {isEn ? "Manager note" : "面试官备注"}: {candidate.scheduling_packet.hiring_manager_note || candidate.scheduling_packet.candidate_summary}
                       </p>
                       <p className="mt-1 break-words">
-                        {isEn ? "Risks" : "风险"}: {(candidate.scheduling_packet.risk_flags ?? []).join("; ") || (isEn ? "none recorded" : "暂无记录")}
+                        {isEn ? "Evidence" : "证据"}: {candidate.scheduling_packet.verified_summary || (candidate.scheduling_packet.strongest_evidence ?? []).join("; ") || (isEn ? "not verified yet" : "尚未验证")}
+                      </p>
+                      <p className="mt-1 break-words">
+                        {isEn ? "Risks" : "风险"}: {candidate.scheduling_packet.risk_summary || (candidate.scheduling_packet.risk_flags ?? []).join("; ") || (isEn ? "none recorded" : "暂无记录")}
                       </p>
                       <p className="mt-1 break-words">
                         {isEn ? "Unverified" : "未核实"}: {(candidate.scheduling_packet.unverified_claims ?? []).join("; ") || (isEn ? "none recorded" : "暂无记录")}

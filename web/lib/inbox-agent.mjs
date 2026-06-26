@@ -134,13 +134,29 @@ function schedulingPacket(item) {
   const candidateName = cleanString(item.candidate_name) || "Candidate";
   const snapshot = isRecord(item.candidate_snapshot) ? item.candidate_snapshot : {};
   const audit = isRecord(snapshot.evidence_audit) ? snapshot.evidence_audit : {};
+  const strongestEvidence = listFrom(snapshot.strongest_evidence || snapshot.strongest_signals);
+  const riskFlags = listFrom(snapshot.risk_flags || audit.risk_flags);
+  const unverifiedClaims = listFrom(audit.unverified_claims);
+  const replyExcerpt = cleanString(item.last_message_excerpt);
+  const evidenceSummary = strongestEvidence.join("; ") || "Evidence still needs hiring review.";
+  const riskSummary = [...riskFlags, ...unverifiedClaims].join("; ") || "No major risks recorded yet.";
+  const candidateReply = [
+    `Thanks for the reply${replyExcerpt ? ` — I saw: "${replyExcerpt}"` : ""}.`,
+    `The role looks potentially relevant because ${evidenceSummary}`,
+    "Could you share 2-3 time windows that would work for a short intro conversation?",
+  ].join(" ");
   return {
     candidate_summary: `${candidateName} replied with interest.`,
-    reply_excerpt: cleanString(item.last_message_excerpt),
-    strongest_evidence: listFrom(snapshot.strongest_evidence || snapshot.strongest_signals),
-    risk_flags: listFrom(snapshot.risk_flags || audit.risk_flags),
-    unverified_claims: listFrom(audit.unverified_claims),
+    reply_excerpt: replyExcerpt,
+    strongest_evidence: strongestEvidence,
+    risk_flags: riskFlags,
+    unverified_claims: unverifiedClaims,
     claim_status_summary: "Verified evidence and unverified claims are separated for hiring review.",
+    handoff_title: `Interview-ready handoff for ${candidateName}`,
+    hiring_manager_note: `${candidateName} is ready for scheduling review. Strongest evidence: ${evidenceSummary} Risks or open questions: ${riskSummary}`,
+    verified_summary: evidenceSummary,
+    risk_summary: riskSummary,
+    candidate_reply: candidateReply,
     suggested_scheduling_message: `Thanks for the reply. I can share 2-3 time windows and a short role brief so we can see whether the conversation is worthwhile.`,
     interview_questions: [
       "What work are you most interested in discussing for this role?",

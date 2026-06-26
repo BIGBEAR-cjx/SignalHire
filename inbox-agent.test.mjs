@@ -5,6 +5,7 @@ import {
   classifyInboxReply,
   shouldStopFollowUp,
 } from "./web/lib/inbox-agent.mjs";
+import { mergeInboxActionNotes } from "./web/lib/inbox-actions.mjs";
 
 test("classifies interested replies with reason and excerpt", () => {
   const result = classifyInboxReply({
@@ -135,4 +136,41 @@ test("adds scheduling handoff packet for interested candidates", () => {
   assert.deepEqual(queue.interested_candidates[0].scheduling_packet.risk_flags, ["Current availability unknown"]);
   assert.deepEqual(queue.interested_candidates[0].scheduling_packet.unverified_claims, ["Compensation expectations"]);
   assert.equal(queue.interested_candidates[0].scheduling_packet.claim_status_summary, "Verified evidence and unverified claims are separated for hiring review.");
+  assert.match(queue.interested_candidates[0].scheduling_packet.candidate_reply, /2-3 time windows/i);
+  assert.match(queue.interested_candidates[0].scheduling_packet.candidate_reply, /Happy to chat next week/i);
+  assert.doesNotMatch(queue.interested_candidates[0].scheduling_packet.candidate_reply, /calendar invite|already scheduled/i);
+  assert.equal(queue.interested_candidates[0].scheduling_packet.handoff_title, "Interview-ready handoff for Ada");
+  assert.match(queue.interested_candidates[0].scheduling_packet.hiring_manager_note, /Built vLLM inference service/);
+  assert.match(queue.interested_candidates[0].scheduling_packet.verified_summary, /Built vLLM inference service/);
+  assert.match(queue.interested_candidates[0].scheduling_packet.risk_summary, /Current availability unknown/);
+});
+
+test("interview-ready action state is excluded from needs scheduling", () => {
+  const queue = buildInboxQueue({
+    threads: [
+      {
+        id: "1",
+        candidate_name: "Ada",
+        classification: "interested",
+        notes: mergeInboxActionNotes("", {
+          action: "schedule",
+          action_status: "interview_ready",
+          action_applied_at: "2026-06-26T10:00:00.000Z",
+          scheduling_message: "Candidate reply",
+        }),
+      },
+      {
+        id: "2",
+        candidate_name: "Grace",
+        classification: "interested",
+      },
+    ],
+  });
+  const ada = queue.interested_candidates.find((candidate) => candidate.candidate_name === "Ada");
+  const grace = queue.interested_candidates.find((candidate) => candidate.candidate_name === "Grace");
+
+  assert.equal(queue.summary.interested, 2);
+  assert.equal(queue.summary.needs_scheduling, 1);
+  assert.equal(grace.action_status, "pending");
+  assert.equal(ada.action_status, "interview_ready");
 });
