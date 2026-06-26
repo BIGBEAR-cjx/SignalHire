@@ -286,7 +286,7 @@ export async function projectRuns(userId: string, projectId: string, limit = 50)
 }
 
 export interface ProjectCandidateGraphView {
-  provider_status: Array<{ provider: "apollo" | "pdl"; enabled: boolean; reason: string }>;
+  provider_status: Array<{ provider: "pdl"; enabled: boolean; reason: string }>;
   summary: {
     candidate_count: number;
     ready_for_outreach_count: number;

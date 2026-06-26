@@ -1,4 +1,4 @@
-export type PeopleProviderName = "apollo" | "pdl";
+export type PeopleProviderName = "pdl";
 export type PeopleProviderStatus = { provider: PeopleProviderName; enabled: boolean; reason: string };
 export type ProviderContactRow = {
   value: string;
@@ -23,7 +23,6 @@ export type ProviderCandidateRow = {
 };
 
 export function buildPeopleProviderConfig(env?: Record<string, string | undefined>): { providers: PeopleProviderStatus[] };
-export function normalizeApolloPerson(value?: unknown): ProviderCandidateRow;
 export function normalizePdlPerson(value?: unknown): ProviderCandidateRow;
 export function providerRowsToSourceLeads(rows?: ProviderCandidateRow[]): Array<{
   source_type: "people_api";

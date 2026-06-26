@@ -253,7 +253,10 @@ export async function sendApprovedOutreachThread(input: { userId: string; thread
   ]);
   if (!thread) return { ok: false, error: "thread_not_found" };
   const validation = validateOutreachSend({ thread, gmailConnected: Boolean(connection) });
-  if (!validation.ok) return { ok: false, error: validation.reason };
+  if (!validation.ok) {
+    await updateOutreachThread({ userId: input.userId, id: input.threadId, send_error: validation.reason });
+    return { ok: false, error: validation.reason };
+  }
   try {
     const raw = buildGmailRawMessage({
       from: connection?.gmail_address || "me",

@@ -9,7 +9,7 @@ import {
 test("normalizes source leads with source provenance", () => {
   const lead = normalizeSourceLead({
     source_type: "people_api",
-    provider: "apollo",
+    provider: "pdl",
     source_url: "https://linkedin.com/in/ada",
     confidence: "high",
     extracted_fields: { name: "Ada Lovelace" },
@@ -17,7 +17,7 @@ test("normalizes source leads with source provenance", () => {
 
   assert.deepEqual(lead, {
     source_type: "people_api",
-    provider: "apollo",
+    provider: "pdl",
     source_url: "https://linkedin.com/in/ada",
     captured_at: "",
     confidence: "high",
@@ -34,7 +34,7 @@ test("builds conservative merge keys from LinkedIn URL, email hash, personal URL
       website: "https://ada.example.com",
     },
     contact_profile: {
-      emails: [{ value: "ada@example.ai", confidence: "high", source: "apollo" }],
+      emails: [{ value: "ada@example.ai", confidence: "high", source: "pdl" }],
     },
   });
 
@@ -63,7 +63,7 @@ test("dedupes candidates and preserves all source nodes", () => {
         current_role: "Growth",
         current_company: "Example AI",
         links: { linkedin: "https://www.linkedin.com/in/ada/" },
-        source_nodes: [{ source_type: "people_api", provider: "apollo", confidence: "medium" }],
+        source_nodes: [{ source_type: "people_api", provider: "pdl", confidence: "medium" }],
       },
     ],
     sourceLeads: [

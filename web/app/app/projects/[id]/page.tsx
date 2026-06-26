@@ -221,7 +221,7 @@ function candidateDisplayStatus(status: ShortlistStatus): CandidateDisplayStatus
 }
 
 type CandidateGraphView = {
-  provider_status: Array<{ provider: "apollo" | "pdl"; enabled: boolean; reason: string }>;
+  provider_status: Array<{ provider: "pdl"; enabled: boolean; reason: string }>;
   summary: {
     candidate_count: number;
     ready_for_outreach_count: number;
@@ -327,6 +327,11 @@ type InboxQueueView = {
     classification_reason: string;
     last_message_excerpt: string;
     suggested_reply: string;
+    next_action?: "schedule" | "reply" | "follow_up_later" | "stop" | "review";
+    action_label?: string;
+    priority?: "high" | "medium" | "low";
+    reply_draft?: string;
+    scheduling_prompt?: string;
     updated_at: string;
     gmail_thread_id?: string;
     outreach_thread_id?: string;
@@ -338,9 +343,24 @@ type InboxQueueView = {
     classification_reason: string;
     last_message_excerpt: string;
     suggested_reply: string;
+    next_action?: "schedule" | "reply" | "follow_up_later" | "stop" | "review";
+    action_label?: string;
+    priority?: "high" | "medium" | "low";
+    reply_draft?: string;
+    scheduling_prompt?: string;
     updated_at: string;
     readiness: "needs_scheduling";
     recommended_next_step: string;
+    scheduling_packet?: {
+      candidate_summary: string;
+      reply_excerpt: string;
+      strongest_evidence?: string[];
+      risk_flags?: string[];
+      unverified_claims?: string[];
+      claim_status_summary?: string;
+      suggested_scheduling_message: string;
+      interview_questions: string[];
+    };
   }>;
 };
 
@@ -350,6 +370,7 @@ type ContactProfileView = {
     source: string;
     confidence: "high" | "medium" | "low" | string;
     deliverability_status?: string;
+    last_verified_at?: string;
   }>;
   phones?: Array<{ value: string; source: string; confidence: string }>;
   linkedin_url?: string;
@@ -370,6 +391,12 @@ type GmailStatusView = {
   scope: string;
   can_read_inbox?: boolean;
   expires_at: string | null;
+};
+
+type ContactProviderStatusView = {
+  provider: "hunter" | string;
+  enabled: boolean;
+  reason: string;
 };
 
 interface ShortlistItem {
@@ -467,12 +494,9 @@ function autonomousCopy(locale: "zh" | "en") {
     candidateReadiness: "Candidate readiness",
     empty: "No candidates in this role yet.",
     sources: "sources",
-    pullApollo: "Pull Apollo candidates",
     pullOpenJobs: "Pull OpenJobs candidates",
-    apolloEmpty: "Apollo is connected, but this plan/workspace returned no candidates. Upgrade Apollo People API access or add contacts to Apollo.",
-    apolloSaved: "Apollo saved {count} candidates for evidence review.",
     openJobsEmpty: "OpenJobs Mira returned no candidates for this brief.",
-    openJobsSaved: "OpenJobs saved {count} candidates for evidence review.",
+    openJobsSaved: "OpenJobs saved {count} candidates for evidence review. Mira provides profile leads only, so SignalHire will still verify public evidence before recommending or sending.",
     openJobsAuthError: "OpenJobs Mira key is invalid or inactive. Update MIRA_KEY before pulling candidates.",
   } : {
     title: "Autonomous sourcing",
@@ -487,12 +511,9 @@ function autonomousCopy(locale: "zh" | "en") {
     candidateReadiness: "候选人推进状态",
     empty: "这个岗位还没有候选人。",
     sources: "个来源",
-    pullApollo: "拉取 Apollo 候选人",
     pullOpenJobs: "拉取 OpenJobs 候选人",
-    apolloEmpty: "Apollo 已连接，但当前套餐/工作区没有返回候选人。升级 People API 权限，或先把 contacts 加到 Apollo。",
-    apolloSaved: "Apollo 已保存 {count} 位候选人，等待证据核验。",
     openJobsEmpty: "OpenJobs Mira 没有为当前岗位返回候选人。",
-    openJobsSaved: "OpenJobs 已保存 {count} 位候选人，等待证据核验。",
+    openJobsSaved: "OpenJobs 已保存 {count} 位候选人，等待证据核验。Mira 只提供候选人资料线索，SignalHire 仍会先做公开证据交叉验证，再推荐或发送外联。",
     openJobsAuthError: "OpenJobs Mira key 无效或未激活。请更新 MIRA_KEY 后再拉取候选人。",
   };
 }
@@ -518,35 +539,13 @@ function AutonomousSourcingPanel({
   onChanged: () => void;
 }) {
   const c = autonomousCopy(locale);
-  const [apolloBusy, setApolloBusy] = useState(false);
   const [openJobsBusy, setOpenJobsBusy] = useState(false);
-  const [apolloMessage, setApolloMessage] = useState("");
+  const [providerMessage, setProviderMessage] = useState("");
   if (!graph) return null;
-  const apolloEnabled = graph.provider_status.some((provider) => provider.provider === "apollo" && provider.enabled);
-
-  async function pullApolloCandidates() {
-    setApolloBusy(true);
-    setApolloMessage("");
-    try {
-      const r = await fetch("/api/providers/apollo/search", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ project_id: projectId, brief: projectBrief, limit: 10, locale }),
-      });
-      const j = await r.json().catch(() => ({}));
-      if (!r.ok) throw new Error(j.error || (locale === "en" ? "Apollo pull failed." : "Apollo 拉取失败。"));
-      setApolloMessage(Number(j.saved) > 0 ? c.apolloSaved.replace("{count}", String(j.saved)) : c.apolloEmpty);
-      if (Number(j.saved) > 0) onChanged();
-    } catch (e) {
-      setApolloMessage((e as Error).message);
-    } finally {
-      setApolloBusy(false);
-    }
-  }
 
   async function pullOpenJobsCandidates() {
     setOpenJobsBusy(true);
-    setApolloMessage("");
+    setProviderMessage("");
     try {
       const r = await fetch("/api/providers/openjobs/search", {
         method: "POST",
@@ -558,10 +557,10 @@ function AutonomousSourcingPanel({
         const raw = String(j.error ?? "");
         throw new Error(/invalid api key/i.test(raw) ? c.openJobsAuthError : (j.error || (locale === "en" ? "OpenJobs pull failed." : "OpenJobs 拉取失败。")));
       }
-      setApolloMessage(Number(j.saved) > 0 ? c.openJobsSaved.replace("{count}", String(j.saved)) : c.openJobsEmpty);
+      setProviderMessage(Number(j.saved) > 0 ? c.openJobsSaved.replace("{count}", String(j.saved)) : c.openJobsEmpty);
       if (Number(j.saved) > 0) onChanged();
     } catch (e) {
-      setApolloMessage((e as Error).message);
+      setProviderMessage((e as Error).message);
     } finally {
       setOpenJobsBusy(false);
     }
@@ -578,9 +577,6 @@ function AutonomousSourcingPanel({
           <p className="mt-1 max-w-3xl text-sm leading-6 text-[var(--sh-muted)]">{c.desc}</p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <SecondaryAction onClick={pullApolloCandidates} disabled={!apolloEnabled || apolloBusy} className="min-h-9 px-3 py-2 text-xs">
-            {c.pullApollo}
-          </SecondaryAction>
           <SecondaryAction onClick={pullOpenJobsCandidates} disabled={openJobsBusy} className="min-h-9 px-3 py-2 text-xs">
             {c.pullOpenJobs}
           </SecondaryAction>
@@ -594,8 +590,8 @@ function AutonomousSourcingPanel({
           ))}
         </div>
       </div>
-      {apolloMessage && (
-        <p className="rounded-xl bg-amber-50 px-3 py-2 text-xs text-amber-800 ring-1 ring-amber-100">{apolloMessage}</p>
+      {providerMessage && (
+        <p className="rounded-xl bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-800 ring-1 ring-amber-100">{providerMessage}</p>
       )}
 
       <div className="grid gap-3 md:grid-cols-4">
@@ -846,6 +842,43 @@ function primaryEmail(contactProfile?: ContactProfileView) {
   return emails.find((email) => (email.confidence === "high" || email.confidence === "medium") && email.deliverability_status !== "bounced") ?? null;
 }
 
+function sendDisabledReason(item: OutreachQueueView["items"][number], gmail?: GmailStatusView | null, locale: "zh" | "en" = "zh") {
+  const isEn = locale === "en";
+  if (item.status !== "drafted" && item.status !== "approved") return "";
+  const emails = item.contact_profile?.emails ?? [];
+  if (!primaryEmail(item.contact_profile)) {
+    if (emails.length === 0) return isEn ? "Send disabled: no sourced email." : "发送不可用：没有带来源的邮箱。";
+    if (emails.every((email) => email.deliverability_status === "bounced")) return isEn ? "Send disabled: email bounced." : "发送不可用：邮箱已退信。";
+    if (emails.every((email) => email.confidence === "low")) return isEn ? "Send disabled: email confidence is low." : "发送不可用：邮箱置信度过低。";
+    return isEn ? "Send disabled: contact requires review." : "发送不可用：联系方式需要复核。";
+  }
+  if (!gmail?.connected) return isEn ? "Send disabled: Gmail is not connected." : "发送不可用：Gmail 未连接。";
+  if (item.status !== "approved") return isEn ? "Send disabled: approve the first email first." : "发送不可用：请先批准首封邮件。";
+  return "";
+}
+
+function contactRiskWarning(item: OutreachQueueView["items"][number], locale: "zh" | "en" = "zh") {
+  const email = primaryEmail(item.contact_profile);
+  if (!email || email.deliverability_status === "valid") return "";
+  return locale === "en"
+    ? `Review deliverability before sending: ${email.deliverability_status || "unknown"}.`
+    : `发送前请复核邮箱可达性：${email.deliverability_status || "unknown"}。`;
+}
+
+function handoffText(candidate: InboxQueueView["interested_candidates"][number]) {
+  const packet = candidate.scheduling_packet;
+  if (!packet) return `${candidate.candidate_name}\n${candidate.last_message_excerpt}`;
+  return [
+    packet.candidate_summary,
+    `Reply: ${packet.reply_excerpt}`,
+    `Evidence: ${(packet.strongest_evidence ?? []).join("; ") || "Not verified yet"}`,
+    `Risks: ${(packet.risk_flags ?? []).join("; ") || "None recorded"}`,
+    `Unverified: ${(packet.unverified_claims ?? []).join("; ") || "None recorded"}`,
+    `Scheduling: ${packet.suggested_scheduling_message}`,
+    `Questions:\n- ${packet.interview_questions.join("\n- ")}`,
+  ].join("\n");
+}
+
 function fallbackSequence(item: OutreachQueueView["items"][number]): OutreachSequenceMessage[] {
   const existing = Array.isArray(item.sequence_messages) ? item.sequence_messages : [];
   if (existing.length > 0) return existing;
@@ -861,7 +894,9 @@ function GmailOutreachPanel({ queue, locale, onChanged }: { queue?: OutreachQueu
   const items = queue?.items ?? [];
   const [busyId, setBusyId] = useState<string | null>(null);
   const [gmail, setGmail] = useState<GmailStatusView | null>(null);
+  const [contactProvider, setContactProvider] = useState<ContactProviderStatusView | null>(null);
   const [editing, setEditing] = useState<Record<string, { subject: string; body: string }>>({});
+  const [sendErrors, setSendErrors] = useState<Record<string, string>>({});
   const [bulkBusy, setBulkBusy] = useState(false);
 
   useEffect(() => {
@@ -876,6 +911,21 @@ function GmailOutreachPanel({ queue, locale, onChanged }: { queue?: OutreachQueu
       }
     }
     void loadGmail();
+    return () => { cancelled = true; };
+  }, [locale]);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function loadContactProvider() {
+      try {
+        const r = await fetch(`/api/contact-resolution/status?locale=${locale}`);
+        const j = await r.json();
+        if (!cancelled && r.ok) setContactProvider(j as ContactProviderStatusView);
+      } catch {
+        if (!cancelled) setContactProvider({ provider: "hunter", enabled: false, reason: "provider_status_unavailable" });
+      }
+    }
+    void loadContactProvider();
     return () => { cancelled = true; };
   }, [locale]);
 
@@ -903,7 +953,47 @@ function GmailOutreachPanel({ queue, locale, onChanged }: { queue?: OutreachQueu
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ locale }),
       });
-      if (r.ok) onChanged();
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok) {
+        const fallback = locale === "en" ? "Gmail send failed." : "Gmail 发送失败。";
+        setSendErrors((prev) => ({ ...prev, [id]: String(j.error || fallback) }));
+        onChanged();
+        return;
+      }
+      setSendErrors((prev) => {
+        const next = { ...prev };
+        delete next[id];
+        return next;
+      });
+      onChanged();
+    } finally {
+      setBusyId(null);
+    }
+  }
+  async function resolveContact(item: OutreachQueueView["items"][number]) {
+    setBusyId(item.id);
+    setSendErrors((prev) => {
+      const next = { ...prev };
+      delete next[item.id];
+      return next;
+    });
+    try {
+      const r = await fetch("/api/contact-resolution/resolve", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ outreach_thread_id: item.id, locale }),
+      });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok || j.status === "disabled" || j.status === "error") {
+        const disabled = j.status === "disabled";
+        setSendErrors((prev) => ({
+          ...prev,
+          [item.id]: disabled
+            ? (isEn ? "Provider not connected." : "联系方式服务未连接。")
+            : String(j.reason || j.error || (isEn ? "Contact resolution failed." : "联系方式解析失败。")),
+        }));
+      }
+      onChanged();
     } finally {
       setBusyId(null);
     }
@@ -944,6 +1034,11 @@ function GmailOutreachPanel({ queue, locale, onChanged }: { queue?: OutreachQueu
             {gmail && !gmail.configured && (
               <span className="rounded-full bg-gray-100 px-3 py-1.5 font-semibold text-gray-600 ring-1 ring-gray-200">
                 {isEn ? "Ask an admin to configure Google OAuth" : "请管理员配置 Google OAuth"}
+              </span>
+            )}
+            {contactProvider && !contactProvider.enabled && (
+              <span className="rounded-full bg-amber-50 px-3 py-1.5 font-semibold text-amber-800 ring-1 ring-amber-200">
+                {isEn ? "Provider not connected" : "联系方式服务未连接"}
               </span>
             )}
           </div>
@@ -988,6 +1083,21 @@ function GmailOutreachPanel({ queue, locale, onChanged }: { queue?: OutreachQueu
                         <span className="rounded-full bg-white px-2 py-0.5 font-medium text-gray-600 ring-1 ring-black/10">
                           confidence: {email.confidence}
                         </span>
+                        <span className="rounded-full bg-white px-2 py-0.5 font-medium text-gray-600 ring-1 ring-black/10">
+                          deliverability_status: {email.deliverability_status || "unknown"}
+                        </span>
+                        {email.last_verified_at && (
+                          <span className="rounded-full bg-white px-2 py-0.5 font-medium text-gray-600 ring-1 ring-black/10">
+                            last_verified_at: {email.last_verified_at}
+                          </span>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => navigator.clipboard?.writeText(email.value)}
+                          className="rounded-full bg-white px-2 py-0.5 font-semibold text-gray-700 ring-1 ring-black/10 hover:bg-gray-100"
+                        >
+                          {isEn ? "Copy email" : "复制邮箱"}
+                        </button>
                         {primaryEmail(item.contact_profile)?.value !== email.value && (
                           <span className="rounded-full bg-amber-50 px-2 py-0.5 font-semibold text-amber-700 ring-1 ring-amber-100">
                             {isEn ? "review only" : "仅供审核"}
@@ -998,9 +1108,37 @@ function GmailOutreachPanel({ queue, locale, onChanged }: { queue?: OutreachQueu
                     <span className="inline-flex rounded-full bg-white px-2 py-0.5 font-medium text-gray-600 ring-1 ring-black/10">
                       contactability_score: {item.contact_profile?.contactability_score ?? 0}
                     </span>
+                    <button
+                      type="button"
+                      onClick={() => resolveContact(item)}
+                      disabled={busyId === item.id || contactProvider?.enabled === false}
+                      className="inline-flex rounded-full bg-white px-2 py-0.5 font-semibold text-gray-700 ring-1 ring-black/10 hover:bg-gray-100 disabled:opacity-50"
+                    >
+                      {isEn ? "Review contact" : "复核联系方式"}
+                    </button>
+                    {item.contact_profile?.linkedin_url && (
+                      <a
+                        href={item.contact_profile.linkedin_url}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="inline-flex rounded-full bg-white px-2 py-0.5 font-semibold text-gray-700 ring-1 ring-black/10 hover:bg-gray-100"
+                      >
+                        LinkedIn
+                      </a>
+                    )}
                   </div>
                 ) : (
-                  <p className="text-amber-700">{isEn ? "No sourced, medium-or-higher confidence email. Sending disabled." : "没有带来源且中高置信度的邮箱，不能发送。"}</p>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <p className="text-amber-700">{isEn ? "No sourced, medium-or-higher confidence email. Sending disabled." : "没有带来源且中高置信度的邮箱，不能发送。"}</p>
+                    <button
+                      type="button"
+                      onClick={() => resolveContact(item)}
+                      disabled={busyId === item.id || contactProvider?.enabled === false}
+                      className="inline-flex rounded-full bg-white px-2 py-0.5 font-semibold text-gray-700 ring-1 ring-black/10 hover:bg-gray-100 disabled:opacity-50"
+                    >
+                      {contactProvider?.enabled === false ? (isEn ? "Provider not connected" : "联系方式服务未连接") : (isEn ? "Resolve contact" : "解析联系方式")}
+                    </button>
+                  </div>
                 )}
               </div>
               <div className="mt-3 grid gap-2">
@@ -1033,7 +1171,21 @@ function GmailOutreachPanel({ queue, locale, onChanged }: { queue?: OutreachQueu
                   ? `${isEn ? "Follow up" : "跟进"}: ${new Date(item.next_follow_up_at).toLocaleDateString(isEn ? "en-US" : "zh-CN")}`
                   : (isEn ? "No follow-up date" : "未设置跟进日期")}
               </p>
-              {item.send_error && <p className="mt-2 rounded-xl bg-rose-50 px-3 py-2 text-xs text-rose-700 ring-1 ring-rose-100">{item.send_error}</p>}
+              {sendDisabledReason(item, gmail, locale) && (
+                <p className="mt-2 rounded-xl bg-amber-50 px-3 py-2 text-xs text-amber-800 ring-1 ring-amber-100">
+                  {sendDisabledReason(item, gmail, locale)}
+                </p>
+              )}
+              {contactRiskWarning(item, locale) && (
+                <p className="mt-2 rounded-xl bg-amber-50 px-3 py-2 text-xs text-amber-800 ring-1 ring-amber-100">
+                  {contactRiskWarning(item, locale)}
+                </p>
+              )}
+              {(sendErrors[item.id] || item.send_error) && (
+                <p className="mt-2 rounded-xl bg-rose-50 px-3 py-2 text-xs text-rose-700 ring-1 ring-rose-100">
+                  {sendErrors[item.id] || item.send_error}
+                </p>
+              )}
               <div className="mt-3 grid gap-2 sm:grid-cols-[minmax(0,1fr)_150px]">
                 <select
                   value={item.status}
@@ -1208,8 +1360,11 @@ function InboxAgentPanel({
                     </span>
                   </div>
                   <p className="mt-1 line-clamp-2 text-gray-600">{item.last_message_excerpt || item.classification_reason}</p>
-                  {item.suggested_reply && (
-                    <p className="mt-2 rounded-lg bg-white px-2 py-1.5 text-gray-600 ring-1 ring-black/5">{item.suggested_reply}</p>
+                  {item.action_label && (
+                    <p className="mt-2 inline-flex rounded-full bg-white px-2 py-1 font-semibold text-gray-700 ring-1 ring-black/5">{item.action_label}</p>
+                  )}
+                  {(item.reply_draft || item.suggested_reply) && (
+                    <p className="mt-2 rounded-lg bg-white px-2 py-1.5 text-gray-600 ring-1 ring-black/5">{item.reply_draft || item.suggested_reply}</p>
                   )}
                 </div>
               ))}
@@ -1230,6 +1385,36 @@ function InboxAgentPanel({
                   <p className="font-semibold">{candidate.candidate_name}</p>
                   <p className="mt-1">{candidate.last_message_excerpt}</p>
                   <p className="mt-2 font-medium">{candidate.recommended_next_step}</p>
+                  {candidate.scheduling_packet && (
+                    <div className="mt-2 rounded-lg bg-white/80 px-2 py-1.5 text-emerald-950 ring-1 ring-emerald-100">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <p className="font-semibold">{candidate.scheduling_packet.candidate_summary}</p>
+                        <button
+                          type="button"
+                          onClick={() => navigator.clipboard?.writeText(handoffText(candidate))}
+                          className="rounded-full bg-emerald-50 px-2 py-0.5 font-semibold text-emerald-800 ring-1 ring-emerald-100"
+                        >
+                          {isEn ? "Copy handoff" : "复制交付包"}
+                        </button>
+                      </div>
+                      <p className="mt-1">{candidate.scheduling_packet.suggested_scheduling_message}</p>
+                      <p className="mt-1 font-semibold">{candidate.scheduling_packet.claim_status_summary}</p>
+                      {(candidate.scheduling_packet.strongest_evidence ?? []).length > 0 && (
+                        <p className="mt-1">{isEn ? "Evidence" : "证据"}: {candidate.scheduling_packet.strongest_evidence?.join("; ")}</p>
+                      )}
+                      {(candidate.scheduling_packet.risk_flags ?? []).length > 0 && (
+                        <p className="mt-1">{isEn ? "Risks" : "风险"}: {candidate.scheduling_packet.risk_flags?.join("; ")}</p>
+                      )}
+                      {(candidate.scheduling_packet.unverified_claims ?? []).length > 0 && (
+                        <p className="mt-1">{isEn ? "Unverified" : "未核实"}: {candidate.scheduling_packet.unverified_claims?.join("; ")}</p>
+                      )}
+                      <ul className="mt-1 space-y-1">
+                        {candidate.scheduling_packet.interview_questions.slice(0, 3).map((question) => (
+                          <li key={question}>- {question}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
                 </div>
               ))}
             </div>

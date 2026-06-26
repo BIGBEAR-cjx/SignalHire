@@ -2,6 +2,10 @@ function cleanString(value) {
   return typeof value === "string" ? value.trim() : "";
 }
 
+function isRecord(value) {
+  return Boolean(value && typeof value === "object" && !Array.isArray(value));
+}
+
 function excerpt(text, limit = 220) {
   const clean = cleanString(text).replace(/\s+/g, " ");
   return clean.length > limit ? `${clean.slice(0, limit - 1)}...` : clean;
@@ -73,26 +77,102 @@ function needsHumanReply(item) {
   return ["ask_for_details", "later", "needs_human_reply"].includes(item.classification);
 }
 
+function listFrom(value, limit = 3) {
+  return Array.isArray(value) ? value.map(cleanString).filter(Boolean).slice(0, limit) : [];
+}
+
+function actionForClassification(item) {
+  const classification = cleanString(item.classification) || "needs_human_reply";
+  if (classification === "interested") {
+    return {
+      next_action: "schedule",
+      action_label: "Schedule interview",
+      priority: "high",
+      reply_draft: "",
+      scheduling_prompt: "Confirm interest, share interview context, and propose 2-3 time windows.",
+    };
+  }
+  if (classification === "ask_for_details") {
+    return {
+      next_action: "reply",
+      action_label: "Reply with role details",
+      priority: "high",
+      reply_draft: cleanString(item.suggested_reply),
+      scheduling_prompt: "",
+    };
+  }
+  if (classification === "later" || classification === "out_of_office") {
+    return {
+      next_action: "follow_up_later",
+      action_label: "Follow up later",
+      priority: "medium",
+      reply_draft: cleanString(item.suggested_reply),
+      scheduling_prompt: "",
+    };
+  }
+  if (classification === "not_interested" || classification === "bounced") {
+    return {
+      next_action: "stop",
+      action_label: "Stop follow-up",
+      priority: "low",
+      reply_draft: "",
+      scheduling_prompt: "",
+    };
+  }
+  return {
+    next_action: "review",
+    action_label: "Review manually",
+    priority: "medium",
+    reply_draft: cleanString(item.suggested_reply),
+    scheduling_prompt: "",
+  };
+}
+
+function schedulingPacket(item) {
+  const candidateName = cleanString(item.candidate_name) || "Candidate";
+  const snapshot = isRecord(item.candidate_snapshot) ? item.candidate_snapshot : {};
+  const audit = isRecord(snapshot.evidence_audit) ? snapshot.evidence_audit : {};
+  return {
+    candidate_summary: `${candidateName} replied with interest.`,
+    reply_excerpt: cleanString(item.last_message_excerpt),
+    strongest_evidence: listFrom(snapshot.strongest_evidence || snapshot.strongest_signals),
+    risk_flags: listFrom(snapshot.risk_flags || audit.risk_flags),
+    unverified_claims: listFrom(audit.unverified_claims),
+    claim_status_summary: "Verified evidence and unverified claims are separated for hiring review.",
+    suggested_scheduling_message: `Thanks for the reply. I can share 2-3 time windows and a short role brief so we can see whether the conversation is worthwhile.`,
+    interview_questions: [
+      "What work are you most interested in discussing for this role?",
+      "Which recent project best represents your fit for this team?",
+      "What timing and process would make an interview worthwhile?",
+    ],
+  };
+}
+
 export function buildInboxQueue({ threads = [] } = {}) {
   const items = [...threads]
-    .map((thread) => ({
-      id: cleanString(thread.id),
-      candidate_name: cleanString(thread.candidate_name) || "Unknown candidate",
-      classification: cleanString(thread.classification) || "needs_human_reply",
-      classification_reason: cleanString(thread.classification_reason),
-      last_message_excerpt: cleanString(thread.last_message_excerpt),
-      suggested_reply: cleanString(thread.suggested_reply),
-      updated_at: cleanString(thread.updated_at),
-      gmail_thread_id: cleanString(thread.gmail_thread_id),
-      outreach_thread_id: cleanString(thread.outreach_thread_id),
-    }))
+    .map((thread) => {
+      const item = {
+        id: cleanString(thread.id),
+        candidate_name: cleanString(thread.candidate_name) || "Unknown candidate",
+        classification: cleanString(thread.classification) || "needs_human_reply",
+        classification_reason: cleanString(thread.classification_reason),
+        last_message_excerpt: cleanString(thread.last_message_excerpt),
+        suggested_reply: cleanString(thread.suggested_reply),
+        candidate_snapshot: isRecord(thread.candidate_snapshot) ? thread.candidate_snapshot : {},
+        updated_at: cleanString(thread.updated_at),
+        gmail_thread_id: cleanString(thread.gmail_thread_id),
+        outreach_thread_id: cleanString(thread.outreach_thread_id),
+      };
+      return { ...item, ...actionForClassification(item) };
+    })
     .sort((a, b) => String(b.updated_at).localeCompare(String(a.updated_at)));
   const interested_candidates = items
     .filter((item) => item.classification === "interested")
     .map((item) => ({
       ...item,
       readiness: "needs_scheduling",
-      recommended_next_step: "Review and schedule interview.",
+      recommended_next_step: item.scheduling_prompt || "Review and schedule interview.",
+      scheduling_packet: schedulingPacket(item),
     }));
   return {
     summary: {

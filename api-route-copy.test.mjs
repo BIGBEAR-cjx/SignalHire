@@ -497,6 +497,7 @@ test("Gmail integration routes and send route stay server-side and scope-limited
   assert.match(callbackRoute, /exchangeGmailCodeForTokens/);
   assert.match(disconnectRoute, /disconnectGmail/);
   assert.match(sendRoute, /sendApprovedOutreachThread/);
+  assert.match(gmailLib, /send_error: validation\.reason/);
   assert.match(gmailLib, /send_state_update_failed/);
   assert.match(gmailLib, /if \(!updated\)/);
   assert.match(gmailLib, /GOOGLE_CLIENT_SECRET/);
@@ -527,6 +528,7 @@ test("role workspace exposes controlled Gmail outreach actions", () => {
   assert.match(page, /\/api\/integrations\/gmail\/connect/);
   assert.match(page, /approveOutreachThread/);
   assert.match(page, /sendOutreachThread/);
+  assert.match(page, /sendErrors/);
   assert.match(page, /contactability_score/);
   assert.match(page, /confidence/);
   assert.match(page, /source/);
@@ -553,22 +555,36 @@ test("Gmail inbox agent persists only role-related threads and renders queues", 
   assert.match(projectPage, /Interested Candidate Queue/);
 });
 
-test("Apollo provider pull is tenant-scoped and writes low-evidence project candidates", () => {
-  const route = readFileSync("web/app/api/providers/apollo/search/route.ts", "utf8");
-  const providers = readFileSync("web/lib/people-providers.mjs", "utf8");
+test("contact resolution route uses server-only provider config and Role Workspace renders review actions", () => {
+  const route = readFileSync("web/app/api/contact-resolution/resolve/route.ts", "utf8");
+  const routeCore = readFileSync("web/lib/contact-resolution-route.mjs", "utf8");
+  const statusRoute = readFileSync("web/app/api/contact-resolution/status/route.ts", "utf8");
+  const providers = readFileSync("web/lib/contact-providers.mjs", "utf8");
   const projectPage = readFileSync("web/app/app/projects/[id]/page.tsx", "utf8");
 
   assert.match(route, /getUser/);
-  assert.match(route, /getProject\(user\.id, projectId\)/);
-  assert.match(route, /searchApolloPeople/);
-  assert.match(route, /apolloRowsToShortlistCandidates/);
-  assert.match(route, /addItem/);
-  assert.match(route, /status: "needs_evidence"/);
-  assert.match(providers, /buildApolloContactsSearchRequest/);
-  assert.match(providers, /mixed_people\/api_search/);
-  assert.match(providers, /contacts\/search/);
-  assert.match(projectPage, /pullApolloCandidates/);
-  assert.match(projectPage, /Apollo/);
+  assert.match(route, /runContactResolution/);
+  assert.match(route, /getOutreachThread/);
+  assert.match(routeCore, /buildContactProviderConfig/);
+  assert.match(routeCore, /getOutreachThread\(\{ userId: user\.id, id \}\)/);
+  assert.match(routeCore, /resolveHunterContact/);
+  assert.match(routeCore, /updateOutreachThread/);
+  assert.match(statusRoute, /buildContactProviderConfig\(process\.env\)/);
+  assert.match(providers, /HUNTER_API_KEY/);
+  assert.match(providers, /https:\/\/api\.hunter\.io\/v2\/email-finder/);
+  assert.match(providers, /redacted_url/);
+  assert.doesNotMatch(projectPage, /HUNTER_API_KEY/);
+  assert.match(projectPage, /resolveContact/);
+  assert.match(projectPage, /Review contact/);
+  assert.match(projectPage, /Resolve contact/);
+  assert.match(projectPage, /Provider not connected/);
+  assert.match(projectPage, /sendDisabledReason/);
+  assert.match(projectPage, /contactRiskWarning/);
+  assert.match(projectPage, /deliverability_status/);
+  assert.match(projectPage, /last_verified_at/);
+  assert.match(projectPage, /Copy email/);
+  assert.match(projectPage, /linkedin_url/);
+  assert.match(projectPage, /Copy handoff/);
 });
 
 test("OpenJobs Mira provider pull is tenant-scoped and writes low-evidence project candidates", () => {
