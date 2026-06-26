@@ -719,9 +719,27 @@ test("outreach readiness combined action resolves contacts before approving draf
   assert.match(projectPage, /已批准 \$\{approvalOutcome\.approved\} 条可发送草稿/);
   assert.match(projectPage, /No emails were sent/);
   assert.match(projectPage, /未发送邮件/);
-  assert.match(projectPage, /disabled=\{contactBulkBusy \|\| prepareBusy \|\| contactProvider\?\.enabled === false \|\| items\.length === 0\}/);
-  assert.match(projectPage, /disabled=\{prepareBusy \|\| contactBulkBusy \|\| contactProvider\?\.enabled === false \|\| items\.length === 0\}/);
+  assert.match(projectPage, /disabled=\{contactBulkBusy \|\| prepareBusy \|\| approvalRetryBusy \|\| contactProvider\?\.enabled === false \|\| items\.length === 0\}/);
+  assert.match(projectPage, /disabled=\{prepareBusy \|\| contactBulkBusy \|\| approvalRetryBusy \|\| contactProvider\?\.enabled === false \|\| items\.length === 0\}/);
   assert.doesNotMatch(projectPage.match(/async function prepareOutreachReadyDrafts[\s\S]*?\n  }/)?.[0] ?? "", /\/api\/outreach-threads\/\$\{[^}]+\}\/send|\/api\/inbox\/actions\/send/);
+});
+
+test("approval retry only re-approves failed drafts without resolving contacts or sending", () => {
+  const projectPage = readFileSync("web/app/app/projects/[id]/page.tsx", "utf8");
+  const helper = readFileSync("web/lib/outreach-readiness.mjs", "utf8");
+  const retryFn = projectPage.match(/async function retryFailedApprovals[\s\S]*?\n  }/)?.[0] ?? "";
+
+  assert.match(helper, /selectOutreachApprovalRetryTargets/);
+  assert.match(projectPage, /selectOutreachApprovalRetryTargets/);
+  assert.match(projectPage, /retryFailedApprovals/);
+  assert.match(projectPage, /approvalOutcome\.failed_items/);
+  assert.match(projectPage, /Retry failed approvals/);
+  assert.match(projectPage, /重试失败批准/);
+  assert.match(retryFn, /buildOutreachApprovalOutcome/);
+  assert.match(retryFn, /await fetch\(`\/api\/outreach-threads\/\$\{id\}`/);
+  assert.match(retryFn, /catch \(error\)[\s\S]*failed\.push/);
+  assert.doesNotMatch(retryFn, /\/api\/contact-resolution\/bulk/);
+  assert.doesNotMatch(retryFn, /\/api\/outreach-threads\/\$\{[^}]+\}\/send|\/api\/inbox\/actions\/send/);
 });
 
 test("OpenJobs Mira provider pull is tenant-scoped and writes low-evidence project candidates", () => {

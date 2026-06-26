@@ -21,7 +21,7 @@ import {
 } from "@/components/ui/signal-ui";
 import { buildCandidateFeedbackPanel, buildProjectActionBrief, buildProjectCandidateDecisionQueue, buildProjectCandidateFeedbackSummary, buildProjectControlRoom, buildProjectDetailHierarchy, buildProjectResearchRounds, buildProjectSearchConsole } from "@/lib/research-loop.mjs";
 import { buildCandidateDecisionSignal, buildEvidencePriorityView, buildProjectEvidenceMatrix } from "@/lib/evidence-priority.mjs";
-import { buildOutreachApprovalOutcome, selectOutreachReadinessTargets } from "@/lib/outreach-readiness.mjs";
+import { buildOutreachApprovalOutcome, selectOutreachApprovalRetryTargets, selectOutreachReadinessTargets } from "@/lib/outreach-readiness.mjs";
 import type { TalentCandidate } from "@/lib/talent-profile.mjs";
 
 type ProjectStatus = "open" | "paused" | "closed";
@@ -1193,6 +1193,7 @@ function GmailOutreachPanel({ queue, projectId, locale, onChanged }: { queue?: O
   const [bulkBusy, setBulkBusy] = useState(false);
   const [contactBulkBusy, setContactBulkBusy] = useState(false);
   const [prepareBusy, setPrepareBusy] = useState(false);
+  const [approvalRetryBusy, setApprovalRetryBusy] = useState(false);
   const [bulkContactResult, setBulkContactResult] = useState<BulkContactResolutionView | null>(null);
   const [approvalOutcome, setApprovalOutcome] = useState<OutreachApprovalOutcomeView | null>(null);
 
@@ -1375,6 +1376,42 @@ function GmailOutreachPanel({ queue, projectId, locale, onChanged }: { queue?: O
       setPrepareBusy(false);
     }
   }
+  async function retryFailedApprovals() {
+    if (!approvalOutcome?.failed_items.length) return;
+    setApprovalRetryBusy(true);
+    try {
+      const targets = selectOutreachApprovalRetryTargets({ failedItems: approvalOutcome.failed_items, items });
+      const targetRows = targets.map((id) => {
+        const item = items.find((queueItem) => queueItem.id === id);
+        return { id, name: item?.candidate_name || id };
+      });
+      const approved: string[] = [];
+      const failed: Array<{ id: string; name: string; error: string }> = [];
+      for (const id of targets) {
+        const item = items.find((queueItem) => queueItem.id === id);
+        if (!item) continue;
+        try {
+          const patch = await fetch(`/api/outreach-threads/${id}`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ status: "approved", sequence_messages: fallbackSequence(item), locale }),
+          });
+          if (patch.ok) {
+            approved.push(id);
+          } else {
+            const errorBody = await patch.json().catch(() => ({}));
+            failed.push({ id, name: item.candidate_name || id, error: String(errorBody.error || "approval_failed") });
+          }
+        } catch (error) {
+          failed.push({ id, name: item.candidate_name || id, error: error instanceof Error ? error.message : "approval_failed" });
+        }
+      }
+      setApprovalOutcome(buildOutreachApprovalOutcome({ targets: targetRows, approved, failed }));
+      onChanged();
+    } finally {
+      setApprovalRetryBusy(false);
+    }
+  }
   async function approveReadyDrafts() {
     const targets = items.filter((item) => item.status === "drafted" && primaryEmail(item.contact_profile));
     setBulkBusy(true);
@@ -1426,14 +1463,14 @@ function GmailOutreachPanel({ queue, projectId, locale, onChanged }: { queue?: O
           </SecondaryAction>
           <SecondaryAction
             onClick={resolveMissingContacts}
-            disabled={contactBulkBusy || prepareBusy || contactProvider?.enabled === false || items.length === 0}
+            disabled={contactBulkBusy || prepareBusy || approvalRetryBusy || contactProvider?.enabled === false || items.length === 0}
             className="min-h-9 px-3 py-2 text-xs"
           >
             {isEn ? "Resolve missing contacts" : "批量解析缺失联系方式"}
           </SecondaryAction>
           <PrimaryAction
             onClick={prepareOutreachReadyDrafts}
-            disabled={prepareBusy || contactBulkBusy || contactProvider?.enabled === false || items.length === 0}
+            disabled={prepareBusy || contactBulkBusy || approvalRetryBusy || contactProvider?.enabled === false || items.length === 0}
             className="min-h-9 px-3 py-2 text-xs"
           >
             {prepareBusy ? (isEn ? "Preparing..." : "准备中...") : (isEn ? "Resolve & approve ready" : "解析并批准可发送草稿")}
@@ -1504,6 +1541,18 @@ function GmailOutreachPanel({ queue, projectId, locale, onChanged }: { queue?: O
                   {(item.name || item.id)}: {item.error}
                 </p>
               ))}
+              <div className="pt-2">
+                <SecondaryAction
+                  onClick={retryFailedApprovals}
+                  disabled={approvalRetryBusy || prepareBusy || contactBulkBusy}
+                  className="min-h-8 px-3 py-1.5 text-xs"
+                >
+                  {approvalRetryBusy ? (isEn ? "Retrying..." : "重试中...") : (isEn ? "Retry failed approvals" : "重试失败批准")}
+                </SecondaryAction>
+                <p className="mt-1 text-[11px] leading-5">
+                  {isEn ? "Retry only approves these drafts; it does not resolve contacts or send email." : "重试只批准这些草稿，不解析联系方式，也不发送邮件。"}
+                </p>
+              </div>
             </div>
           )}
         </div>

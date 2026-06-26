@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { buildOutreachApprovalOutcome, selectOutreachReadinessTargets } from "./web/lib/outreach-readiness.mjs";
+import { buildOutreachApprovalOutcome, selectOutreachApprovalRetryTargets, selectOutreachReadinessTargets } from "./web/lib/outreach-readiness.mjs";
 
 function item(id, overrides = {}) {
   return {
@@ -111,4 +111,24 @@ test("builds approval outcome states for no targets, success, partial failure, a
     status: "all_failed",
     failed_items: [{ id: "t1", name: "Ada", error: "patch_failed" }],
   });
+});
+
+test("selects only current drafted failed approval rows for retry", () => {
+  const targets = selectOutreachApprovalRetryTargets({
+    failedItems: [
+      { id: "retry-1", name: "Ada", error: "network" },
+      { id: "missing", name: "Missing", error: "not_found" },
+      { id: "sent", name: "Sent", error: "already_sent" },
+      { id: "retry-1", name: "Ada duplicate", error: "network" },
+      { id: " ", name: "Blank", error: "blank" },
+      { id: "retry-2", name: "Grace", error: "timeout" },
+    ],
+    items: [
+      item("retry-1"),
+      item("sent", { status: "sent" }),
+      item("retry-2"),
+    ],
+  });
+
+  assert.deepEqual(targets, ["retry-1", "retry-2"]);
 });

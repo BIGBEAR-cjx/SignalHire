@@ -42,6 +42,27 @@ export function selectOutreachReadinessTargets({ items = [], contactResult = {} 
   return targets;
 }
 
+/**
+ * @param {{ failedItems?: unknown[], items?: unknown[] }} input
+ * @returns {string[]}
+ */
+export function selectOutreachApprovalRetryTargets({ failedItems = [], items = [] } = {}) {
+  const draftedById = new Map();
+  for (const item of Array.isArray(items) ? items : []) {
+    const id = cleanString(item?.id);
+    if (id && item?.status === "drafted") draftedById.set(id, true);
+  }
+  const targets = [];
+  const seen = new Set();
+  for (const failedItem of Array.isArray(failedItems) ? failedItems : []) {
+    const id = cleanString(failedItem?.id);
+    if (!id || seen.has(id) || !draftedById.has(id)) continue;
+    seen.add(id);
+    targets.push(id);
+  }
+  return targets;
+}
+
 function targetRows(targets = []) {
   return (Array.isArray(targets) ? targets : []).map((target) => {
     if (typeof target === "string") return { id: cleanString(target), name: "", error: "" };
