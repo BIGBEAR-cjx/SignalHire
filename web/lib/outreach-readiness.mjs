@@ -41,3 +41,55 @@ export function selectOutreachReadinessTargets({ items = [], contactResult = {} 
   }
   return targets;
 }
+
+function targetRows(targets = []) {
+  return (Array.isArray(targets) ? targets : []).map((target) => {
+    if (typeof target === "string") return { id: cleanString(target), name: "", error: "" };
+    return {
+      id: cleanString(target?.id),
+      name: cleanString(target?.name),
+      error: cleanString(target?.error),
+    };
+  }).filter((target) => target.id);
+}
+
+function idSet(values = []) {
+  return new Set((Array.isArray(values) ? values : []).map((value) => cleanString(value)).filter(Boolean));
+}
+
+/**
+ * @param {{ targets?: Array<string | { id?: unknown, name?: unknown }>, approved?: string[], failed?: Array<{ id?: unknown, name?: unknown, error?: unknown }> }} input
+ * @returns {{ attempted: number, approved: number, failed: number, status: "none" | "all_approved" | "partial_failed" | "all_failed", failed_items: Array<{ id: string, name: string, error: string }> }}
+ */
+export function buildOutreachApprovalOutcome({ targets = [], approved = [], failed = [] } = {}) {
+  const rows = targetRows(targets);
+  const approvedIds = idSet(approved);
+  const failedById = new Map(targetRows(failed).map((row) => [row.id, row]));
+  const failedItems = rows
+    .filter((row) => failedById.has(row.id) || (!approvedIds.has(row.id) && rows.length > 0))
+    .map((row) => {
+      const failedRow = failedById.get(row.id);
+      return {
+        id: row.id,
+        name: failedRow?.name || row.name,
+        error: failedRow?.error || "approval_failed",
+      };
+    });
+  const attempted = rows.length;
+  const failedCount = failedItems.length;
+  const approvedCount = Math.max(0, attempted - failedCount);
+  const status = attempted === 0
+    ? "none"
+    : failedCount === 0
+      ? "all_approved"
+      : approvedCount === 0
+        ? "all_failed"
+        : "partial_failed";
+  return {
+    attempted,
+    approved: approvedCount,
+    failed: failedCount,
+    status,
+    failed_items: failedItems,
+  };
+}

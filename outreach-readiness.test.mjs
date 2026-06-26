@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { selectOutreachReadinessTargets } from "./web/lib/outreach-readiness.mjs";
+import { buildOutreachApprovalOutcome, selectOutreachReadinessTargets } from "./web/lib/outreach-readiness.mjs";
 
 function item(id, overrides = {}) {
   return {
@@ -67,4 +67,48 @@ test("does not approve malformed failed bulk rows even when can_send is true", (
   });
 
   assert.deepEqual(targets, []);
+});
+
+test("builds approval outcome states for no targets, success, partial failure, and all failed", () => {
+  assert.deepEqual(buildOutreachApprovalOutcome({ targets: [] }), {
+    attempted: 0,
+    approved: 0,
+    failed: 0,
+    status: "none",
+    failed_items: [],
+  });
+
+  assert.deepEqual(buildOutreachApprovalOutcome({
+    targets: [{ id: "t1", name: "Ada" }, { id: "t2", name: "Grace" }],
+    approved: ["t1", "t2"],
+  }), {
+    attempted: 2,
+    approved: 2,
+    failed: 0,
+    status: "all_approved",
+    failed_items: [],
+  });
+
+  assert.deepEqual(buildOutreachApprovalOutcome({
+    targets: [{ id: "t1", name: "Ada" }, { id: "t2", name: "Grace" }],
+    approved: ["t1"],
+    failed: [{ id: "t2", name: "Grace", error: "network" }],
+  }), {
+    attempted: 2,
+    approved: 1,
+    failed: 1,
+    status: "partial_failed",
+    failed_items: [{ id: "t2", name: "Grace", error: "network" }],
+  });
+
+  assert.deepEqual(buildOutreachApprovalOutcome({
+    targets: [{ id: "t1", name: "Ada" }],
+    failed: [{ id: "t1", name: "Ada", error: "patch_failed" }],
+  }), {
+    attempted: 1,
+    approved: 0,
+    failed: 1,
+    status: "all_failed",
+    failed_items: [{ id: "t1", name: "Ada", error: "patch_failed" }],
+  });
 });

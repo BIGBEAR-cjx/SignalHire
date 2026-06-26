@@ -705,11 +705,20 @@ test("outreach readiness combined action resolves contacts before approving draf
   const helper = readFileSync("web/lib/outreach-readiness.mjs", "utf8");
 
   assert.match(helper, /selectOutreachReadinessTargets/);
+  assert.match(helper, /buildOutreachApprovalOutcome/);
   assert.match(projectPage, /Resolve & approve ready/);
   assert.match(projectPage, /解析并批准可发送草稿/);
   assert.match(projectPage, /prepareOutreachReadyDrafts/);
   assert.match(projectPage, /\/api\/contact-resolution\/bulk/);
   assert.match(projectPage, /selectOutreachReadinessTargets/);
+  assert.match(projectPage, /buildOutreachApprovalOutcome/);
+  assert.match(projectPage, /approvalOutcome/);
+  assert.match(projectPage.match(/async function prepareOutreachReadyDrafts[\s\S]*?\n  }/)?.[0] ?? "", /try \{[\s\S]*?await fetch\(`\/api\/outreach-threads\/\$\{id\}`/);
+  assert.match(projectPage.match(/async function prepareOutreachReadyDrafts[\s\S]*?\n  }/)?.[0] ?? "", /catch \(error\)[\s\S]*failed\.push/);
+  assert.match(projectPage, /Approved \$\{approvalOutcome\.approved\} ready drafts/);
+  assert.match(projectPage, /已批准 \$\{approvalOutcome\.approved\} 条可发送草稿/);
+  assert.match(projectPage, /No emails were sent/);
+  assert.match(projectPage, /未发送邮件/);
   assert.match(projectPage, /disabled=\{contactBulkBusy \|\| prepareBusy \|\| contactProvider\?\.enabled === false \|\| items\.length === 0\}/);
   assert.match(projectPage, /disabled=\{prepareBusy \|\| contactBulkBusy \|\| contactProvider\?\.enabled === false \|\| items\.length === 0\}/);
   assert.doesNotMatch(projectPage.match(/async function prepareOutreachReadyDrafts[\s\S]*?\n  }/)?.[0] ?? "", /\/api\/outreach-threads\/\$\{[^}]+\}\/send|\/api\/inbox\/actions\/send/);

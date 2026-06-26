@@ -21,7 +21,7 @@ import {
 } from "@/components/ui/signal-ui";
 import { buildCandidateFeedbackPanel, buildProjectActionBrief, buildProjectCandidateDecisionQueue, buildProjectCandidateFeedbackSummary, buildProjectControlRoom, buildProjectDetailHierarchy, buildProjectResearchRounds, buildProjectSearchConsole } from "@/lib/research-loop.mjs";
 import { buildCandidateDecisionSignal, buildEvidencePriorityView, buildProjectEvidenceMatrix } from "@/lib/evidence-priority.mjs";
-import { selectOutreachReadinessTargets } from "@/lib/outreach-readiness.mjs";
+import { buildOutreachApprovalOutcome, selectOutreachReadinessTargets } from "@/lib/outreach-readiness.mjs";
 import type { TalentCandidate } from "@/lib/talent-profile.mjs";
 
 type ProjectStatus = "open" | "paused" | "closed";
@@ -483,6 +483,14 @@ type BulkContactResolutionView = {
     can_send: boolean;
     cost_units: number;
   }>;
+};
+
+type OutreachApprovalOutcomeView = {
+  attempted: number;
+  approved: number;
+  failed: number;
+  status: "none" | "all_approved" | "partial_failed" | "all_failed";
+  failed_items: Array<{ id: string; name: string; error: string }>;
 };
 
 interface ShortlistItem {
@@ -973,6 +981,14 @@ function contactProviderDisabledText(locale: "zh" | "en") {
     : "Hunter 联系方式服务尚未配置。请管理员添加 Hunter 凭证。";
 }
 
+function approvalOutcomeLabel(approvalOutcome: OutreachApprovalOutcomeView, locale: "zh" | "en") {
+  const isEn = locale === "en";
+  if (approvalOutcome.status === "none") return isEn ? "No ready drafts approved." : "本次没有可批准草稿。";
+  if (approvalOutcome.status === "all_approved") return isEn ? `Approved ${approvalOutcome.approved} ready drafts.` : `已批准 ${approvalOutcome.approved} 条可发送草稿。`;
+  if (approvalOutcome.status === "all_failed") return isEn ? `0 ready drafts approved; ${approvalOutcome.failed} failed.` : `未批准可发送草稿；${approvalOutcome.failed} 条失败。`;
+  return isEn ? `Approved ${approvalOutcome.approved} ready drafts; ${approvalOutcome.failed} failed.` : `已批准 ${approvalOutcome.approved} 条可发送草稿；${approvalOutcome.failed} 条失败。`;
+}
+
 function sendDisabledReason(item: OutreachQueueView["items"][number], gmail?: GmailStatusView | null, locale: "zh" | "en" = "zh") {
   const isEn = locale === "en";
   if (item.status !== "drafted" && item.status !== "approved") return "";
@@ -1178,6 +1194,7 @@ function GmailOutreachPanel({ queue, projectId, locale, onChanged }: { queue?: O
   const [contactBulkBusy, setContactBulkBusy] = useState(false);
   const [prepareBusy, setPrepareBusy] = useState(false);
   const [bulkContactResult, setBulkContactResult] = useState<BulkContactResolutionView | null>(null);
+  const [approvalOutcome, setApprovalOutcome] = useState<OutreachApprovalOutcomeView | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -1281,6 +1298,7 @@ function GmailOutreachPanel({ queue, projectId, locale, onChanged }: { queue?: O
   async function resolveMissingContacts() {
     setContactBulkBusy(true);
     setBulkContactResult(null);
+    setApprovalOutcome(null);
     try {
       const r = await fetch("/api/contact-resolution/bulk", {
         method: "POST",
@@ -1306,6 +1324,7 @@ function GmailOutreachPanel({ queue, projectId, locale, onChanged }: { queue?: O
   async function prepareOutreachReadyDrafts() {
     setPrepareBusy(true);
     setBulkContactResult(null);
+    setApprovalOutcome(null);
     try {
       const r = await fetch("/api/contact-resolution/bulk", {
         method: "POST",
@@ -1325,15 +1344,32 @@ function GmailOutreachPanel({ queue, projectId, locale, onChanged }: { queue?: O
       const result = j as BulkContactResolutionView;
       setBulkContactResult(result);
       const targets = selectOutreachReadinessTargets({ items, contactResult: result });
+      const targetRows = targets.map((id) => {
+        const item = items.find((queueItem) => queueItem.id === id);
+        return { id, name: item?.candidate_name || id };
+      });
+      const approved: string[] = [];
+      const failed: Array<{ id: string; name: string; error: string }> = [];
       for (const id of targets) {
         const item = items.find((queueItem) => queueItem.id === id);
         if (!item) continue;
-        await fetch(`/api/outreach-threads/${id}`, {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ status: "approved", sequence_messages: fallbackSequence(item), locale }),
-        });
+        try {
+          const patch = await fetch(`/api/outreach-threads/${id}`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ status: "approved", sequence_messages: fallbackSequence(item), locale }),
+          });
+          if (patch.ok) {
+            approved.push(id);
+          } else {
+            const errorBody = await patch.json().catch(() => ({}));
+            failed.push({ id, name: item.candidate_name || id, error: String(errorBody.error || "approval_failed") });
+          }
+        } catch (error) {
+          failed.push({ id, name: item.candidate_name || id, error: error instanceof Error ? error.message : "approval_failed" });
+        }
       }
+      setApprovalOutcome(buildOutreachApprovalOutcome({ targets: targetRows, approved, failed }));
       onChanged();
     } finally {
       setPrepareBusy(false);
@@ -1451,6 +1487,23 @@ function GmailOutreachPanel({ queue, projectId, locale, onChanged }: { queue?: O
                   </div>
                 );
               })}
+            </div>
+          )}
+        </div>
+      )}
+      {approvalOutcome && (
+        <div className={`rounded-2xl px-4 py-3 text-xs leading-5 ring-1 ${
+          approvalOutcome.failed > 0 ? "bg-amber-50 text-amber-900 ring-amber-100" : "bg-emerald-50 text-emerald-800 ring-emerald-100"
+        }`}>
+          <p className="font-semibold">{approvalOutcomeLabel(approvalOutcome, locale)}</p>
+          <p className="mt-1">{isEn ? "No emails were sent." : "未发送邮件。"}</p>
+          {approvalOutcome.failed_items.length > 0 && (
+            <div className="mt-2 space-y-1">
+              {approvalOutcome.failed_items.map((item) => (
+                <p key={item.id} className="break-words">
+                  {(item.name || item.id)}: {item.error}
+                </p>
+              ))}
             </div>
           )}
         </div>
