@@ -208,3 +208,24 @@ test("builds no-reply due follow-up draft from sequence messages", () => {
   assert.equal(queue.items[0].reply_draft, "Hi Ada, quick follow-up because your vLLM inference work looked especially relevant.");
   assert.doesNotMatch(queue.items[0].reply_draft, /thanks for (your|the) reply/i);
 });
+
+test("today queue prioritizes scheduling and replies before due follow-up and review", () => {
+  const queue = buildInboxQueue({
+    threads: [
+      { id: "followup", candidate_name: "Follow", classification: "no_reply_follow_up", updated_at: "2026-06-26T10:00:00.000Z" },
+      { id: "review", candidate_name: "Review", classification: "needs_human_reply", updated_at: "2026-06-26T11:00:00.000Z" },
+      { id: "stop", candidate_name: "Stop", classification: "bounced", updated_at: "2026-06-26T12:00:00.000Z" },
+      { id: "reply", candidate_name: "Reply", classification: "ask_for_details", updated_at: "2026-06-26T13:00:00.000Z" },
+      { id: "schedule", candidate_name: "Schedule", classification: "interested", updated_at: "2026-06-26T14:00:00.000Z" },
+    ],
+  });
+
+  assert.deepEqual(queue.today_queue.map((item) => [item.id, item.today_rank, item.next_action]), [
+    ["schedule", 1, "schedule"],
+    ["reply", 2, "reply"],
+    ["followup", 3, "save_follow_up_draft"],
+    ["review", 4, "review"],
+  ]);
+  assert.equal(queue.today_queue.some((item) => item.id === "stop"), false);
+  assert.match(queue.today_queue[0].today_reason, /Schedule|scheduling|约面/i);
+});

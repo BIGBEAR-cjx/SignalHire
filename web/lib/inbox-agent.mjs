@@ -167,6 +167,38 @@ function actionForClassification(item) {
   };
 }
 
+function todayQueueRank(item) {
+  if (item.next_action === "schedule" && item.action_status !== "interview_ready") return 1;
+  if (item.next_action === "reply" && item.action_status === "pending") return 2;
+  if (item.next_action === "save_follow_up_draft" && item.action_status === "pending") return 3;
+  if (item.next_action === "review" && item.action_status === "pending") return 4;
+  if (item.next_action === "follow_up_later" && item.action_status !== "scheduled") return 5;
+  return 0;
+}
+
+function todayQueueReason(item, rank) {
+  if (rank === 1) return "Schedule next: candidate replied with interest.";
+  if (rank === 2) return "Reply next: candidate asked for role details.";
+  if (rank === 3) return "Follow up next: no reply and follow-up is due.";
+  if (rank === 4) return "Review next: reply needs human judgment.";
+  if (rank === 5) return "Follow up later: candidate asked to defer or is out of office.";
+  return "";
+}
+
+function buildTodayQueue(items) {
+  return items
+    .map((item) => {
+      const todayRank = todayQueueRank(item);
+      return {
+        ...item,
+        today_rank: todayRank,
+        today_reason: todayQueueReason(item, todayRank),
+      };
+    })
+    .filter((item) => item.today_rank > 0)
+    .sort((a, b) => a.today_rank - b.today_rank || String(b.updated_at).localeCompare(String(a.updated_at)));
+}
+
 function schedulingPacket(item) {
   const candidateName = cleanString(item.candidate_name) || "Candidate";
   const snapshot = isRecord(item.candidate_snapshot) ? item.candidate_snapshot : {};
@@ -250,11 +282,12 @@ export function buildInboxQueue({ threads = [] } = {}) {
       review_required: items.filter((item) => item.next_action === "review" && item.action_status === "pending").length,
     },
     items,
+    today_queue: buildTodayQueue(items),
     interested_candidates,
   };
 }
 
-const FOLLOW_UP_ACTIVE_STATUSES = new Set(["sent", "contacted", "follow_up_scheduled", "follow_up_due"]);
+const FOLLOW_UP_ACTIVE_STATUSES = new Set(["sent", "contacted", "follow_up_later", "follow_up_scheduled", "follow_up_due"]);
 const FOLLOW_UP_STOPPED_STATUSES = new Set(["stopped", "bounced", "rejected", "hired"]);
 
 function followUpIsDue(thread, now) {

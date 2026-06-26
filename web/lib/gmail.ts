@@ -1,5 +1,6 @@
 import { createClient } from "@insforge/sdk";
 import { buildGmailAuthUrl, buildGmailRawMessage, decryptTokenBundle, encryptTokenBundle, validateOutreachSend } from "./gmail-outreach.mjs";
+import { refreshGmailTokenBundle } from "./gmail-token.mjs";
 import { getOutreachThread, updateOutreachThread, type OutreachThread } from "./outreach-threads";
 
 const BASE = process.env.INSFORGE_API_BASE_URL;
@@ -179,8 +180,23 @@ export async function disconnectGmail(userId: string) {
 
 async function accessTokenFor(connection: GmailConnection) {
   const bundle = decryptTokenBundle(connection.encrypted_token_bundle, requiredEnv("GMAIL_TOKEN_ENCRYPTION_KEY")) as GmailTokenBundle;
-  if (bundle.access_token) return bundle.access_token;
-  throw new Error("Gmail access token unavailable");
+  const result = await refreshGmailTokenBundle({
+    bundle,
+    clientId: requiredEnv("GOOGLE_CLIENT_ID"),
+    clientSecret: requiredEnv("GOOGLE_CLIENT_SECRET"),
+  });
+  if (result.refreshed) {
+    const refreshedBundle = result.bundle as GmailTokenBundle;
+    await saveConnection({
+      userId: connection.user_id,
+      gmailAddress: connection.gmail_address,
+      encryptedTokenBundle: encryptTokenBundle(refreshedBundle, requiredEnv("GMAIL_TOKEN_ENCRYPTION_KEY")),
+      scope: refreshedBundle.scope ?? connection.scope,
+      expiresAt: refreshedBundle.expires_at ?? connection.expires_at,
+    });
+  }
+  if (result.accessToken) return result.accessToken;
+  throw new Error("gmail_reconnect_required");
 }
 
 async function sendViaGmail(input: { accessToken: string; raw: string }) {
