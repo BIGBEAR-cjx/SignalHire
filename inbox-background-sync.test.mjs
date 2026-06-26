@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
+  buildProjectInboxSyncSummary,
   runBackgroundInboxSync,
   selectBackgroundInboxSyncProjects,
 } from "./web/lib/inbox-background-sync.mjs";
@@ -125,4 +126,82 @@ test("background inbox sync surfaces candidate query errors instead of empty suc
   assert.equal(result.ok, false);
   assert.equal(result.projects_scanned, 0);
   assert.deepEqual(result.errors, [{ user_id: "", project_id: "", error: "inbox_sync_project_query_failed" }]);
+});
+
+test("background inbox sync persists project-level summary metadata", async () => {
+  const recorded = [];
+  const result = await runBackgroundInboxSync({
+    projects: [
+      { userId: "u1", projectId: "p1", threadCount: 1 },
+      { userId: "u2", projectId: "p2", threadCount: 1 },
+    ],
+    now: new Date("2026-06-26T10:00:00.000Z"),
+    syncProject: async (project) => ({
+      ok: project.projectId === "p1",
+      scanned: project.projectId === "p1" ? 3 : 0,
+      synced: project.projectId === "p1" ? 2 : 0,
+      skipped_reason: project.projectId === "p2" ? "gmail_not_connected" : "",
+      errors: [],
+      last_synced_at: "2026-06-26T10:00:00.000Z",
+    }),
+    recordProjectSyncSummary: async (entry) => {
+      recorded.push(entry);
+    },
+  });
+
+  assert.equal(result.ok, true);
+  assert.equal(recorded.length, 2);
+  assert.deepEqual(recorded.map((entry) => [entry.userId, entry.projectId]), [["u1", "p1"], ["u2", "p2"]]);
+  assert.deepEqual(recorded[0].summary, {
+    source: "background",
+    ok: true,
+    last_attempted_at: "2026-06-26T10:00:00.000Z",
+    last_synced_at: "2026-06-26T10:00:00.000Z",
+    scanned: 3,
+    synced: 2,
+    skipped_reason: "",
+    error_count: 0,
+    errors: [],
+  });
+  assert.equal(recorded[1].summary.ok, true);
+  assert.equal(recorded[1].summary.skipped_reason, "gmail_not_connected");
+});
+
+test("background inbox sync surfaces project summary write failures without stopping later projects", async () => {
+  const recorded = [];
+  const result = await runBackgroundInboxSync({
+    projects: [
+      { userId: "u1", projectId: "p1", threadCount: 1 },
+      { userId: "u2", projectId: "p2", threadCount: 1 },
+    ],
+    now: new Date("2026-06-26T10:00:00.000Z"),
+    syncProject: async () => ({ ok: true, scanned: 1, synced: 1, errors: [], skipped_reason: "" }),
+    recordProjectSyncSummary: async (entry) => {
+      if (entry.projectId === "p1") throw new Error("inbox_sync_summary_write_failed");
+      recorded.push(entry.projectId);
+    },
+  });
+
+  assert.equal(result.ok, false);
+  assert.deepEqual(recorded, ["p2"]);
+  assert.deepEqual(result.errors, [{ user_id: "u1", project_id: "p1", error: "inbox_sync_summary_write_failed" }]);
+});
+
+test("project inbox sync summary treats skipped Gmail states as visible non-failures", () => {
+  const summary = buildProjectInboxSyncSummary({
+    source: "background",
+    now: new Date("2026-06-26T10:00:00.000Z"),
+    result: {
+      ok: false,
+      scanned: 0,
+      synced: 0,
+      skipped_reason: "gmail_readonly_scope_missing",
+      errors: [],
+      last_synced_at: "2026-06-26T10:00:00.000Z",
+    },
+  });
+
+  assert.equal(summary.ok, true);
+  assert.equal(summary.skipped_reason, "gmail_readonly_scope_missing");
+  assert.equal(summary.error_count, 0);
 });

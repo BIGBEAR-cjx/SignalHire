@@ -27,6 +27,7 @@ export interface Project {
   brief: string | null;
   status: ProjectStatus;
   color: string | null;
+  inbox_sync_summary?: unknown;
   created_at: string;
   updated_at: string;
 }
@@ -61,12 +62,13 @@ export async function listProjects(userId: string): Promise<ProjectWithKpi[]> {
   const rows = await runSQL<{
     id: string; user_id: string; name: string; brief: string | null;
     status: ProjectStatus; color: string | null;
+    inbox_sync_summary?: unknown;
     created_at: string; updated_at: string;
     candidates_total: string; candidates_active: string;
     runs_total: string; runs_active: string;
   }>(
     `SELECT
-        p.id, p.user_id, p.name, p.brief, p.status, p.color, p.created_at, p.updated_at,
+        p.id, p.user_id, p.name, p.brief, p.status, p.color, p.inbox_sync_summary, p.created_at, p.updated_at,
         COALESCE(s.candidates_total, 0)  AS candidates_total,
         COALESCE(s.candidates_active, 0) AS candidates_active,
         COALESCE(r.runs_total, 0)        AS runs_total,
@@ -98,6 +100,7 @@ export async function listProjects(userId: string): Promise<ProjectWithKpi[]> {
     brief: r.brief,
     status: r.status,
     color: r.color,
+    inbox_sync_summary: r.inbox_sync_summary ?? {},
     created_at: r.created_at,
     updated_at: r.updated_at,
     candidates_total: Number(r.candidates_total),
@@ -113,12 +116,13 @@ export async function getProject(userId: string, id: string): Promise<ProjectWit
   const rows = await runSQL<{
     id: string; user_id: string; name: string; brief: string | null;
     status: ProjectStatus; color: string | null;
+    inbox_sync_summary?: unknown;
     created_at: string; updated_at: string;
     candidates_total: string; candidates_active: string;
     runs_total: string; runs_active: string;
   }>(
     `SELECT
-        p.id, p.user_id, p.name, p.brief, p.status, p.color, p.created_at, p.updated_at,
+        p.id, p.user_id, p.name, p.brief, p.status, p.color, p.inbox_sync_summary, p.created_at, p.updated_at,
         COALESCE(s.candidates_total, 0)  AS candidates_total,
         COALESCE(s.candidates_active, 0) AS candidates_active,
         COALESCE(r.runs_total, 0)        AS runs_total,
@@ -146,12 +150,28 @@ export async function getProject(userId: string, id: string): Promise<ProjectWit
   if (!r) return null;
   return {
     id: r.id, user_id: r.user_id, name: r.name, brief: r.brief, status: r.status, color: r.color,
+    inbox_sync_summary: r.inbox_sync_summary ?? {},
     created_at: r.created_at, updated_at: r.updated_at,
     candidates_total: Number(r.candidates_total),
     candidates_active: Number(r.candidates_active),
     runs_total: Number(r.runs_total),
     runs_active: Number(r.runs_active),
   };
+}
+
+export async function updateProjectInboxSyncSummary(input: {
+  userId: string; id: string; summary: unknown;
+}): Promise<boolean> {
+  if (!client) return false;
+  const { data, error } = await client.database
+    .from(TABLE)
+    .update({ inbox_sync_summary: input.summary, updated_at: new Date().toISOString() })
+    .eq("id", input.id)
+    .eq("user_id", input.userId)
+    .select("id");
+  if (error) throw new Error("inbox_sync_summary_write_failed");
+  if ((data as Array<unknown> | null)?.length !== 1) throw new Error("inbox_sync_summary_write_failed");
+  return true;
 }
 
 // 创建新项目。

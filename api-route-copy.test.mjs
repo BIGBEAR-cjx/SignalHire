@@ -153,6 +153,24 @@ test("Vercel cron can run background inbox sync without exposing Gmail secrets",
   assert.doesNotMatch(cronRoute, /GOOGLE_CLIENT_SECRET|GMAIL_TOKEN_ENCRYPTION_KEY|access_token|refresh_token/);
 });
 
+test("background inbox sync summary is persisted and visible in Role Workspace", () => {
+  const migration = readFileSync("migrations/20260626130000_autonomous_recruiter_p2h_inbox_sync_summary.sql", "utf8");
+  const runner = readFileSync("web/lib/inbox-background-sync.mjs", "utf8");
+  const wrapper = readFileSync("web/lib/inbox-background-sync.ts", "utf8");
+  const projects = readFileSync("web/lib/projects.ts", "utf8");
+  const projectRoute = readFileSync("web/app/api/projects/[id]/route.ts", "utf8");
+  const projectPage = readFileSync("web/app/app/projects/[id]/page.tsx", "utf8");
+
+  assert.match(migration, /alter table public\.projects[\s\S]*add column if not exists inbox_sync_summary jsonb/);
+  assert.match(runner, /buildProjectInboxSyncSummary/);
+  assert.match(runner, /recordProjectSyncSummary/);
+  assert.match(wrapper, /updateProjectInboxSyncSummary/);
+  assert.match(projects, /inbox_sync_summary/);
+  assert.match(projectRoute, /inbox_sync_summary/);
+  assert.match(projectPage, /Background sync/);
+  assert.match(projectPage, /后台同步/);
+});
+
 test("backfill API user-facing copy stays locale-keyed", () => {
   for (const file of ["web/app/api/backfill/route.ts", "web/app/api/backfill/merge/route.ts"]) {
     const source = readFileSync(file, "utf8");

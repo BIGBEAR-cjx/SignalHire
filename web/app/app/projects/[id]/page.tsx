@@ -252,6 +252,7 @@ interface ProjectDetail {
     name: string;
     brief: string | null;
     status: ProjectStatus;
+    inbox_sync_summary?: ProjectInboxSyncSummaryView;
     candidates_total: number;
     candidates_active: number;
     runs_total: number;
@@ -415,6 +416,18 @@ type InboxSyncResultView = {
   skipped_reason?: string;
   last_synced_at?: string;
   errors?: Array<{ outreach_thread_id: string; error: string }>;
+};
+
+type ProjectInboxSyncSummaryView = {
+  source?: string;
+  ok?: boolean;
+  last_attempted_at?: string;
+  last_synced_at?: string;
+  scanned?: number;
+  synced?: number;
+  skipped_reason?: string;
+  error_count?: number;
+  errors?: Array<{ error?: string }>;
 };
 
 type ContactProfileView = {
@@ -1099,6 +1112,29 @@ function inboxSyncSummaryLabel(result: InboxSyncResultView | null, locale: "zh" 
     : `已扫描 ${scanned} 个线程，同步 ${synced} 条回复${errors ? `，${errors} 条失败` : ""}。`;
 }
 
+function projectInboxSyncSummaryLabel(summary: ProjectInboxSyncSummaryView | undefined, locale: "zh" | "en") {
+  const isEn = locale === "en";
+  if (!summary?.last_attempted_at) {
+    return isEn
+      ? "Background sync has not checked this role yet. You can still sync manually."
+      : "后台同步还没有检查过这个岗位，也可以先手动同步。";
+  }
+  const scanned = Number(summary.scanned ?? 0);
+  const synced = Number(summary.synced ?? 0);
+  const when = new Date(summary.last_attempted_at).toLocaleString(isEn ? "en-US" : "zh-CN");
+  if (summary.skipped_reason) {
+    return `${isEn ? "Background sync" : "后台同步"}: ${when} · ${inboxSyncErrorLabel(summary.skipped_reason, locale)}`;
+  }
+  if (summary.ok === false || Number(summary.error_count ?? 0) > 0) {
+    const count = Number(summary.error_count ?? 1) || 1;
+    const firstError = summary.errors?.[0]?.error;
+    return `${isEn ? "Background sync" : "后台同步"}: ${when} · ${
+      isEn ? `${count} error${count === 1 ? "" : "s"}` : `${count} 个错误`
+    }${firstError ? ` · ${inboxSyncErrorLabel(firstError, locale)}` : ""}`;
+  }
+  return `${isEn ? "Background sync" : "后台同步"}: ${when} · ${isEn ? `scanned ${scanned}` : `扫描 ${scanned}`} · ${isEn ? `synced ${synced}` : `同步 ${synced}`}`;
+}
+
 function inboxPriorityLine(summary: InboxQueueView["summary"] | undefined, locale: "zh" | "en") {
   const isEn = locale === "en";
   const scheduling = summary?.needs_scheduling ?? summary?.interested ?? 0;
@@ -1572,12 +1608,14 @@ function InboxAgentPanel({
   queue,
   projectId,
   projectBrief,
+  projectSyncSummary,
   locale,
   onChanged,
 }: {
   queue?: InboxQueueView;
   projectId: string;
   projectBrief: string;
+  projectSyncSummary?: ProjectInboxSyncSummaryView;
   locale: "zh" | "en";
   onChanged: () => void;
 }) {
@@ -1664,6 +1702,20 @@ function InboxAgentPanel({
           <FiRefreshCw className={`h-3.5 w-3.5 ${syncing ? "animate-spin" : ""}`} aria-hidden="true" />
           {isEn ? "Sync Gmail replies" : "同步 Gmail 回复"}
         </PrimaryAction>
+      </div>
+
+      <div className={`rounded-2xl px-4 py-3 text-xs leading-5 ring-1 ${
+        projectSyncSummary?.ok === false || Number(projectSyncSummary?.error_count ?? 0) > 0
+          ? "bg-amber-50 text-amber-900 ring-amber-100"
+          : "bg-white/80 text-gray-700 ring-black/10"
+      }`}>
+        <p className="font-semibold">{isEn ? "Background sync" : "后台同步"}</p>
+        <p className="mt-1">{projectInboxSyncSummaryLabel(projectSyncSummary, locale)}</p>
+        {(projectSyncSummary?.skipped_reason === "gmail_readonly_scope_missing" || projectSyncSummary?.skipped_reason === "gmail_not_connected" || projectSyncSummary?.skipped_reason === "gmail_reconnect_required") && (
+          <SecondaryAction href="/api/integrations/gmail/connect" className="mt-2 min-h-8 px-3 py-1.5 text-xs">
+            {isEn ? "Reconnect Gmail inbox access" : "重新授权 Gmail inbox 读取权限"}
+          </SecondaryAction>
+        )}
       </div>
 
       {error && <p className="rounded-xl bg-amber-50 px-3 py-2 text-xs text-amber-800 ring-1 ring-amber-100">{error}</p>}
@@ -2130,6 +2182,7 @@ export default function ProjectDetailPage() {
         queue={detail.inboxQueue}
         projectId={id}
         projectBrief={briefForSearch}
+        projectSyncSummary={detail.project.inbox_sync_summary}
         locale={locale}
         onChanged={reloadDetail}
       />
