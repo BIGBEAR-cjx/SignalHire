@@ -21,6 +21,7 @@ import {
 } from "@/components/ui/signal-ui";
 import { buildCandidateFeedbackPanel, buildProjectActionBrief, buildProjectCandidateDecisionQueue, buildProjectCandidateFeedbackSummary, buildProjectControlRoom, buildProjectDetailHierarchy, buildProjectResearchRounds, buildProjectSearchConsole } from "@/lib/research-loop.mjs";
 import { buildCandidateDecisionSignal, buildEvidencePriorityView, buildProjectEvidenceMatrix } from "@/lib/evidence-priority.mjs";
+import { selectOutreachReadinessTargets } from "@/lib/outreach-readiness.mjs";
 import type { TalentCandidate } from "@/lib/talent-profile.mjs";
 
 type ProjectStatus = "open" | "paused" | "closed";
@@ -1175,6 +1176,7 @@ function GmailOutreachPanel({ queue, projectId, locale, onChanged }: { queue?: O
   const [sendErrors, setSendErrors] = useState<Record<string, string>>({});
   const [bulkBusy, setBulkBusy] = useState(false);
   const [contactBulkBusy, setContactBulkBusy] = useState(false);
+  const [prepareBusy, setPrepareBusy] = useState(false);
   const [bulkContactResult, setBulkContactResult] = useState<BulkContactResolutionView | null>(null);
 
   useEffect(() => {
@@ -1301,6 +1303,42 @@ function GmailOutreachPanel({ queue, projectId, locale, onChanged }: { queue?: O
       setContactBulkBusy(false);
     }
   }
+  async function prepareOutreachReadyDrafts() {
+    setPrepareBusy(true);
+    setBulkContactResult(null);
+    try {
+      const r = await fetch("/api/contact-resolution/bulk", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ project_id: projectId, locale }),
+      });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok) {
+        setBulkContactResult({
+          status: "error",
+          provider: contactProvider?.provider || "hunter",
+          reason: String(j.error || (isEn ? "Contact resolution failed." : "联系方式解析失败。")),
+          summary: { resolved: 0, skipped: 0, failed: 1, cost_units: 0 },
+        });
+        return;
+      }
+      const result = j as BulkContactResolutionView;
+      setBulkContactResult(result);
+      const targets = selectOutreachReadinessTargets({ items, contactResult: result });
+      for (const id of targets) {
+        const item = items.find((queueItem) => queueItem.id === id);
+        if (!item) continue;
+        await fetch(`/api/outreach-threads/${id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ status: "approved", sequence_messages: fallbackSequence(item), locale }),
+        });
+      }
+      onChanged();
+    } finally {
+      setPrepareBusy(false);
+    }
+  }
   async function approveReadyDrafts() {
     const targets = items.filter((item) => item.status === "drafted" && primaryEmail(item.contact_profile));
     setBulkBusy(true);
@@ -1352,11 +1390,18 @@ function GmailOutreachPanel({ queue, projectId, locale, onChanged }: { queue?: O
           </SecondaryAction>
           <SecondaryAction
             onClick={resolveMissingContacts}
-            disabled={contactBulkBusy || contactProvider?.enabled === false || items.length === 0}
+            disabled={contactBulkBusy || prepareBusy || contactProvider?.enabled === false || items.length === 0}
             className="min-h-9 px-3 py-2 text-xs"
           >
             {isEn ? "Resolve missing contacts" : "批量解析缺失联系方式"}
           </SecondaryAction>
+          <PrimaryAction
+            onClick={prepareOutreachReadyDrafts}
+            disabled={prepareBusy || contactBulkBusy || contactProvider?.enabled === false || items.length === 0}
+            className="min-h-9 px-3 py-2 text-xs"
+          >
+            {prepareBusy ? (isEn ? "Preparing..." : "准备中...") : (isEn ? "Resolve & approve ready" : "解析并批准可发送草稿")}
+          </PrimaryAction>
           <PrimaryAction onClick={approveReadyDrafts} disabled={bulkBusy || items.every((item) => item.status !== "drafted" || !primaryEmail(item.contact_profile))} className="min-h-9 px-3 py-2 text-xs">
             {isEn ? "Approve ready drafts" : "批量批准可发送草稿"}
           </PrimaryAction>

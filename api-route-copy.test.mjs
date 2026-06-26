@@ -700,6 +700,21 @@ test("contact resolution route uses server-only provider config and Role Workspa
   assert.match(projectPage, /Copy manager handoff/);
 });
 
+test("outreach readiness combined action resolves contacts before approving drafts without sending", () => {
+  const projectPage = readFileSync("web/app/app/projects/[id]/page.tsx", "utf8");
+  const helper = readFileSync("web/lib/outreach-readiness.mjs", "utf8");
+
+  assert.match(helper, /selectOutreachReadinessTargets/);
+  assert.match(projectPage, /Resolve & approve ready/);
+  assert.match(projectPage, /解析并批准可发送草稿/);
+  assert.match(projectPage, /prepareOutreachReadyDrafts/);
+  assert.match(projectPage, /\/api\/contact-resolution\/bulk/);
+  assert.match(projectPage, /selectOutreachReadinessTargets/);
+  assert.match(projectPage, /disabled=\{contactBulkBusy \|\| prepareBusy \|\| contactProvider\?\.enabled === false \|\| items\.length === 0\}/);
+  assert.match(projectPage, /disabled=\{prepareBusy \|\| contactBulkBusy \|\| contactProvider\?\.enabled === false \|\| items\.length === 0\}/);
+  assert.doesNotMatch(projectPage.match(/async function prepareOutreachReadyDrafts[\s\S]*?\n  }/)?.[0] ?? "", /\/api\/outreach-threads\/\$\{[^}]+\}\/send|\/api\/inbox\/actions\/send/);
+});
+
 test("OpenJobs Mira provider pull is tenant-scoped and writes low-evidence project candidates", () => {
   const route = readFileSync("web/app/api/providers/openjobs/search/route.ts", "utf8");
   const routeCore = readFileSync("web/lib/openjobs-route.mjs", "utf8");
