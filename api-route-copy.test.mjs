@@ -136,6 +136,22 @@ test("Vercel cron triggers due Talent Monitor tasks", () => {
   assert.match(cronRoute, /CRON_SECRET/);
 });
 
+test("Vercel cron can run background inbox sync without exposing Gmail secrets", () => {
+  const config = readFileSync("web/vercel.json", "utf8");
+  const cronRoute = readFileSync("web/app/api/cron/inbox-sync/route.ts", "utf8");
+  const runner = readFileSync("web/lib/inbox-background-sync.mjs", "utf8");
+  const wrapper = readFileSync("web/lib/inbox-background-sync.ts", "utf8");
+
+  assert.match(config, /"path": "\/api\/cron\/inbox-sync"/);
+  assert.match(cronRoute, /backgroundInboxSync/);
+  assert.match(cronRoute, /CRON_SECRET/);
+  assert.match(cronRoute, /Bearer \$\{secret\}/);
+  assert.match(runner, /maxProjects/);
+  assert.match(runner, /maxThreadsPerProject/);
+  assert.match(wrapper, /syncGmailInboxForProject/);
+  assert.doesNotMatch(cronRoute, /GOOGLE_CLIENT_SECRET|GMAIL_TOKEN_ENCRYPTION_KEY|access_token|refresh_token/);
+});
+
 test("backfill API user-facing copy stays locale-keyed", () => {
   for (const file of ["web/app/api/backfill/route.ts", "web/app/api/backfill/merge/route.ts"]) {
     const source = readFileSync(file, "utf8");

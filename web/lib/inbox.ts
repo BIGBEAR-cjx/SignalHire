@@ -133,11 +133,12 @@ export async function buildProjectInboxQueueView(userId: string, projectId: stri
   });
 }
 
-export async function syncGmailInboxForProject(input: { userId: string; projectId: string; roleBrief?: string }) {
+export async function syncGmailInboxForProject(input: { userId: string; projectId: string; roleBrief?: string; maxThreads?: number }) {
   return syncGmailInboxForProjectCore(({
     userId: input.userId,
     projectId: input.projectId,
     roleBrief: input.roleBrief,
+    maxThreads: input.maxThreads,
     getGmailConnectionStatus,
     listRoleRelatedOutreachThreads,
     getGmailThreadMessages,
