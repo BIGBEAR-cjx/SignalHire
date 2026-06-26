@@ -1,5 +1,6 @@
 import { createClient } from "@insforge/sdk";
 import { buildInboxQueue, classifyInboxReply, shouldStopFollowUp } from "./inbox-agent.mjs";
+import { buildInboxActionPatch } from "./inbox-actions.mjs";
 import { getGmailConnectionStatus, getGmailThreadMessages, type GmailThreadMessage } from "./gmail";
 import { listOutreachThreads, updateOutreachThread, type OutreachThread } from "./outreach-threads";
 
@@ -114,7 +115,19 @@ export async function listInboxThreads(input: { userId: string; projectId: strin
 
 export async function buildProjectInboxQueueView(userId: string, projectId: string) {
   const threads = await listInboxThreads({ userId, projectId });
-  return buildInboxQueue({ threads: threads as never[] });
+  const outreachThreads = await listOutreachThreads({ userId, projectId });
+  const outreachById = new Map(outreachThreads.map((thread) => [thread.id, thread]));
+  const mergedThreads = threads.map((thread) => {
+    const outreach = thread.outreach_thread_id ? outreachById.get(thread.outreach_thread_id) : null;
+    return {
+      ...thread,
+      action_notes: outreach?.notes ?? "",
+      outreach_status: outreach?.status ?? "",
+      next_follow_up_at: outreach?.next_follow_up_at ?? null,
+      candidate_snapshot: outreach?.candidate_snapshot ?? {},
+    };
+  });
+  return buildInboxQueue({ threads: mergedThreads as never[] });
 }
 
 export async function syncGmailInboxForProject(input: { userId: string; projectId: string; roleBrief?: string }) {
@@ -147,9 +160,15 @@ export async function syncGmailInboxForProject(input: { userId: string; projectI
       if (classification.classification === "interested") {
         await updateOutreachThread({ userId: input.userId, id: thread.id, status: "replied" });
       } else if (shouldStopFollowUp(classification.classification)) {
+        const stopPatch = buildInboxActionPatch({
+          action: "stop",
+          notes: thread.notes,
+          now: new Date(),
+        });
         await updateOutreachThread({
           userId: input.userId,
           id: thread.id,
+          ...(stopPatch.ok ? stopPatch.patch : {}),
           status: classification.classification === "bounced" ? "bounced" : "stopped",
         });
       }

@@ -538,6 +538,8 @@ test("Gmail inbox agent persists only role-related threads and renders queues", 
   const migration = readFileSync("migrations/20260624190000_autonomous_recruiter_p2a_inbox_agent.sql", "utf8");
   const inboxLib = readFileSync("web/lib/inbox.ts", "utf8");
   const inboxAgent = readFileSync("web/lib/inbox-agent.mjs", "utf8");
+  const inboxActions = readFileSync("web/lib/inbox-actions.mjs", "utf8");
+  const inboxActionsRoute = readFileSync("web/app/api/inbox/actions/route.ts", "utf8");
   const syncRoute = readFileSync("web/app/api/inbox/gmail/sync/route.ts", "utf8");
   const projectRoute = readFileSync("web/app/api/projects/[id]/route.ts", "utf8");
   const projectPage = readFileSync("web/app/app/projects/[id]/page.tsx", "utf8");
@@ -549,9 +551,20 @@ test("Gmail inbox agent persists only role-related threads and renders queues", 
   assert.match(inboxLib, /latestCandidateMessage/);
   assert.match(inboxLib, /status\.gmail_address/);
   assert.match(inboxAgent, /classifyInboxReply/);
+  assert.match(inboxAgent, /action_status/);
+  assert.match(inboxActions, /buildInboxActionPatch/);
+  assert.match(inboxActions, /signalhire-inbox-action/);
+  assert.match(inboxActionsRoute, /runInboxAction/);
+  assert.match(inboxActionsRoute, /getOutreachThread/);
+  assert.match(inboxActionsRoute, /updateOutreachThread/);
   assert.match(syncRoute, /syncGmailInboxForProject/);
   assert.match(projectRoute, /inboxQueue: await buildProjectInboxQueueView/);
   assert.match(projectPage, /InboxAgentPanel/);
+  assert.match(projectPage, /\/api\/inbox\/actions/);
+  assert.match(projectPage, /inboxPriorityLine/);
+  assert.match(projectPage, /Mark interview-ready/);
+  assert.match(projectPage, /Schedule follow-up/);
+  assert.match(projectPage, /Save suggested draft/);
   assert.match(projectPage, /Interested Candidate Queue/);
 });
 

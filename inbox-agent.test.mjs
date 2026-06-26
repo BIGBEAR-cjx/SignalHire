@@ -55,8 +55,10 @@ test("builds inbox and interested queues with interview-ready review candidates"
   assert.equal(queue.summary.total, 3);
   assert.equal(queue.summary.interested, 1);
   assert.equal(queue.summary.needs_human_reply, 1);
+  assert.equal(queue.summary.needs_scheduling, 1);
+  assert.equal(queue.summary.needs_reply, 1);
   assert.deepEqual(queue.items.map((item) => [item.candidate_name, item.next_action, item.action_label]), [
-    ["Ada", "schedule", "Schedule interview"],
+    ["Ada", "schedule", "Prepare scheduling handoff"],
     ["Grace", "reply", "Reply with role details"],
     ["Lin", "stop", "Stop follow-up"],
   ]);
@@ -64,6 +66,26 @@ test("builds inbox and interested queues with interview-ready review candidates"
     ["Ada", "needs_scheduling"],
   ]);
   assert.deepEqual(queue.items.map((item) => item.classification), ["interested", "ask_for_details", "not_interested"]);
+  assert.deepEqual(queue.items.map((item) => item.action_status), ["pending", "pending", "pending"]);
+});
+
+test("builds inbox action status from outreach metadata and status", () => {
+  const queue = buildInboxQueue({
+    threads: [
+      {
+        id: "1",
+        candidate_name: "Ada",
+        classification: "interested",
+        action_notes: '<!--signalhire-inbox-action:%7B%22action%22%3A%22schedule%22%2C%22action_status%22%3A%22interview_ready%22%2C%22action_applied_at%22%3A%222026-06-26T10%3A00%3A00.000Z%22%7D-->',
+      },
+      { id: "2", candidate_name: "Grace", classification: "not_interested", outreach_status: "stopped" },
+    ],
+  });
+
+  assert.equal(queue.items[0].action_status, "interview_ready");
+  assert.equal(queue.items[1].action_status, "stopped");
+  assert.equal(queue.summary.needs_scheduling, 0);
+  assert.equal(queue.summary.stopped, 1);
 });
 
 test("maps later, out of office, and unclear replies to action-first queue states", () => {

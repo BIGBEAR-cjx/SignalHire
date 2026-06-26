@@ -1,3 +1,5 @@
+import { defaultActionStatus, parseInboxActionState } from "./inbox-actions.mjs";
+
 function cleanString(value) {
   return typeof value === "string" ? value.trim() : "";
 }
@@ -86,7 +88,7 @@ function actionForClassification(item) {
   if (classification === "interested") {
     return {
       next_action: "schedule",
-      action_label: "Schedule interview",
+      action_label: "Prepare scheduling handoff",
       priority: "high",
       reply_draft: "",
       scheduling_prompt: "Confirm interest, share interview context, and propose 2-3 time windows.",
@@ -151,6 +153,7 @@ function schedulingPacket(item) {
 export function buildInboxQueue({ threads = [] } = {}) {
   const items = [...threads]
     .map((thread) => {
+      const actionState = parseInboxActionState(thread.notes || thread.action_notes);
       const item = {
         id: cleanString(thread.id),
         candidate_name: cleanString(thread.candidate_name) || "Unknown candidate",
@@ -162,6 +165,11 @@ export function buildInboxQueue({ threads = [] } = {}) {
         updated_at: cleanString(thread.updated_at),
         gmail_thread_id: cleanString(thread.gmail_thread_id),
         outreach_thread_id: cleanString(thread.outreach_thread_id),
+        action_state: actionState,
+        action_status: actionState?.action_status || defaultActionStatus({
+          action: actionState?.action,
+          outreachStatus: thread.outreach_status || thread.status,
+        }),
       };
       return { ...item, ...actionForClassification(item) };
     })
@@ -171,7 +179,7 @@ export function buildInboxQueue({ threads = [] } = {}) {
     .map((item) => ({
       ...item,
       readiness: "needs_scheduling",
-      recommended_next_step: item.scheduling_prompt || "Review and schedule interview.",
+      recommended_next_step: item.scheduling_prompt || "Prepare a scheduling handoff for hiring review.",
       scheduling_packet: schedulingPacket(item),
     }));
   return {
@@ -179,6 +187,11 @@ export function buildInboxQueue({ threads = [] } = {}) {
       total: items.length,
       interested: interested_candidates.length,
       needs_human_reply: items.filter(needsHumanReply).length,
+      needs_scheduling: items.filter((item) => item.next_action === "schedule" && item.action_status !== "interview_ready").length,
+      needs_reply: items.filter((item) => item.next_action === "reply" && item.action_status === "pending").length,
+      follow_up_later: items.filter((item) => item.next_action === "follow_up_later" && item.action_status !== "scheduled").length,
+      stopped: items.filter((item) => item.action_status === "stopped").length,
+      review_required: items.filter((item) => item.next_action === "review" && item.action_status === "pending").length,
     },
     items,
     interested_candidates,

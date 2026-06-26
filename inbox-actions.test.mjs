@@ -1,0 +1,72 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import {
+  buildInboxActionPatch,
+  mergeInboxActionNotes,
+  parseInboxActionState,
+} from "./web/lib/inbox-actions.mjs";
+import { runInboxAction } from "./web/lib/inbox-actions-route.mjs";
+
+test("stores and reads inbox action metadata without losing human notes", () => {
+  const state = {
+    action: "reply",
+    action_status: "draft_saved",
+    action_applied_at: "2026-06-26T10:00:00.000Z",
+    reply_draft: "Hi Ada...",
+  };
+  const notes = mergeInboxActionNotes("Human note", state);
+
+  assert.match(notes, /Human note/);
+  assert.deepEqual(parseInboxActionState(notes), {
+    action: "reply",
+    action_status: "draft_saved",
+    action_applied_at: "2026-06-26T10:00:00.000Z",
+    reply_draft: "Hi Ada...",
+    follow_up_at: "",
+    scheduling_message: "",
+  });
+});
+
+test("maps inbox actions to outreach thread patches", () => {
+  const now = new Date("2026-06-26T10:00:00.000Z");
+
+  assert.equal(buildInboxActionPatch({ action: "bad", now }).ok, false);
+  assert.deepEqual(buildInboxActionPatch({ action: "schedule", now }).patch.status, "replied");
+  assert.deepEqual(buildInboxActionPatch({ action: "reply", reply_draft: "Draft", now }).patch.body, "Draft");
+  assert.equal(buildInboxActionPatch({ action: "follow_up_later", now }).patch.status, "follow_up_scheduled");
+  assert.match(buildInboxActionPatch({ action: "follow_up_later", now }).patch.next_follow_up_at, /^2026-07-03T10:00:00/);
+  assert.equal(buildInboxActionPatch({ action: "stop", now }).patch.status, "stopped");
+  assert.equal(buildInboxActionPatch({ action: "review", now }).action_state.action_status, "reviewed");
+});
+
+test("runInboxAction checks auth, ownership lookup, invalid action, and update", async () => {
+  const calls = [];
+  const deps = {
+    user: { id: "user-1" },
+    getOutreachThread: async (input) => {
+      calls.push(["get", input]);
+      return { id: input.id, user_id: input.userId, notes: "Existing" };
+    },
+    updateOutreachThread: async (input) => {
+      calls.push(["update", input]);
+      return { id: input.id, status: input.status, notes: input.notes };
+    },
+    now: new Date("2026-06-26T10:00:00.000Z"),
+  };
+
+  assert.equal((await runInboxAction({ body: {}, ...deps, user: null })).status, 401);
+  assert.equal((await runInboxAction({ body: {}, ...deps })).status, 400);
+  assert.equal((await runInboxAction({ body: { outreach_thread_id: "t1", action: "bad" }, ...deps })).status, 400);
+
+  const result = await runInboxAction({
+    body: { outreach_thread_id: "t1", action: "reply", reply_draft: "Draft" },
+    ...deps,
+  });
+
+  assert.equal(result.status, 200);
+  assert.equal(result.body.action_state.action_status, "draft_saved");
+  assert.deepEqual(calls[0], ["get", { userId: "user-1", id: "t1" }]);
+  assert.equal(calls.at(-1)[1].userId, "user-1");
+  assert.equal(calls.at(-1)[1].status, "replied");
+  assert.equal(calls.at(-1)[1].body, "Draft");
+});

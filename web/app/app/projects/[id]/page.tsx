@@ -318,8 +318,19 @@ type OutreachQueueView = {
   }>;
 };
 
+type InboxActionStatus = "pending" | "draft_saved" | "scheduled" | "interview_ready" | "stopped" | "reviewed";
+
 type InboxQueueView = {
-  summary: { total: number; interested: number; needs_human_reply: number };
+  summary: {
+    total: number;
+    interested: number;
+    needs_human_reply: number;
+    needs_scheduling?: number;
+    needs_reply?: number;
+    follow_up_later?: number;
+    stopped?: number;
+    review_required?: number;
+  };
   items: Array<{
     id: string;
     candidate_name: string;
@@ -332,6 +343,14 @@ type InboxQueueView = {
     priority?: "high" | "medium" | "low";
     reply_draft?: string;
     scheduling_prompt?: string;
+    action_status?: InboxActionStatus;
+    action_state?: {
+      action?: string;
+      action_status?: InboxActionStatus;
+      reply_draft?: string;
+      follow_up_at?: string;
+      scheduling_message?: string;
+    } | null;
     updated_at: string;
     gmail_thread_id?: string;
     outreach_thread_id?: string;
@@ -348,6 +367,15 @@ type InboxQueueView = {
     priority?: "high" | "medium" | "low";
     reply_draft?: string;
     scheduling_prompt?: string;
+    action_status?: InboxActionStatus;
+    action_state?: {
+      action?: string;
+      action_status?: InboxActionStatus;
+      reply_draft?: string;
+      follow_up_at?: string;
+      scheduling_message?: string;
+    } | null;
+    outreach_thread_id?: string;
     updated_at: string;
     readiness: "needs_scheduling";
     recommended_next_step: string;
@@ -363,6 +391,8 @@ type InboxQueueView = {
     };
   }>;
 };
+
+type InboxActionItemView = InboxQueueView["items"][number] | InboxQueueView["interested_candidates"][number];
 
 type ContactProfileView = {
   emails?: Array<{
@@ -879,6 +909,79 @@ function handoffText(candidate: InboxQueueView["interested_candidates"][number])
   ].join("\n");
 }
 
+function inboxActionStatusLabel(status: InboxActionStatus | undefined, locale: "zh" | "en") {
+  const isEn = locale === "en";
+  const labels: Record<InboxActionStatus, string> = {
+    pending: isEn ? "Pending" : "待处理",
+    draft_saved: isEn ? "Draft saved" : "草稿已保存",
+    scheduled: isEn ? "Follow-up scheduled" : "已安排稍后跟进",
+    interview_ready: isEn ? "Interview-ready" : "可安排面试",
+    stopped: isEn ? "Stopped" : "已停止跟进",
+    reviewed: isEn ? "Reviewed" : "已复核",
+  };
+  return labels[status || "pending"];
+}
+
+function inboxActionButtonLabel(item: InboxActionItemView, locale: "zh" | "en") {
+  const isEn = locale === "en";
+  if (item.action_status && item.action_status !== "pending") return inboxActionStatusLabel(item.action_status, locale);
+  if (item.next_action === "schedule") return isEn ? "Mark interview-ready" : "标记可约面";
+  if (item.next_action === "reply") return isEn ? "Save suggested draft" : "保存建议草稿";
+  if (item.next_action === "follow_up_later") return isEn ? "Schedule follow-up" : "安排稍后跟进";
+  if (item.next_action === "stop") return isEn ? "Stop follow-up" : "停止跟进";
+  if (item.next_action === "review") return isEn ? "Mark reviewed" : "标记已复核";
+  return isEn ? "Apply action" : "执行动作";
+}
+
+function defaultFollowUpIso() {
+  const date = new Date();
+  date.setDate(date.getDate() + 7);
+  return date.toISOString();
+}
+
+function formatShortDate(value: string | undefined, locale: "zh" | "en") {
+  if (!value) return "";
+  const date = new Date(value);
+  if (!Number.isFinite(date.getTime())) return "";
+  return date.toLocaleDateString(locale === "en" ? "en-US" : "zh-CN", { month: "short", day: "numeric" });
+}
+
+function inboxActionPayload(item: InboxActionItemView) {
+  return {
+    outreach_thread_id: item.outreach_thread_id,
+    action: item.next_action,
+    reply_draft: item.reply_draft || item.suggested_reply || "",
+    follow_up_at: item.next_action === "follow_up_later" ? defaultFollowUpIso() : "",
+    scheduling_message: item.scheduling_prompt || "",
+  };
+}
+
+function inboxActionSuccessLabel(item: InboxActionItemView, locale: "zh" | "en") {
+  const isEn = locale === "en";
+  if (item.next_action === "schedule") return isEn ? "Handoff marked interview-ready." : "交付包已标记为可约面。";
+  if (item.next_action === "reply") return isEn ? "Suggested reply draft saved." : "建议回复草稿已保存。";
+  if (item.next_action === "follow_up_later") {
+    const date = formatShortDate(item.action_state?.follow_up_at, locale);
+    return isEn ? `Follow-up scheduled${date ? ` for ${date}` : ""}.` : `已安排稍后跟进${date ? `：${date}` : ""}。`;
+  }
+  if (item.next_action === "stop") return isEn ? "Follow-up stopped." : "已停止后续跟进。";
+  if (item.next_action === "review") return isEn ? "Reply marked reviewed." : "回复已标记复核。";
+  return isEn ? "Action saved." : "动作已保存。";
+}
+
+function inboxPriorityLine(summary: InboxQueueView["summary"] | undefined, locale: "zh" | "en") {
+  const isEn = locale === "en";
+  const scheduling = summary?.needs_scheduling ?? summary?.interested ?? 0;
+  const reply = summary?.needs_reply ?? 0;
+  const review = summary?.review_required ?? summary?.needs_human_reply ?? 0;
+  const later = summary?.follow_up_later ?? 0;
+  if (scheduling > 0) return isEn ? `Start with ${scheduling} scheduling handoff${scheduling > 1 ? "s" : ""}.` : `优先处理 ${scheduling} 个可约面交付包。`;
+  if (reply > 0) return isEn ? `Next, save ${reply} suggested reply draft${reply > 1 ? "s" : ""}.` : `下一步保存 ${reply} 个建议回复草稿。`;
+  if (review > 0) return isEn ? `Review ${review} unclear repl${review > 1 ? "ies" : "y"}.` : `需要复核 ${review} 条不明确回复。`;
+  if (later > 0) return isEn ? `Schedule ${later} later follow-up${later > 1 ? "s" : ""}.` : `安排 ${later} 个稍后跟进。`;
+  return isEn ? "No urgent reply actions right now." : "当前没有紧急回复动作。";
+}
+
 function fallbackSequence(item: OutreachQueueView["items"][number]): OutreachSequenceMessage[] {
   const existing = Array.isArray(item.sequence_messages) ? item.sequence_messages : [];
   if (existing.length > 0) return existing;
@@ -1269,6 +1372,9 @@ function InboxAgentPanel({
   const interested = queue?.interested_candidates ?? [];
   const [syncing, setSyncing] = useState(false);
   const [error, setError] = useState("");
+  const [busyActionId, setBusyActionId] = useState("");
+  const [actionErrors, setActionErrors] = useState<Record<string, string>>({});
+  const [successMessages, setSuccessMessages] = useState<Record<string, string>>({});
 
   function inboxSyncErrorLabel(value: unknown) {
     const key = typeof value === "string" ? value : "";
@@ -1299,6 +1405,34 @@ function InboxAgentPanel({
     }
   }
 
+  async function applyInboxAction(item: InboxActionItemView) {
+    if (!item.outreach_thread_id || !item.next_action) {
+      setActionErrors((prev) => ({
+        ...prev,
+        [item.id]: isEn ? "This reply is not linked to an outreach thread." : "这条回复没有关联外联线程。",
+      }));
+      return;
+    }
+    setBusyActionId(item.id);
+    setActionErrors((prev) => ({ ...prev, [item.id]: "" }));
+    setSuccessMessages((prev) => ({ ...prev, [item.id]: "" }));
+    try {
+      const r = await fetch("/api/inbox/actions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(inboxActionPayload(item)),
+      });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(j.error || (isEn ? "Inbox action failed." : "处理回复动作失败。"));
+      setSuccessMessages((prev) => ({ ...prev, [item.id]: inboxActionSuccessLabel({ ...item, action_state: j.action_state } as InboxActionItemView, locale) }));
+      onChanged();
+    } catch (e) {
+      setActionErrors((prev) => ({ ...prev, [item.id]: (e as Error).message }));
+    } finally {
+      setBusyActionId("");
+    }
+  }
+
   return (
     <Surface className="space-y-4 p-5">
       <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
@@ -1312,6 +1446,9 @@ function InboxAgentPanel({
               ? "Reads only Gmail threads created by SignalHire outreach for this role, then classifies replies into review and interview-ready queues."
               : "只读取这个岗位由 SignalHire 外联创建的 Gmail 线程，并把候选人回复分类到待处理和可约面队列。"}
           </p>
+          <p className="mt-2 inline-flex rounded-full bg-gray-900 px-3 py-1 text-xs font-semibold text-white">
+            {inboxPriorityLine(queue?.summary, locale)}
+          </p>
         </div>
         <PrimaryAction onClick={syncReplies} disabled={syncing} className="min-h-9 px-3 py-2 text-xs">
           <FiRefreshCw className={`h-3.5 w-3.5 ${syncing ? "animate-spin" : ""}`} aria-hidden="true" />
@@ -1321,18 +1458,26 @@ function InboxAgentPanel({
 
       {error && <p className="rounded-xl bg-amber-50 px-3 py-2 text-xs text-amber-800 ring-1 ring-amber-100">{error}</p>}
 
-      <div className="grid gap-3 sm:grid-cols-3">
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
         <div className="rounded-2xl border border-black/10 bg-white/80 p-4">
-          <p className="text-xs text-[var(--sh-muted)]">{isEn ? "Classified replies" : "已分类回复"}</p>
-          <p className="mt-1 text-2xl font-semibold text-[var(--sh-ink)]">{queue?.summary.total ?? 0}</p>
+          <p className="text-xs text-[var(--sh-muted)]">{isEn ? "Needs scheduling" : "待约面"}</p>
+          <p className="mt-1 text-2xl font-semibold text-emerald-700">{queue?.summary.needs_scheduling ?? queue?.summary.interested ?? 0}</p>
         </div>
         <div className="rounded-2xl border border-black/10 bg-white/80 p-4">
-          <p className="text-xs text-[var(--sh-muted)]">{isEn ? "Interested" : "有兴趣"}</p>
-          <p className="mt-1 text-2xl font-semibold text-emerald-700">{queue?.summary.interested ?? 0}</p>
+          <p className="text-xs text-[var(--sh-muted)]">{isEn ? "Needs reply" : "待回复"}</p>
+          <p className="mt-1 text-2xl font-semibold text-amber-700">{queue?.summary.needs_reply ?? 0}</p>
         </div>
         <div className="rounded-2xl border border-black/10 bg-white/80 p-4">
-          <p className="text-xs text-[var(--sh-muted)]">{isEn ? "Needs human reply" : "需人工回复"}</p>
-          <p className="mt-1 text-2xl font-semibold text-amber-700">{queue?.summary.needs_human_reply ?? 0}</p>
+          <p className="text-xs text-[var(--sh-muted)]">{isEn ? "Follow up later" : "稍后跟进"}</p>
+          <p className="mt-1 text-2xl font-semibold text-sky-700">{queue?.summary.follow_up_later ?? 0}</p>
+        </div>
+        <div className="rounded-2xl border border-black/10 bg-white/80 p-4">
+          <p className="text-xs text-[var(--sh-muted)]">{isEn ? "Review required" : "需复核"}</p>
+          <p className="mt-1 text-2xl font-semibold text-violet-700">{queue?.summary.review_required ?? queue?.summary.needs_human_reply ?? 0}</p>
+        </div>
+        <div className="rounded-2xl border border-black/10 bg-white/80 p-4">
+          <p className="text-xs text-[var(--sh-muted)]">{isEn ? "Stopped" : "已停止"}</p>
+          <p className="mt-1 text-2xl font-semibold text-rose-700">{queue?.summary.stopped ?? 0}</p>
         </div>
       </div>
 
@@ -1344,11 +1489,11 @@ function InboxAgentPanel({
               {isEn ? "No synced replies yet." : "还没有同步到候选人回复。"}
             </p>
           ) : (
-            <div className="mt-3 space-y-2">
+            <div className="mt-3 min-w-0 space-y-2">
               {items.slice(0, 6).map((item) => (
-                <div key={item.id} className="rounded-xl bg-gray-50 px-3 py-2 text-xs ring-1 ring-black/5">
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <p className="font-semibold text-gray-900">{item.candidate_name}</p>
+                <div key={item.id} className="min-w-0 rounded-xl bg-gray-50 px-3 py-2 text-xs ring-1 ring-black/5">
+                  <div className="flex min-w-0 flex-wrap items-center justify-between gap-2">
+                    <p className="min-w-0 break-all font-semibold text-gray-900">{item.candidate_name}</p>
                     <span className={`rounded-full px-2 py-0.5 font-semibold ring-1 ${
                       item.classification === "interested"
                         ? "bg-emerald-50 text-emerald-700 ring-emerald-100"
@@ -1359,12 +1504,42 @@ function InboxAgentPanel({
                       {item.classification.replace(/_/g, " ")}
                     </span>
                   </div>
-                  <p className="mt-1 line-clamp-2 text-gray-600">{item.last_message_excerpt || item.classification_reason}</p>
+                  <p className="mt-1 line-clamp-2 break-words text-gray-600">{item.last_message_excerpt || item.classification_reason}</p>
                   {item.action_label && (
-                    <p className="mt-2 inline-flex rounded-full bg-white px-2 py-1 font-semibold text-gray-700 ring-1 ring-black/5">{item.action_label}</p>
+                    <div className="mt-2 flex flex-wrap items-center gap-2">
+                      <p className="inline-flex rounded-full bg-white px-2 py-1 font-semibold text-gray-700 ring-1 ring-black/5">{item.action_label}</p>
+                      <p className="inline-flex rounded-full bg-white px-2 py-1 font-semibold text-gray-500 ring-1 ring-black/5">
+                        {inboxActionStatusLabel(item.action_status, locale)}
+                      </p>
+                    </div>
                   )}
                   {(item.reply_draft || item.suggested_reply) && (
-                    <p className="mt-2 rounded-lg bg-white px-2 py-1.5 text-gray-600 ring-1 ring-black/5">{item.reply_draft || item.suggested_reply}</p>
+                    <p className="mt-2 break-words rounded-lg bg-white px-2 py-1.5 text-gray-600 ring-1 ring-black/5">{item.reply_draft || item.suggested_reply}</p>
+                  )}
+                  <div className="mt-2 flex flex-wrap items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => applyInboxAction(item)}
+                      disabled={busyActionId === item.id || (item.action_status ?? "pending") !== "pending"}
+                      className="rounded-full bg-gray-900 px-2.5 py-1 font-semibold text-white disabled:cursor-not-allowed disabled:bg-gray-300"
+                    >
+                      {busyActionId === item.id ? (isEn ? "Saving..." : "保存中...") : inboxActionButtonLabel(item, locale)}
+                    </button>
+                    {item.next_action === "schedule" && (
+                      <button
+                        type="button"
+                        onClick={() => navigator.clipboard?.writeText(item.scheduling_prompt || "")}
+                        className="rounded-full bg-white px-2.5 py-1 font-semibold text-gray-700 ring-1 ring-black/10"
+                      >
+                        {isEn ? "Copy scheduling ask" : "复制约面话术"}
+                      </button>
+                    )}
+                  </div>
+                  {actionErrors[item.id] && (
+                    <p className="mt-2 rounded-lg bg-rose-50 px-2 py-1.5 text-rose-700 ring-1 ring-rose-100">{actionErrors[item.id]}</p>
+                  )}
+                  {successMessages[item.id] && (
+                    <p className="mt-2 rounded-lg bg-emerald-50 px-2 py-1.5 text-emerald-800 ring-1 ring-emerald-100">{successMessages[item.id]}</p>
                   )}
                 </div>
               ))}
@@ -1372,23 +1547,42 @@ function InboxAgentPanel({
           )}
         </div>
 
-        <div className="rounded-2xl border border-black/10 bg-white/80 p-4">
+        <div className="min-w-0 rounded-2xl border border-black/10 bg-white/80 p-4">
           <p className="text-sm font-semibold text-[var(--sh-ink)]">{isEn ? "Interested Candidate Queue" : "可约面候选人队列"}</p>
           {interested.length === 0 ? (
             <p className="mt-3 rounded-xl border border-dashed border-black/10 bg-gray-50 p-3 text-sm text-[var(--sh-muted)]">
               {isEn ? "No interview-ready replies yet." : "还没有可约面的候选人回复。"}
             </p>
           ) : (
-            <div className="mt-3 space-y-2">
+            <div className="mt-3 min-w-0 space-y-2">
               {interested.slice(0, 5).map((candidate) => (
-                <div key={candidate.id} className="rounded-xl bg-emerald-50 px-3 py-2 text-xs text-emerald-900 ring-1 ring-emerald-100">
-                  <p className="font-semibold">{candidate.candidate_name}</p>
-                  <p className="mt-1">{candidate.last_message_excerpt}</p>
+                <div key={candidate.id} className="min-w-0 rounded-xl bg-emerald-50 px-3 py-2 text-xs text-emerald-900 ring-1 ring-emerald-100">
+                  <p className="min-w-0 break-all font-semibold">{candidate.candidate_name}</p>
+                  <p className="mt-1 break-words">{candidate.last_message_excerpt}</p>
                   <p className="mt-2 font-medium">{candidate.recommended_next_step}</p>
+                  <div className="mt-2 flex flex-wrap items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => applyInboxAction(candidate)}
+                      disabled={busyActionId === candidate.id || (candidate.action_status ?? "pending") !== "pending"}
+                      className="rounded-full bg-emerald-700 px-2.5 py-1 font-semibold text-white disabled:cursor-not-allowed disabled:bg-emerald-200"
+                    >
+                      {busyActionId === candidate.id ? (isEn ? "Saving..." : "保存中...") : inboxActionButtonLabel(candidate, locale)}
+                    </button>
+                    <span className="rounded-full bg-white/80 px-2 py-0.5 font-semibold text-emerald-800 ring-1 ring-emerald-100">
+                      {inboxActionStatusLabel(candidate.action_status, locale)}
+                    </span>
+                  </div>
+                  {actionErrors[candidate.id] && (
+                    <p className="mt-2 rounded-lg bg-rose-50 px-2 py-1.5 text-rose-700 ring-1 ring-rose-100">{actionErrors[candidate.id]}</p>
+                  )}
+                  {successMessages[candidate.id] && (
+                    <p className="mt-2 rounded-lg bg-emerald-50 px-2 py-1.5 text-emerald-800 ring-1 ring-emerald-100">{successMessages[candidate.id]}</p>
+                  )}
                   {candidate.scheduling_packet && (
                     <div className="mt-2 rounded-lg bg-white/80 px-2 py-1.5 text-emerald-950 ring-1 ring-emerald-100">
                       <div className="flex flex-wrap items-center justify-between gap-2">
-                        <p className="font-semibold">{candidate.scheduling_packet.candidate_summary}</p>
+                        <p className="break-words font-semibold">{candidate.scheduling_packet.candidate_summary}</p>
                         <button
                           type="button"
                           onClick={() => navigator.clipboard?.writeText(handoffText(candidate))}
@@ -1397,17 +1591,17 @@ function InboxAgentPanel({
                           {isEn ? "Copy handoff" : "复制交付包"}
                         </button>
                       </div>
-                      <p className="mt-1">{candidate.scheduling_packet.suggested_scheduling_message}</p>
-                      <p className="mt-1 font-semibold">{candidate.scheduling_packet.claim_status_summary}</p>
-                      {(candidate.scheduling_packet.strongest_evidence ?? []).length > 0 && (
-                        <p className="mt-1">{isEn ? "Evidence" : "证据"}: {candidate.scheduling_packet.strongest_evidence?.join("; ")}</p>
-                      )}
-                      {(candidate.scheduling_packet.risk_flags ?? []).length > 0 && (
-                        <p className="mt-1">{isEn ? "Risks" : "风险"}: {candidate.scheduling_packet.risk_flags?.join("; ")}</p>
-                      )}
-                      {(candidate.scheduling_packet.unverified_claims ?? []).length > 0 && (
-                        <p className="mt-1">{isEn ? "Unverified" : "未核实"}: {candidate.scheduling_packet.unverified_claims?.join("; ")}</p>
-                      )}
+                      <p className="mt-1 break-words">{candidate.scheduling_packet.suggested_scheduling_message}</p>
+                      <p className="mt-1 break-words font-semibold">{candidate.scheduling_packet.claim_status_summary}</p>
+                      <p className="mt-1 break-words">
+                        {isEn ? "Evidence" : "证据"}: {(candidate.scheduling_packet.strongest_evidence ?? []).join("; ") || (isEn ? "not verified yet" : "尚未验证")}
+                      </p>
+                      <p className="mt-1 break-words">
+                        {isEn ? "Risks" : "风险"}: {(candidate.scheduling_packet.risk_flags ?? []).join("; ") || (isEn ? "none recorded" : "暂无记录")}
+                      </p>
+                      <p className="mt-1 break-words">
+                        {isEn ? "Unverified" : "未核实"}: {(candidate.scheduling_packet.unverified_claims ?? []).join("; ") || (isEn ? "none recorded" : "暂无记录")}
+                      </p>
                       <ul className="mt-1 space-y-1">
                         {candidate.scheduling_packet.interview_questions.slice(0, 3).map((question) => (
                           <li key={question}>- {question}</li>
