@@ -1,5 +1,5 @@
 export const INBOX_ACTIONS = ["schedule", "reply", "save_follow_up_draft", "follow_up_later", "stop", "review"];
-export const INBOX_ACTION_STATUSES = ["pending", "draft_saved", "scheduled", "interview_ready", "stopped", "reviewed"];
+export const INBOX_ACTION_STATUSES = ["pending", "draft_saved", "scheduled", "interview_ready", "stopped", "reviewed", "sent"];
 
 const ACTION_MARKER = "signalhire-inbox-action";
 
@@ -112,6 +112,26 @@ export function buildInboxActionPatch({
       notes: mergeInboxActionNotes(notes, state),
       next_follow_up_at: cleanAction === "follow_up_later" ? followUpAt : undefined,
       body: (cleanAction === "reply" || cleanAction === "save_follow_up_draft") && state.reply_draft ? state.reply_draft : undefined,
+    },
+  };
+}
+
+export function buildInboxDraftSentPatch({ notes = "", now = new Date() } = {}) {
+  const state = parseInboxActionState(notes);
+  if (!state || !["reply", "save_follow_up_draft"].includes(state.action) || state.action_status !== "draft_saved") {
+    return { ok: false, error: "draft_not_saved" };
+  }
+  const sentState = {
+    ...state,
+    action_status: "sent",
+    action_applied_at: now.toISOString(),
+  };
+  return {
+    ok: true,
+    action_state: sentState,
+    patch: {
+      status: state.action === "save_follow_up_draft" ? "sent" : "replied",
+      notes: mergeInboxActionNotes(notes, sentState),
     },
   };
 }

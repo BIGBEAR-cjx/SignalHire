@@ -319,7 +319,7 @@ type OutreachQueueView = {
   }>;
 };
 
-type InboxActionStatus = "pending" | "draft_saved" | "scheduled" | "interview_ready" | "stopped" | "reviewed";
+type InboxActionStatus = "pending" | "draft_saved" | "scheduled" | "interview_ready" | "stopped" | "reviewed" | "sent";
 
 type InboxQueueView = {
   summary: {
@@ -1020,6 +1020,7 @@ function inboxActionStatusLabel(status: InboxActionStatus | undefined, locale: "
     interview_ready: isEn ? "Interview-ready" : "可安排面试",
     stopped: isEn ? "Stopped" : "已停止跟进",
     reviewed: isEn ? "Reviewed" : "已复核",
+    sent: isEn ? "Sent" : "已发送",
   };
   return labels[status || "pending"];
 }
@@ -1034,6 +1035,10 @@ function inboxActionButtonLabel(item: InboxActionItemView, locale: "zh" | "en") 
   if (item.next_action === "stop") return isEn ? "Stop follow-up" : "停止跟进";
   if (item.next_action === "review") return isEn ? "Mark reviewed" : "标记已复核";
   return isEn ? "Apply action" : "执行动作";
+}
+
+function canSendSavedInboxDraft(item: InboxActionItemView) {
+  return (item.action_status ?? "pending") === "draft_saved" && ["reply", "save_follow_up_draft"].includes(item.next_action ?? "");
 }
 
 function inboxActionDisplayLabel(item: InboxActionItemView, locale: "zh" | "en") {
@@ -1681,6 +1686,34 @@ function InboxAgentPanel({
     }
   }
 
+  async function sendInboxDraft(item: InboxActionItemView) {
+    if (!item.outreach_thread_id) {
+      setActionErrors((prev) => ({
+        ...prev,
+        [item.id]: isEn ? "This draft is not linked to an outreach thread." : "这条草稿没有关联外联线程。",
+      }));
+      return;
+    }
+    setBusyActionId(item.id);
+    setActionErrors((prev) => ({ ...prev, [item.id]: "" }));
+    setSuccessMessages((prev) => ({ ...prev, [item.id]: "" }));
+    try {
+      const r = await fetch("/api/inbox/actions/send", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ outreach_thread_id: item.outreach_thread_id, locale }),
+      });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(j.error || (isEn ? "Saved draft send failed." : "已保存草稿发送失败。"));
+      setSuccessMessages((prev) => ({ ...prev, [item.id]: isEn ? "Saved draft sent." : "已发送保存的草稿。" }));
+      onChanged();
+    } catch (e) {
+      setActionErrors((prev) => ({ ...prev, [item.id]: (e as Error).message }));
+    } finally {
+      setBusyActionId("");
+    }
+  }
+
   return (
     <Surface className="space-y-4 p-5">
       <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
@@ -1841,6 +1874,16 @@ function InboxAgentPanel({
                     >
                       {busyActionId === item.id ? (isEn ? "Saving..." : "保存中...") : inboxActionButtonLabel(item, locale)}
                     </button>
+                    {canSendSavedInboxDraft(item) && (
+                      <button
+                        type="button"
+                        onClick={() => sendInboxDraft(item)}
+                        disabled={busyActionId === item.id}
+                        className="rounded-full bg-blue-600 px-2.5 py-1 font-semibold text-white disabled:cursor-not-allowed disabled:bg-gray-300"
+                      >
+                        {busyActionId === item.id ? (isEn ? "Sending..." : "发送中...") : (isEn ? "Send saved draft" : "发送已保存草稿")}
+                      </button>
+                    )}
                     {item.next_action === "schedule" && (
                       <button
                         type="button"

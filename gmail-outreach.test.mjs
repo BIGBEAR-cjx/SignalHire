@@ -3,9 +3,11 @@ import assert from "node:assert/strict";
 import {
   buildGmailAuthUrl,
   buildGmailRawMessage,
+  buildGmailSendPayload,
   decryptTokenBundle,
   encryptTokenBundle,
   validateOutreachSend,
+  validateInboxDraftSend,
 } from "./web/lib/gmail-outreach.mjs";
 import {
   buildOutreachSequenceMessages,
@@ -72,6 +74,43 @@ test("send validation rejects draft, missing email, low confidence email, and di
   assert.equal(validateOutreachSend({ thread: approved, gmailConnected: true }).ok, true);
 });
 
+test("inbox draft send validation only accepts saved reply and follow-up drafts", () => {
+  const base = {
+    status: "follow_up_due",
+    subject: "Re: Agent infra role",
+    body: "Hi Ada, quick follow-up.",
+    gmail_thread_id: "gmail-thread-1",
+    contact_profile: { emails: [{ value: "ada@example.ai", source: "hunter", confidence: "high" }] },
+  };
+  const savedReply = {
+    ...base,
+    status: "replied",
+    notes: `<!--signalhire-inbox-action:${encodeURIComponent(JSON.stringify({
+      action: "reply",
+      action_status: "draft_saved",
+      action_applied_at: "2026-06-26T10:00:00.000Z",
+      reply_draft: "Hi Ada",
+    }))}-->`,
+  };
+  const savedFollowUp = {
+    ...base,
+    notes: `<!--signalhire-inbox-action:${encodeURIComponent(JSON.stringify({
+      action: "save_follow_up_draft",
+      action_status: "draft_saved",
+      action_applied_at: "2026-06-26T10:00:00.000Z",
+      reply_draft: "Hi Ada, quick follow-up.",
+    }))}-->`,
+  };
+
+  assert.equal(validateInboxDraftSend({ thread: savedReply, gmailConnected: true }).ok, true);
+  assert.equal(validateInboxDraftSend({ thread: savedFollowUp, gmailConnected: true }).ok, true);
+  assert.equal(validateInboxDraftSend({ thread: { ...savedFollowUp, gmail_thread_id: "" }, gmailConnected: true }).reason, "missing_gmail_thread_id");
+  assert.equal(validateInboxDraftSend({ thread: { ...savedFollowUp, body: "" }, gmailConnected: true }).reason, "missing_message");
+  assert.equal(validateInboxDraftSend({ thread: { ...savedFollowUp, contact_profile: { emails: [] } }, gmailConnected: true }).reason, "missing_sendable_email");
+  assert.equal(validateInboxDraftSend({ thread: { ...savedFollowUp, notes: "" }, gmailConnected: true }).reason, "draft_not_saved");
+  assert.equal(validateInboxDraftSend({ thread: savedFollowUp, gmailConnected: false }).reason, "gmail_not_connected");
+});
+
 test("approved outreach can be converted to a Gmail raw message", () => {
   const raw = buildGmailRawMessage({
     from: "recruiter@example.com",
@@ -84,6 +123,14 @@ test("approved outreach can be converted to a Gmail raw message", () => {
   assert.match(decoded, /To: ada@example.ai/);
   assert.match(decoded, /Subject: Agent infra role/);
   assert.match(decoded, /Hi Ada/);
+});
+
+test("gmail send payload can bind inbox replies to the original thread", () => {
+  assert.deepEqual(buildGmailSendPayload({ raw: "raw-1" }), { raw: "raw-1" });
+  assert.deepEqual(buildGmailSendPayload({ raw: "raw-1", threadId: "gmail-thread-1" }), {
+    raw: "raw-1",
+    threadId: "gmail-thread-1",
+  });
 });
 
 test("approval and sent patches stamp lifecycle fields", () => {

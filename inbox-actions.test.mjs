@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
   buildInboxActionPatch,
+  buildInboxDraftSentPatch,
   mergeInboxActionNotes,
   parseInboxActionState,
 } from "./web/lib/inbox-actions.mjs";
@@ -67,6 +68,33 @@ test("save follow-up draft persists body without sending", () => {
   assert.equal(result.patch.sent_at, undefined);
   assert.equal(result.action_state.action_status, "draft_saved");
   assert.equal(result.action_state.reply_draft, "Hi Ada, quick follow-up because your vLLM work looked relevant.");
+});
+
+test("inbox draft sent patch marks saved reply and follow-up actions as sent", () => {
+  const replyNotes = mergeInboxActionNotes("Human note", {
+    action: "reply",
+    action_status: "draft_saved",
+    action_applied_at: "2026-06-26T10:00:00.000Z",
+    reply_draft: "Hi Ada",
+  });
+  const followUpNotes = mergeInboxActionNotes("", {
+    action: "save_follow_up_draft",
+    action_status: "draft_saved",
+    action_applied_at: "2026-06-26T10:00:00.000Z",
+    reply_draft: "Hi Ada, quick follow-up.",
+  });
+
+  const reply = buildInboxDraftSentPatch({ notes: replyNotes, now: new Date("2026-06-26T11:00:00.000Z") });
+  const followUp = buildInboxDraftSentPatch({ notes: followUpNotes, now: new Date("2026-06-26T11:00:00.000Z") });
+
+  assert.equal(reply.ok, true);
+  assert.equal(reply.patch.status, "replied");
+  assert.match(reply.patch.notes, /Human note/);
+  assert.equal(parseInboxActionState(reply.patch.notes).action_status, "sent");
+  assert.equal(followUp.ok, true);
+  assert.equal(followUp.patch.status, "sent");
+  assert.equal(parseInboxActionState(followUp.patch.notes).action, "save_follow_up_draft");
+  assert.equal(parseInboxActionState(followUp.patch.notes).action_status, "sent");
 });
 
 test("runInboxAction saves follow-up draft through the authorized outreach thread", async () => {

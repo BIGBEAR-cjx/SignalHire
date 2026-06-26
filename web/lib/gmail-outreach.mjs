@@ -12,6 +12,20 @@ function isRecord(value) {
   return Boolean(value && typeof value === "object" && !Array.isArray(value));
 }
 
+function latestInboxActionState(notes = "") {
+  const marker = "signalhire-inbox-action";
+  const regex = new RegExp(`<!--${marker}:([^>]*)-->`, "g");
+  let last = "";
+  let match;
+  while ((match = regex.exec(cleanString(notes)))) last = match[1];
+  if (!last) return null;
+  try {
+    return JSON.parse(decodeURIComponent(last));
+  } catch {
+    return null;
+  }
+}
+
 function encryptionKey(secret) {
   const clean = cleanString(secret);
   if (!clean) throw new Error("Missing Gmail token encryption key");
@@ -68,6 +82,13 @@ export function buildGmailRawMessage({ from, to, subject, body }) {
   return Buffer.from(message, "utf8").toString("base64url");
 }
 
+export function buildGmailSendPayload({ raw, threadId }) {
+  const payload = { raw: cleanString(raw) };
+  const cleanThreadId = cleanString(threadId);
+  if (cleanThreadId) payload.threadId = cleanThreadId;
+  return payload;
+}
+
 export function validateOutreachSend({ thread, gmailConnected }) {
   const source = isRecord(thread) ? thread : {};
   if (!gmailConnected) return { ok: false, reason: "gmail_not_connected" };
@@ -76,4 +97,20 @@ export function validateOutreachSend({ thread, gmailConnected }) {
   if (!email) return { ok: false, reason: "missing_sendable_email" };
   if (!cleanString(source.subject) || !cleanString(source.body)) return { ok: false, reason: "missing_message" };
   return { ok: true, email };
+}
+
+export function validateInboxDraftSend({ thread, gmailConnected }) {
+  const source = isRecord(thread) ? thread : {};
+  if (!gmailConnected) return { ok: false, reason: "gmail_not_connected" };
+  const state = latestInboxActionState(source.notes);
+  const action = cleanString(state?.action);
+  const actionStatus = cleanString(state?.action_status);
+  if (!["reply", "save_follow_up_draft"].includes(action) || actionStatus !== "draft_saved") {
+    return { ok: false, reason: "draft_not_saved" };
+  }
+  if (!cleanString(source.gmail_thread_id)) return { ok: false, reason: "missing_gmail_thread_id" };
+  const email = primarySendableEmail(source.contact_profile);
+  if (!email) return { ok: false, reason: "missing_sendable_email" };
+  if (!cleanString(source.subject) || !cleanString(source.body)) return { ok: false, reason: "missing_message" };
+  return { ok: true, email, action };
 }

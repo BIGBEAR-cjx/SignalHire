@@ -1,6 +1,7 @@
 import { createClient } from "@insforge/sdk";
-import { buildGmailAuthUrl, buildGmailRawMessage, decryptTokenBundle, encryptTokenBundle, validateOutreachSend } from "./gmail-outreach.mjs";
+import { buildGmailAuthUrl, buildGmailRawMessage, buildGmailSendPayload, decryptTokenBundle, encryptTokenBundle, validateInboxDraftSend, validateOutreachSend } from "./gmail-outreach.mjs";
 import { refreshGmailTokenBundle } from "./gmail-token.mjs";
+import { buildInboxDraftSentPatch } from "./inbox-actions.mjs";
 import { getOutreachThread, updateOutreachThread, type OutreachThread } from "./outreach-threads";
 
 const BASE = process.env.INSFORGE_API_BASE_URL;
@@ -199,14 +200,14 @@ async function accessTokenFor(connection: GmailConnection) {
   throw new Error("gmail_reconnect_required");
 }
 
-async function sendViaGmail(input: { accessToken: string; raw: string }) {
+async function sendViaGmail(input: { accessToken: string; raw: string; threadId?: string }) {
   const response = await fetch(GMAIL_SEND_URL, {
     method: "POST",
     headers: {
       Authorization: `Bearer ${input.accessToken}`,
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({ raw: input.raw }),
+    body: JSON.stringify(buildGmailSendPayload({ raw: input.raw, threadId: input.threadId })),
   });
   const json = await response.json().catch(() => ({}));
   if (!response.ok) throw new Error(`Gmail send failed ${response.status}`);
@@ -287,6 +288,51 @@ export async function sendApprovedOutreachThread(input: { userId: string; thread
       status: "sent",
       gmail_message_id: result.id ?? "",
       gmail_thread_id: result.threadId ?? "",
+      send_error: "",
+    });
+    if (!updated) return { ok: false, error: "send_state_update_failed" };
+    return { ok: true, thread: updated };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Gmail send failed";
+    await updateOutreachThread({ userId: input.userId, id: input.threadId, send_error: message });
+    return { ok: false, error: message };
+  }
+}
+
+export async function sendInboxDraftThread(input: { userId: string; threadId: string }) {
+  const [connection, thread] = await Promise.all([
+    findConnection(input.userId),
+    getOutreachThread({ userId: input.userId, id: input.threadId }),
+  ]);
+  if (!thread) return { ok: false, error: "thread_not_found" };
+  const validation = validateInboxDraftSend({ thread, gmailConnected: Boolean(connection) });
+  if (!validation.ok) {
+    await updateOutreachThread({ userId: input.userId, id: input.threadId, send_error: validation.reason });
+    return { ok: false, error: validation.reason };
+  }
+  try {
+    const raw = buildGmailRawMessage({
+      from: connection?.gmail_address || "me",
+      to: validation.email.value,
+      subject: thread.subject,
+      body: thread.body,
+    });
+    const result = await sendViaGmail({
+      accessToken: await accessTokenFor(connection as GmailConnection),
+      raw,
+      threadId: thread.gmail_thread_id,
+    });
+    const sentPatch = buildInboxDraftSentPatch({ notes: thread.notes });
+    if (!sentPatch.ok) {
+      await updateOutreachThread({ userId: input.userId, id: input.threadId, send_error: sentPatch.error });
+      return { ok: false, error: sentPatch.error };
+    }
+    const updated = await updateOutreachThread({
+      userId: input.userId,
+      id: input.threadId,
+      ...sentPatch.patch,
+      gmail_message_id: result.id ?? "",
+      gmail_thread_id: result.threadId ?? thread.gmail_thread_id,
       send_error: "",
     });
     if (!updated) return { ok: false, error: "send_state_update_failed" };

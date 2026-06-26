@@ -631,6 +631,30 @@ test("Gmail inbox agent persists only role-related threads and renders queues", 
   assert.match(projectPage, /Interested Candidate Queue/);
 });
 
+test("controlled inbox draft send stays server-side and human-approved", () => {
+  const route = readFileSync("web/app/api/inbox/actions/send/route.ts", "utf8");
+  const gmailLib = readFileSync("web/lib/gmail.ts", "utf8");
+  const pureLib = readFileSync("web/lib/gmail-outreach.mjs", "utf8");
+  const inboxActions = readFileSync("web/lib/inbox-actions.mjs", "utf8");
+  const projectPage = readFileSync("web/app/app/projects/[id]/page.tsx", "utf8");
+
+  assert.match(route, /getUser/);
+  assert.match(route, /sendInboxDraftThread/);
+  assert.match(route, /result\.error === "thread_not_found"/);
+  assert.match(route, /status: 404/);
+  assert.match(gmailLib, /sendInboxDraftThread/);
+  assert.match(gmailLib, /buildGmailSendPayload/);
+  assert.match(gmailLib, /threadId: thread\.gmail_thread_id/);
+  assert.match(pureLib, /validateInboxDraftSend/);
+  assert.match(pureLib, /buildGmailSendPayload/);
+  assert.match(inboxActions, /buildInboxDraftSentPatch/);
+  assert.match(projectPage, /type InboxActionStatus = [^;]+\"sent\"/);
+  assert.match(projectPage, /Send saved draft/);
+  assert.match(projectPage, /发送已保存草稿/);
+  assert.match(projectPage, /sendInboxDraft/);
+  assert.doesNotMatch(route, /GOOGLE_CLIENT_SECRET|GMAIL_TOKEN_ENCRYPTION_KEY|access_token|refresh_token/);
+});
+
 test("contact resolution route uses server-only provider config and Role Workspace renders review actions", () => {
   const route = readFileSync("web/app/api/contact-resolution/resolve/route.ts", "utf8");
   const bulkRoute = readFileSync("web/app/api/contact-resolution/bulk/route.ts", "utf8");
