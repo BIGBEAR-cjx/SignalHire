@@ -39,6 +39,20 @@ test("maps inbox actions to outreach thread patches", () => {
   assert.equal(buildInboxActionPatch({ action: "review", now }).action_state.action_status, "reviewed");
 });
 
+test("schedule action persists scheduling message as interview-ready state", () => {
+  const now = new Date("2026-06-26T10:00:00.000Z");
+  const result = buildInboxActionPatch({
+    action: "schedule",
+    scheduling_message: "Hi Ada, could you share 2-3 time windows?",
+    now,
+  });
+
+  assert.equal(result.ok, true);
+  assert.equal(result.patch.status, "replied");
+  assert.equal(result.action_state.action_status, "interview_ready");
+  assert.equal(result.action_state.scheduling_message, "Hi Ada, could you share 2-3 time windows?");
+});
+
 test("runInboxAction checks auth, ownership lookup, invalid action, and update", async () => {
   const calls = [];
   const deps = {

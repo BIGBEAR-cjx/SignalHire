@@ -563,6 +563,8 @@ test("Gmail inbox agent persists only role-related threads and renders queues", 
   assert.match(projectPage, /\/api\/inbox\/actions/);
   assert.match(projectPage, /inboxPriorityLine/);
   assert.match(projectPage, /Mark interview-ready/);
+  assert.match(projectPage, /Copy candidate reply/);
+  assert.match(projectPage, /Copy manager handoff/);
   assert.match(projectPage, /Schedule follow-up/);
   assert.match(projectPage, /Save suggested draft/);
   assert.match(projectPage, /Interested Candidate Queue/);
@@ -610,7 +612,7 @@ test("contact resolution route uses server-only provider config and Role Workspa
   assert.match(projectPage, /last_verified_at/);
   assert.match(projectPage, /Copy email/);
   assert.match(projectPage, /linkedin_url/);
-  assert.match(projectPage, /Copy handoff/);
+  assert.match(projectPage, /Copy manager handoff/);
 });
 
 test("OpenJobs Mira provider pull is tenant-scoped and writes low-evidence project candidates", () => {
