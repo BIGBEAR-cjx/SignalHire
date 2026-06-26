@@ -346,6 +346,7 @@ type InboxQueueView = {
     priority?: "high" | "medium" | "low";
     reply_draft?: string;
     scheduling_prompt?: string;
+    saved_scheduling_draft?: string;
     action_status?: InboxActionStatus;
     action_state?: {
       action?: string;
@@ -373,6 +374,7 @@ type InboxQueueView = {
     priority?: "high" | "medium" | "low";
     reply_draft?: string;
     scheduling_prompt?: string;
+    saved_scheduling_draft?: string;
     action_status?: InboxActionStatus;
     action_state?: {
       action?: string;
@@ -1052,8 +1054,8 @@ function inboxActionStatusLabel(status: InboxActionStatus | undefined, locale: "
 
 function inboxActionButtonLabel(item: InboxActionItemView, locale: "zh" | "en") {
   const isEn = locale === "en";
-  if (item.action_status && item.action_status !== "pending") return inboxActionStatusLabel(item.action_status, locale);
   if (item.next_action === "schedule") return isEn ? "Mark interview-ready" : "标记可约面";
+  if (item.action_status && item.action_status !== "pending") return inboxActionStatusLabel(item.action_status, locale);
   if (item.next_action === "reply") return isEn ? "Save suggested draft" : "保存建议草稿";
   if (item.next_action === "save_follow_up_draft") return isEn ? "Save follow-up draft" : "保存跟进草稿";
   if (item.next_action === "follow_up_later") return isEn ? "Schedule follow-up" : "安排稍后跟进";
@@ -1064,6 +1066,11 @@ function inboxActionButtonLabel(item: InboxActionItemView, locale: "zh" | "en") 
 
 function canSendSavedInboxDraft(item: InboxActionItemView) {
   return (item.action_status ?? "pending") === "draft_saved" && ["reply", "save_follow_up_draft"].includes(item.next_action ?? "");
+}
+
+function canApplyInboxAction(item: InboxActionItemView) {
+  const status = item.action_status ?? "pending";
+  return status === "pending" || (item.next_action === "schedule" && status === "draft_saved");
 }
 
 function inboxActionDisplayLabel(item: InboxActionItemView, locale: "zh" | "en") {
@@ -1090,14 +1097,14 @@ function formatShortDate(value: string | undefined, locale: "zh" | "en") {
   return date.toLocaleDateString(locale === "en" ? "en-US" : "zh-CN", { month: "short", day: "numeric" });
 }
 
-function inboxActionPayload(item: InboxActionItemView) {
+function inboxActionPayload(item: InboxActionItemView, calendarAvailabilityById: Record<string, CalendarSchedulingResultView> = {}) {
   const packet = "scheduling_packet" in item ? item.scheduling_packet : undefined;
   return {
     outreach_thread_id: item.outreach_thread_id,
     action: item.next_action,
     reply_draft: item.reply_draft || item.suggested_reply || "",
     follow_up_at: item.next_action === "follow_up_later" ? defaultFollowUpIso() : "",
-    scheduling_message: packet?.candidate_reply || item.scheduling_prompt || "",
+    scheduling_message: calendarAvailabilityById[item.id]?.draft.body || item.saved_scheduling_draft || packet?.candidate_reply || item.scheduling_prompt || "",
   };
 }
 
@@ -1863,7 +1870,7 @@ function InboxAgentPanel({
       const r = await fetch("/api/inbox/actions", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(inboxActionPayload(item)),
+        body: JSON.stringify(inboxActionPayload(item, calendarAvailabilityById)),
       });
       const j = await r.json().catch(() => ({}));
       if (!r.ok) throw new Error(j.error || (isEn ? "Inbox action failed." : "处理回复动作失败。"));
@@ -1923,6 +1930,43 @@ function InboxAgentPanel({
       const j = await r.json().catch(() => ({}));
       if (!r.ok) throw new Error(j.error || calendarAvailabilityLabel(j.skipped_reason, locale));
       setCalendarAvailabilityById((prev) => ({ ...prev, [candidate.id]: j as CalendarSchedulingResultView }));
+    } catch (e) {
+      setActionErrors((prev) => ({ ...prev, [candidate.id]: (e as Error).message }));
+    } finally {
+      setBusyActionId("");
+    }
+  }
+
+  async function saveSchedulingDraft(candidate: InboxQueueView["interested_candidates"][number]) {
+    const schedulingMessage = calendarAvailabilityById[candidate.id]?.draft.body
+      || candidate.saved_scheduling_draft
+      || candidate.scheduling_packet?.candidate_reply
+      || candidate.scheduling_packet?.suggested_scheduling_message
+      || "";
+    if (!candidate.outreach_thread_id || !schedulingMessage) {
+      setActionErrors((prev) => ({
+        ...prev,
+        [candidate.id]: isEn ? "There is no scheduling draft to save." : "没有可保存的约面草稿。",
+      }));
+      return;
+    }
+    setBusyActionId(`save-scheduling:${candidate.id}`);
+    setActionErrors((prev) => ({ ...prev, [candidate.id]: "" }));
+    setSuccessMessages((prev) => ({ ...prev, [candidate.id]: "" }));
+    try {
+      const r = await fetch("/api/inbox/actions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          outreach_thread_id: candidate.outreach_thread_id,
+          action: "save_scheduling_draft",
+          scheduling_message: schedulingMessage,
+        }),
+      });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(j.error || (isEn ? "Scheduling draft save failed." : "约面草稿保存失败。"));
+      setSuccessMessages((prev) => ({ ...prev, [candidate.id]: isEn ? "Scheduling draft saved." : "约面草稿已保存。" }));
+      onChanged();
     } catch (e) {
       setActionErrors((prev) => ({ ...prev, [candidate.id]: (e as Error).message }));
     } finally {
@@ -2085,7 +2129,7 @@ function InboxAgentPanel({
                     <button
                       type="button"
                       onClick={() => applyInboxAction(item)}
-                      disabled={busyActionId === item.id || (item.action_status ?? "pending") !== "pending"}
+                      disabled={busyActionId === item.id || !canApplyInboxAction(item)}
                       className="rounded-full bg-gray-900 px-2.5 py-1 font-semibold text-white disabled:cursor-not-allowed disabled:bg-gray-300"
                     >
                       {busyActionId === item.id ? (isEn ? "Saving..." : "保存中...") : inboxActionButtonLabel(item, locale)}
@@ -2132,10 +2176,10 @@ function InboxAgentPanel({
         </div>
 
         <div className="min-w-0 rounded-2xl border border-black/10 bg-white/80 p-4">
-          <p className="text-sm font-semibold text-[var(--sh-ink)]">{isEn ? "Interested Candidate Queue" : "可约面候选人队列"}</p>
+          <p className="text-sm font-semibold text-[var(--sh-ink)]">{isEn ? "Interested replies" : "有意向回复"}</p>
           {interested.length === 0 ? (
             <p className="mt-3 rounded-xl border border-dashed border-black/10 bg-gray-50 p-3 text-sm text-[var(--sh-muted)]">
-              {isEn ? "No interview-ready replies yet." : "还没有可约面的候选人回复。"}
+              {isEn ? "No interested replies yet." : "还没有有意向的候选人回复。"}
             </p>
           ) : (
             <div className="mt-3 min-w-0 space-y-2">
@@ -2148,7 +2192,7 @@ function InboxAgentPanel({
                     <button
                       type="button"
                       onClick={() => applyInboxAction(candidate)}
-                      disabled={busyActionId === candidate.id || (candidate.action_status ?? "pending") !== "pending"}
+                      disabled={busyActionId === candidate.id || !canApplyInboxAction(candidate)}
                       className="rounded-full bg-emerald-700 px-2.5 py-1 font-semibold text-white disabled:cursor-not-allowed disabled:bg-emerald-200"
                     >
                       {busyActionId === candidate.id ? (isEn ? "Saving..." : "保存中...") : inboxActionButtonLabel(candidate, locale)}
@@ -2203,6 +2247,19 @@ function InboxAgentPanel({
                         <p className="mt-1 break-words text-[11px] leading-5 text-emerald-800">
                           {isEn ? "No calendar invite or email is sent. Suggested windows stay as a recruiter-reviewed draft." : "不会自动发送日历邀请或邮件；可约时间只会生成待确认草稿。"}
                         </p>
+                        <div className="mt-2 flex flex-wrap items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => saveSchedulingDraft(candidate)}
+                            disabled={busyActionId === `save-scheduling:${candidate.id}` || !candidate.outreach_thread_id || !(calendarAvailabilityById[candidate.id]?.draft.body || candidate.saved_scheduling_draft || candidate.scheduling_packet?.candidate_reply || candidate.scheduling_packet?.suggested_scheduling_message)}
+                            className="rounded-full bg-white px-2.5 py-1 font-semibold text-emerald-800 ring-1 ring-emerald-100 disabled:cursor-not-allowed disabled:bg-emerald-100 disabled:text-emerald-400"
+                          >
+                            {busyActionId === `save-scheduling:${candidate.id}` ? (isEn ? "Saving..." : "保存中...") : (isEn ? "Save scheduling draft" : "保存约面草稿")}
+                          </button>
+                          <p className="break-words text-[11px] leading-5 text-emerald-800">
+                            {isEn ? "Saving this draft does not send email or create a calendar invite." : "保存草稿不会发送邮件，也不会创建日历邀请。"}
+                          </p>
+                        </div>
                         {calendarAvailabilityById[candidate.id] && (
                           <div className="mt-2 rounded-lg bg-white px-2 py-1.5 text-xs ring-1 ring-emerald-100">
                             {!calendarAvailabilityById[candidate.id].ok && (
@@ -2218,6 +2275,19 @@ function InboxAgentPanel({
                               className="mt-2 rounded-full bg-white px-2 py-0.5 font-semibold text-emerald-800 ring-1 ring-emerald-100"
                             >
                               {isEn ? "Copy calendar-aware draft" : "复制可约时间草稿"}
+                            </button>
+                          </div>
+                        )}
+                        {candidate.saved_scheduling_draft && (
+                          <div className="mt-2 rounded-lg bg-white px-2 py-1.5 text-xs ring-1 ring-emerald-100">
+                            <p className="break-words font-semibold">{isEn ? "Saved scheduling draft" : "已保存约面草稿"}</p>
+                            <p className="mt-1 whitespace-pre-wrap break-words">{candidate.saved_scheduling_draft}</p>
+                            <button
+                              type="button"
+                              onClick={() => navigator.clipboard?.writeText(candidate.saved_scheduling_draft || "")}
+                              className="mt-2 rounded-full bg-white px-2 py-0.5 font-semibold text-emerald-800 ring-1 ring-emerald-100"
+                            >
+                              {isEn ? "Copy saved draft" : "复制已保存草稿"}
                             </button>
                           </div>
                         )}

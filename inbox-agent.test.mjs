@@ -175,6 +175,30 @@ test("interview-ready action state is excluded from needs scheduling", () => {
   assert.equal(ada.action_status, "interview_ready");
 });
 
+test("saved scheduling draft remains in needs scheduling and is exposed on interested candidate", () => {
+  const queue = buildInboxQueue({
+    threads: [
+      {
+        id: "1",
+        candidate_name: "Ada",
+        classification: "interested",
+        notes: mergeInboxActionNotes("", {
+          action: "save_scheduling_draft",
+          action_status: "draft_saved",
+          action_applied_at: "2026-06-26T10:00:00.000Z",
+          scheduling_message: "Calendar-aware draft with two windows",
+        }),
+      },
+    ],
+  });
+
+  assert.equal(queue.summary.interested, 1);
+  assert.equal(queue.summary.needs_scheduling, 1);
+  assert.equal(queue.interested_candidates[0].action_status, "draft_saved");
+  assert.equal(queue.interested_candidates[0].saved_scheduling_draft, "Calendar-aware draft with two windows");
+  assert.match(queue.interested_candidates[0].recommended_next_step, /saved scheduling draft/i);
+});
+
 test("builds no-reply due follow-up draft from sequence messages", () => {
   const queue = buildInboxQueue({
     threads: [

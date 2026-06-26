@@ -239,6 +239,9 @@ export function buildInboxQueue({ threads = [] } = {}) {
   const items = [...threads]
     .map((thread) => {
       const actionState = parseInboxActionState(thread.notes || thread.action_notes);
+      const savedSchedulingDraft = actionState?.action === "save_scheduling_draft" && actionState?.action_status === "draft_saved"
+        ? cleanString(actionState.scheduling_message)
+        : "";
       const item = {
         id: cleanString(thread.id),
         candidate_name: cleanString(thread.candidate_name) || "Unknown candidate",
@@ -253,6 +256,7 @@ export function buildInboxQueue({ threads = [] } = {}) {
         gmail_thread_id: cleanString(thread.gmail_thread_id),
         outreach_thread_id: cleanString(thread.outreach_thread_id),
         action_state: actionState,
+        saved_scheduling_draft: savedSchedulingDraft,
         action_status: actionState?.action_status || defaultActionStatus({
           action: actionState?.action,
           outreachStatus: thread.outreach_status || thread.status,
@@ -266,7 +270,9 @@ export function buildInboxQueue({ threads = [] } = {}) {
     .map((item) => ({
       ...item,
       readiness: "needs_scheduling",
-      recommended_next_step: item.scheduling_prompt || "Prepare a scheduling handoff for hiring review.",
+      recommended_next_step: item.saved_scheduling_draft
+        ? "Review saved scheduling draft, then mark interview-ready."
+        : item.scheduling_prompt || "Prepare a scheduling handoff for hiring review.",
       scheduling_packet: schedulingPacket(item),
     }));
   return {

@@ -576,6 +576,29 @@ test("calendar availability route stays server-side and Role Workspace renders s
   assert.doesNotMatch(projectPage.match(/async function generateCalendarSchedulingDraft[\s\S]*?\n  }/)?.[0] ?? "", /\/send|\/api\/inbox\/actions\/send|\/api\/outreach-threads\/\$\{[^}]+\}\/send/);
 });
 
+test("persistent scheduling draft state saves generated draft before interview-ready handoff", () => {
+  const inboxActions = readFileSync("web/lib/inbox-actions.mjs", "utf8");
+  const inboxAgent = readFileSync("web/lib/inbox-agent.mjs", "utf8");
+  const projectPage = readFileSync("web/app/app/projects/[id]/page.tsx", "utf8");
+  const saveFn = projectPage.match(/async function saveSchedulingDraft[\s\S]*?\n  }/)?.[0] ?? "";
+  const payloadFn = projectPage.match(/function inboxActionPayload[\s\S]*?\n}/)?.[0] ?? "";
+
+  assert.match(inboxActions, /save_scheduling_draft/);
+  assert.match(inboxActions, /draft_saved/);
+  assert.match(inboxAgent, /saved_scheduling_draft/);
+  assert.match(projectPage, /Save scheduling draft/);
+  assert.match(projectPage, /保存约面草稿/);
+  assert.match(projectPage, /Saved scheduling draft/);
+  assert.match(projectPage, /已保存约面草稿/);
+  assert.match(saveFn, /action: "save_scheduling_draft"/);
+  assert.match(saveFn, /scheduling_message/);
+  assert.match(payloadFn, /calendarAvailabilityById\[item\.id\]\?\.draft\.body/);
+  assert.match(payloadFn, /item\.saved_scheduling_draft/);
+  assert.match(projectPage, /Saving this draft does not send email or create a calendar invite/);
+  assert.match(projectPage, /保存草稿不会发送邮件，也不会创建日历邀请/);
+  assert.doesNotMatch(saveFn, /\/send|\/api\/inbox\/actions\/send|calendar\/v3\/events|\/events/);
+});
+
 test("outreach schema migration adds Gmail connection and send lifecycle fields", () => {
   const migration = readFileSync("migrations/20260624170000_autonomous_recruiter_p1a_gmail_outreach.sql", "utf8");
 
@@ -656,7 +679,8 @@ test("Gmail inbox agent persists only role-related threads and renders queues", 
   assert.match(projectPage, /Copy follow-up draft/);
   assert.match(projectPage, /inboxActionDisplayLabel/);
   assert.match(projectPage, /保存到期跟进草稿/);
-  assert.match(projectPage, /Interested Candidate Queue/);
+  assert.match(projectPage, /Interested replies/);
+  assert.match(projectPage, /有意向回复/);
 });
 
 test("controlled inbox draft send stays server-side and human-approved", () => {

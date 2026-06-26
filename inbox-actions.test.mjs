@@ -54,6 +54,50 @@ test("schedule action persists scheduling message as interview-ready state", () 
   assert.equal(result.action_state.scheduling_message, "Hi Ada, could you share 2-3 time windows?");
 });
 
+test("save scheduling draft persists scheduling message without sending or marking interview-ready", () => {
+  const now = new Date("2026-06-26T10:00:00.000Z");
+  const result = buildInboxActionPatch({
+    action: "save_scheduling_draft",
+    scheduling_message: "Hi Ada, here are two available windows from my calendar.",
+    now,
+  });
+
+  assert.equal(result.ok, true);
+  assert.equal(result.patch.status, "replied");
+  assert.equal(result.patch.body, undefined);
+  assert.equal(result.patch.sent_at, undefined);
+  assert.equal(result.patch.gmail_message_id, undefined);
+  assert.equal(result.action_state.action_status, "draft_saved");
+  assert.equal(result.action_state.scheduling_message, "Hi Ada, here are two available windows from my calendar.");
+  assert.deepEqual(parseInboxActionState(result.patch.notes), {
+    action: "save_scheduling_draft",
+    action_status: "draft_saved",
+    action_applied_at: "2026-06-26T10:00:00.000Z",
+    reply_draft: "",
+    follow_up_at: "",
+    scheduling_message: "Hi Ada, here are two available windows from my calendar.",
+  });
+});
+
+test("schedule action can promote a previously saved scheduling draft to interview-ready", () => {
+  const savedNotes = mergeInboxActionNotes("", {
+    action: "save_scheduling_draft",
+    action_status: "draft_saved",
+    action_applied_at: "2026-06-26T10:00:00.000Z",
+    scheduling_message: "Saved calendar-aware draft",
+  });
+  const result = buildInboxActionPatch({
+    action: "schedule",
+    notes: savedNotes,
+    scheduling_message: "Saved calendar-aware draft",
+    now: new Date("2026-06-26T11:00:00.000Z"),
+  });
+
+  assert.equal(result.ok, true);
+  assert.equal(result.action_state.action_status, "interview_ready");
+  assert.equal(parseInboxActionState(result.patch.notes).scheduling_message, "Saved calendar-aware draft");
+});
+
 test("save follow-up draft persists body without sending", () => {
   const now = new Date("2026-06-26T10:00:00.000Z");
   const result = buildInboxActionPatch({

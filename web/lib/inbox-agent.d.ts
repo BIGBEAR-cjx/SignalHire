@@ -10,6 +10,7 @@ export type InboxQueueItem = {
   updated_at: string;
   gmail_thread_id?: string;
   outreach_thread_id?: string;
+  saved_scheduling_draft?: string;
 };
 
 export type InboxQueueView = {
@@ -18,6 +19,7 @@ export type InboxQueueView = {
   interested_candidates: Array<InboxQueueItem & {
     readiness: "needs_scheduling";
     recommended_next_step: string;
+    saved_scheduling_draft?: string;
     scheduling_packet?: {
       candidate_summary: string;
       reply_excerpt: string;
