@@ -552,7 +552,10 @@ test("Gmail inbox agent persists only role-related threads and renders queues", 
   assert.match(inboxLib, /status\.gmail_address/);
   assert.match(inboxAgent, /classifyInboxReply/);
   assert.match(inboxAgent, /action_status/);
+  assert.match(inboxAgent, /no_reply_follow_up/);
+  assert.match(inboxAgent, /due_follow_up/);
   assert.match(inboxActions, /buildInboxActionPatch/);
+  assert.match(inboxActions, /save_follow_up_draft/);
   assert.match(inboxActions, /signalhire-inbox-action/);
   assert.match(inboxActionsRoute, /runInboxAction/);
   assert.match(inboxActionsRoute, /getOutreachThread/);
@@ -567,6 +570,10 @@ test("Gmail inbox agent persists only role-related threads and renders queues", 
   assert.match(projectPage, /Copy manager handoff/);
   assert.match(projectPage, /Schedule follow-up/);
   assert.match(projectPage, /Save suggested draft/);
+  assert.match(projectPage, /Save follow-up draft/);
+  assert.match(projectPage, /Copy follow-up draft/);
+  assert.match(projectPage, /inboxActionDisplayLabel/);
+  assert.match(projectPage, /保存到期跟进草稿/);
   assert.match(projectPage, /Interested Candidate Queue/);
 });
 

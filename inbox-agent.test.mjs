@@ -174,3 +174,37 @@ test("interview-ready action state is excluded from needs scheduling", () => {
   assert.equal(grace.action_status, "pending");
   assert.equal(ada.action_status, "interview_ready");
 });
+
+test("builds no-reply due follow-up draft from sequence messages", () => {
+  const queue = buildInboxQueue({
+    threads: [
+      {
+        id: "followup-thread-1",
+        candidate_name: "Ada",
+        classification: "no_reply_follow_up",
+        sequence_messages: [
+          { step: 1, body: "Initial note" },
+          {
+            step: 2,
+            body: "Hi Ada, quick follow-up because your vLLM inference work looked especially relevant.",
+          },
+        ],
+        candidate_snapshot: {
+          strongest_evidence: ["Built vLLM inference service"],
+        },
+        updated_at: "2026-06-26T10:00:00.000Z",
+        outreach_thread_id: "thread-1",
+        gmail_thread_id: "gmail-1",
+      },
+    ],
+  });
+
+  assert.equal(queue.summary.due_follow_up, 1);
+  assert.equal(queue.summary.needs_reply, 0);
+  assert.equal(queue.interested_candidates.length, 0);
+  assert.equal(queue.items[0].classification, "no_reply_follow_up");
+  assert.equal(queue.items[0].next_action, "save_follow_up_draft");
+  assert.equal(queue.items[0].action_label, "Save follow-up draft");
+  assert.equal(queue.items[0].reply_draft, "Hi Ada, quick follow-up because your vLLM inference work looked especially relevant.");
+  assert.doesNotMatch(queue.items[0].reply_draft, /thanks for (your|the) reply/i);
+});

@@ -1,5 +1,5 @@
 import { createClient } from "@insforge/sdk";
-import { buildInboxQueue, classifyInboxReply, shouldStopFollowUp } from "./inbox-agent.mjs";
+import { buildInboxQueue, classifyInboxReply, mergeInboxThreadsWithDueFollowUps, shouldStopFollowUp } from "./inbox-agent.mjs";
 import { buildInboxActionPatch } from "./inbox-actions.mjs";
 import { getGmailConnectionStatus, getGmailThreadMessages, type GmailThreadMessage } from "./gmail";
 import { listOutreachThreads, updateOutreachThread, type OutreachThread } from "./outreach-threads";
@@ -125,9 +125,16 @@ export async function buildProjectInboxQueueView(userId: string, projectId: stri
       outreach_status: outreach?.status ?? "",
       next_follow_up_at: outreach?.next_follow_up_at ?? null,
       candidate_snapshot: outreach?.candidate_snapshot ?? {},
+      sequence_messages: outreach?.sequence_messages ?? [],
+      role_brief: outreach?.role_brief ?? "",
     };
   });
-  return buildInboxQueue({ threads: mergedThreads as never[] });
+  return buildInboxQueue({
+    threads: mergeInboxThreadsWithDueFollowUps({
+      inboxThreads: mergedThreads as never[],
+      outreachThreads: outreachThreads as never[],
+    }) as never[],
+  });
 }
 
 export async function syncGmailInboxForProject(input: { userId: string; projectId: string; roleBrief?: string }) {
