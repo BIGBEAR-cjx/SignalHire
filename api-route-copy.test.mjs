@@ -143,6 +143,7 @@ test("Vercel cron can run background inbox sync without exposing Gmail secrets",
   const wrapper = readFileSync("web/lib/inbox-background-sync.ts", "utf8");
 
   assert.match(config, /"path": "\/api\/cron\/inbox-sync"/);
+  assert.match(config, /"schedule": "0 2 \* \* \*"/);
   assert.match(cronRoute, /backgroundInboxSync/);
   assert.match(cronRoute, /CRON_SECRET/);
   assert.match(cronRoute, /Bearer \$\{secret\}/);
