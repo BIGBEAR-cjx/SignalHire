@@ -137,7 +137,17 @@ export default function ConsoleLayout({ children }: { children: React.ReactNode 
   const [user, setUser] = useState<User | null | undefined>(undefined); // undefined = 初始加载中
 
   useEffect(() => {
-    currentUser(locale).then((u) => setUser(u));
+    let cancelled = false;
+    currentUser(locale)
+      .then((u) => {
+        if (!cancelled) setUser(u);
+      })
+      .catch(() => {
+        if (!cancelled) setUser(null);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [locale]);
 
   async function handleLogout() {

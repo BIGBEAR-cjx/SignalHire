@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { FiArrowRight, FiLock, FiMail } from "react-icons/fi";
 import LanguageSwitcher from "@/components/LanguageSwitcher";
@@ -14,9 +14,15 @@ export default function LoginPage() {
   const [pw, setPw] = useState("");
   const [err, setErr] = useState("");
   const [loading, setLoading] = useState(false);
+  const [hydrated, setHydrated] = useState(false);
+
+  useEffect(() => {
+    setHydrated(true);
+  }, []);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
+    if (!hydrated) return;
     if (!email.trim() || !pw) return;
     setLoading(true); setErr("");
     const r = await login(email.trim(), pw, locale);
@@ -55,7 +61,7 @@ export default function LoginPage() {
             <h2 className="mt-2 text-3xl font-semibold tracking-tight text-[var(--sh-ink)]">{t("auth.loginTitle")}</h2>
           </div>
 
-          <form onSubmit={submit} className="space-y-4">
+          <form method="post" onSubmit={submit} className="space-y-4">
             <label className="block">
               <span className="mb-2 block text-sm font-medium text-[var(--sh-muted)]">{t("auth.email")}</span>
               <span className="flex items-center gap-3 rounded-2xl border border-black/10 bg-white/78 px-4 py-3 transition focus-within:border-[var(--sh-blue)] focus-within:bg-white">
@@ -79,7 +85,7 @@ export default function LoginPage() {
               </span>
             </label>
             {err && <p className="rounded-2xl bg-red-50 px-4 py-3 text-sm text-red-700 ring-1 ring-red-100">{err}</p>}
-            <button type="submit" disabled={loading} className="sh-primary-action w-full disabled:pointer-events-none disabled:opacity-50">
+            <button type="submit" disabled={!hydrated || loading} className="sh-primary-action w-full disabled:pointer-events-none disabled:opacity-50">
               {loading ? t("auth.loggingIn") : t("common.login")}
               <FiArrowRight aria-hidden="true" />
             </button>

@@ -95,7 +95,7 @@ async function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
 
 async function currentUserFromCookie(locale: string): Promise<{ email: string } | null> {
   try {
-    const res = await fetch(`/api/whoami?locale=${encodeURIComponent(locale)}`);
+    const res = await withTimeout(fetch(`/api/whoami?locale=${encodeURIComponent(locale)}`), CURRENT_USER_TIMEOUT_MS);
     if (!res.ok) return null;
     const data = await res.json().catch(() => null);
     const email = typeof data?.user?.email === "string" ? data.user.email : "";
