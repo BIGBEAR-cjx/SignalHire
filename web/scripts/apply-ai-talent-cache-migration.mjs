@@ -16,6 +16,7 @@ const migrations = [
   "20260615100000_dinq-recruiting-agent-mvp.sql",
   "20260624170000_autonomous_recruiter_p1a_gmail_outreach.sql",
   "20260624190000_autonomous_recruiter_p2a_inbox_agent.sql",
+  "20260626130000_autonomous_recruiter_p2h_inbox_sync_summary.sql",
 ];
 
 async function applyMigration(fileName) {

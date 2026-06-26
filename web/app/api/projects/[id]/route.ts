@@ -51,8 +51,9 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
     projectCandidateBreakdown(user.id, id),
   ]);
 
+  const projectResponse = freshProject ?? project;
   return Response.json({
-    project: freshProject ?? project,
+    project: { ...projectResponse, inbox_sync_summary: projectResponse.inbox_sync_summary ?? {} },
     breakdown: freshBreakdown ?? breakdown,
     runs,
     searchTasks,

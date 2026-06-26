@@ -77,6 +77,7 @@ export async function runBackgroundInboxSync({
   maxThreadsPerProject = 20,
   now = new Date(),
   projectError = "",
+  recordProjectSyncSummary = async () => {},
   syncProject = async () => {
     throw new Error("sync_project_dependency_missing");
   },
@@ -104,6 +105,20 @@ export async function runBackgroundInboxSync({
         projectId: project.projectId,
         maxThreads: maxThreadsPerProject,
       });
+      try {
+        await recordProjectSyncSummary({
+          userId: project.userId,
+          projectId: project.projectId,
+          summary: buildProjectInboxSyncSummary({ result, now, source: "background" }),
+        });
+      } catch (error) {
+        summary.ok = false;
+        summary.errors.push({
+          user_id: project.userId,
+          project_id: project.projectId,
+          error: error instanceof Error ? error.message : "inbox_sync_summary_write_failed",
+        });
+      }
       summary.threads_scanned += Number(result?.scanned ?? 0) || 0;
       summary.replies_synced += Number(result?.synced ?? 0) || 0;
       if (result?.skipped_reason) {
@@ -124,6 +139,23 @@ export async function runBackgroundInboxSync({
         }
       }
     } catch (error) {
+      try {
+        await recordProjectSyncSummary({
+          userId: project.userId,
+          projectId: project.projectId,
+          summary: buildProjectInboxSyncSummary({
+            now,
+            source: "background",
+            result: {
+              ok: false,
+              scanned: 0,
+              synced: 0,
+              skipped_reason: "",
+              errors: [{ error: error instanceof Error ? error.message : "sync_failed" }],
+            },
+          }),
+        });
+      } catch {}
       summary.ok = false;
       summary.errors.push({
         user_id: project.userId,
@@ -135,12 +167,31 @@ export async function runBackgroundInboxSync({
   return summary;
 }
 
+export function buildProjectInboxSyncSummary({ result = {}, now = new Date(), source = "background" } = {}) {
+  const errors = Array.isArray(result?.errors)
+    ? result.errors.map((error) => ({ error: cleanString(error?.error) || "sync_failed" })).filter((error) => error.error)
+    : [];
+  const skippedReason = cleanString(result?.skipped_reason || result?.skipped);
+  return {
+    source,
+    ok: errors.length === 0,
+    last_attempted_at: now.toISOString(),
+    last_synced_at: cleanString(result?.last_synced_at) || now.toISOString(),
+    scanned: Number(result?.scanned ?? 0) || 0,
+    synced: Number(result?.synced ?? 0) || 0,
+    skipped_reason: skippedReason,
+    error_count: errors.length,
+    errors,
+  };
+}
+
 export async function backgroundInboxSync({
   maxProjects = 10,
   maxThreadsPerProject = 20,
   now = new Date(),
   listProjects = listBackgroundInboxSyncProjects,
   syncProject,
+  recordProjectSyncSummary,
 } = {}) {
   let projects = [];
   let projectError = "";
@@ -156,5 +207,6 @@ export async function backgroundInboxSync({
     maxThreadsPerProject,
     now,
     syncProject,
+    recordProjectSyncSummary,
   });
 }
