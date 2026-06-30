@@ -9,9 +9,9 @@ import { PrimaryAction, SecondaryAction, Surface } from "@/components/ui/signal-
 
 function copy(locale: "zh" | "en") {
   return locale === "en" ? {
-    eyebrow: "Lead preview",
-    title: "Unverified leads found while research is running",
-    desc: "These are source-level leads, not recommendations. SignalHire still needs a public evidence packet and contact provenance before outreach.",
+    eyebrow: "Profile Lead Layer",
+    title: "Unverified profile leads found while research is running",
+    desc: "These are profile leads, not recommendations. SignalHire still needs a public evidence packet and contact provenance before outreach.",
     waiting: "No preview leads yet. The agent will show source-level leads here before the final shortlist is ready.",
     completed: "Verified results are available. Use the shortlist and candidate evidence packet instead of preview leads.",
     missing: "Missing evidence",
@@ -24,9 +24,9 @@ function copy(locale: "zh" | "en") {
     source: "Source",
     noOutreach: "Outreach disabled until evidence and contact provenance are verified.",
   } : {
-    eyebrow: "Lead preview",
-    title: "研究进行中发现的未核验线索",
-    desc: "这些只是来源级线索，不是推荐名单。SignalHire 仍需要补齐公开证据包和联系方式来源后，才允许外联。",
+    eyebrow: "Profile Lead Layer / 资料线索层",
+    title: "研究进行中发现的未核验资料线索",
+    desc: "这些只是 profile leads，不是推荐名单。SignalHire 仍需要补齐公开证据包和联系方式来源后，才允许外联。",
     waiting: "暂时还没有 preview lead。Agent 会在最终 shortlist 前先把来源级线索显示在这里。",
     completed: "已经有核验后的结果，请优先查看 shortlist 和候选人证据包。",
     missing: "缺失证据",

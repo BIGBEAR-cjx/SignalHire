@@ -27,6 +27,7 @@ import { buildAgencyOutreachActivityDigest } from "@/lib/outreach-activity-diges
 import { buildEvidenceDrivenOutreachSequence } from "@/lib/outreach-draft.mjs";
 import { latestFollowUpDraftState } from "@/lib/outreach-followups.mjs";
 import { buildRoleOutreachSettings } from "@/lib/outreach-settings.mjs";
+import { parseNetworkSeedCsv } from "@/lib/referral-paths.mjs";
 import { sourceTypeLabel, sourceTypeTooltip } from "@/lib/source-classifier.mjs";
 import type { LeadPreviewView } from "@/lib/lead-preview";
 import type { TalentCandidate } from "@/lib/talent-profile.mjs";
@@ -254,6 +255,68 @@ type CandidateGraphView = {
   }>;
 };
 
+type NetworkSeedView = {
+  label: string;
+  relation: string;
+  linkedin_url: string;
+  companies: string[];
+  schools: string[];
+  projects: string[];
+};
+
+type ReferralPathView = {
+  candidate_id: string;
+  candidate_name: string;
+  paths: Array<{
+    path_type: string;
+    shared_context: string;
+    introducer_label: string;
+    confidence: "high" | "medium" | "low" | string;
+    intro_snippet: string;
+    client_safe: boolean;
+  }>;
+};
+
+type SequenceAnalyticsView = {
+  role_id: string;
+  summary: {
+    drafted: number;
+    approved: number;
+    sent: number;
+    opened: null;
+    replied: number;
+    interested: number;
+    bounced: number;
+    stopped: number;
+    due_follow_up: number;
+    open_tracking_available: false;
+  };
+  open_tracking_available: false;
+  open_tracking_label: string;
+  step_performance: Array<{
+    step: 1 | 2 | 3;
+    drafted: number;
+    sent: number;
+    replied: number;
+    interested: number;
+    bounced: number;
+  }>;
+  next_actions: string[];
+};
+
+type ProfileLeadLayerView = {
+  provider: "openjobs_mira" | "people_api";
+  enabled: boolean;
+  lead_count: number;
+  verified_candidate_count: number;
+  needs_evidence_count: number;
+  copy: {
+    title: string;
+    explanation: string;
+    next_step: string;
+  };
+};
+
 interface ProjectDetail {
   project: {
     id: string;
@@ -266,6 +329,7 @@ interface ProjectDetail {
       follow_up_interval_days: 7;
       client_visible_digest: boolean;
     };
+    network_seeds?: NetworkSeedView[];
     candidates_total: number;
     candidates_active: number;
     runs_total: number;
@@ -287,6 +351,9 @@ interface ProjectDetail {
   inboxQueue?: InboxQueueView;
   candidateGraph?: CandidateGraphView;
   leadPreview?: LeadPreviewView;
+  referralPaths?: ReferralPathView[];
+  sequenceAnalytics?: SequenceAnalyticsView;
+  profileLeadLayer?: ProfileLeadLayerView;
 }
 
 type SearchTaskView = {
@@ -507,6 +574,239 @@ type ContactProviderStatusView = {
   reason: string;
 };
 
+function networkSeedsToCsv(seeds: NetworkSeedView[]) {
+  if (seeds.length === 0) return "name,company,school,project,linkedin_url\n";
+  const quote = (value: string) => `"${String(value ?? "").replace(/"/g, "\"\"")}"`;
+  const rows = seeds.map((seed) => [
+    seed.label,
+    seed.companies.join("; "),
+    seed.schools.join("; "),
+    seed.projects.join("; "),
+    seed.linkedin_url,
+  ].map(quote).join(","));
+  return ["name,company,school,project,linkedin_url", ...rows].join("\n");
+}
+
+function NetworkReferralPathsPanel({
+  projectId,
+  networkSeeds,
+  referralPaths,
+  locale,
+  onChanged,
+}: {
+  projectId: string;
+  networkSeeds: NetworkSeedView[];
+  referralPaths: ReferralPathView[];
+  locale: string;
+  onChanged: () => void;
+}) {
+  const [seedText, setSeedText] = useState(() => networkSeedsToCsv(networkSeeds));
+  const [saving, setSaving] = useState(false);
+  const [message, setMessage] = useState("");
+  const labels = locale === "en"
+    ? {
+        eyebrow: "Network / Referral Paths",
+        title: "Warm intro paths",
+        desc: "Import team network, previous candidates, or LinkedIn seeds. SignalHire treats these as soft context until verified.",
+        placeholder: "name,company,school,project,linkedin_url",
+        save: "Save seeds",
+        saving: "Saving...",
+        saved: "Network seeds saved",
+        empty: "No warm intro path yet. Add seeds with company, school, project, or LinkedIn context.",
+        seedCount: "seeds",
+        confidence: "confidence",
+      }
+    : {
+        eyebrow: "Network / Referral Paths",
+        title: "可尝试引荐路径",
+        desc: "导入员工网络、历史候选人或 LinkedIn seed。SignalHire 只把它们作为待验证的轻量关系线索。",
+        placeholder: "name,company,school,project,linkedin_url",
+        save: "保存 seed",
+        saving: "保存中...",
+        saved: "Network seeds 已保存",
+        empty: "暂无可尝试引荐路径。可添加公司、学校、项目或 LinkedIn 背景 seed。",
+        seedCount: "个 seed",
+        confidence: "可信度",
+      };
+
+  useEffect(() => {
+    setSeedText(networkSeedsToCsv(networkSeeds));
+  }, [networkSeeds]);
+
+  async function saveSeeds() {
+    setSaving(true);
+    setMessage("");
+    try {
+      const seeds = parseNetworkSeedCsv(seedText);
+      const r = await fetch(`/api/projects/${projectId}/network-seeds`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ network_seeds: seeds, locale }),
+      });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(j.error || "network_seeds_update_failed");
+      setMessage(labels.saved);
+      onChanged();
+    } catch (error) {
+      setMessage((error as Error).message);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <Surface className="p-5 md:p-6">
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div className="max-w-2xl">
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-neutral-500">{labels.eyebrow}</p>
+          <h2 className="mt-1 text-xl font-semibold text-[var(--sh-ink)]">{labels.title}</h2>
+          <p className="mt-2 text-sm leading-6 text-[var(--sh-muted)]">{labels.desc}</p>
+        </div>
+        <div className="rounded-full bg-white px-3 py-1.5 text-xs font-semibold text-[var(--sh-muted)] ring-1 ring-black/10">
+          {networkSeeds.length} {labels.seedCount}
+        </div>
+      </div>
+      <div className="mt-5 grid gap-4 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
+        <div>
+          <textarea
+            value={seedText}
+            onChange={(event) => setSeedText(event.target.value)}
+            placeholder={labels.placeholder}
+            className="min-h-[154px] w-full resize-y rounded-2xl border border-black/10 bg-white px-3 py-3 font-mono text-xs leading-5 text-[var(--sh-ink)] outline-none focus:border-black/30"
+          />
+          <div className="mt-3 flex flex-wrap items-center gap-3">
+            <button
+              type="button"
+              onClick={saveSeeds}
+              disabled={saving}
+              className="inline-flex min-h-9 items-center gap-2 rounded-full bg-neutral-950 px-3 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-neutral-800 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <FiCheckCircle className="h-3.5 w-3.5" aria-hidden="true" />
+              {saving ? labels.saving : labels.save}
+            </button>
+            {message && <p className="text-xs text-[var(--sh-muted)]">{message}</p>}
+          </div>
+        </div>
+        <div className="space-y-3">
+          {referralPaths.length === 0 ? (
+            <div className="rounded-2xl border border-dashed border-black/10 bg-white/70 p-4 text-sm leading-6 text-[var(--sh-muted)]">
+              {labels.empty}
+            </div>
+          ) : referralPaths.map((candidate) => (
+            <div key={candidate.candidate_id || candidate.candidate_name} className="rounded-2xl border border-black/10 bg-white/76 p-4">
+              <p className="text-sm font-semibold text-[var(--sh-ink)]">{candidate.candidate_name}</p>
+              <div className="mt-3 space-y-2">
+                {candidate.paths.map((path, index) => (
+                  <div key={`${path.path_type}:${path.introducer_label}:${index}`} className="rounded-xl bg-[var(--sh-canvas)] px-3 py-2">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <p className="text-xs font-semibold text-[var(--sh-ink)]">{path.introducer_label}</p>
+                      <span className="rounded-full bg-white px-2 py-0.5 text-[11px] font-semibold text-[var(--sh-muted)] ring-1 ring-black/10">
+                        {labels.confidence}: {path.confidence}
+                      </span>
+                    </div>
+                    <p className="mt-1 text-xs leading-5 text-[var(--sh-muted)]">{path.shared_context}</p>
+                    <p className="mt-2 text-xs leading-5 text-[var(--sh-ink)]">{path.intro_snippet}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </Surface>
+  );
+}
+
+function SequenceAnalyticsPanel({ sequenceAnalytics, locale }: { sequenceAnalytics?: SequenceAnalyticsView; locale: string }) {
+  const isEn = locale === "en";
+  const view = sequenceAnalytics ?? {
+    role_id: "",
+    summary: {
+      drafted: 0,
+      approved: 0,
+      sent: 0,
+      opened: null,
+      replied: 0,
+      interested: 0,
+      bounced: 0,
+      stopped: 0,
+      due_follow_up: 0,
+      open_tracking_available: false,
+    },
+    open_tracking_available: false,
+    open_tracking_label: isEn ? "Open tracking unavailable" : "Open tracking 不可用",
+    step_performance: [],
+    next_actions: [],
+  };
+  const metrics = [
+    { key: "drafted", label: isEn ? "Drafted" : "已起草", value: view.summary.drafted },
+    { key: "approved", label: isEn ? "Approved" : "已批准", value: view.summary.approved },
+    { key: "sent", label: isEn ? "Sent" : "已发送", value: view.summary.sent },
+    { key: "replied", label: isEn ? "Replied" : "已回复", value: view.summary.replied },
+    { key: "interested", label: isEn ? "Interested" : "有意向", value: view.summary.interested },
+    { key: "bounced", label: isEn ? "Bounced" : "退信", value: view.summary.bounced },
+    { key: "stopped", label: isEn ? "Stopped" : "已停止", value: view.summary.stopped },
+    { key: "due", label: isEn ? "Due follow-up" : "到期跟进", value: view.summary.due_follow_up },
+  ];
+  return (
+    <Surface className="p-5 md:p-6">
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div className="max-w-2xl">
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-neutral-500">Sequence Analytics</p>
+          <h2 className="mt-1 text-xl font-semibold text-[var(--sh-ink)]">{isEn ? "Outreach performance" : "外联表现"}</h2>
+          <p className="mt-2 text-sm leading-6 text-[var(--sh-muted)]">
+            {isEn
+              ? "Role-level sequence health by candidate status and step. Open tracking stays unavailable unless Gmail provides it."
+              : "按岗位、候选人状态和步骤汇总外联表现。不制造打开追踪；Gmail 未提供时显示不可用。"}
+          </p>
+        </div>
+        <span className="inline-flex items-center gap-2 rounded-full bg-white px-3 py-1.5 text-xs font-semibold text-[var(--sh-muted)] ring-1 ring-black/10">
+          <FiAlertTriangle className="h-3.5 w-3.5" aria-hidden="true" />
+          {view.open_tracking_label}
+        </span>
+      </div>
+      <div className="mt-5 grid gap-2 sm:grid-cols-4">
+        {metrics.map((metric) => (
+          <div key={metric.key} className="rounded-2xl bg-white/76 px-3 py-3 ring-1 ring-black/10">
+            <p className="text-[11px] font-semibold text-[var(--sh-muted)]">{metric.label}</p>
+            <p className="mt-1 text-2xl font-semibold tabular-nums text-[var(--sh-ink)]">{metric.value}</p>
+          </div>
+        ))}
+      </div>
+      <div className="mt-4 grid gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(260px,0.8fr)]">
+        <div className="rounded-2xl border border-black/10 bg-white/72 p-4">
+          <p className="text-xs font-semibold text-[var(--sh-muted)]">{isEn ? "Step performance" : "步骤表现"}</p>
+          <div className="mt-3 space-y-2">
+            {(view.step_performance.length ? view.step_performance : [1, 2, 3].map((step) => ({ step, drafted: 0, sent: 0, replied: 0, interested: 0, bounced: 0 }))).map((step) => (
+              <div key={step.step} className="grid grid-cols-5 gap-2 rounded-xl bg-[var(--sh-canvas)] px-3 py-2 text-xs">
+                <span className="font-semibold text-[var(--sh-ink)]">Step {step.step}</span>
+                <span>{isEn ? "Draft" : "草稿"} {step.drafted}</span>
+                <span>{isEn ? "Sent" : "发送"} {step.sent}</span>
+                <span>{isEn ? "Reply" : "回复"} {step.replied}</span>
+                <span>{isEn ? "Bounce" : "退信"} {step.bounced}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+        <div className="rounded-2xl border border-black/10 bg-white/72 p-4">
+          <p className="text-xs font-semibold text-[var(--sh-muted)]">{isEn ? "Next actions" : "下一步"}</p>
+          {view.next_actions.length > 0 ? (
+            <ul className="mt-3 space-y-2 text-xs leading-5 text-[var(--sh-ink)]">
+              {view.next_actions.map((action) => (
+                <li key={action} className="rounded-xl bg-[var(--sh-canvas)] px-3 py-2">{action}</li>
+              ))}
+            </ul>
+          ) : (
+            <p className="mt-3 rounded-xl bg-[var(--sh-canvas)] px-3 py-2 text-xs text-[var(--sh-muted)]">
+              {isEn ? "No action recommended yet." : "暂无建议操作。"}
+            </p>
+          )}
+        </div>
+      </div>
+    </Surface>
+  );
+}
+
 type BulkContactResolutionView = {
   status: string;
   provider: string;
@@ -618,7 +918,7 @@ function monitorCopy(locale: "zh" | "en") {
 function autonomousCopy(locale: "zh" | "en") {
   return locale === "en" ? {
     title: "Autonomous sourcing",
-    desc: "Multi-source candidate graph for this role. External people APIs stay optional until keys are configured.",
+    desc: "Multi-source candidate graph for this role. Profile Lead Layer providers stay optional until keys are configured.",
     sourced: "Sourced",
     ready: "Ready for outreach",
     needsVerification: "Needs verification",
@@ -629,13 +929,13 @@ function autonomousCopy(locale: "zh" | "en") {
     candidateReadiness: "Candidate readiness",
     empty: "No candidates in this role yet.",
     sources: "sources",
-    pullOpenJobs: "Pull OpenJobs candidates",
+    pullOpenJobs: "Pull profile leads",
     openJobsEmpty: "OpenJobs Mira returned no candidates for this brief.",
     openJobsSaved: "OpenJobs saved {count} candidates for evidence review. Mira provides profile leads only, so SignalHire will still verify public evidence before recommending or sending.",
     openJobsAuthError: "OpenJobs Mira key is invalid or inactive. Update MIRA_KEY before pulling candidates.",
   } : {
     title: "Autonomous sourcing",
-    desc: "这个岗位的多来源候选人图谱。外部 people API 未配置时，仍会使用候选池和公开证据降级展示。",
+    desc: "这个岗位的多来源候选人图谱。Profile Lead Layer provider 未配置时，仍会使用候选池和公开证据降级展示。",
     sourced: "已发现",
     ready: "可进入外联",
     needsVerification: "需补证据",
@@ -646,7 +946,7 @@ function autonomousCopy(locale: "zh" | "en") {
     candidateReadiness: "候选人推进状态",
     empty: "这个岗位还没有候选人。",
     sources: "个来源",
-    pullOpenJobs: "拉取 OpenJobs 候选人",
+    pullOpenJobs: "拉取资料线索",
     openJobsEmpty: "OpenJobs Mira 没有为当前岗位返回候选人。",
     openJobsSaved: "OpenJobs 已保存 {count} 位候选人，等待证据核验。Mira 只提供候选人资料线索，SignalHire 仍会先做公开证据交叉验证，再推荐或发送外联。",
     openJobsAuthError: "OpenJobs Mira key 无效或未激活。请更新 MIRA_KEY 后再拉取候选人。",
@@ -662,12 +962,14 @@ function readinessLabel(readiness: CandidateGraphView["candidates"][number]["rea
 
 function AutonomousSourcingPanel({
   graph,
+  profileLeadLayer,
   projectId,
   projectBrief,
   locale,
   onChanged,
 }: {
   graph?: CandidateGraphView;
+  profileLeadLayer?: ProfileLeadLayerView;
   projectId: string;
   projectBrief: string;
   locale: "zh" | "en";
@@ -727,6 +1029,36 @@ function AutonomousSourcingPanel({
       </div>
       {providerMessage && (
         <p className="rounded-xl bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-800 ring-1 ring-amber-100">{providerMessage}</p>
+      )}
+      {profileLeadLayer && (
+        <div className="rounded-2xl border border-amber-100 bg-amber-50/70 p-4">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div className="max-w-3xl">
+              <p className="text-sm font-semibold text-amber-950">{profileLeadLayer.copy.title}</p>
+              <p className="mt-1 text-xs leading-5 text-amber-900">{profileLeadLayer.copy.explanation}</p>
+              <p className="mt-2 text-xs font-semibold leading-5 text-amber-950">{profileLeadLayer.copy.next_step}</p>
+            </div>
+            <StatusBadge
+              label={`OpenJobs/Mira · ${profileLeadLayer.enabled ? c.enabled : c.disabled}`}
+              dotClassName={profileLeadLayer.enabled ? "bg-emerald-500" : "bg-gray-400"}
+              className={profileLeadLayer.enabled ? "bg-emerald-50 text-emerald-700 ring-emerald-200" : "bg-white text-gray-600 ring-black/10"}
+            />
+          </div>
+          <div className="mt-3 grid gap-2 sm:grid-cols-3">
+            <div className="rounded-xl bg-white/80 px-3 py-2 text-xs ring-1 ring-amber-100">
+              <span className="block text-amber-800">Profile leads</span>
+              <span className="mt-1 block text-lg font-semibold text-amber-950">{profileLeadLayer.lead_count}</span>
+            </div>
+            <div className="rounded-xl bg-white/80 px-3 py-2 text-xs ring-1 ring-amber-100">
+              <span className="block text-amber-800">Evidence-backed</span>
+              <span className="mt-1 block text-lg font-semibold text-amber-950">{profileLeadLayer.verified_candidate_count}</span>
+            </div>
+            <div className="rounded-xl bg-white/80 px-3 py-2 text-xs ring-1 ring-amber-100">
+              <span className="block text-amber-800">Needs evidence verification</span>
+              <span className="mt-1 block text-lg font-semibold text-amber-950">{profileLeadLayer.needs_evidence_count}</span>
+            </div>
+          </div>
+        </div>
       )}
 
       <div className="grid gap-3 md:grid-cols-4">
@@ -2785,8 +3117,17 @@ export default function ProjectDetailPage() {
 
       <AutonomousSourcingPanel
         graph={detail.candidateGraph}
+        profileLeadLayer={detail.profileLeadLayer}
         projectId={id}
         projectBrief={briefForSearch}
+        locale={locale}
+        onChanged={reloadDetail}
+      />
+
+      <NetworkReferralPathsPanel
+        projectId={id}
+        networkSeeds={detail.project.network_seeds ?? []}
+        referralPaths={detail.referralPaths ?? []}
         locale={locale}
         onChanged={reloadDetail}
       />
@@ -2807,6 +3148,11 @@ export default function ProjectDetailPage() {
         projectSyncSummary={detail.project.inbox_sync_summary}
         locale={locale}
         onChanged={reloadDetail}
+      />
+
+      <SequenceAnalyticsPanel
+        sequenceAnalytics={detail.sequenceAnalytics}
+        locale={locale}
       />
 
       <InboxAgentPanel
@@ -3818,6 +4164,9 @@ function CandidateDetailPanel({
   const [notes, setNotes] = useState(item.notes ?? "");
   const [savedHint, setSavedHint] = useState(false);
   const [savingFeedback, setSavingFeedback] = useState("");
+  const [atsExporting, setAtsExporting] = useState(false);
+  const [atsExportPreview, setAtsExportPreview] = useState<{ name?: string; evidence_summary?: string; source_mix_summary?: string } | null>(null);
+  const [atsExportError, setAtsExportError] = useState("");
   const [outreachOpen, setOutreachOpen] = useState(false);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -3876,6 +4225,29 @@ function CandidateDetailPanel({
       body: JSON.stringify({ project_id: null, locale }),
     });
     if (r.ok) onUnassigned();
+  }
+
+  async function exportToAts() {
+    setAtsExporting(true);
+    setAtsExportError("");
+    try {
+      const r = await fetch("/api/ats-lite/candidates/export", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          shortlist_item_id: item.id,
+          report_base_url: window.location.origin,
+          locale,
+        }),
+      });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(j.error || "ats_export_preview_failed");
+      setAtsExportPreview(j.export_preview);
+    } catch (error) {
+      setAtsExportError((error as Error).message);
+    } finally {
+      setAtsExporting(false);
+    }
   }
 
   const candidate = item.candidate;
@@ -3947,6 +4319,27 @@ function CandidateDetailPanel({
         <FiMail className="h-4 w-4" aria-hidden="true" />
         {t("projects.detail.candidate.outreach")}
       </button>
+      <button
+        onClick={exportToAts}
+        disabled={atsExporting}
+        className="inline-flex w-full items-center justify-center gap-2 rounded-full border border-black/10 bg-white px-4 py-2.5 text-sm font-semibold text-[var(--sh-ink)] shadow-sm transition hover:border-black/20 disabled:opacity-50"
+      >
+        <FiSend className="h-4 w-4" aria-hidden="true" />
+        {atsExporting ? (locale === "en" ? "Preparing..." : "准备中...") : (locale === "en" ? "Export to ATS" : "导出到 ATS")}
+      </button>
+      {(atsExportPreview || atsExportError) && (
+        <div className="rounded-2xl border border-black/10 bg-white/78 p-3 text-xs leading-5">
+          {atsExportError ? (
+            <p className="font-semibold text-rose-700">{atsExportError}</p>
+          ) : (
+            <>
+              <p className="font-semibold text-[var(--sh-ink)]">{atsExportPreview?.name}</p>
+              <p className="mt-1 text-[var(--sh-muted)]">{atsExportPreview?.evidence_summary}</p>
+              <p className="mt-1 text-[var(--sh-faint)]">{atsExportPreview?.source_mix_summary}</p>
+            </>
+          )}
+        </div>
+      )}
       <OutreachModal
         open={outreachOpen}
         onClose={() => setOutreachOpen(false)}

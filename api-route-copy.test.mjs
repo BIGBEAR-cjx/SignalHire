@@ -335,7 +335,8 @@ test("Lessie-inspired recruiting flow exposes preview, source mix, and follow-up
   const resultComponents = readFileSync("web/components/result.tsx", "utf8");
   const candidateGraph = readFileSync("web/lib/candidate-graph.mjs", "utf8");
 
-  assert.match(projectRoute, /leadPreview: await buildProjectLeadPreviewView/);
+  assert.match(projectRoute, /buildProjectLeadPreviewView\(user\.id, id\)/);
+  assert.match(projectRoute, /leadPreview/);
   assert.match(projects, /FROM open_evidence_leads/);
   assert.match(projects, /source_run_id = \$2/);
   assert.match(projects, /ORDER BY observed_at DESC/);
@@ -358,6 +359,20 @@ test("Lessie-inspired recruiting flow exposes preview, source mix, and follow-up
   assert.match(projectPage, /manual_approval_required/);
   assert.match(projectPage, /draft_for_review/);
   assert.match(projectPage, /delay_days: index === 0 \? undefined : 7/);
+});
+
+test("public report renders SignalHire Smart Report before candidate details", () => {
+  const resultComponents = readFileSync("web/components/result.tsx", "utf8");
+  const reportPage = readFileSync("web/app/r/[id]/page.tsx", "utf8");
+
+  assert.match(resultComponents, /buildSmartReportView/);
+  assert.match(resultComponents, /export function SmartReportPanel/);
+  assert.match(resultComponents, /Smart Report|智能交付报告/);
+  assert.match(resultComponents, /Ready for outreach|可外联/);
+  assert.match(resultComponents, /referral_summary/);
+  assert.match(resultComponents, /Warm intro paths|可尝试引荐路径/);
+  assert.match(reportPage, /SmartReportPanel/);
+  assert.match(reportPage, /<SmartReportPanel result=\{talentResult\} locale=\{locale\} \/>/);
 });
 
 test("claims expose a unified supplement-material entry", () => {
@@ -599,7 +614,8 @@ test("project detail API returns autonomous sourcing candidate graph", () => {
   assert.match(projects, /buildProjectCandidateGraphView/);
   assert.match(projects, /buildCandidateGraph/);
   assert.match(projects, /candidateGraph/);
-  assert.match(route, /candidateGraph: await buildProjectCandidateGraphView/);
+  assert.match(route, /buildProjectCandidateGraphView\(user\.id, id\)/);
+  assert.match(route, /candidateGraph/);
 });
 
 test("role workspace renders autonomous sourcing graph panel", () => {
@@ -765,7 +781,8 @@ test("Gmail inbox agent persists only role-related threads and renders queues", 
   assert.match(inboxActionsRoute, /getOutreachThread/);
   assert.match(inboxActionsRoute, /updateOutreachThread/);
   assert.match(syncRoute, /syncGmailInboxForProject/);
-  assert.match(projectRoute, /inboxQueue: await buildProjectInboxQueueView/);
+  assert.match(projectRoute, /buildProjectInboxQueueView\(user\.id, id\)/);
+  assert.match(projectRoute, /inboxQueue/);
   assert.match(projectPage, /InboxAgentPanel/);
   assert.match(projectPage, /\/api\/inbox\/actions/);
   assert.match(projectPage, /Last synced/);
@@ -916,4 +933,90 @@ test("OpenJobs Mira provider pull is tenant-scoped and writes low-evidence proje
   assert.match(provider, /detail-by-id/);
   assert.match(projectPage, /pullOpenJobsCandidates/);
   assert.match(projectPage, /OpenJobs/);
+});
+
+test("project network seeds persist and feed referral path views", () => {
+  const migration = readFileSync("migrations/20260630142000_project_network_seeds.sql", "utf8");
+  const projects = readFileSync("web/lib/projects.ts", "utf8");
+  const projectRoute = readFileSync("web/app/api/projects/[id]/route.ts", "utf8");
+  const seedsRoute = readFileSync("web/app/api/projects/[id]/network-seeds/route.ts", "utf8");
+  const projectPage = readFileSync("web/app/app/projects/[id]/page.tsx", "utf8");
+
+  assert.match(migration, /add column if not exists network_seeds jsonb not null default '\[\]'::jsonb/);
+  assert.match(projects, /network_seeds/);
+  assert.match(projects, /updateProjectNetworkSeeds/);
+  assert.match(projects, /buildProjectReferralPathView/);
+  assert.match(projectRoute, /buildProjectReferralPathView\(user\.id, id, locale\)/);
+  assert.match(projectRoute, /referralPaths/);
+  assert.match(seedsRoute, /updateProjectNetworkSeeds/);
+  assert.match(seedsRoute, /network_seeds/);
+  assert.match(projectPage, /parseNetworkSeedCsv/);
+  assert.match(projectPage, /NetworkReferralPathsPanel/);
+  assert.match(projectPage, /\/api\/projects\/\$\{projectId\}\/network-seeds/);
+  assert.match(projectPage, /referralPaths/);
+});
+
+test("ATS-lite exposes Greenhouse import and candidate export preview", () => {
+  const atsCore = readFileSync("web/lib/ats-lite.mjs", "utf8");
+  const statusRoute = readFileSync("web/app/api/ats-lite/status/route.ts", "utf8");
+  const importRoute = readFileSync("web/app/api/ats-lite/jobs/import/route.ts", "utf8");
+  const exportRoute = readFileSync("web/app/api/ats-lite/candidates/export/route.ts", "utf8");
+  const shortlist = readFileSync("web/lib/shortlist.ts", "utf8");
+  const settingsPage = readFileSync("web/app/app/settings/page.tsx", "utf8");
+  const projectsPage = readFileSync("web/app/app/projects/page.tsx", "utf8");
+  const projectPage = readFileSync("web/app/app/projects/[id]/page.tsx", "utf8");
+
+  assert.match(atsCore, /ATS_LITE_PROVIDER = "greenhouse"/);
+  assert.match(atsCore, /GREENHOUSE_API_KEY/);
+  assert.match(statusRoute, /buildAtsLiteProviderStatus/);
+  assert.match(importRoute, /mockGreenhouseJob/);
+  assert.match(importRoute, /createProject/);
+  assert.match(exportRoute, /getItem/);
+  assert.match(exportRoute, /buildAtsCandidateExportPayload/);
+  assert.match(shortlist, /export async function getItem/);
+  assert.match(settingsPage, /\/api\/ats-lite\/status/);
+  assert.match(projectsPage, /\/api\/ats-lite\/jobs\/import/);
+  assert.match(projectsPage, /Import from ATS|从 ATS 导入/);
+  assert.match(projectPage, /\/api\/ats-lite\/candidates\/export/);
+  assert.match(projectPage, /Export to ATS|导出到 ATS/);
+});
+
+test("role workspace exposes sequence analytics without open tracking pixels", () => {
+  const analytics = readFileSync("web/lib/sequence-analytics.mjs", "utf8");
+  const projectRoute = readFileSync("web/app/api/projects/[id]/route.ts", "utf8");
+  const projectPage = readFileSync("web/app/app/projects/[id]/page.tsx", "utf8");
+  const digest = readFileSync("web/lib/outreach-activity-digest.mjs", "utf8");
+
+  assert.match(analytics, /buildSequenceAnalyticsView/);
+  assert.match(analytics, /open_tracking_available: false/);
+  assert.doesNotMatch(analytics, /tracking pixel|open pixel|pixel/i);
+  assert.match(projectRoute, /buildSequenceAnalyticsView/);
+  assert.match(projectRoute, /sequenceAnalytics/);
+  assert.match(projectPage, /SequenceAnalyticsPanel/);
+  assert.match(projectPage, /sequenceAnalytics=\{detail\.sequenceAnalytics\}/);
+  assert.ok(projectPage.indexOf("<GmailOutreachPanel") < projectPage.indexOf("<SequenceAnalyticsPanel"));
+  assert.ok(projectPage.indexOf("<SequenceAnalyticsPanel") < projectPage.indexOf("<InboxAgentPanel"));
+  assert.match(digest, /Sequence analytics/);
+});
+
+test("Profile Lead Layer productizes OpenJobs Mira as low-evidence leads", () => {
+  const layer = readFileSync("web/lib/profile-lead-layer.mjs", "utf8");
+  const sourceClassifier = readFileSync("web/lib/source-classifier.mjs", "utf8");
+  const leadPreview = readFileSync("web/components/LeadPreviewPanel.tsx", "utf8");
+  const projectRoute = readFileSync("web/app/api/projects/[id]/route.ts", "utf8");
+  const projectPage = readFileSync("web/app/app/projects/[id]/page.tsx", "utf8");
+  const openJobsProvider = readFileSync("web/lib/openjobs-provider.mjs", "utf8");
+
+  assert.match(layer, /buildProfileLeadLayerView/);
+  assert.match(layer, /Profile Lead Layer/);
+  assert.match(layer, /evidence verification/);
+  assert.doesNotMatch(layer, /database search/i);
+  assert.match(sourceClassifier, /Profile lead/);
+  assert.match(leadPreview, /Profile Lead Layer/);
+  assert.match(projectRoute, /profileLeadLayer/);
+  assert.match(projectPage, /profileLeadLayer=\{detail\.profileLeadLayer\}/);
+  assert.match(projectPage, /Pull profile leads|拉取资料线索/);
+  assert.match(projectPage, /evidence verification|证据核验/);
+  assert.match(openJobsProvider, /overall_evidence_quality: "low"/);
+  assert.match(openJobsProvider, /OpenJobs AI profile has not been independently verified by public evidence/);
 });

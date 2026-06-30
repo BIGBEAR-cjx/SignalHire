@@ -5,6 +5,7 @@
 import {
   buildProjectCandidateGraphView,
   buildProjectLeadPreviewView,
+  buildProjectReferralPathView,
   deleteProject,
   getProject,
   projectCandidateBreakdown,
@@ -14,7 +15,9 @@ import {
   type ProjectStatus,
 } from "@/lib/projects";
 import { listSearchTasks } from "@/lib/search-tasks";
-import { listOutreachQueue } from "@/lib/outreach-threads";
+import { listOutreachQueue, listOutreachThreads } from "@/lib/outreach-threads";
+import { buildSequenceAnalyticsView } from "@/lib/sequence-analytics.mjs";
+import { buildProfileLeadLayerView } from "@/lib/profile-lead-layer.mjs";
 import { buildProjectInboxQueueView } from "@/lib/inbox";
 import { ingestProjectRunCandidates } from "@/lib/shortlist";
 import { normalizeLocale, t } from "@/lib/i18n.mjs";
@@ -31,12 +34,13 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
   const { id } = await ctx.params;
   if (!id) return Response.json({ error: t(locale, "api.error.missingId") }, { status: 400 });
 
-  const [project, breakdown, runs, searchTasks, outreachQueue] = await Promise.all([
+  const [project, breakdown, runs, searchTasks, outreachQueue, outreachThreads] = await Promise.all([
     getProject(user.id, id),
     projectCandidateBreakdown(user.id, id),
     projectRuns(user.id, id, 30),
     listSearchTasks({ userId: user.id, projectId: id }),
     listOutreachQueue({ userId: user.id, projectId: id }),
+    listOutreachThreads({ userId: user.id, projectId: id }),
   ]);
   if (!project) return Response.json({ error: t(locale, "api.error.projectNotFound") }, { status: 404 });
   await Promise.all(runs
@@ -53,15 +57,24 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
   ]);
 
   const projectResponse = freshProject ?? project;
+  const [inboxQueue, candidateGraph, leadPreview, referralPaths] = await Promise.all([
+    buildProjectInboxQueueView(user.id, id),
+    buildProjectCandidateGraphView(user.id, id),
+    buildProjectLeadPreviewView(user.id, id),
+    buildProjectReferralPathView(user.id, id, locale),
+  ]);
   return Response.json({
     project: { ...projectResponse, inbox_sync_summary: projectResponse.inbox_sync_summary ?? {} },
     breakdown: freshBreakdown ?? breakdown,
     runs,
     searchTasks,
     outreachQueue,
-    inboxQueue: await buildProjectInboxQueueView(user.id, id),
-    candidateGraph: await buildProjectCandidateGraphView(user.id, id),
-    leadPreview: await buildProjectLeadPreviewView(user.id, id),
+    inboxQueue,
+    candidateGraph,
+    leadPreview,
+    referralPaths,
+    sequenceAnalytics: buildSequenceAnalyticsView({ roleId: id, threads: outreachThreads, locale }),
+    profileLeadLayer: buildProfileLeadLayerView({ leadPreview, candidateGraph, locale }),
   });
 }
 

@@ -167,7 +167,7 @@ const LABELS = {
   paper: { en: "Paper", zh: "论文" },
   company_page: { en: "Company page", zh: "公司页面" },
   personal_site: { en: "Personal site", zh: "个人站点" },
-  people_api: { en: "People API", zh: "People API" },
+  people_api: { en: "Profile lead", zh: "资料线索" },
   linkedin_seed: { en: "LinkedIn seed", zh: "LinkedIn 线索" },
   public_web: { en: "Public web", zh: "公开网页" },
   internal_resume: { en: "Internal resume", zh: "内部简历" },
@@ -192,8 +192,8 @@ const TOOLTIPS = {
     zh: "个人主页或作品集证据，外联前需核对关联结论。",
   },
   people_api: {
-    en: "Lead/contact source. Not strong evidence by itself.",
-    zh: "线索/联系方式来源，本身不是强证据。",
+    en: "Profile lead/contact source. Not strong evidence by itself; verify public evidence before recommendation or outreach.",
+    zh: "资料线索/联系方式来源，本身不是强证据；推荐或外联前需验证公开证据。",
   },
   linkedin_seed: {
     en: "Identity lead from LinkedIn. Verify public evidence before recommendation.",

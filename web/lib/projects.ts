@@ -11,6 +11,7 @@ import { buildCandidateGraph } from "./candidate-graph.mjs";
 import { buildLeadPreviewView } from "./lead-preview.mjs";
 import { buildRoleOutreachSettings } from "./outreach-settings.mjs";
 import { buildPeopleProviderConfig, providerRowsToSourceLeads } from "./people-providers.mjs";
+import { buildReferralPathViews, normalizeNetworkSeed } from "./referral-paths.mjs";
 import { listItems } from "./shortlist";
 
 const BASE = process.env.INSFORGE_API_BASE_URL;
@@ -31,6 +32,7 @@ export interface Project {
   color: string | null;
   inbox_sync_summary?: unknown;
   outreach_settings?: unknown;
+  network_seeds?: unknown[];
   created_at: string;
   updated_at: string;
 }
@@ -67,12 +69,13 @@ export async function listProjects(userId: string): Promise<ProjectWithKpi[]> {
     status: ProjectStatus; color: string | null;
     inbox_sync_summary?: unknown;
     outreach_settings?: unknown;
+    network_seeds?: unknown;
     created_at: string; updated_at: string;
     candidates_total: string; candidates_active: string;
     runs_total: string; runs_active: string;
   }>(
     `SELECT
-        p.id, p.user_id, p.name, p.brief, p.status, p.color, p.inbox_sync_summary, p.outreach_settings, p.created_at, p.updated_at,
+        p.id, p.user_id, p.name, p.brief, p.status, p.color, p.inbox_sync_summary, p.outreach_settings, p.network_seeds, p.created_at, p.updated_at,
         COALESCE(s.candidates_total, 0)  AS candidates_total,
         COALESCE(s.candidates_active, 0) AS candidates_active,
         COALESCE(r.runs_total, 0)        AS runs_total,
@@ -106,6 +109,7 @@ export async function listProjects(userId: string): Promise<ProjectWithKpi[]> {
     color: r.color,
     inbox_sync_summary: r.inbox_sync_summary ?? {},
     outreach_settings: buildRoleOutreachSettings(r.outreach_settings),
+    network_seeds: normalizeProjectNetworkSeeds(r.network_seeds),
     created_at: r.created_at,
     updated_at: r.updated_at,
     candidates_total: Number(r.candidates_total),
@@ -123,12 +127,13 @@ export async function getProject(userId: string, id: string): Promise<ProjectWit
     status: ProjectStatus; color: string | null;
     inbox_sync_summary?: unknown;
     outreach_settings?: unknown;
+    network_seeds?: unknown;
     created_at: string; updated_at: string;
     candidates_total: string; candidates_active: string;
     runs_total: string; runs_active: string;
   }>(
     `SELECT
-        p.id, p.user_id, p.name, p.brief, p.status, p.color, p.inbox_sync_summary, p.outreach_settings, p.created_at, p.updated_at,
+        p.id, p.user_id, p.name, p.brief, p.status, p.color, p.inbox_sync_summary, p.outreach_settings, p.network_seeds, p.created_at, p.updated_at,
         COALESCE(s.candidates_total, 0)  AS candidates_total,
         COALESCE(s.candidates_active, 0) AS candidates_active,
         COALESCE(r.runs_total, 0)        AS runs_total,
@@ -158,12 +163,21 @@ export async function getProject(userId: string, id: string): Promise<ProjectWit
     id: r.id, user_id: r.user_id, name: r.name, brief: r.brief, status: r.status, color: r.color,
     inbox_sync_summary: r.inbox_sync_summary ?? {},
     outreach_settings: buildRoleOutreachSettings(r.outreach_settings),
+    network_seeds: normalizeProjectNetworkSeeds(r.network_seeds),
     created_at: r.created_at, updated_at: r.updated_at,
     candidates_total: Number(r.candidates_total),
     candidates_active: Number(r.candidates_active),
     runs_total: Number(r.runs_total),
     runs_active: Number(r.runs_active),
   };
+}
+
+export function normalizeProjectNetworkSeeds(value: unknown): unknown[] {
+  const seeds = Array.isArray(value) ? value : [];
+  return seeds
+    .map((seed) => normalizeNetworkSeed(seed))
+    .filter((seed) => seed.linkedin_url || seed.companies.length || seed.schools.length || seed.projects.length)
+    .slice(0, 200);
 }
 
 export async function updateProjectInboxSyncSummary(input: {
@@ -215,6 +229,22 @@ export async function updateProjectOutreachSettings(input: {
   if (error) throw new Error("outreach_settings_write_failed");
   const row = (data as Array<{ outreach_settings?: unknown }> | null)?.[0];
   return row ? buildRoleOutreachSettings(row.outreach_settings) : null;
+}
+
+export async function updateProjectNetworkSeeds(input: {
+  userId: string; id: string; networkSeeds: unknown;
+}): Promise<unknown[] | null> {
+  if (!client) return null;
+  const networkSeeds = normalizeProjectNetworkSeeds(input.networkSeeds);
+  const { data, error } = await client.database
+    .from(TABLE)
+    .update({ network_seeds: networkSeeds, updated_at: new Date().toISOString() })
+    .eq("id", input.id)
+    .eq("user_id", input.userId)
+    .select("network_seeds");
+  if (error) throw new Error("network_seeds_write_failed");
+  const row = (data as Array<{ network_seeds?: unknown }> | null)?.[0];
+  return row ? normalizeProjectNetworkSeeds(row.network_seeds) : null;
 }
 
 // 创建新项目。
@@ -471,4 +501,16 @@ export async function buildProjectCandidateGraphView(userId: string, projectId: 
     }),
   };
   return candidateGraph;
+}
+
+export async function buildProjectReferralPathView(userId: string, projectId: string, locale = "zh") {
+  const [project, items] = await Promise.all([
+    getProject(userId, projectId),
+    listItems(userId, projectId),
+  ]);
+  return buildReferralPathViews({
+    candidates: items.map((item) => item.candidate),
+    networkSeeds: project?.network_seeds ?? [],
+    locale: locale === "en" ? "en" : "zh",
+  });
 }

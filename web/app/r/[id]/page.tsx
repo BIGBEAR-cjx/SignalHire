@@ -10,6 +10,7 @@ import {
   CandidateProfileView,
   EvidenceGraphView,
   ShortlistDeliveryReportView,
+  SmartReportPanel,
   TrustReportView,
   type Claim,
   type Candidate,
@@ -251,6 +252,7 @@ export default async function ReportPage({
               {row.kind === "search" ? (
                 talentResult ? (
                   <>
+                    <SmartReportPanel result={talentResult} locale={locale} />
                     <ShortlistDeliveryReportView result={talentResult} locale={locale} />
                     <CandidateComparisonView result={talentResult} locale={locale} />
                     {talentResult.candidates.map((candidate, index) => (

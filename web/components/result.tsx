@@ -22,11 +22,13 @@ declare module "@/lib/talent-profile.mjs" {
 }
 
 import type { BackfillMergeSummary, CandidateComparisonRow, CandidateEvidenceAuditSummary, CandidateEvidenceMatrix, CandidateProfileCacheEntry, CandidateReadingSummary, CandidateReviewBrief, CandidateEvidenceDossier, CoverageBackfillJob, EvidenceCoverageGroup, SearchResultWorkspace, ShortlistDeliveryReport, SimilarCandidateSuggestion, SourceExecutionJob, SourceQueryPlanItem, TalentCandidate, TalentSearchResult } from "@/lib/talent-profile.mjs";
+import type { SmartReportView as SmartReportViewModel } from "@/lib/smart-report.mjs";
 import { buildCandidateComparisonRows, buildCandidateEvidenceAudit, buildCandidateEvidenceMatrix, buildCandidateProfileCacheEntry, buildCandidateReadingSummary, buildCandidateReviewBrief, buildCandidateEvidenceDossier, buildCoverageBackfillPlan, buildEvidenceCoverage, buildSearchResultWorkspace, buildShortlistDeliveryReport, buildSimilarCandidateSuggestions, buildSourceExecution, buildSourceQueryPlan } from "@/lib/talent-profile.mjs";
 import type { IconType } from "react-icons";
 import { FiCheckCircle, FiChevronDown, FiClock, FiExternalLink, FiFlag, FiHelpCircle, FiInfo, FiLink2, FiRefreshCw, FiShare2, FiUploadCloud, FiXCircle } from "react-icons/fi";
 import { t as translate } from "@/lib/i18n.mjs";
 import { sourceTypeLabel, sourceTypeTooltip } from "@/lib/source-classifier.mjs";
+import { buildSmartReportView } from "@/lib/smart-report.mjs";
 import { buildRelatedTalentView, buildTalentIntelligenceReport } from "@/lib/talent-intelligence.mjs";
 import {
   reportUniqueSources,
@@ -449,6 +451,117 @@ function ReportMetric({ label, value, sublabel }: { label: string; value: string
       <p className="mt-1 text-xs font-semibold text-gray-500">{label}</p>
       {sublabel && <p className="mt-1 text-xs leading-relaxed text-gray-400">{sublabel}</p>}
     </div>
+  );
+}
+
+export function SmartReportPanel({ result, locale }: { result: TalentSearchResult } & ResultLocaleProps) {
+  const report: SmartReportViewModel = buildSmartReportView(result, { locale });
+  if (report.metrics.candidates === 0) return null;
+  const isEn = locale === "en";
+  const title = isEn ? "Smart Report" : "智能交付报告";
+  return (
+    <ResultSurface>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-400">
+            {isEn ? "Hiring manager / client view" : "Hiring manager / 客户视图"}
+          </p>
+          <h2 className="mt-1 text-lg font-semibold text-gray-900">{title}</h2>
+          <p className="mt-1 text-sm leading-relaxed text-gray-600">{report.brief_summary}</p>
+        </div>
+        <span className="rounded-full bg-gray-900 px-2.5 py-1 text-xs font-semibold text-white">
+          {isEn ? "Client-ready" : "可交付"}
+        </span>
+      </div>
+      <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <ReportMetric label={isEn ? "Candidates" : "候选人"} value={report.metrics.candidates} />
+        <ReportMetric label={isEn ? "Strong evidence" : "强证据"} value={report.metrics.strong_evidence} />
+        <ReportMetric label={isEn ? "Ready for outreach" : "可外联"} value={report.metrics.ready_for_outreach} />
+        <ReportMetric label={isEn ? "Needs scheduling" : "待约面"} value={report.metrics.needs_scheduling} />
+      </div>
+      {report.source_mix.length > 0 && (
+        <div className="mt-4 rounded-2xl border border-black/10 bg-white/72 p-4">
+          <p className="text-sm font-semibold text-gray-900">{isEn ? "Source mix" : "来源构成"}</p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            {report.source_mix.slice(0, 8).map((item) => (
+              <span key={item.source_type} title={item.tooltip} className="rounded-full bg-gray-50 px-2.5 py-1 text-xs font-semibold text-gray-700 ring-1 ring-black/10">
+                {item.label} · {item.count}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+      {report.referral_summary.length > 0 && (
+        <div className="mt-4 rounded-2xl border border-emerald-100 bg-emerald-50/50 p-4">
+          <p className="text-sm font-semibold text-emerald-950">{isEn ? "Warm intro paths" : "可尝试引荐路径"}</p>
+          <p className="mt-1 text-xs leading-relaxed text-emerald-800">
+            {isEn
+              ? "Client-safe referral context from user-provided network seeds. Treat it as a prioritization signal, not proof of relationship."
+              : "基于用户提供的人脉种子生成的客户可见引荐线索。它只用于排序和判断优先级，不代表已确认关系。"}
+          </p>
+          <div className="mt-3 grid gap-2 md:grid-cols-2">
+            {report.referral_summary.slice(0, 4).map((path) => (
+              <div key={`${path.candidate_name}:${path.path_type}:${path.shared_context}`} className="rounded-xl bg-white/80 px-3 py-2 text-xs ring-1 ring-emerald-100">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <p className="font-semibold text-emerald-950">{path.candidate_name}</p>
+                  <span className="rounded-full bg-emerald-50 px-2 py-0.5 font-semibold text-emerald-800 ring-1 ring-emerald-100">
+                    {path.confidence}
+                  </span>
+                </div>
+                <p className="mt-1 leading-5 text-emerald-900">{path.shared_context}</p>
+                <p className="mt-1 leading-5 text-emerald-800">{path.intro_snippet}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+      {report.top_candidates.length > 0 && (
+        <div className="mt-4 grid gap-3 md:grid-cols-2">
+          {report.top_candidates.map((candidate) => (
+            <article key={candidate.name} className="rounded-2xl border border-black/10 bg-white/72 p-4">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <h3 className="text-sm font-semibold text-gray-900">{candidate.name}</h3>
+                  {candidate.role && <p className="mt-0.5 text-xs leading-relaxed text-gray-500">{candidate.role}</p>}
+                </div>
+                <span className="rounded-full bg-white px-2 py-0.5 text-xs font-semibold text-gray-700 ring-1 ring-gray-200">
+                  {candidate.match_score}
+                </span>
+              </div>
+              <p className="mt-2 text-sm leading-relaxed text-gray-700">{candidate.evidence_summary}</p>
+              <div className="mt-2 flex flex-wrap gap-1.5">
+                <QualityPill value={candidate.evidence_quality} locale={locale} />
+                <span className="rounded-full bg-white px-2 py-0.5 text-xs font-medium text-gray-600 ring-1 ring-gray-200">
+                  {candidate.outreach_status}
+                </span>
+              </div>
+              {candidate.primary_risk && <p className="mt-2 text-xs leading-relaxed text-amber-700">{candidate.primary_risk}</p>}
+              <p className="mt-2 text-xs leading-relaxed text-blue-800">{candidate.next_action}</p>
+            </article>
+          ))}
+        </div>
+      )}
+      {(report.risks.length > 0 || report.next_actions.length > 0) && (
+        <div className="mt-4 grid gap-3 md:grid-cols-2">
+          {report.risks.length > 0 && (
+            <div className="rounded-2xl border border-amber-100 bg-amber-50/60 p-4">
+              <p className="text-sm font-semibold text-amber-900">{isEn ? "Risks and evidence gaps" : "风险和证据缺口"}</p>
+              <ul className="mt-2 list-disc space-y-1 pl-5 text-sm leading-relaxed text-amber-800">
+                {report.risks.map((risk) => <li key={risk}>{risk}</li>)}
+              </ul>
+            </div>
+          )}
+          {report.next_actions.length > 0 && (
+            <div className="rounded-2xl border border-blue-100 bg-blue-50/60 p-4">
+              <p className="text-sm font-semibold text-blue-900">{isEn ? "Recommended next actions" : "推荐下一步"}</p>
+              <ul className="mt-2 list-disc space-y-1 pl-5 text-sm leading-relaxed text-blue-900/80">
+                {report.next_actions.map((action) => <li key={action}>{action}</li>)}
+              </ul>
+            </div>
+          )}
+        </div>
+      )}
+    </ResultSurface>
   );
 }
 

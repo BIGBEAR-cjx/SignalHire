@@ -12,6 +12,7 @@ export default function SettingsPage() {
   const { locale, t } = useI18n();
   const router = useRouter();
   const [user, setUser] = useState<{ id: string; email: string } | null>(null);
+  const [atsProvider, setAtsProvider] = useState<{ provider: string; enabled: boolean; reason: string } | null>(null);
   const [copied, setCopied] = useState(false);
 
   useEffect(() => {
@@ -19,6 +20,13 @@ export default function SettingsPage() {
     fetch(`/api/whoami?locale=${locale}`)
       .then((r) => (r.ok ? r.json() : null))
       .then((j) => j?.user && setUser(j.user))
+      .catch(() => {});
+  }, [locale]);
+
+  useEffect(() => {
+    fetch(`/api/ats-lite/status?locale=${locale}`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((j) => j?.provider && setAtsProvider(j.provider))
       .catch(() => {});
   }, [locale]);
 
@@ -68,6 +76,26 @@ export default function SettingsPage() {
           <FiLogOut className="h-4 w-4" aria-hidden="true" />
           {t("settings.logout")}
         </SecondaryAction>
+      </Surface>
+
+      <Surface className="p-5 md:p-6">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-neutral-500">ATS-lite</p>
+            <h2 className="mt-1 text-xl font-semibold text-[var(--sh-ink)]">Greenhouse</h2>
+            <p className="mt-2 text-sm leading-6 text-[var(--sh-muted)]">
+              {locale === "en" ? "Import ATS roles and preview reviewed candidate exports." : "导入 ATS 岗位，并预览已审阅候选人的导出内容。"}
+            </p>
+          </div>
+          <span className={`rounded-full px-3 py-1.5 text-xs font-semibold ring-1 ${
+            atsProvider?.enabled ? "bg-emerald-50 text-emerald-700 ring-emerald-200" : "bg-amber-50 text-amber-800 ring-amber-200"
+          }`}>
+            {atsProvider?.enabled ? "enabled" : "disabled"}
+          </span>
+        </div>
+        <p className="mt-3 rounded-2xl bg-white/70 px-3 py-2 text-xs text-[var(--sh-muted)] ring-1 ring-black/5">
+          {atsProvider?.reason ?? "Loading ATS provider status"}
+        </p>
       </Surface>
 
       <Surface className="p-5 md:p-6">

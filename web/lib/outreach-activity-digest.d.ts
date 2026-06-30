@@ -27,4 +27,5 @@ export type OutreachActivityDigestThread = {
 export function buildAgencyOutreachActivityDigest(input?: {
   roleName?: string;
   threads?: OutreachActivityDigestThread[];
+  sequenceAnalytics?: unknown;
 }): string;

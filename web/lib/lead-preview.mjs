@@ -77,17 +77,18 @@ function normalizeLead(row) {
 
   if (!id) return null;
 
+  const sourceType = cleanString(row.source_type || row.provider || row.source || "unknown");
   return {
     id,
-    label: "unverified lead",
+    label: sourceType === "people_api" ? "profile lead" : "unverified lead",
     candidate_name: name || "Unnamed lead",
     headline: cleanString(row.headline || row.current_role || row.role || row.title),
     company,
-    source_type: cleanString(row.source_type || row.provider || row.source || "unknown"),
+    source_type: sourceType,
     source_url: sourceUrl,
     possible_match_reason: cleanString(row.match_reason || row.reason || row.summary || row.snippet),
     missing_evidence: MISSING_EVIDENCE,
-    next_verification_step: DEFAULT_NEXT_STEP,
+    next_verification_step: sourceType === "people_api" ? "Run evidence verification before recommendation or outreach." : DEFAULT_NEXT_STEP,
     confidence: cleanString(row.confidence || "low"),
     feedback_state: "untouched",
     can_outreach: false,

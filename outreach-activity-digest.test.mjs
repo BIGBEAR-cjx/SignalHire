@@ -55,3 +55,31 @@ test("summarizes missing optional fields without exposing internal fields", () =
   assert.match(digest, /No sourced contact yet/);
   assert.doesNotMatch(digest, /hidden/);
 });
+
+test("adds aggregate sequence analytics to client digest", () => {
+  const digest = buildAgencyOutreachActivityDigest({
+    roleName: "Founding ML Engineer",
+    sequenceAnalytics: {
+      summary: {
+        drafted: 2,
+        approved: 1,
+        sent: 5,
+        replied: 2,
+        interested: 1,
+        bounced: 1,
+        stopped: 1,
+        due_follow_up: 2,
+        open_tracking_available: false,
+      },
+      step_performance: [{ step: 1, drafted: 1, sent: 3, replied: 2, interested: 1, bounced: 0 }],
+      next_actions: ["Review due follow-up drafts"],
+    },
+    threads: [],
+  });
+
+  assert.match(digest, /Sequence analytics/);
+  assert.match(digest, /Sent: 5/);
+  assert.match(digest, /Open tracking: unavailable/);
+  assert.match(digest, /Step 1: sent 3, replied 2, interested 1, bounced 0/);
+  assert.doesNotMatch(digest, /private_notes|raw_reference/);
+});

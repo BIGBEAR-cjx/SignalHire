@@ -66,6 +66,27 @@ test("builds preview items from open evidence leads", () => {
   assert.equal(view.items[0].feedback_state, "untouched");
 });
 
+test("labels people API rows as profile leads that require verification", () => {
+  const view = buildLeadPreviewView({
+    run: { status: "running" },
+    openEvidenceLeads: [
+      {
+        provider: "openjobs_mira",
+        source_type: "people_api",
+        url: "https://linkedin.com/in/ada",
+        title: "Ada Lovelace",
+        snippet: "OpenJobs profile lead",
+        confidence: "low",
+      },
+    ],
+  });
+
+  assert.equal(view.items[0].label, "profile lead");
+  assert.equal(view.items[0].source_type, "people_api");
+  assert.equal(view.items[0].can_outreach, false);
+  assert.match(view.items[0].next_verification_step, /evidence verification/i);
+});
+
 test("dedupes preview leads by source url and name company key", () => {
   const view = buildLeadPreviewView({
     run: {

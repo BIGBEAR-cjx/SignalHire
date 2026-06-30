@@ -4,7 +4,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { FiFolder, FiPlus } from "react-icons/fi";
+import { FiDownloadCloud, FiFolder, FiPlus } from "react-icons/fi";
 import { useI18n } from "@/components/LanguageProvider";
 import {
   EmptyState,
@@ -184,6 +184,8 @@ function NewProjectDialog({
   const [name, setName] = useState("");
   const [brief, setBrief] = useState("");
   const [creating, setCreating] = useState(false);
+  const [importingAts, setImportingAts] = useState(false);
+  const [atsJobId, setAtsJobId] = useState("greenhouse-demo-role");
   const [error, setError] = useState("");
 
   const reset = useCallback(() => {
@@ -227,6 +229,25 @@ function NewProjectDialog({
     }
   }
 
+  async function importFromAts() {
+    setImportingAts(true); setError("");
+    try {
+      const r = await fetch("/api/ats-lite/jobs/import", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ external_job_id: atsJobId.trim() || "greenhouse-demo-role", locale }),
+      });
+      const j = await r.json();
+      if (!r.ok) throw new Error(j.error || "ats_import_failed");
+      reset();
+      onCreated(j.project);
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setImportingAts(false);
+    }
+  }
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/40 p-4 backdrop-blur-sm" onClick={closeDialog}>
       <Surface
@@ -241,6 +262,28 @@ function NewProjectDialog({
         </div>
 
         <div className="mt-4 space-y-3">
+          <div className="rounded-2xl border border-black/10 bg-white/70 p-3">
+            <div className="flex flex-wrap items-end gap-2">
+              <div className="min-w-[180px] flex-1">
+                <label className="mb-1 block text-xs font-medium text-gray-600">{locale === "en" ? "Greenhouse job ID" : "Greenhouse 岗位 ID"}</label>
+                <input
+                  value={atsJobId}
+                  onChange={(e) => setAtsJobId(e.target.value)}
+                  placeholder="greenhouse-demo-role"
+                  className="block w-full rounded-xl border border-black/10 bg-white px-3 py-2 text-sm text-[var(--sh-ink)] outline-none focus:border-black/20"
+                />
+              </div>
+              <button
+                type="button"
+                onClick={importFromAts}
+                disabled={importingAts}
+                className="inline-flex min-h-10 items-center gap-2 rounded-full bg-neutral-950 px-3 py-2 text-xs font-semibold text-white hover:bg-neutral-800 disabled:opacity-50"
+              >
+                <FiDownloadCloud className="h-3.5 w-3.5" aria-hidden="true" />
+                {importingAts ? (locale === "en" ? "Importing..." : "导入中...") : (locale === "en" ? "Import from ATS" : "从 ATS 导入")}
+              </button>
+            </div>
+          </div>
           <div>
             <label className="mb-1 block text-xs font-medium text-gray-600">{t("projects.name")}</label>
             <input

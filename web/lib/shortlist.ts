@@ -93,6 +93,22 @@ export async function listItems(userId: string, filter?: ProjectFilter): Promise
   }
 }
 
+export async function getItem(userId: string, id: string): Promise<ShortlistItem | null> {
+  if (!client) return null;
+  try {
+    const { data, error } = await client.database
+      .from(TABLE)
+      .select("id,user_id,source_run_id,project_id,candidate,status,notes,created_at,updated_at")
+      .eq("user_id", userId)
+      .eq("id", id)
+      .limit(1);
+    if (error || !data) return null;
+    return (data as ShortlistItem[])[0] ?? null;
+  } catch {
+    return null;
+  }
+}
+
 // 列当前用户在某次 search 下已收藏的 candidate_index 集合 (用于 UI 高亮)。
 export async function listIndicesForRun(userId: string, sourceRunId: string): Promise<number[]> {
   if (!client) return [];
