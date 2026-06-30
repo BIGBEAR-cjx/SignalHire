@@ -64,3 +64,42 @@ test("builds editable outreach draft that references evidence and omits unverifi
   assert.doesNotMatch(draft.body, /Berlin/);
   assert.equal(draft.evidence_brief.proof_points.includes("Maintains a public vLLM integration"), true);
 });
+
+test("builds three outreach sequence messages with review-only follow-ups", () => {
+  assert.equal(typeof outreachDraft.buildEvidenceDrivenOutreachSequence, "function");
+
+  const sequence = outreachDraft.buildEvidenceDrivenOutreachSequence({
+    tone: "friendly",
+    senderName: "Jian",
+    roleBrief: "a founding ML infrastructure engineer",
+    candidate: {
+      name: "Ada Lovelace",
+      current_role: "ML Engineer",
+      current_company: "Example AI",
+      strongest_signals: ["Published GPU inference benchmarks", "Maintains an open-source eval toolkit"],
+      claims: [
+        {
+          claim: "Maintains eval toolkit",
+          verdict: "verified",
+          evidence: [{ url: "https://github.com/ada/eval" }],
+        },
+      ],
+      outreach_angle: "Lead with her GPU inference benchmark work.",
+    },
+  });
+
+  assert.equal(sequence.length, 3);
+  assert.deepEqual(sequence.map((message) => message.step), [1, 2, 3]);
+  assert.equal(sequence[0].send_mode, "manual_approval_required");
+  assert.equal(sequence[1].send_mode, "draft_for_review");
+  assert.equal(sequence[2].send_mode, "draft_for_review");
+  assert.equal(sequence[1].delay_days, 7);
+  assert.equal(sequence[2].delay_days, 7);
+  assert.deepEqual(sequence[0].evidence_refs.slice(0, 2), [
+    "Published GPU inference benchmarks",
+    "Maintains an open-source eval toolkit",
+  ]);
+  assert.match(sequence[0].body, /GPU inference benchmarks|eval toolkit/);
+  assert.match(sequence[1].body, /GPU inference benchmarks|eval toolkit/);
+  assert.match(sequence[2].body, /GPU inference benchmarks|eval toolkit/);
+});

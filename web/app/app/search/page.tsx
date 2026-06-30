@@ -9,6 +9,7 @@ import { useI18n } from "@/components/LanguageProvider";
 import ResearchTool from "@/components/ResearchTool";
 import type { ProjectFeedbackPreferenceView } from "@/components/research-workspace";
 import { LoadingState, PageIntro } from "@/components/ui/signal-ui";
+import type { LeadPreviewView } from "@/lib/lead-preview";
 import { buildLatestProjectFeedbackPreference } from "@/lib/research-loop.mjs";
 import { shouldAutoRunInitialSearch } from "@/lib/search-page-state.mjs";
 
@@ -22,6 +23,7 @@ function SearchInner() {
     projectId: string;
     name?: string;
     feedbackPreference: ProjectFeedbackPreferenceView | null;
+    leadPreview: LeadPreviewView | null;
   } | null>(null);
 
   // 在项目上下文时拉项目名 (面包屑显示)
@@ -39,6 +41,7 @@ function SearchInner() {
         projectId,
         name: typeof j?.project?.name === "string" ? j.project.name : undefined,
         feedbackPreference: preference.canApply ? preference : null,
+        leadPreview: j?.leadPreview ?? null,
       });
     }).catch(() => {});
     return () => { cancelled = true; };
@@ -47,6 +50,7 @@ function SearchInner() {
   const activeProjectContext = projectContext?.projectId === projectId ? projectContext : null;
   const projectName = activeProjectContext?.name;
   const projectFeedbackPreference = activeProjectContext?.feedbackPreference ?? null;
+  const projectLeadPreview = activeProjectContext?.leadPreview ?? null;
 
   return (
     <div className="space-y-6">
@@ -63,6 +67,7 @@ function SearchInner() {
         projectId={projectId}
         projectName={projectName}
         projectFeedbackPreference={projectFeedbackPreference}
+        projectLeadPreview={projectLeadPreview}
       />
     </div>
   );

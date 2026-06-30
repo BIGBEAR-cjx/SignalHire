@@ -151,3 +151,65 @@ export function buildEvidenceDrivenOutreachDraft({ candidate = {}, tone = "profe
     evidence_brief: evidence,
   };
 }
+
+function sequenceEvidenceRefs(evidence) {
+  const refs = [];
+  for (const item of [...cleanStringArray(evidence?.proof_points, 3), cleanString(evidence?.contact_angle)]) {
+    if (item && !refs.includes(item)) refs.push(item);
+  }
+  return refs.slice(0, 3);
+}
+
+export function buildEvidenceDrivenOutreachSequence({ candidate = {}, tone = "professional", senderName = "", roleBrief = "" } = {}) {
+  const firstDraft = buildEvidenceDrivenOutreachDraft({ candidate, tone, senderName, roleBrief });
+  const evidence = firstDraft.evidence_brief;
+  const first = firstName(evidence.candidate_name);
+  const sender = cleanString(senderName) || "[Your name]";
+  const refs = sequenceEvidenceRefs(evidence);
+  const proof = refs[0] || cleanString(evidence.contact_angle) || "your recent work";
+  const roleContext = cleanString(roleBrief);
+  const followUpContext = roleContext
+    ? `I am following up because ${proof} still looks relevant for ${roleContext}.`
+    : `I am following up because ${proof} still looks relevant to this search.`;
+  const subject = `Re: ${firstDraft.subject || `${first}, quick note`}`.slice(0, 78);
+
+  return [
+    {
+      step: 1,
+      subject: firstDraft.subject,
+      body: firstDraft.body,
+      send_mode: "manual_approval_required",
+      evidence_refs: refs,
+    },
+    {
+      step: 2,
+      subject,
+      body: [
+        `Hi ${first},`,
+        "",
+        followUpContext,
+        "Would it be worth a short conversation?",
+        "",
+        sender,
+      ].join("\n\n").trim(),
+      send_mode: "draft_for_review",
+      evidence_refs: refs,
+      delay_days: 7,
+    },
+    {
+      step: 3,
+      subject,
+      body: [
+        `Hi ${first},`,
+        "",
+        "Last note from me. If the timing is not right, no problem.",
+        `I reached out because ${proof}.`,
+        "",
+        sender,
+      ].join("\n\n").trim(),
+      send_mode: "draft_for_review",
+      evidence_refs: refs,
+      delay_days: 7,
+    },
+  ];
+}

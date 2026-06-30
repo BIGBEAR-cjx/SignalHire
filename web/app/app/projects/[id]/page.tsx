@@ -7,6 +7,7 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { FiAlertTriangle, FiArrowLeft, FiCheckCircle, FiClock, FiMail, FiPauseCircle, FiPlay, FiRefreshCw, FiSearch, FiSend, FiTrash2 } from "react-icons/fi";
 import { CandidateComparisonView, CandidateProfileView, EvidencePriorityPanel } from "@/components/result";
+import LeadPreviewPanel from "@/components/LeadPreviewPanel";
 import { useI18n } from "@/components/LanguageProvider";
 import OutreachModal from "@/components/OutreachModal";
 import {
@@ -22,6 +23,11 @@ import {
 import { buildCandidateFeedbackPanel, buildProjectActionBrief, buildProjectCandidateDecisionQueue, buildProjectCandidateFeedbackSummary, buildProjectControlRoom, buildProjectDetailHierarchy, buildProjectResearchRounds, buildProjectSearchConsole } from "@/lib/research-loop.mjs";
 import { buildCandidateDecisionSignal, buildEvidencePriorityView, buildProjectEvidenceMatrix } from "@/lib/evidence-priority.mjs";
 import { buildOutreachApprovalOutcome, selectOutreachApprovalRetryTargets, selectOutreachReadinessTargets } from "@/lib/outreach-readiness.mjs";
+import { buildAgencyOutreachActivityDigest } from "@/lib/outreach-activity-digest.mjs";
+import { buildEvidenceDrivenOutreachSequence } from "@/lib/outreach-draft.mjs";
+import { buildRoleOutreachSettings } from "@/lib/outreach-settings.mjs";
+import { sourceTypeLabel, sourceTypeTooltip } from "@/lib/source-classifier.mjs";
+import type { LeadPreviewView } from "@/lib/lead-preview";
 import type { TalentCandidate } from "@/lib/talent-profile.mjs";
 
 type ProjectStatus = "open" | "paused" | "closed";
@@ -254,6 +260,11 @@ interface ProjectDetail {
     brief: string | null;
     status: ProjectStatus;
     inbox_sync_summary?: ProjectInboxSyncSummaryView;
+    outreach_settings?: {
+      auto_follow_up_only: boolean;
+      follow_up_interval_days: 7;
+      client_visible_digest: boolean;
+    };
     candidates_total: number;
     candidates_active: number;
     runs_total: number;
@@ -274,6 +285,7 @@ interface ProjectDetail {
   outreachQueue?: OutreachQueueView;
   inboxQueue?: InboxQueueView;
   candidateGraph?: CandidateGraphView;
+  leadPreview?: LeadPreviewView;
 }
 
 type SearchTaskView = {
@@ -307,10 +319,14 @@ type OutreachQueueView = {
     status: string;
     subject: string;
     body?: string;
+    candidate_snapshot?: unknown;
+    tone?: string;
+    role_brief?: string;
     contact_profile?: ContactProfileView;
     sequence_messages?: OutreachSequenceMessage[];
     approved_at?: string | null;
     sent_at?: string | null;
+    last_contacted_at?: string | null;
     gmail_message_id?: string;
     gmail_thread_id?: string;
     send_error?: string;
@@ -458,6 +474,9 @@ type OutreachSequenceMessage = {
   subject: string;
   body: string;
   evidence_hooks?: string[];
+  evidence_refs?: string[];
+  send_mode?: string;
+  delay_days?: number;
 };
 
 type GmailStatusView = {
@@ -724,8 +743,12 @@ function AutonomousSourcingPanel({
             {graph.source_mix.length === 0 ? (
               <p className="text-sm text-[var(--sh-muted)]">{c.empty}</p>
             ) : graph.source_mix.map((source) => (
-              <div key={source.source_type} className="flex items-center justify-between rounded-xl bg-gray-50 px-3 py-2 text-xs ring-1 ring-black/5">
-                <span className="font-medium text-gray-800">{source.source_type.replace(/_/g, " ")}</span>
+              <div
+                key={source.source_type}
+                title={sourceTypeTooltip(source.source_type, locale)}
+                className="flex items-center justify-between rounded-xl bg-gray-50 px-3 py-2 text-xs ring-1 ring-black/5"
+              >
+                <span className="font-medium text-gray-800">{sourceTypeLabel(source.source_type, locale)}</span>
                 <span className="text-gray-500">{source.count}</span>
               </div>
             ))}
@@ -744,8 +767,12 @@ function AutonomousSourcingPanel({
                   {candidate.source_types.length > 0 && (
                     <div className="mt-1 flex flex-wrap gap-1">
                       {candidate.source_types.slice(0, 3).map((sourceType) => (
-                        <span key={sourceType} className="rounded-full bg-white px-2 py-0.5 text-[11px] font-medium text-gray-600 ring-1 ring-black/10">
-                          {sourceType.replace(/_/g, " ")}
+                        <span
+                          key={sourceType}
+                          title={sourceTypeTooltip(sourceType, locale)}
+                          className="rounded-full bg-white px-2 py-0.5 text-[11px] font-medium text-gray-600 ring-1 ring-black/10"
+                        >
+                          {sourceTypeLabel(sourceType, locale)}
                         </span>
                       ))}
                       {candidate.source_types.length > 3 && (
@@ -1207,15 +1234,46 @@ function inboxPriorityLine(summary: InboxQueueView["summary"] | undefined, local
 
 function fallbackSequence(item: OutreachQueueView["items"][number]): OutreachSequenceMessage[] {
   const existing = Array.isArray(item.sequence_messages) ? item.sequence_messages : [];
-  if (existing.length > 0) return existing;
-  return [
-    { step: 1, subject: item.subject || "Following up", body: item.body || "", evidence_hooks: [] },
-    { step: 2, subject: `Re: ${item.subject || "Following up"}`, body: `Hi ${item.candidate_name}, quick follow-up on my note above.`, evidence_hooks: [] },
-    { step: 3, subject: `Re: ${item.subject || "Following up"}`, body: "Last note from me. If now is not the right time, I can close the loop.", evidence_hooks: [] },
-  ];
+  if (existing.length > 0) {
+    return existing.slice(0, 3).map((message, index) => ({
+      ...message,
+      step: message.step || index + 1,
+      send_mode: message.send_mode || (index === 0 ? "manual_approval_required" : "draft_for_review"),
+      delay_days: index === 0 ? undefined : (message.delay_days ?? 7),
+    }));
+  }
+  const sequence = buildEvidenceDrivenOutreachSequence({
+    candidate: isRecord(item.candidate_snapshot) ? item.candidate_snapshot : { name: item.candidate_name },
+    tone: item.tone || "professional",
+    senderName: "",
+    roleBrief: item.role_brief || "",
+  }) as OutreachSequenceMessage[];
+  return sequence.map((message, index) => ({
+    ...message,
+    step: index + 1,
+    subject: index === 0 ? item.subject || message.subject : message.subject,
+    body: index === 0 ? item.body || message.body : message.body,
+    evidence_hooks: message.evidence_hooks ?? message.evidence_refs ?? [],
+    send_mode: index === 0 ? "manual_approval_required" : "draft_for_review",
+    delay_days: index === 0 ? undefined : 7,
+  }));
 }
 
-function GmailOutreachPanel({ queue, projectId, locale, onChanged }: { queue?: OutreachQueueView; projectId: string; locale: "zh" | "en"; onChanged: () => void }) {
+function GmailOutreachPanel({
+  queue,
+  projectId,
+  projectName,
+  persistedSettings,
+  locale,
+  onChanged,
+}: {
+  queue?: OutreachQueueView;
+  projectId: string;
+  projectName: string;
+  persistedSettings?: ProjectDetail["project"]["outreach_settings"];
+  locale: "zh" | "en";
+  onChanged: () => void;
+}) {
   const isEn = locale === "en";
   const items = queue?.items ?? [];
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -1229,6 +1287,46 @@ function GmailOutreachPanel({ queue, projectId, locale, onChanged }: { queue?: O
   const [approvalRetryBusy, setApprovalRetryBusy] = useState(false);
   const [bulkContactResult, setBulkContactResult] = useState<BulkContactResolutionView | null>(null);
   const [approvalOutcome, setApprovalOutcome] = useState<OutreachApprovalOutcomeView | null>(null);
+  const [roleOutreachSettings, setRoleOutreachSettings] = useState(() => buildRoleOutreachSettings(persistedSettings));
+  const [settingsSaving, setSettingsSaving] = useState(false);
+  const digest = buildAgencyOutreachActivityDigest({
+    roleName: projectName,
+    threads: items.map((item) => ({
+      candidate_name: item.candidate_name,
+      status: item.status,
+      last_activity: item.last_contacted_at || item.updated_at,
+      next_follow_up_at: item.next_follow_up_at || "",
+      evidence_angle: fallbackSequence(item)[0]?.evidence_hooks?.[0] || fallbackSequence(item)[0]?.evidence_refs?.[0] || "",
+      contact_profile: item.contact_profile,
+      reply_summary: item.send_error ? (isEn ? "Send error recorded" : "已记录发送错误") : "",
+    })),
+  });
+
+  useEffect(() => {
+    setRoleOutreachSettings(buildRoleOutreachSettings(persistedSettings));
+  }, [persistedSettings]);
+
+  async function updateRoleOutreachSettings(next: { auto_follow_up_only?: boolean; client_visible_digest?: boolean }) {
+    const previous = roleOutreachSettings;
+    const updated = buildRoleOutreachSettings({ ...roleOutreachSettings, ...next });
+    setRoleOutreachSettings(updated);
+    setSettingsSaving(true);
+    try {
+      const r = await fetch(`/api/projects/${projectId}/outreach-settings`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ settings: updated, locale }),
+      });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(String(j.error || "settings_update_failed"));
+      setRoleOutreachSettings(buildRoleOutreachSettings(j.settings));
+      onChanged();
+    } catch {
+      setRoleOutreachSettings(previous);
+    } finally {
+      setSettingsSaving(false);
+    }
+  }
 
   useEffect(() => {
     let cancelled = false;
@@ -1513,6 +1611,46 @@ function GmailOutreachPanel({ queue, projectId, locale, onChanged }: { queue?: O
           </PrimaryAction>
         </div>
       </div>
+      <div className="grid gap-3 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
+        <div className="rounded-2xl border border-black/10 bg-white/72 p-4">
+          <p className="text-xs font-semibold text-[var(--sh-muted)]">{isEn ? "Role-level outreach settings" : "岗位级外联设置"}</p>
+          <label className="mt-3 flex items-start gap-3 rounded-xl bg-[var(--sh-canvas)] px-3 py-3 text-xs leading-5 text-[var(--sh-muted)] ring-1 ring-black/5">
+            <input
+              type="checkbox"
+              checked={roleOutreachSettings.auto_follow_up_only}
+              onChange={(event) => updateRoleOutreachSettings({ auto_follow_up_only: event.target.checked })}
+              disabled={settingsSaving}
+              className="mt-1"
+            />
+            <span>
+              <span className="block font-semibold text-[var(--sh-ink)]">
+                {isEn ? "Auto follow-up only" : "仅自动跟进"}
+              </span>
+              {isEn
+                ? "The first email still requires manual approval and Gmail send. Due follow-ups become Gmail review drafts, not sent messages."
+                : "首封邮件仍需人工批准并通过 Gmail 发送。到期跟进只会变成 Gmail 待审核草稿，不会自动发送。"}
+            </span>
+          </label>
+          <p className="mt-3 rounded-xl bg-blue-50 px-3 py-2 text-xs leading-5 text-blue-800 ring-1 ring-blue-100">
+            {isEn
+              ? `Default follow-up interval: ${roleOutreachSettings.follow_up_interval_days} days.`
+              : `默认跟进间隔：${roleOutreachSettings.follow_up_interval_days} 天。`}
+          </p>
+        </div>
+        <div className="rounded-2xl border border-black/10 bg-white/72 p-4">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <p className="text-xs font-semibold text-[var(--sh-muted)]">{isEn ? "Client-visible activity digest" : "客户可见外联活动摘要"}</p>
+            <button
+              type="button"
+              onClick={() => navigator.clipboard?.writeText(digest)}
+              className="rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-gray-700 ring-1 ring-black/10 hover:bg-gray-50"
+            >
+              {isEn ? "Copy digest" : "复制摘要"}
+            </button>
+          </div>
+          <pre className="mt-3 max-h-48 overflow-y-auto whitespace-pre-wrap rounded-xl bg-[var(--sh-canvas)] p-3 text-xs leading-5 text-[var(--sh-muted)] ring-1 ring-black/5">{digest}</pre>
+        </div>
+      </div>
       {bulkContactResult && (
         <div className="rounded-2xl bg-blue-50 px-4 py-3 text-xs leading-5 text-blue-900 ring-1 ring-blue-100">
           <p className="font-semibold">
@@ -1698,8 +1836,23 @@ function GmailOutreachPanel({ queue, projectId, locale, onChanged }: { queue?: O
                 <div className="mt-2 space-y-1.5">
                   {fallbackSequence(item).slice(0, 3).map((message) => (
                     <div key={message.step} className="rounded-lg bg-gray-50 px-2 py-1.5 text-xs ring-1 ring-black/5">
-                      <span className="font-semibold text-gray-800">#{message.step}</span>
-                      <span className="ml-2 text-gray-600">{message.subject}</span>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="font-semibold text-gray-800">#{message.step}</span>
+                        <span className="text-gray-600">{message.subject}</span>
+                        <span className="rounded-full bg-white px-2 py-0.5 text-[11px] font-medium text-gray-600 ring-1 ring-black/10">
+                          {message.step === 1 ? (isEn ? "manual approval" : "人工批准") : (isEn ? "draft for review" : "草稿待审核")}
+                        </span>
+                        {message.delay_days && (
+                          <span className="rounded-full bg-white px-2 py-0.5 text-[11px] font-medium text-gray-600 ring-1 ring-black/10">
+                            {isEn ? `${message.delay_days}d follow-up` : `${message.delay_days} 天后跟进`}
+                          </span>
+                        )}
+                      </div>
+                      {((message.evidence_hooks ?? message.evidence_refs ?? []).length > 0) && (
+                        <p className="mt-1 truncate text-[11px] text-gray-500">
+                          {isEn ? "Evidence angle" : "证据角度"}: {(message.evidence_hooks ?? message.evidence_refs ?? []).join("; ")}
+                        </p>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -2527,6 +2680,13 @@ export default function ProjectDetailPage() {
         showBrief={showSearchConsoleBrief}
       />
 
+      <LeadPreviewPanel
+        view={detail.leadPreview}
+        locale={locale}
+        projectId={id}
+        baseSearchInput={projectConsole.nextSearchInput || briefForSearch}
+      />
+
       <AutonomousSourcingPanel
         graph={detail.candidateGraph}
         projectId={id}
@@ -2543,7 +2703,14 @@ export default function ProjectDetailPage() {
         onChanged={reloadDetail}
       />
 
-      <GmailOutreachPanel queue={detail.outreachQueue} projectId={detail.project.id} locale={locale} onChanged={reloadDetail} />
+      <GmailOutreachPanel
+        queue={detail.outreachQueue}
+        projectId={detail.project.id}
+        projectName={detail.project.name}
+        persistedSettings={detail.project.outreach_settings}
+        locale={locale}
+        onChanged={reloadDetail}
+      />
 
       <InboxAgentPanel
         queue={detail.inboxQueue}

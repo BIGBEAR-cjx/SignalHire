@@ -89,6 +89,14 @@ const REQUIRED_TABLES = [
       "next_follow_up_at",
     ],
   },
+  {
+    table: "projects",
+    columns: [
+      "id",
+      "user_id",
+      "outreach_settings",
+    ],
+  },
 ];
 
 const client = createClient({ baseUrl: BASE, anonKey: KEY, isServerMode: true });

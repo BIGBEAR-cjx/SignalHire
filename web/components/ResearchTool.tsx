@@ -7,6 +7,7 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { FiCheckCircle, FiChevronDown, FiPlay, FiSliders } from "react-icons/fi";
 import { useI18n } from "@/components/LanguageProvider";
+import LeadPreviewPanel from "@/components/LeadPreviewPanel";
 import {
   BackfillMergeSummaryView,
   CandidateCard,
@@ -52,6 +53,7 @@ import { nextResearchPollDelayMs, RESEARCH_POLL_SLOW_AFTER_MS } from "@/lib/rese
 import { buildEvidencePriorityView } from "@/lib/evidence-priority.mjs";
 import { extractPdfTextFromFile } from "@/lib/client-resume-extract";
 import { MAX_RESUME_FILE_BYTES, detectSupportedResumeFileType } from "@/lib/resume-upload-constraints.mjs";
+import type { LeadPreviewConstraint, LeadPreviewView } from "@/lib/lead-preview";
 
 type FeedItem = { id: number; kind: "search" | "fetch"; info: string };
 type SearchResult = { candidates?: Candidate[] } | TalentSearchResult;
@@ -409,6 +411,7 @@ export default function ResearchTool({
   projectId,           // 在某项目上下文里搜/验 → 入队 + 收藏自动归项目
   projectName,         // 仅显示
   projectFeedbackPreference,
+  projectLeadPreview,
 }: {
   mode: "search" | "verify";
   initialInput?: string;
@@ -416,6 +419,7 @@ export default function ResearchTool({
   projectId?: string;
   projectName?: string;
   projectFeedbackPreference?: ProjectFeedbackPreferenceView | null;
+  projectLeadPreview?: LeadPreviewView | null;
 }) {
   const { locale, t } = useI18n();
   const [input, setInput] = useState(initialInput);
@@ -855,6 +859,18 @@ export default function ResearchTool({
     }
   }
 
+  function applyLeadPreviewConstraint(constraint: LeadPreviewConstraint) {
+    const instruction = constraint.next_search_instruction.trim();
+    if (!instruction) return;
+    setInput((current) => {
+      if (current.includes(instruction)) return current;
+      return [current.trim(), `Negative constraints:\n${instruction}`].filter(Boolean).join("\n\n");
+    });
+    setSearchIntakeDraft(null);
+    setEditablePlan(null);
+    setAdvancedPlanOpen(false);
+  }
+
   function answerIntakeQuestion(question: SearchIntakeQuestion, option: { value: string; label: string }) {
     if (!searchIntakeDraft) return;
     syncSearchIntake(answerSearchIntakeQuestion(searchIntakeDraft, {
@@ -1194,6 +1210,16 @@ export default function ResearchTool({
 
       {isSearch && projectFeedbackPreference && (
         <ProjectFeedbackPreferenceBanner preference={projectFeedbackPreference} />
+      )}
+
+      {isSearch && projectLeadPreview && (
+        <LeadPreviewPanel
+          view={projectLeadPreview}
+          locale={locale}
+          projectId={projectId}
+          baseSearchInput={input}
+          onConstraint={applyLeadPreviewConstraint}
+        />
       )}
 
       {showSearchSetup ? (

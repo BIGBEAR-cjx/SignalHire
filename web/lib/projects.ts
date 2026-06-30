@@ -8,6 +8,8 @@
 
 import { createClient } from "@insforge/sdk";
 import { buildCandidateGraph } from "./candidate-graph.mjs";
+import { buildLeadPreviewView } from "./lead-preview.mjs";
+import { buildRoleOutreachSettings } from "./outreach-settings.mjs";
 import { buildPeopleProviderConfig, providerRowsToSourceLeads } from "./people-providers.mjs";
 import { listItems } from "./shortlist";
 
@@ -28,6 +30,7 @@ export interface Project {
   status: ProjectStatus;
   color: string | null;
   inbox_sync_summary?: unknown;
+  outreach_settings?: unknown;
   created_at: string;
   updated_at: string;
 }
@@ -63,12 +66,13 @@ export async function listProjects(userId: string): Promise<ProjectWithKpi[]> {
     id: string; user_id: string; name: string; brief: string | null;
     status: ProjectStatus; color: string | null;
     inbox_sync_summary?: unknown;
+    outreach_settings?: unknown;
     created_at: string; updated_at: string;
     candidates_total: string; candidates_active: string;
     runs_total: string; runs_active: string;
   }>(
     `SELECT
-        p.id, p.user_id, p.name, p.brief, p.status, p.color, p.inbox_sync_summary, p.created_at, p.updated_at,
+        p.id, p.user_id, p.name, p.brief, p.status, p.color, p.inbox_sync_summary, p.outreach_settings, p.created_at, p.updated_at,
         COALESCE(s.candidates_total, 0)  AS candidates_total,
         COALESCE(s.candidates_active, 0) AS candidates_active,
         COALESCE(r.runs_total, 0)        AS runs_total,
@@ -101,6 +105,7 @@ export async function listProjects(userId: string): Promise<ProjectWithKpi[]> {
     status: r.status,
     color: r.color,
     inbox_sync_summary: r.inbox_sync_summary ?? {},
+    outreach_settings: buildRoleOutreachSettings(r.outreach_settings),
     created_at: r.created_at,
     updated_at: r.updated_at,
     candidates_total: Number(r.candidates_total),
@@ -117,12 +122,13 @@ export async function getProject(userId: string, id: string): Promise<ProjectWit
     id: string; user_id: string; name: string; brief: string | null;
     status: ProjectStatus; color: string | null;
     inbox_sync_summary?: unknown;
+    outreach_settings?: unknown;
     created_at: string; updated_at: string;
     candidates_total: string; candidates_active: string;
     runs_total: string; runs_active: string;
   }>(
     `SELECT
-        p.id, p.user_id, p.name, p.brief, p.status, p.color, p.inbox_sync_summary, p.created_at, p.updated_at,
+        p.id, p.user_id, p.name, p.brief, p.status, p.color, p.inbox_sync_summary, p.outreach_settings, p.created_at, p.updated_at,
         COALESCE(s.candidates_total, 0)  AS candidates_total,
         COALESCE(s.candidates_active, 0) AS candidates_active,
         COALESCE(r.runs_total, 0)        AS runs_total,
@@ -151,6 +157,7 @@ export async function getProject(userId: string, id: string): Promise<ProjectWit
   return {
     id: r.id, user_id: r.user_id, name: r.name, brief: r.brief, status: r.status, color: r.color,
     inbox_sync_summary: r.inbox_sync_summary ?? {},
+    outreach_settings: buildRoleOutreachSettings(r.outreach_settings),
     created_at: r.created_at, updated_at: r.updated_at,
     candidates_total: Number(r.candidates_total),
     candidates_active: Number(r.candidates_active),
@@ -172,6 +179,22 @@ export async function updateProjectInboxSyncSummary(input: {
   if (error) throw new Error("inbox_sync_summary_write_failed");
   if ((data as Array<unknown> | null)?.length !== 1) throw new Error("inbox_sync_summary_write_failed");
   return true;
+}
+
+export async function updateProjectOutreachSettings(input: {
+  userId: string; id: string; settings: unknown;
+}): Promise<unknown | null> {
+  if (!client) return null;
+  const settings = buildRoleOutreachSettings(input.settings);
+  const { data, error } = await client.database
+    .from(TABLE)
+    .update({ outreach_settings: settings, updated_at: new Date().toISOString() })
+    .eq("id", input.id)
+    .eq("user_id", input.userId)
+    .select("outreach_settings");
+  if (error) throw new Error("outreach_settings_write_failed");
+  const row = (data as Array<{ outreach_settings?: unknown }> | null)?.[0];
+  return row ? buildRoleOutreachSettings(row.outreach_settings) : null;
 }
 
 // 创建新项目。
@@ -286,6 +309,7 @@ export interface ProjectRun {
   status: string;
   query_text: string;
   updated_at: string;
+  progress?: unknown;
   result?: unknown;
 }
 export async function projectRuns(userId: string, projectId: string, limit = 50): Promise<ProjectRun[]> {
@@ -293,7 +317,7 @@ export async function projectRuns(userId: string, projectId: string, limit = 50)
   try {
     const { data, error } = await client.database
       .from("research_runs")
-      .select("id,kind,label,summary,status,query_text,updated_at,result")
+      .select("id,kind,label,summary,status,query_text,updated_at,progress,result")
       .eq("user_id", userId)
       .eq("project_id", projectId)
       .order("updated_at", { ascending: false })
@@ -303,6 +327,60 @@ export async function projectRuns(userId: string, projectId: string, limit = 50)
   } catch {
     return [];
   }
+}
+
+export interface ProjectLeadPreviewView {
+  status: string;
+  items: Array<{
+    id: string;
+    label: string;
+    candidate_name: string;
+    headline: string;
+    company: string;
+    source_type: string;
+    source_url: string;
+    possible_match_reason: string;
+    missing_evidence: string[];
+    next_verification_step: string;
+    confidence: string;
+    feedback_state: string;
+    can_outreach: boolean;
+  }>;
+  feedback_constraints: unknown[];
+}
+
+async function listOpenEvidenceLeadsForRun(userId: string, runId: string): Promise<unknown[]> {
+  const rows = await runSQL<Record<string, unknown>>(
+    `SELECT
+       id,
+       provider,
+       source_type,
+       url AS source_url,
+       url,
+       title,
+       candidate_name,
+       title AS snippet,
+       '' AS reason,
+       '' AS company,
+       '' AS current_company,
+       CASE WHEN metric >= 50 THEN 'medium' ELSE 'low' END AS confidence
+     FROM open_evidence_leads
+     WHERE user_id = $1 AND source_run_id = $2
+     ORDER BY observed_at DESC
+     LIMIT 50`,
+    [userId, runId],
+  );
+  return rows ?? [];
+}
+
+export async function buildProjectLeadPreviewView(userId: string, projectId: string): Promise<ProjectLeadPreviewView> {
+  const runs = await projectRuns(userId, projectId, 10);
+  const run = runs.find((item) => item.kind === "search" && ["queued", "running", "retrying"].includes(item.status))
+    ?? runs.find((item) => item.kind === "search");
+  if (!run) return buildLeadPreviewView() as ProjectLeadPreviewView;
+
+  const openEvidenceLeads = await listOpenEvidenceLeadsForRun(userId, run.id);
+  return buildLeadPreviewView({ run, openEvidenceLeads }) as ProjectLeadPreviewView;
 }
 
 export interface ProjectCandidateGraphView {

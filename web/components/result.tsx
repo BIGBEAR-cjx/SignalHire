@@ -26,6 +26,7 @@ import { buildCandidateComparisonRows, buildCandidateEvidenceAudit, buildCandida
 import type { IconType } from "react-icons";
 import { FiCheckCircle, FiChevronDown, FiClock, FiExternalLink, FiFlag, FiHelpCircle, FiInfo, FiLink2, FiRefreshCw, FiShare2, FiUploadCloud, FiXCircle } from "react-icons/fi";
 import { t as translate } from "@/lib/i18n.mjs";
+import { sourceTypeLabel, sourceTypeTooltip } from "@/lib/source-classifier.mjs";
 import { buildRelatedTalentView, buildTalentIntelligenceReport } from "@/lib/talent-intelligence.mjs";
 import {
   reportUniqueSources,
@@ -451,6 +452,34 @@ function ReportMetric({ label, value, sublabel }: { label: string; value: string
   );
 }
 
+export function SourceMixSummaryView({ result, locale }: { result: TalentSearchResult } & ResultLocaleProps) {
+  const sourceMix = result.evidence_graph?.source_mix?.length
+    ? result.evidence_graph.source_mix
+    : result.agent_execution?.telemetry?.source_mix ?? [];
+  if (sourceMix.length === 0) return null;
+  return (
+    <div className="mt-4 rounded-2xl border border-black/10 bg-white/72 p-4">
+      <p className="text-sm font-semibold text-gray-900">{locale === "en" ? "Source mix" : "来源构成"}</p>
+      <p className="mt-1 text-xs leading-relaxed text-gray-500">
+        {locale === "en"
+          ? "Public evidence categories used to build this shortlist."
+          : "用于生成这份 shortlist 的公开证据来源类型。"}
+      </p>
+      <div className="mt-3 flex flex-wrap gap-2">
+        {sourceMix.slice(0, 8).map((item) => (
+          <span
+            key={item.source_type}
+            title={sourceTypeTooltip(item.source_type, locale)}
+            className="rounded-full bg-gray-50 px-2.5 py-1 text-xs font-semibold text-gray-700 ring-1 ring-black/10"
+          >
+            {sourceTypeLabel(item.source_type, locale)} · {item.count}
+          </span>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export function ShortlistDeliveryReportView({ result, locale }: { result: TalentSearchResult } & ResultLocaleProps) {
   const report: ShortlistDeliveryReport = buildShortlistDeliveryReport(result, { locale });
   if (report.candidate_count === 0) return null;
@@ -471,6 +500,7 @@ export function ShortlistDeliveryReportView({ result, locale }: { result: Talent
         <ReportMetric label={resultCopy(locale, "strongEvidenceCandidates")} value={report.high_evidence_count} />
         <ReportMetric label={resultCopy(locale, "sourceCoverage")} value={`${report.covered_group_count}/${report.coverage_group_count}`} />
       </div>
+      <SourceMixSummaryView result={result} locale={locale} />
       {report.recommended_candidates.length > 0 && (
         <div className="mt-4">
           <p className="text-sm font-semibold text-gray-900">{resultCopy(locale, "priorityReview")}</p>
@@ -568,7 +598,12 @@ export function SearchPlanView({ result, locale }: { result: TalentSearchResult 
         <div className="mt-4 grid gap-3 md:grid-cols-2">
           {plan.source_strategy.map((source, i) => (
             <article key={`${source.source_type}-${i}`} className="rounded-xl border border-gray-100 bg-gray-50/70 p-4">
-              <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">{source.source_type}</p>
+              <p
+                title={sourceTypeTooltip(source.source_type, locale)}
+                className="text-xs font-semibold uppercase tracking-wide text-gray-400"
+              >
+                {sourceTypeLabel(source.source_type, locale)}
+              </p>
               <h3 className="mt-1 text-sm font-semibold text-gray-900">{source.target}</h3>
               {source.reason && <p className="mt-2 text-sm leading-relaxed text-gray-600">{source.reason}</p>}
             </article>
@@ -590,8 +625,11 @@ export function SearchPlanView({ result, locale }: { result: TalentSearchResult 
                   <span className="rounded-full bg-gray-900 px-2 py-0.5 text-xs font-semibold text-white">
                     {item.priority}
                   </span>
-                  <span className="rounded-full bg-blue-50 px-2 py-0.5 text-xs font-medium text-blue-700 ring-1 ring-blue-100">
-                    {item.source_type}
+                  <span
+                    title={sourceTypeTooltip(item.source_type, locale)}
+                    className="rounded-full bg-blue-50 px-2 py-0.5 text-xs font-medium text-blue-700 ring-1 ring-blue-100"
+                  >
+                    {sourceTypeLabel(item.source_type, locale)}
                   </span>
                   <span className="text-xs text-gray-400">{coverageGroupLabel(item.coverage_group, locale)}</span>
                 </div>
@@ -678,8 +716,11 @@ export function SourceExecutionView({ result, locale }: { result: TalentSearchRe
                 <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ring-1 ${status.chip}`}>
                   {status.label}
                 </span>
-                <span className="rounded-full bg-white px-2 py-0.5 text-xs font-medium text-blue-700 ring-1 ring-blue-100">
-                  {job.source_type}
+                <span
+                  title={sourceTypeTooltip(job.source_type, locale)}
+                  className="rounded-full bg-white px-2 py-0.5 text-xs font-medium text-blue-700 ring-1 ring-blue-100"
+                >
+                  {sourceTypeLabel(job.source_type, locale)}
                 </span>
                 <span className="text-xs text-gray-400">{coverageGroupLabel(job.coverage_group, locale)}</span>
               </div>
@@ -762,8 +803,11 @@ export function CoverageBackfillView({
                 <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ring-1 ${status.chip}`}>
                   {status.label}
                 </span>
-                <span className="rounded-full bg-white px-2 py-0.5 text-xs font-medium text-blue-700 ring-1 ring-blue-100">
-                  {job.missing_source_type}
+                <span
+                  title={sourceTypeTooltip(job.missing_source_type, locale)}
+                  className="rounded-full bg-white px-2 py-0.5 text-xs font-medium text-blue-700 ring-1 ring-blue-100"
+                >
+                  {sourceTypeLabel(job.missing_source_type, locale)}
                 </span>
                 <span className="text-xs text-gray-500">{coverageGroupLabel(job.coverage_group, locale)}</span>
               </div>
@@ -852,8 +896,12 @@ export function BackfillMergeSummaryView({
                   {resultCopy(locale, "newEvidence", { count: candidate.new_evidence_count })}
                 </span>
                 {candidate.new_source_types.map((type) => (
-                  <span key={type} className="rounded-full bg-blue-50 px-2 py-0.5 text-xs font-medium text-blue-700 ring-1 ring-blue-100">
-                    {type}
+                  <span
+                    key={type}
+                    title={sourceTypeTooltip(type, locale)}
+                    className="rounded-full bg-blue-50 px-2 py-0.5 text-xs font-medium text-blue-700 ring-1 ring-blue-100"
+                  >
+                    {sourceTypeLabel(type, locale)}
                   </span>
                 ))}
               </div>
@@ -1400,8 +1448,12 @@ function CandidateSourceLinks({ candidate, sourceTypes, locale }: { candidate: T
         </span>
       )}
       {sourceTypes.slice(0, 4).map((sourceType) => (
-        <span key={sourceType} className="rounded-full bg-[var(--sh-canvas)] px-2.5 py-1 text-xs font-medium text-[var(--sh-muted)] ring-1 ring-black/10">
-          {sourceType}
+        <span
+          key={sourceType}
+          title={sourceTypeTooltip(sourceType, locale)}
+          className="rounded-full bg-[var(--sh-canvas)] px-2.5 py-1 text-xs font-medium text-[var(--sh-muted)] ring-1 ring-black/10"
+        >
+          {sourceTypeLabel(sourceType, locale)}
         </span>
       ))}
     </div>
@@ -1489,9 +1541,23 @@ export function SearchResultWorkspaceView({
           )}
           <div className="rounded-2xl bg-white/72 p-3 ring-1 ring-black/5">
             <p className="text-xs font-semibold text-[var(--sh-muted)]">{workspaceUiCopy(locale, "sourceMix")}</p>
-            <p className="mt-2 text-sm leading-6 text-[var(--sh-ink)]">
-              {workspace.agent_execution.telemetry.source_mix.slice(0, 5).map((item) => `${item.source_type} ${item.count}`).join(" / ") || `${workspace.completion.searches} ${workspaceUiCopy(locale, "searches")} / ${workspace.completion.fetches} ${workspaceUiCopy(locale, "fetches")}`}
-            </p>
+            {workspace.agent_execution.telemetry.source_mix.length > 0 ? (
+              <div className="mt-2 flex flex-wrap gap-1.5">
+                {workspace.agent_execution.telemetry.source_mix.slice(0, 5).map((item) => (
+                  <span
+                    key={item.source_type}
+                    title={sourceTypeTooltip(item.source_type, locale)}
+                    className="rounded-full bg-[var(--sh-canvas)] px-2.5 py-1 text-xs font-semibold text-[var(--sh-ink)] ring-1 ring-black/10"
+                  >
+                    {sourceTypeLabel(item.source_type, locale)} {item.count}
+                  </span>
+                ))}
+              </div>
+            ) : (
+              <p className="mt-2 text-sm leading-6 text-[var(--sh-ink)]">
+                {workspace.completion.searches} {workspaceUiCopy(locale, "searches")} / {workspace.completion.fetches} {workspaceUiCopy(locale, "fetches")}
+              </p>
+            )}
             {workspace.completion.duration_seconds > 0 && (
               <p className="mt-1 text-xs text-[var(--sh-muted)]">{workspace.completion.duration_seconds}{workspaceUiCopy(locale, "seconds")}</p>
             )}
@@ -1743,8 +1809,12 @@ export function EvidenceAuditView({ candidate, result, locale }: { candidate: Ta
       {audit.source_types.length > 0 && (
         <div className="mt-3 flex flex-wrap gap-1.5">
           {audit.source_types.map((type) => (
-            <span key={type} className="rounded-full bg-white px-2 py-0.5 text-xs font-medium text-blue-700 ring-1 ring-blue-100">
-              {type}
+            <span
+              key={type}
+              title={sourceTypeTooltip(type, locale)}
+              className="rounded-full bg-white px-2 py-0.5 text-xs font-medium text-blue-700 ring-1 ring-blue-100"
+            >
+              {sourceTypeLabel(type, locale)}
             </span>
           ))}
         </div>
@@ -1820,8 +1890,12 @@ export function EvidenceGraphView({ result, candidate, locale }: { result: Talen
       {node?.source_types.length ? (
         <div className="mt-2 flex flex-wrap gap-1.5">
           {node.source_types.map((type) => (
-            <span key={type} className="rounded-full bg-blue-50 px-2 py-0.5 text-xs font-medium text-blue-700 ring-1 ring-blue-100">
-              {type}
+            <span
+              key={type}
+              title={sourceTypeTooltip(type, locale)}
+              className="rounded-full bg-blue-50 px-2 py-0.5 text-xs font-medium text-blue-700 ring-1 ring-blue-100"
+            >
+              {sourceTypeLabel(type, locale)}
             </span>
           ))}
         </div>
@@ -1886,8 +1960,11 @@ function CandidateEvidenceMatrixView({ matrix, locale }: { matrix: CandidateEvid
                           {/* eslint-disable-next-line @next/next/no-img-element */}
                           <img src={favicon(source.url)} alt="" width={12} height={12} className="rounded-sm" />
                           <span className="truncate">{source.host || host(source.url, locale)}</span>
-                          <span className="shrink-0 rounded-full bg-blue-50 px-1.5 py-0.5 text-[10px] font-medium text-blue-700 ring-1 ring-blue-100">
-                            {source.source_type}
+                          <span
+                            title={sourceTypeTooltip(source.source_type, locale)}
+                            className="shrink-0 rounded-full bg-blue-50 px-1.5 py-0.5 text-[10px] font-medium text-blue-700 ring-1 ring-blue-100"
+                          >
+                            {sourceTypeLabel(source.source_type, locale)}
                           </span>
                         </a>
                       ))}
@@ -1944,8 +2021,12 @@ function CandidateEvidenceDossierView({
 
       <div className="mt-3 flex flex-wrap gap-1.5">
         {dossier.source_types.map((type) => (
-          <span key={type} className="rounded-full bg-white px-2 py-0.5 text-xs font-medium text-blue-700 ring-1 ring-blue-100">
-            {type}
+          <span
+            key={type}
+            title={sourceTypeTooltip(type, locale)}
+            className="rounded-full bg-white px-2 py-0.5 text-xs font-medium text-blue-700 ring-1 ring-blue-100"
+          >
+            {sourceTypeLabel(type, locale)}
           </span>
         ))}
       </div>
@@ -1967,8 +2048,12 @@ function CandidateEvidenceDossierView({
           {dossier.backfill_delta.new_source_types.length > 0 && (
             <div className="mt-2 flex flex-wrap gap-1.5">
               {dossier.backfill_delta.new_source_types.map((type) => (
-                <span key={type} className="rounded-full bg-white px-2 py-0.5 text-xs font-medium text-blue-700 ring-1 ring-blue-100">
-                  {type}
+                <span
+                  key={type}
+                  title={sourceTypeTooltip(type, locale)}
+                  className="rounded-full bg-white px-2 py-0.5 text-xs font-medium text-blue-700 ring-1 ring-blue-100"
+                >
+                  {sourceTypeLabel(type, locale)}
                 </span>
               ))}
             </div>
