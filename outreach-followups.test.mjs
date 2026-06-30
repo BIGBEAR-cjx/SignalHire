@@ -143,3 +143,20 @@ test("summarizes follow-up draft run outcomes", () => {
     reasons: { not_due: 1, db_error: 1 },
   });
 });
+
+test("follow-up draft run summary records run time for persisted observability", () => {
+  const summary = buildFollowUpDraftRunSummary([
+    { status: "drafted" },
+    { status: "drafted" },
+    { status: "skipped", reason: "not_due" },
+  ], { now });
+
+  assert.deepEqual(summary, {
+    last_run_at: "2026-06-30T10:00:00.000Z",
+    scanned: 3,
+    drafted: 2,
+    skipped: 1,
+    failed: 0,
+    reasons: { not_due: 1 },
+  });
+});

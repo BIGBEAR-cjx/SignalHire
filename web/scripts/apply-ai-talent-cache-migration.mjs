@@ -18,6 +18,7 @@ const migrations = [
   "20260624190000_autonomous_recruiter_p2a_inbox_agent.sql",
   "20260626130000_autonomous_recruiter_p2h_inbox_sync_summary.sql",
   "20260630120000_outreach_followup_settings.sql",
+  "20260630130000_outreach_gmail_draft_fields.sql",
 ];
 
 async function applyMigration(fileName) {

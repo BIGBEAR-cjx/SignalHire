@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import {
   GOOGLE_CALENDAR_FREEBUSY_SCOPE,
   buildGmailAuthUrl,
+  buildGmailDraftPayload,
   buildGmailRawMessage,
   buildGmailSendPayload,
   decryptTokenBundle,
@@ -139,6 +140,15 @@ test("gmail send payload can bind inbox replies to the original thread", () => {
   });
 });
 
+test("gmail draft payload keeps follow-ups as drafts on the original thread", () => {
+  assert.deepEqual(buildGmailDraftPayload({ raw: "raw-1", threadId: "gmail-thread-1" }), {
+    message: {
+      raw: "raw-1",
+      threadId: "gmail-thread-1",
+    },
+  });
+});
+
 test("approval and sent patches stamp lifecycle fields", () => {
   const approved = normalizeOutreachThreadPatch({ status: "approved" }, { now: new Date("2026-06-24T10:00:00.000Z") });
   const sent = normalizeOutreachThreadPatch({
@@ -151,4 +161,16 @@ test("approval and sent patches stamp lifecycle fields", () => {
   assert.equal(sent.sent_at, "2026-06-24T11:00:00.000Z");
   assert.equal(sent.gmail_message_id, "msg-1");
   assert.equal(sent.gmail_thread_id, "thread-1");
+});
+
+test("gmail draft patches store draft id without stamping sent lifecycle", () => {
+  const patch = normalizeOutreachThreadPatch({
+    gmail_draft_id: "draft-1",
+    gmail_draft_updated_at: "2026-06-30T10:00:00.000Z",
+  }, { now: new Date("2026-06-30T10:00:00.000Z") });
+
+  assert.equal(patch.gmail_draft_id, "draft-1");
+  assert.equal(patch.gmail_draft_updated_at, "2026-06-30T10:00:00.000Z");
+  assert.equal(patch.sent_at, undefined);
+  assert.equal(patch.gmail_message_id, undefined);
 });

@@ -25,6 +25,7 @@ import { buildCandidateDecisionSignal, buildEvidencePriorityView, buildProjectEv
 import { buildOutreachApprovalOutcome, selectOutreachApprovalRetryTargets, selectOutreachReadinessTargets } from "@/lib/outreach-readiness.mjs";
 import { buildAgencyOutreachActivityDigest } from "@/lib/outreach-activity-digest.mjs";
 import { buildEvidenceDrivenOutreachSequence } from "@/lib/outreach-draft.mjs";
+import { latestFollowUpDraftState } from "@/lib/outreach-followups.mjs";
 import { buildRoleOutreachSettings } from "@/lib/outreach-settings.mjs";
 import { sourceTypeLabel, sourceTypeTooltip } from "@/lib/source-classifier.mjs";
 import type { LeadPreviewView } from "@/lib/lead-preview";
@@ -329,7 +330,10 @@ type OutreachQueueView = {
     last_contacted_at?: string | null;
     gmail_message_id?: string;
     gmail_thread_id?: string;
+    gmail_draft_id?: string;
+    gmail_draft_updated_at?: string | null;
     send_error?: string;
+    notes?: string | null;
     next_follow_up_at: string | null;
     updated_at: string;
     queue_state: "due" | "draft" | "scheduled" | "active";
@@ -454,6 +458,14 @@ type ProjectInboxSyncSummaryView = {
   skipped_reason?: string;
   error_count?: number;
   errors?: Array<{ error?: string }>;
+  outreach_followup_summary?: {
+    last_run_at?: string;
+    scanned?: number;
+    drafted?: number;
+    skipped?: number;
+    failed?: number;
+    reasons?: Record<string, number>;
+  };
 };
 
 type ContactProfileView = {
@@ -1217,6 +1229,23 @@ function projectInboxSyncSummaryLabel(summary: ProjectInboxSyncSummaryView | und
   return `${isEn ? "Background sync" : "后台同步"}: ${when} · ${isEn ? `scanned ${scanned}` : `扫描 ${scanned}`} · ${isEn ? `synced ${synced}` : `同步 ${synced}`}`;
 }
 
+function projectFollowUpSchedulerSummaryLabel(summary: ProjectInboxSyncSummaryView | undefined, locale: "zh" | "en") {
+  const isEn = locale === "en";
+  const followUp = summary?.outreach_followup_summary;
+  if (!followUp?.last_run_at) {
+    return isEn
+      ? "Follow-up scheduler has not run for this role yet."
+      : "跟进调度还没有检查过这个岗位。";
+  }
+  const when = new Date(followUp.last_run_at).toLocaleString(isEn ? "en-US" : "zh-CN");
+  const drafted = Number(followUp.drafted ?? 0);
+  const scanned = Number(followUp.scanned ?? 0);
+  const failed = Number(followUp.failed ?? 0);
+  return isEn
+    ? `Follow-up scheduler: ${when} · scanned ${scanned} · generated ${drafted} review draft${drafted === 1 ? "" : "s"}${failed ? ` · ${failed} failed` : ""}`
+    : `跟进调度：${when} · 扫描 ${scanned} · 生成 ${drafted} 个待审核跟进草稿${failed ? ` · ${failed} 个失败` : ""}`;
+}
+
 function inboxPriorityLine(summary: InboxQueueView["summary"] | undefined, locale: "zh" | "en") {
   const isEn = locale === "en";
   const scheduling = summary?.needs_scheduling ?? summary?.interested ?? 0;
@@ -1264,6 +1293,7 @@ function GmailOutreachPanel({
   projectId,
   projectName,
   persistedSettings,
+  projectSyncSummary,
   locale,
   onChanged,
 }: {
@@ -1271,6 +1301,7 @@ function GmailOutreachPanel({
   projectId: string;
   projectName: string;
   persistedSettings?: ProjectDetail["project"]["outreach_settings"];
+  projectSyncSummary?: ProjectInboxSyncSummaryView;
   locale: "zh" | "en";
   onChanged: () => void;
 }) {
@@ -1385,6 +1416,31 @@ function GmailOutreachPanel({
       const j = await r.json().catch(() => ({}));
       if (!r.ok) {
         const fallback = locale === "en" ? "Gmail send failed." : "Gmail 发送失败。";
+        setSendErrors((prev) => ({ ...prev, [id]: String(j.error || fallback) }));
+        onChanged();
+        return;
+      }
+      setSendErrors((prev) => {
+        const next = { ...prev };
+        delete next[id];
+        return next;
+      });
+      onChanged();
+    } finally {
+      setBusyId(null);
+    }
+  }
+  async function saveGmailDraft(id: string) {
+    setBusyId(id);
+    try {
+      const r = await fetch(`/api/outreach-threads/${id}/draft`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ locale }),
+      });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok) {
+        const fallback = locale === "en" ? "Gmail draft creation failed." : "Gmail 草稿创建失败。";
         setSendErrors((prev) => ({ ...prev, [id]: String(j.error || fallback) }));
         onChanged();
         return;
@@ -1636,6 +1692,9 @@ function GmailOutreachPanel({
               ? `Default follow-up interval: ${roleOutreachSettings.follow_up_interval_days} days.`
               : `默认跟进间隔：${roleOutreachSettings.follow_up_interval_days} 天。`}
           </p>
+          <p className="mt-2 rounded-xl bg-white px-3 py-2 text-xs leading-5 text-gray-700 ring-1 ring-black/10">
+            {projectFollowUpSchedulerSummaryLabel(projectSyncSummary, locale)}
+          </p>
         </div>
         <div className="rounded-2xl border border-black/10 bg-white/72 p-4">
           <div className="flex flex-wrap items-center justify-between gap-2">
@@ -1734,7 +1793,15 @@ function GmailOutreachPanel({
         </p>
       ) : (
         <ul className="grid gap-3 lg:grid-cols-2">
-          {items.slice(0, 6).map((item) => (
+          {items.slice(0, 6).map((item) => {
+            const followUpDraftState = latestFollowUpDraftState(item.notes ?? "");
+            const isDueFollowUpDraft = item.status === "follow_up_due" && Boolean(followUpDraftState);
+            const isFirstEmailDraft = item.status === "drafted" || item.status === "approved";
+            const draftKindLabel = isDueFollowUpDraft
+              ? (isEn ? "Due follow-up draft" : "到期跟进草稿")
+              : (isEn ? "First email draft" : "首封草稿");
+            const isDueDisplay = isDueFollowUpDraft || item.queue_state === "due";
+            return (
             <li key={item.id} className="rounded-2xl border border-black/10 bg-white/80 p-4">
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
@@ -1742,11 +1809,33 @@ function GmailOutreachPanel({
                   <p className="mt-1 truncate text-xs text-[var(--sh-muted)]">{item.subject || (isEn ? "Untitled draft" : "未命名草稿")}</p>
                 </div>
                 <StatusBadge
-                  label={item.queue_state === "due" ? (isEn ? "Due" : "到期") : item.status}
-                  dotClassName={item.queue_state === "due" ? "bg-amber-500" : "bg-blue-500"}
-                  className={item.queue_state === "due" ? "bg-amber-50 text-amber-800 ring-amber-200" : "bg-blue-50 text-blue-700 ring-blue-200"}
+                  label={isDueFollowUpDraft ? draftKindLabel : (item.queue_state === "due" ? (isEn ? "Due" : "到期") : item.status)}
+                  dotClassName={isDueDisplay ? "bg-amber-500" : "bg-blue-500"}
+                  className={isDueDisplay ? "bg-amber-50 text-amber-800 ring-amber-200" : "bg-blue-50 text-blue-700 ring-blue-200"}
                 />
               </div>
+              {(isDueFollowUpDraft || isFirstEmailDraft) && (
+                <p className={`mt-3 rounded-xl px-3 py-2 text-xs leading-5 ring-1 ${
+                  isDueFollowUpDraft
+                    ? "bg-amber-50 text-amber-900 ring-amber-100"
+                    : "bg-blue-50 text-blue-800 ring-blue-100"
+                }`}>
+                  {isDueFollowUpDraft
+                    ? (isEn
+                      ? `This is follow-up #${followUpDraftState?.step ?? ""} prepared for review. Saving a Gmail draft will not send email.`
+                      : `这是第 ${followUpDraftState?.step ?? ""} 封到期跟进草稿，需审核后保存到 Gmail 草稿箱，不会发送邮件。`)
+                    : (isEn
+                      ? "First email draft. Approve it before sending from Gmail."
+                      : "首封草稿。先批准，再通过 Gmail 发送。")}
+                </p>
+              )}
+              {item.gmail_draft_id && (
+                <p className="mt-2 rounded-xl bg-emerald-50 px-3 py-2 text-xs leading-5 text-emerald-800 ring-1 ring-emerald-100">
+                  {isEn
+                    ? `Gmail draft saved${item.gmail_draft_updated_at ? ` · ${new Date(item.gmail_draft_updated_at).toLocaleString("en-US")}` : ""}`
+                    : `Gmail 草稿已保存${item.gmail_draft_updated_at ? ` · ${new Date(item.gmail_draft_updated_at).toLocaleString("zh-CN")}` : ""}`}
+                </p>
+              )}
               <div className="mt-3 rounded-xl bg-gray-50 px-3 py-2 text-xs ring-1 ring-black/5">
                 {(item.contact_profile?.emails?.length ?? 0) > 0 ? (
                   <div className="space-y-1.5">
@@ -1822,13 +1911,13 @@ function GmailOutreachPanel({
                   value={editing[item.id]?.subject ?? item.subject ?? ""}
                   onChange={(event) => setEditing((prev) => ({ ...prev, [item.id]: { subject: event.target.value, body: prev[item.id]?.body ?? item.body ?? "" } }))}
                   className="min-h-9 rounded-xl border border-black/10 bg-white px-3 text-xs text-[var(--sh-ink)] outline-none focus:border-[var(--sh-blue)]"
-                  aria-label={isEn ? "First email subject" : "首封邮件标题"}
+                  aria-label={isDueFollowUpDraft ? (isEn ? "Follow-up subject" : "跟进邮件标题") : (isEn ? "First email subject" : "首封邮件标题")}
                 />
                 <textarea
                   value={editing[item.id]?.body ?? item.body ?? ""}
                   onChange={(event) => setEditing((prev) => ({ ...prev, [item.id]: { subject: prev[item.id]?.subject ?? item.subject ?? "", body: event.target.value } }))}
                   className="min-h-[88px] resize-y rounded-xl border border-black/10 bg-white px-3 py-2 text-xs leading-5 text-[var(--sh-ink)] outline-none focus:border-[var(--sh-blue)]"
-                  aria-label={isEn ? "First email body" : "首封邮件正文"}
+                  aria-label={isDueFollowUpDraft ? (isEn ? "Follow-up body" : "跟进邮件正文") : (isEn ? "First email body" : "首封邮件正文")}
                 />
               </div>
               <div className="mt-3 rounded-xl border border-black/10 bg-white px-3 py-2">
@@ -1887,6 +1976,7 @@ function GmailOutreachPanel({
                 >
                   {[
                     ...(item.status === "sent" ? ["sent"] : []),
+                    ...(item.status === "follow_up_due" ? ["follow_up_due"] : []),
                     "drafted",
                     "approved",
                     "follow_up_scheduled",
@@ -1926,6 +2016,11 @@ function GmailOutreachPanel({
                 <PrimaryAction onClick={() => approveOutreachThread(item)} disabled={busyId === item.id || !primaryEmail(item.contact_profile) || item.status !== "drafted"} className="min-h-9 px-3 py-2 text-xs">
                   {isEn ? "Approve" : "批准"}
                 </PrimaryAction>
+                {isDueFollowUpDraft && (
+                  <PrimaryAction onClick={() => saveGmailDraft(item.id)} disabled={busyId === item.id || !gmail?.connected || !primaryEmail(item.contact_profile) || !item.gmail_thread_id} className="min-h-9 px-3 py-2 text-xs">
+                    {isEn ? "Save Gmail draft" : "保存 Gmail 草稿"}
+                  </PrimaryAction>
+                )}
                 <PrimaryAction onClick={() => sendOutreachThread(item.id)} disabled={busyId === item.id || !gmail?.connected || !primaryEmail(item.contact_profile) || item.status !== "approved"} className="min-h-9 px-3 py-2 text-xs">
                   <FiSend className="h-3.5 w-3.5" aria-hidden="true" />
                   {isEn ? "Send" : "发送"}
@@ -1935,7 +2030,8 @@ function GmailOutreachPanel({
                 </SecondaryAction>
               </div>
             </li>
-          ))}
+          );
+          })}
         </ul>
       )}
     </Surface>
@@ -2708,6 +2804,7 @@ export default function ProjectDetailPage() {
         projectId={detail.project.id}
         projectName={detail.project.name}
         persistedSettings={detail.project.outreach_settings}
+        projectSyncSummary={detail.project.inbox_sync_summary}
         locale={locale}
         onChanged={reloadDetail}
       />

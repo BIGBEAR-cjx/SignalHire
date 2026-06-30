@@ -19,7 +19,8 @@ export function buildDueFollowUpDraftPatch(input?: {
   settings?: unknown;
   now?: Date;
 }): DueFollowUpDraftPatch;
-export function buildFollowUpDraftRunSummary(items?: Array<{ status?: string; reason?: string }>): {
+export function buildFollowUpDraftRunSummary(items?: Array<{ status?: string; reason?: string }>, options?: { now?: Date | string }): {
+  last_run_at?: string;
   scanned: number;
   drafted: number;
   skipped: number;

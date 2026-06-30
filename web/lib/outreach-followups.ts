@@ -2,6 +2,7 @@ import { createClient } from "@insforge/sdk";
 import { buildDueFollowUpDraftPatch, buildFollowUpDraftRunSummary } from "./outreach-followups.mjs";
 import { buildRoleOutreachSettings } from "./outreach-settings.mjs";
 import { updateOutreachThread, type OutreachThread } from "./outreach-threads";
+import { recordProjectOutreachFollowUpSummary } from "./projects";
 
 const BASE = process.env.INSFORGE_API_BASE_URL;
 const KEY = process.env.INSFORGE_API_KEY;
@@ -76,6 +77,7 @@ export async function processDueFollowUpDrafts({
 
   for (const project of projects) {
     const settings = buildRoleOutreachSettings(project.outreach_settings);
+    const projectOutcomes: Array<{ status: string; reason?: string }> = [];
     const threads = await listDueThreadsForProject({
       userId: project.user_id,
       projectId: project.id,
@@ -86,7 +88,9 @@ export async function processDueFollowUpDrafts({
     for (const thread of threads) {
       const result = buildDueFollowUpDraftPatch({ thread, settings, now });
       if (!result.ok) {
-        outcomes.push({ status: "skipped", reason: result.reason });
+        const outcome = { status: "skipped", reason: result.reason };
+        projectOutcomes.push(outcome);
+        outcomes.push(outcome);
         continue;
       }
       try {
@@ -95,16 +99,28 @@ export async function processDueFollowUpDrafts({
           id: thread.id,
           ...result.patch,
         });
-        outcomes.push(updated ? { status: "drafted" } : { status: "failed", reason: "update_failed" });
+        const outcome = updated ? { status: "drafted" } : { status: "failed", reason: "update_failed" };
+        projectOutcomes.push(outcome);
+        outcomes.push(outcome);
       } catch (error) {
-        outcomes.push({ status: "failed", reason: error instanceof Error ? error.message : "update_failed" });
+        const outcome = { status: "failed", reason: error instanceof Error ? error.message : "update_failed" };
+        projectOutcomes.push(outcome);
+        outcomes.push(outcome);
       }
     }
+
+    try {
+      await recordProjectOutreachFollowUpSummary({
+        userId: project.user_id,
+        id: project.id,
+        summary: buildFollowUpDraftRunSummary(projectOutcomes, { now }),
+      });
+    } catch {}
   }
 
   return {
     ok: true,
     project_count: projects.length,
-    summary: buildFollowUpDraftRunSummary(outcomes),
+    summary: buildFollowUpDraftRunSummary(outcomes, { now }),
   };
 }

@@ -97,6 +97,8 @@ export function buildOutreachThreadDraft({
     last_contacted_at: normalizedStatus === "contacted" || normalizedStatus === "sent" ? now.toISOString() : null,
     gmail_message_id: "",
     gmail_thread_id: "",
+    gmail_draft_id: "",
+    gmail_draft_updated_at: null,
     send_error: "",
   };
 }
@@ -127,6 +129,8 @@ export function normalizeOutreachThreadPatch(input = {}, { now = new Date() } = 
   if (input.sent_at !== undefined) patch.sent_at = validIso(input.sent_at);
   if (input.gmail_message_id !== undefined) patch.gmail_message_id = cleanString(input.gmail_message_id);
   if (input.gmail_thread_id !== undefined) patch.gmail_thread_id = cleanString(input.gmail_thread_id);
+  if (input.gmail_draft_id !== undefined) patch.gmail_draft_id = cleanString(input.gmail_draft_id);
+  if (input.gmail_draft_updated_at !== undefined) patch.gmail_draft_updated_at = validIso(input.gmail_draft_updated_at);
   if (input.send_error !== undefined) patch.send_error = cleanString(input.send_error);
   return patch;
 }

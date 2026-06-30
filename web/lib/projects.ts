@@ -181,6 +181,26 @@ export async function updateProjectInboxSyncSummary(input: {
   return true;
 }
 
+export async function recordProjectOutreachFollowUpSummary(input: {
+  userId: string; id: string; summary: unknown;
+}): Promise<boolean> {
+  const rows = await runSQL<{ id: string }>(
+    `UPDATE projects
+     SET inbox_sync_summary = jsonb_set(
+       COALESCE(inbox_sync_summary, '{}'::jsonb),
+       '{outreach_followup_summary}',
+       $3::jsonb,
+       true
+     ),
+     updated_at = now()
+     WHERE user_id = $1 AND id = $2
+     RETURNING id`,
+    [input.userId, input.id, JSON.stringify(input.summary ?? {})],
+  );
+  if (!rows || rows.length !== 1) throw new Error("outreach_followup_summary_write_failed");
+  return true;
+}
+
 export async function updateProjectOutreachSettings(input: {
   userId: string; id: string; settings: unknown;
 }): Promise<unknown | null> {

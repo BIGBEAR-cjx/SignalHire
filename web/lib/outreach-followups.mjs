@@ -13,6 +13,7 @@ function isRecord(value) {
 }
 
 function validDate(value) {
+  if (value instanceof Date) return Number.isFinite(value.getTime()) ? value : null;
   const clean = cleanString(value);
   if (!clean) return null;
   const date = new Date(clean);
@@ -100,18 +101,21 @@ export function buildDueFollowUpDraftPatch({ thread = {}, settings = {}, now = n
   };
 }
 
-export function buildFollowUpDraftRunSummary(items = []) {
+export function buildFollowUpDraftRunSummary(items = [], options = {}) {
   const rows = Array.isArray(items) ? items : [];
   const reasons = {};
   for (const item of rows) {
     const reason = cleanString(item?.reason);
     if (reason) reasons[reason] = (reasons[reason] ?? 0) + 1;
   }
-  return {
+  const summary = {
     scanned: rows.length,
     drafted: rows.filter((item) => item?.status === "drafted").length,
     skipped: rows.filter((item) => item?.status === "skipped").length,
     failed: rows.filter((item) => item?.status === "failed").length,
     reasons,
   };
+  const runAt = validDate(options?.now);
+  if (runAt) return { last_run_at: runAt.toISOString(), ...summary };
+  return summary;
 }

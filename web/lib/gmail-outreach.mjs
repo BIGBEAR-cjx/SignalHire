@@ -90,6 +90,10 @@ export function buildGmailSendPayload({ raw, threadId }) {
   return payload;
 }
 
+export function buildGmailDraftPayload({ raw, threadId }) {
+  return { message: buildGmailSendPayload({ raw, threadId }) };
+}
+
 export function validateOutreachSend({ thread, gmailConnected }) {
   const source = isRecord(thread) ? thread : {};
   if (!gmailConnected) return { ok: false, reason: "gmail_not_connected" };

@@ -184,6 +184,44 @@ test("outreach follow-up cron saves review drafts without Gmail auto-send", () =
   assert.doesNotMatch(projectPage, /localStorage\.setItem\(`signalhire:outreach-settings/);
 });
 
+test("follow-up review drafts are visibly distinct and cron summary is persisted", () => {
+  const projectPage = readFileSync("web/app/app/projects/[id]/page.tsx", "utf8");
+  const runner = readFileSync("web/lib/outreach-followups.ts", "utf8");
+  const projects = readFileSync("web/lib/projects.ts", "utf8");
+
+  assert.match(projectPage, /latestFollowUpDraftState/);
+  assert.match(projectPage, /Due follow-up draft/);
+  assert.match(projectPage, /到期跟进草稿/);
+  assert.match(projectPage, /First email draft/);
+  assert.match(projectPage, /首封草稿/);
+  assert.match(projectPage, /projectFollowUpSchedulerSummaryLabel/);
+  assert.match(runner, /recordProjectOutreachFollowUpSummary/);
+  assert.match(projects, /outreach_followup_summary/);
+});
+
+test("Gmail draft API creates review drafts without sending", () => {
+  const migration = readFileSync("migrations/20260630130000_outreach_gmail_draft_fields.sql", "utf8");
+  const runner = readFileSync("web/scripts/apply-ai-talent-cache-migration.mjs", "utf8");
+  const schema = readFileSync("web/scripts/check-ai-talent-cache-schema.mjs", "utf8");
+  const route = readFileSync("web/app/api/outreach-threads/[id]/draft/route.ts", "utf8");
+  const gmail = readFileSync("web/lib/gmail.ts", "utf8");
+  const outreach = readFileSync("web/lib/outreach-threads.mjs", "utf8");
+  const projectPage = readFileSync("web/app/app/projects/[id]/page.tsx", "utf8");
+
+  assert.match(migration, /add column if not exists gmail_draft_id text/);
+  assert.match(migration, /add column if not exists gmail_draft_updated_at timestamptz/);
+  assert.match(runner, /20260630130000_outreach_gmail_draft_fields\.sql/);
+  assert.match(schema, /gmail_draft_id/);
+  assert.match(schema, /gmail_draft_updated_at/);
+  assert.match(route, /saveGmailDraftForThread/);
+  assert.match(gmail, /drafts/);
+  assert.match(gmail, /saveGmailDraftForThread/);
+  assert.match(outreach, /gmail_draft_id/);
+  assert.match(projectPage, /saveGmailDraft/);
+  assert.match(projectPage, /Save Gmail draft/);
+  assert.doesNotMatch(route, /sendApprovedOutreachThread|sendInboxDraftThread|messages\/send/);
+});
+
 test("background inbox sync summary is persisted and visible in Role Workspace", () => {
   const migration = readFileSync("migrations/20260626130000_autonomous_recruiter_p2h_inbox_sync_summary.sql", "utf8");
   const runner = readFileSync("web/lib/inbox-background-sync.mjs", "utf8");
