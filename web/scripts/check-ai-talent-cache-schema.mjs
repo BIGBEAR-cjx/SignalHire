@@ -87,6 +87,16 @@ const REQUIRED_TABLES = [
       "body",
       "status",
       "next_follow_up_at",
+      "gmail_draft_id",
+      "gmail_draft_updated_at",
+    ],
+  },
+  {
+    table: "projects",
+    columns: [
+      "id",
+      "user_id",
+      "outreach_settings",
     ],
   },
 ];

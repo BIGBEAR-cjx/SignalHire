@@ -74,6 +74,8 @@ test("schema verification covers AI talent cache tables", () => {
   assert.match(source, /open_evidence_leads/);
   assert.match(source, /search_tasks/);
   assert.match(source, /outreach_threads/);
+  assert.match(source, /projects/);
+  assert.match(source, /outreach_settings/);
   assert.match(source, /source_run_id/);
   assert.match(source, /cache_key/);
   assert.match(researchRunsSource, /search_task_id/);
@@ -88,6 +90,7 @@ test("AI talent cache migration can be applied without jq", () => {
   assert.match(source, /20260615100000_dinq-recruiting-agent-mvp\.sql/);
   assert.match(source, /20260624170000_autonomous_recruiter_p1a_gmail_outreach\.sql/);
   assert.match(source, /20260624190000_autonomous_recruiter_p2a_inbox_agent\.sql/);
+  assert.match(source, /20260630120000_outreach_followup_settings\.sql/);
   assert.match(source, /advance\/rawsql/);
   assert.match(source, /INSFORGE_API_BASE_URL/);
   assert.doesNotMatch(source, /jq/);
@@ -151,6 +154,72 @@ test("Vercel cron can run background inbox sync without exposing Gmail secrets",
   assert.match(runner, /maxThreadsPerProject/);
   assert.match(wrapper, /syncGmailInboxForProject/);
   assert.doesNotMatch(cronRoute, /GOOGLE_CLIENT_SECRET|GMAIL_TOKEN_ENCRYPTION_KEY|access_token|refresh_token/);
+});
+
+test("outreach follow-up cron saves review drafts without Gmail auto-send", () => {
+  const migration = readFileSync("migrations/20260630120000_outreach_followup_settings.sql", "utf8");
+  const config = readFileSync("web/vercel.json", "utf8");
+  const route = readFileSync("web/app/api/cron/outreach-followups/route.ts", "utf8");
+  const runner = readFileSync("web/lib/outreach-followups.ts", "utf8");
+  const pure = readFileSync("web/lib/outreach-followups.mjs", "utf8");
+  const projects = readFileSync("web/lib/projects.ts", "utf8");
+  const settingsRoute = readFileSync("web/app/api/projects/[id]/outreach-settings/route.ts", "utf8");
+  const projectPage = readFileSync("web/app/app/projects/[id]/page.tsx", "utf8");
+
+  assert.match(migration, /add column if not exists outreach_settings jsonb/);
+  assert.match(config, /"path": "\/api\/cron\/outreach-followups"/);
+  assert.match(route, /processDueFollowUpDrafts/);
+  assert.match(route, /CRON_SECRET/);
+  assert.match(runner, /outreach_settings->>'auto_follow_up_only'/);
+  assert.match(runner, /updateOutreachThread/);
+  assert.doesNotMatch(`${route}\n${runner}`, /sendApprovedOutreachThread|sendInboxDraftThread|sendViaGmail|messages\/send/);
+  assert.match(pure, /step < 2/);
+  assert.match(pure, /follow_up_due/);
+  assert.match(pure, /draft_for_review/);
+  assert.match(projects, /updateProjectOutreachSettings/);
+  assert.match(projects, /buildRoleOutreachSettings\(r\.outreach_settings\)/);
+  assert.match(settingsRoute, /updateProjectOutreachSettings/);
+  assert.match(projectPage, /persistedSettings/);
+  assert.match(projectPage, /\/api\/projects\/\$\{projectId\}\/outreach-settings/);
+  assert.doesNotMatch(projectPage, /localStorage\.setItem\(`signalhire:outreach-settings/);
+});
+
+test("follow-up review drafts are visibly distinct and cron summary is persisted", () => {
+  const projectPage = readFileSync("web/app/app/projects/[id]/page.tsx", "utf8");
+  const runner = readFileSync("web/lib/outreach-followups.ts", "utf8");
+  const projects = readFileSync("web/lib/projects.ts", "utf8");
+
+  assert.match(projectPage, /latestFollowUpDraftState/);
+  assert.match(projectPage, /Due follow-up draft/);
+  assert.match(projectPage, /到期跟进草稿/);
+  assert.match(projectPage, /First email draft/);
+  assert.match(projectPage, /首封草稿/);
+  assert.match(projectPage, /projectFollowUpSchedulerSummaryLabel/);
+  assert.match(runner, /recordProjectOutreachFollowUpSummary/);
+  assert.match(projects, /outreach_followup_summary/);
+});
+
+test("Gmail draft API creates review drafts without sending", () => {
+  const migration = readFileSync("migrations/20260630130000_outreach_gmail_draft_fields.sql", "utf8");
+  const runner = readFileSync("web/scripts/apply-ai-talent-cache-migration.mjs", "utf8");
+  const schema = readFileSync("web/scripts/check-ai-talent-cache-schema.mjs", "utf8");
+  const route = readFileSync("web/app/api/outreach-threads/[id]/draft/route.ts", "utf8");
+  const gmail = readFileSync("web/lib/gmail.ts", "utf8");
+  const outreach = readFileSync("web/lib/outreach-threads.mjs", "utf8");
+  const projectPage = readFileSync("web/app/app/projects/[id]/page.tsx", "utf8");
+
+  assert.match(migration, /add column if not exists gmail_draft_id text/);
+  assert.match(migration, /add column if not exists gmail_draft_updated_at timestamptz/);
+  assert.match(runner, /20260630130000_outreach_gmail_draft_fields\.sql/);
+  assert.match(schema, /gmail_draft_id/);
+  assert.match(schema, /gmail_draft_updated_at/);
+  assert.match(route, /saveGmailDraftForThread/);
+  assert.match(gmail, /drafts/);
+  assert.match(gmail, /saveGmailDraftForThread/);
+  assert.match(outreach, /gmail_draft_id/);
+  assert.match(projectPage, /saveGmailDraft/);
+  assert.match(projectPage, /Save Gmail draft/);
+  assert.doesNotMatch(route, /sendApprovedOutreachThread|sendInboxDraftThread|messages\/send/);
 });
 
 test("background inbox sync summary is persisted and visible in Role Workspace", () => {
@@ -254,6 +323,41 @@ test("evidence-qualified workspace shows delivery summary and claim counts", () 
   assert.match(resultComponents, /majorGapLabel/);
   assert.match(resultComponents, /row\.claim_counts\.verified/);
   assert.match(talentProfile, /claim_counts/);
+});
+
+test("Lessie-inspired recruiting flow exposes preview, source mix, and follow-up safeguards", () => {
+  const projectRoute = readFileSync("web/app/api/projects/[id]/route.ts", "utf8");
+  const projects = readFileSync("web/lib/projects.ts", "utf8");
+  const searchPage = readFileSync("web/app/app/search/page.tsx", "utf8");
+  const researchTool = readFileSync("web/components/ResearchTool.tsx", "utf8");
+  const projectPage = readFileSync("web/app/app/projects/[id]/page.tsx", "utf8");
+  const leadPreviewPanel = readFileSync("web/components/LeadPreviewPanel.tsx", "utf8");
+  const resultComponents = readFileSync("web/components/result.tsx", "utf8");
+  const candidateGraph = readFileSync("web/lib/candidate-graph.mjs", "utf8");
+
+  assert.match(projectRoute, /leadPreview: await buildProjectLeadPreviewView/);
+  assert.match(projects, /FROM open_evidence_leads/);
+  assert.match(projects, /source_run_id = \$2/);
+  assert.match(projects, /ORDER BY observed_at DESC/);
+  assert.doesNotMatch(projects, /WHERE user_id = \$1 AND run_id = \$2/);
+  assert.doesNotMatch(projects, /ORDER BY created_at DESC/);
+  assert.match(projects, /progress,result/);
+  assert.match(searchPage, /projectLeadPreview/);
+  assert.match(researchTool, /LeadPreviewPanel/);
+  assert.match(researchTool, /applyLeadPreviewConstraint/);
+  assert.match(projectPage, /view=\{detail\.leadPreview\}/);
+  assert.match(leadPreviewPanel, /buildLeadPreviewConstraint/);
+  assert.match(leadPreviewPanel, /can_outreach/);
+  assert.match(leadPreviewPanel, /sourceTypeTooltip/);
+  assert.match(candidateGraph, /classifySourceType/);
+  assert.match(resultComponents, /SourceMixSummaryView/);
+  assert.match(resultComponents, /sourceTypeTooltip/);
+  assert.match(projectPage, /auto_follow_up_only/);
+  assert.match(projectPage, /follow_up_interval_days/);
+  assert.match(projectPage, /buildAgencyOutreachActivityDigest/);
+  assert.match(projectPage, /manual_approval_required/);
+  assert.match(projectPage, /draft_for_review/);
+  assert.match(projectPage, /delay_days: index === 0 \? undefined : 7/);
 });
 
 test("claims expose a unified supplement-material entry", () => {

@@ -1,7 +1,8 @@
 import { createHash } from "node:crypto";
+import { classifySourceType } from "./source-classifier.mjs";
 
-const SOURCE_TYPES = new Set(["internal_resume", "people_api", "linkedin_seed", "public_web", "manual_upload"]);
-const SOURCE_MIX_ORDER = ["people_api", "public_web", "linkedin_seed", "internal_resume", "manual_upload"];
+const SOURCE_TYPES = new Set(["github", "paper", "company_page", "personal_site", "people_api", "linkedin_seed", "public_web", "internal_resume", "manual_upload"]);
+const SOURCE_MIX_ORDER = ["github", "paper", "company_page", "personal_site", "people_api", "public_web", "linkedin_seed", "internal_resume", "manual_upload"];
 const CONFIDENCE_LEVELS = new Set(["high", "medium", "low"]);
 const EVIDENCE_QUALITY = new Set(["high", "medium", "low"]);
 
@@ -28,8 +29,8 @@ function cleanKey(value) {
     .slice(0, 160);
 }
 
-function sourceTypeOf(value) {
-  const sourceType = cleanString(value);
+function sourceTypeOf(source) {
+  const sourceType = classifySourceType(source);
   return SOURCE_TYPES.has(sourceType) ? sourceType : "public_web";
 }
 
@@ -85,7 +86,7 @@ function candidateWebsite(candidate) {
 export function normalizeSourceLead(value = {}) {
   const source = isRecord(value) ? value : {};
   return {
-    source_type: sourceTypeOf(source.source_type),
+    source_type: sourceTypeOf(source),
     provider: cleanString(source.provider),
     source_url: cleanString(source.source_url),
     captured_at: cleanString(source.captured_at),
@@ -121,7 +122,7 @@ function sourceLeadsFromCandidate(candidate) {
     for (const item of evidence) {
       if (item?.url) {
         nodes.push(normalizeSourceLead({
-          source_type: "public_web",
+          source_type: item.source_type || "public_web",
           source_url: item.url,
           confidence: item.confidence || "high",
           extracted_fields: { source_type: cleanString(item.source_type) },

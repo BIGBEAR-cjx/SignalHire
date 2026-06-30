@@ -30,6 +30,8 @@ export interface OutreachThread {
   sent_at: string | null;
   gmail_message_id: string;
   gmail_thread_id: string;
+  gmail_draft_id: string;
+  gmail_draft_updated_at: string | null;
   send_error: string;
   last_contacted_at: string | null;
   next_follow_up_at: string | null;
@@ -172,6 +174,8 @@ export async function updateOutreachThread(input: {
   sent_at?: string | null;
   gmail_message_id?: string;
   gmail_thread_id?: string;
+  gmail_draft_id?: string;
+  gmail_draft_updated_at?: string | null;
   send_error?: string;
 }): Promise<OutreachThread | null> {
   if (!client) return null;

@@ -11,6 +11,10 @@
     {
       "path": "/api/cron/inbox-sync",
       "schedule": "0 2 * * *"
+    },
+    {
+      "path": "/api/cron/outreach-followups",
+      "schedule": "0 3 * * *"
     }
   ]
 }

@@ -1,8 +1,10 @@
 import { createClient } from "@insforge/sdk";
 import { buildCalendarFreeBusyRequest, calendarScopeStatus, slotsFromFreeBusy } from "./calendar-availability.mjs";
-import { buildGmailAuthUrl, buildGmailRawMessage, buildGmailSendPayload, decryptTokenBundle, encryptTokenBundle, validateInboxDraftSend, validateOutreachSend } from "./gmail-outreach.mjs";
+import { primarySendableEmail } from "./contact-profile.mjs";
+import { buildGmailAuthUrl, buildGmailDraftPayload, buildGmailRawMessage, buildGmailSendPayload, decryptTokenBundle, encryptTokenBundle, validateInboxDraftSend, validateOutreachSend } from "./gmail-outreach.mjs";
 import { refreshGmailTokenBundle } from "./gmail-token.mjs";
 import { buildInboxDraftSentPatch } from "./inbox-actions.mjs";
+import { latestFollowUpDraftState } from "./outreach-followups.mjs";
 import { getOutreachThread, updateOutreachThread, type OutreachThread } from "./outreach-threads";
 
 const BASE = process.env.INSFORGE_API_BASE_URL;
@@ -11,6 +13,7 @@ const client = BASE && KEY ? createClient({ baseUrl: BASE, anonKey: KEY, isServe
 const TABLE = "gmail_connections";
 const GMAIL_TOKEN_URL = "https://oauth2.googleapis.com/token";
 const GMAIL_SEND_URL = "https://gmail.googleapis.com/gmail/v1/users/me/messages/send";
+const GMAIL_DRAFT_URL = "https://gmail.googleapis.com/gmail/v1/users/me/drafts";
 const GMAIL_THREAD_URL = "https://gmail.googleapis.com/gmail/v1/users/me/threads";
 const CALENDAR_FREEBUSY_URL = "https://www.googleapis.com/calendar/v3/freeBusy";
 
@@ -218,6 +221,33 @@ async function sendViaGmail(input: { accessToken: string; raw: string; threadId?
   return json as { id?: string; threadId?: string };
 }
 
+async function createGmailDraft(input: { accessToken: string; raw: string; threadId?: string }) {
+  const response = await fetch(GMAIL_DRAFT_URL, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${input.accessToken}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(buildGmailDraftPayload({ raw: input.raw, threadId: input.threadId })),
+  });
+  const json = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(`Gmail draft failed ${response.status}`);
+  return json as { id?: string; message?: { threadId?: string } };
+}
+
+function validateFollowUpDraftSave(thread: OutreachThread | null, gmailConnected: boolean) {
+  if (!gmailConnected) return { ok: false as const, reason: "gmail_not_connected" };
+  if (!thread) return { ok: false as const, reason: "thread_not_found" };
+  if (thread.status !== "follow_up_due") return { ok: false as const, reason: "not_follow_up_due" };
+  if (!thread.gmail_thread_id?.trim()) return { ok: false as const, reason: "missing_gmail_thread_id" };
+  const state = latestFollowUpDraftState(thread.notes);
+  if (!state || String(state.action) !== "save_follow_up_draft") return { ok: false as const, reason: "draft_not_saved" };
+  const email = primarySendableEmail(thread.contact_profile as never);
+  if (!email) return { ok: false as const, reason: "missing_sendable_email" };
+  if (!thread.subject.trim() || !thread.body.trim()) return { ok: false as const, reason: "missing_message" };
+  return { ok: true as const, email };
+}
+
 function gmailHeader(headers: Array<{ name?: string; value?: string }> | undefined, name: string) {
   return headers?.find((header) => header.name?.toLowerCase() === name.toLowerCase())?.value ?? "";
 }
@@ -386,6 +416,47 @@ export async function sendInboxDraftThread(input: { userId: string; threadId: st
     return { ok: true, thread: updated };
   } catch (error) {
     const message = error instanceof Error ? error.message : "Gmail send failed";
+    await updateOutreachThread({ userId: input.userId, id: input.threadId, send_error: message });
+    return { ok: false, error: message };
+  }
+}
+
+export async function saveGmailDraftForThread(input: { userId: string; threadId: string }) {
+  const [connection, thread] = await Promise.all([
+    findConnection(input.userId),
+    getOutreachThread({ userId: input.userId, id: input.threadId }),
+  ]);
+  const validation = validateFollowUpDraftSave(thread, Boolean(connection));
+  if (!validation.ok) {
+    if (thread) await updateOutreachThread({ userId: input.userId, id: input.threadId, send_error: validation.reason });
+    return { ok: false, error: validation.reason };
+  }
+  const sourceThread = thread as OutreachThread;
+  const sourceConnection = connection as GmailConnection;
+  try {
+    const raw = buildGmailRawMessage({
+      from: sourceConnection.gmail_address || "me",
+      to: validation.email.value,
+      subject: sourceThread.subject,
+      body: sourceThread.body,
+    });
+    const result = await createGmailDraft({
+      accessToken: await accessTokenFor(sourceConnection),
+      raw,
+      threadId: sourceThread.gmail_thread_id,
+    });
+    const updated = await updateOutreachThread({
+      userId: input.userId,
+      id: input.threadId,
+      gmail_draft_id: result.id ?? "",
+      gmail_draft_updated_at: new Date().toISOString(),
+      gmail_thread_id: result.message?.threadId ?? sourceThread.gmail_thread_id,
+      send_error: "",
+    });
+    if (!updated) return { ok: false, error: "draft_state_update_failed" };
+    return { ok: true, thread: updated };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Gmail draft failed";
     await updateOutreachThread({ userId: input.userId, id: input.threadId, send_error: message });
     return { ok: false, error: message };
   }

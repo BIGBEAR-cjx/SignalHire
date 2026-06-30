@@ -4,6 +4,7 @@
 //   DELETE → 删除 (关联候选人/历史 project_id 置 NULL, 不删除)
 import {
   buildProjectCandidateGraphView,
+  buildProjectLeadPreviewView,
   deleteProject,
   getProject,
   projectCandidateBreakdown,
@@ -60,6 +61,7 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
     outreachQueue,
     inboxQueue: await buildProjectInboxQueueView(user.id, id),
     candidateGraph: await buildProjectCandidateGraphView(user.id, id),
+    leadPreview: await buildProjectLeadPreviewView(user.id, id),
   });
 }
 
