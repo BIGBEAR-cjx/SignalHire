@@ -1,5 +1,6 @@
 const MISSING_EVIDENCE = ["public evidence packet", "contact provenance"];
 const DEFAULT_NEXT_STEP = "Verify public evidence packet and contact provenance before recommendation or outreach.";
+const BLOCKED_OUTREACH_REASON = "Preview outreach is disabled until public evidence and contact provenance are verified.";
 
 function isRecord(value) {
   return Boolean(value && typeof value === "object" && !Array.isArray(value));
@@ -95,9 +96,28 @@ function normalizeLead(row) {
   };
 }
 
+function buildSummary(items) {
+  const sourceTypeCounts = new Map();
+
+  for (const item of items) {
+    sourceTypeCounts.set(item.source_type, (sourceTypeCounts.get(item.source_type) || 0) + 1);
+  }
+
+  const profileLeadCount = items.filter((item) => item.source_type === "people_api").length;
+  return {
+    item_count: items.length,
+    profile_lead_count: profileLeadCount,
+    evidence_source_count: items.length - profileLeadCount,
+    source_type_counts: Array.from(sourceTypeCounts, ([source_type, count]) => ({ source_type, count })),
+    can_outreach_count: items.filter((item) => item.can_outreach).length,
+    blocked_outreach_reason: BLOCKED_OUTREACH_REASON,
+  };
+}
+
 export function buildLeadPreviewView({ run = {}, openEvidenceLeads = [] } = {}) {
   if (resultHasVerifiedCandidates(run)) {
-    return { status: "verified_results_available", items: [], feedback_constraints: [] };
+    const items = [];
+    return { status: "verified_results_available", items, summary: buildSummary(items), feedback_constraints: [] };
   }
 
   const seen = new Set();
@@ -121,6 +141,7 @@ export function buildLeadPreviewView({ run = {}, openEvidenceLeads = [] } = {}) 
   return {
     status: items.length > 0 ? "preview_available" : "waiting_for_leads",
     items,
+    summary: buildSummary(items),
     feedback_constraints: [],
   };
 }

@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { FiAlertCircle, FiCheckCircle, FiChevronRight, FiClock, FiFilter, FiRefreshCw, FiSearch, FiX } from "react-icons/fi";
 import { useI18n } from "@/components/LanguageProvider";
 import { EmptyState, LoadingState, PageIntro, PrimaryAction, SecondaryAction, StatusBadge, Surface } from "@/components/ui/signal-ui";
+import { buildHistoryFilterChips } from "@/lib/history.mjs";
 
 type HistoryStatus = "all" | "queued" | "running" | "retrying" | "done" | "error" | "canceled" | "needs_action";
 type HistoryKind = "all" | "search" | "verify";
@@ -46,9 +47,11 @@ type HistoryItem = {
     shortlist_ready: boolean;
   };
   needs_action: boolean;
+  needs_action_reasons?: string[];
 };
 
 type ProjectOption = { id: string; name: string };
+type HistoryFilterChip = { key: string; label: string; clearPatch: Record<string, string> };
 
 const DEFAULT_FILTERS: HistoryFilters = {
   q: "",
@@ -178,6 +181,8 @@ export default function HistoryPage() {
     filters: "Filters",
     moreFilters: "More filters",
     clear: "Clear",
+    activeFilters: "Active filters",
+    removeFilter: "Remove filter",
     type: "Type",
     status: "Status",
     time: "Time",
@@ -209,10 +214,12 @@ export default function HistoryPage() {
     filters: "筛选",
     moreFilters: "更多筛选",
     clear: "清空",
+    activeFilters: "已选筛选",
+    removeFilter: "移除筛选",
     type: "类型",
     status: "状态",
     time: "时间",
-    role: "Role",
+    role: "岗位",
     evidence: "证据",
     allRoles: "全部岗位",
     all: "全部",
@@ -239,6 +246,22 @@ export default function HistoryPage() {
 
   const setFilter = (patch: Partial<HistoryFilters>) => setFilters((current) => ({ ...current, ...patch }));
   const clearFilters = () => setFilters(DEFAULT_FILTERS);
+  const activeFilterChips = useMemo(
+    () => buildHistoryFilterChips(filters, projects, { locale }) as HistoryFilterChip[],
+    [filters, projects, locale],
+  );
+  const clearActiveFilter = (clearPatch: Record<string, string>) => {
+    const has = (key: keyof HistoryFilters) => Object.prototype.hasOwnProperty.call(clearPatch, key);
+    setFilters((current) => ({
+      ...current,
+      q: has("q") ? clearPatch.q : current.q,
+      kind: has("kind") ? clearPatch.kind as HistoryKind : current.kind,
+      status: has("status") ? clearPatch.status as HistoryStatus : current.status,
+      range: has("range") ? clearPatch.range as HistoryRange : current.range,
+      projectId: has("projectId") ? clearPatch.projectId : current.projectId,
+      evidence: has("evidence") ? clearPatch.evidence as EvidenceFilter : current.evidence,
+    }));
+  };
 
   return (
     <div className="space-y-6">
@@ -294,6 +317,24 @@ export default function HistoryPage() {
             </button>
           )}
         </div>
+
+        {activeFilterChips.length > 0 && (
+          <div className="flex flex-wrap items-center gap-2" aria-label={copy.activeFilters}>
+            {activeFilterChips.map((chip) => (
+              <button
+                key={chip.key}
+                type="button"
+                onClick={() => clearActiveFilter(chip.clearPatch)}
+                className="inline-flex min-h-9 max-w-full items-center gap-1.5 rounded-full bg-neutral-100 px-3 py-1.5 text-xs font-semibold text-neutral-700 ring-1 ring-black/5 hover:bg-neutral-200"
+                aria-label={`${copy.removeFilter}: ${chip.label}`}
+                title={chip.label}
+              >
+                <span className="max-w-56 truncate">{chip.label}</span>
+                <FiX className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+              </button>
+            ))}
+          </div>
+        )}
 
         {moreOpen && (
           <div className="grid gap-3 border-t border-black/10 pt-4 md:grid-cols-2 xl:grid-cols-4">
@@ -391,6 +432,11 @@ export default function HistoryPage() {
                           )}
                         </div>
                       )}
+                      {h.needs_action && h.needs_action_reasons?.length ? (
+                        <p className="max-w-full truncate text-xs font-medium text-red-700" title={h.needs_action_reasons.join(" / ")}>
+                          {h.needs_action_reasons.join(" / ")}
+                        </p>
+                      ) : null}
                     </div>
                     <span className="inline-flex shrink-0 items-center gap-2 text-sm font-semibold text-neutral-900">
                       {h.next_action.label}

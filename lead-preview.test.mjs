@@ -1,5 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { buildLeadPreviewView } from "./web/lib/lead-preview.mjs";
 import { buildLeadPreviewConstraint } from "./web/lib/lead-preview-feedback.mjs";
 
@@ -177,6 +178,89 @@ test("returns waiting status and ignores malformed lead rows", () => {
 
   assert.equal(view.status, "waiting_for_leads");
   assert.equal(view.items.length, 0);
+});
+
+test("summarizes preview counts and source type mix", () => {
+  const view = buildLeadPreviewView({
+    run: {
+      progress: {
+        agent_execution: {
+          candidate_submission_events: [
+            {
+              name: "Ada Lovelace",
+              company: "Example AI",
+              source_type: "github",
+              source_url: "https://github.com/ada",
+            },
+            {
+              name: "Grace Hopper",
+              company: "Navy",
+              source_type: "paper",
+              source_url: "https://example.com/grace-paper",
+            },
+          ],
+        },
+      },
+    },
+    openEvidenceLeads: [
+      {
+        provider: "openjobs_mira",
+        source_type: "people_api",
+        url: "https://linkedin.com/in/katherine",
+        title: "Katherine Johnson",
+      },
+      {
+        source_type: "github",
+        source_url: "https://github.com/dorothy",
+        title: "Dorothy Vaughan",
+      },
+    ],
+  });
+
+  assert.deepEqual(view.summary, {
+    item_count: 4,
+    profile_lead_count: 1,
+    evidence_source_count: 3,
+    source_type_counts: [
+      { source_type: "github", count: 2 },
+      { source_type: "paper", count: 1 },
+      { source_type: "people_api", count: 1 },
+    ],
+    can_outreach_count: 0,
+    blocked_outreach_reason: "Preview outreach is disabled until public evidence and contact provenance are verified.",
+  });
+});
+
+test("always includes summary for waiting and verified result states", () => {
+  const waitingView = buildLeadPreviewView();
+  const verifiedView = buildLeadPreviewView({
+    run: {
+      result: {
+        shortlist: [{ name: "Verified Candidate" }],
+      },
+    },
+  });
+
+  assert.equal(waitingView.status, "waiting_for_leads");
+  assert.equal(waitingView.summary.item_count, 0);
+  assert.equal(waitingView.summary.can_outreach_count, 0);
+  assert.equal(waitingView.summary.blocked_outreach_reason, "Preview outreach is disabled until public evidence and contact provenance are verified.");
+
+  assert.equal(verifiedView.status, "verified_results_available");
+  assert.equal(verifiedView.summary.item_count, 0);
+  assert.deepEqual(verifiedView.summary.source_type_counts, []);
+  assert.equal(verifiedView.summary.blocked_outreach_reason, "Preview outreach is disabled until public evidence and contact provenance are verified.");
+});
+
+test("LeadPreviewPanel statically renders summary from view.summary", () => {
+  const source = readFileSync(new URL("./web/components/LeadPreviewPanel.tsx", import.meta.url), "utf8");
+  const projects = readFileSync(new URL("./web/lib/projects.ts", import.meta.url), "utf8");
+
+  assert.match(source, /view\.summary/);
+  assert.match(source, /预览线索/);
+  assert.match(source, /aria-label=\{c\.blockedReason\}/);
+  assert.match(projects, /import type \{ LeadPreviewView \}/);
+  assert.match(projects, /export type ProjectLeadPreviewView = LeadPreviewView/);
 });
 
 test("not relevant feedback becomes a next-search constraint", () => {

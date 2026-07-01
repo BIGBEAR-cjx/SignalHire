@@ -72,6 +72,88 @@ function statusLabel(status, locale) {
   return labels[status] ?? status;
 }
 
+function kindLabel(kind, locale) {
+  const en = locale === "en";
+  const labels = {
+    search: en ? "Search" : "搜人",
+    verify: en ? "Verify" : "核验",
+  };
+  return labels[kind] ?? kind;
+}
+
+function rangeLabel(range, locale) {
+  const en = locale === "en";
+  const labels = {
+    today: en ? "Today" : "今天",
+    "7d": en ? "7 days" : "7 天",
+    "30d": en ? "30 days" : "30 天",
+  };
+  return labels[range] ?? range;
+}
+
+function evidenceLabel(evidence, locale) {
+  const en = locale === "en";
+  const labels = {
+    high_confidence: en ? "High confidence" : "高置信",
+    needs_verification: en ? "Needs verification" : "待核验",
+    low_evidence: en ? "Low evidence" : "低证据",
+    has_gaps: en ? "Has evidence gaps" : "有证据缺口",
+    shortlist_ready: en ? "Shortlist ready" : "可交付名单",
+  };
+  return labels[evidence] ?? evidence;
+}
+
+function chipLabel(name, value, locale) {
+  const en = locale === "en";
+  const names = {
+    q: en ? "Keyword" : "关键词",
+    kind: en ? "Type" : "类型",
+    status: en ? "Status" : "状态",
+    range: en ? "Time" : "时间",
+    projectId: en ? "Role" : "岗位",
+    evidence: en ? "Evidence" : "证据",
+  };
+  return `${names[name] ?? name}: ${value}`;
+}
+
+/**
+ * @returns {Array<{ key: string; label: string; clearPatch: Record<string, string> }>}
+ */
+export function buildHistoryFilterChips(filters, projects = [], { locale = "zh" } = {}) {
+  const projectMap = new Map((projects ?? []).map((project) => [cleanString(project?.id), cleanString(project?.name)]));
+  const chips = [];
+  const q = cleanString(filters?.q);
+  const kind = oneOf(filters?.kind, HISTORY_KINDS);
+  const rawStatus = cleanString(filters?.status);
+  const status = oneOf(rawStatus, HISTORY_STATUSES);
+  const needsAction = filters?.needsAction === true || rawStatus === "needs_action";
+  const range = oneOf(filters?.range, HISTORY_RANGES);
+  const projectId = cleanString(filters?.projectId).slice(0, 80);
+  const evidence = oneOf(filters?.evidence, HISTORY_EVIDENCE_FILTERS);
+
+  if (q) {
+    chips.push({ key: "q", label: chipLabel("q", q, locale), clearPatch: { q: "" } });
+  }
+  if (kind !== "all") {
+    chips.push({ key: "kind", label: chipLabel("kind", kindLabel(kind, locale), locale), clearPatch: { kind: "all" } });
+  }
+  if (needsAction) {
+    chips.push({ key: "status", label: chipLabel("status", locale === "en" ? "Needs action" : "需要处理", locale), clearPatch: { status: "all", needsAction: "" } });
+  } else if (status !== "all") {
+    chips.push({ key: "status", label: chipLabel("status", statusLabel(status, locale), locale), clearPatch: { status: "all" } });
+  }
+  if (range !== "all") {
+    chips.push({ key: "range", label: chipLabel("range", rangeLabel(range, locale), locale), clearPatch: { range: "all" } });
+  }
+  if (projectId) {
+    chips.push({ key: "projectId", label: chipLabel("projectId", projectMap.get(projectId) || projectId, locale), clearPatch: { projectId: "" } });
+  }
+  if (evidence !== "all") {
+    chips.push({ key: "evidence", label: chipLabel("evidence", evidenceLabel(evidence, locale), locale), clearPatch: { evidence: "all" } });
+  }
+  return chips;
+}
+
 function nextActionForRun(row, locale) {
   const en = locale === "en";
   const kind = row.kind === "verify" ? "verify" : "search";
@@ -123,6 +205,18 @@ export function buildHistoryEvidenceSummary(result, { locale = "zh" } = {}) {
   }
 }
 
+function buildNeedsActionReasons(status, evidenceSummary, locale) {
+  const en = locale === "en";
+  const reasons = [];
+  if (status === "error") reasons.push(en ? "Failed run" : "运行失败");
+  if (status === "canceled") reasons.push(en ? "Canceled run" : "运行已取消");
+  if (evidenceSummary?.has_gaps) reasons.push(en ? "Evidence gaps" : "证据缺口");
+  if (evidenceSummary?.needs_verification_count) {
+    reasons.push(en ? "Candidates need verification" : "候选人待核验");
+  }
+  return reasons;
+}
+
 export function buildHistoryRunView(row, { locale = "zh" } = {}) {
   const normalized = {
     id: cleanString(row.id),
@@ -139,12 +233,14 @@ export function buildHistoryRunView(row, { locale = "zh" } = {}) {
     finished_at: cleanString(row.finished_at) || null,
   };
   const evidenceSummary = buildHistoryEvidenceSummary(row.result, { locale });
+  const needsActionReasons = buildNeedsActionReasons(normalized.status, evidenceSummary, locale);
   return {
     ...normalized,
     status_label: statusLabel(normalized.status, locale),
     next_action: nextActionForRun(normalized, locale),
     evidence_summary: evidenceSummary ?? undefined,
-    needs_action: FINAL_ERROR_STATUSES.has(normalized.status) || Boolean(evidenceSummary?.has_gaps || evidenceSummary?.needs_verification_count),
+    needs_action: needsActionReasons.length > 0,
+    needs_action_reasons: needsActionReasons.length > 0 ? needsActionReasons : undefined,
   };
 }
 

@@ -9,6 +9,7 @@
 import { createClient } from "@insforge/sdk";
 import { buildCandidateGraph } from "./candidate-graph.mjs";
 import { buildLeadPreviewView } from "./lead-preview.mjs";
+import type { LeadPreviewView } from "./lead-preview";
 import { buildRoleOutreachSettings } from "./outreach-settings.mjs";
 import { buildPeopleProviderConfig, providerRowsToSourceLeads } from "./people-providers.mjs";
 import { buildReferralPathViews, normalizeNetworkSeed } from "./referral-paths.mjs";
@@ -379,25 +380,7 @@ export async function projectRuns(userId: string, projectId: string, limit = 50)
   }
 }
 
-export interface ProjectLeadPreviewView {
-  status: string;
-  items: Array<{
-    id: string;
-    label: string;
-    candidate_name: string;
-    headline: string;
-    company: string;
-    source_type: string;
-    source_url: string;
-    possible_match_reason: string;
-    missing_evidence: string[];
-    next_verification_step: string;
-    confidence: string;
-    feedback_state: string;
-    can_outreach: boolean;
-  }>;
-  feedback_constraints: unknown[];
-}
+export type ProjectLeadPreviewView = LeadPreviewView;
 
 async function listOpenEvidenceLeadsForRun(userId: string, runId: string): Promise<unknown[]> {
   const rows = await runSQL<Record<string, unknown>>(

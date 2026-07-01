@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
 import {
+  buildHistoryFilterChips,
   buildHistoryRunView,
   historyRangeStart,
   matchesHistoryEvidenceFilter,
@@ -64,6 +65,30 @@ test("normalizes history filters and date ranges", () => {
   assert.match(historyRangeStart("7d", new Date("2026-06-23T12:00:00.000Z")), /^2026-06-16T12:00:00\.000Z$/);
 });
 
+test("builds removable active history filter chips", () => {
+  const filters = normalizeHistoryFilters({
+    q: " founder ",
+    kind: "verify",
+    status: "needs_action",
+    range: "7d",
+    projectId: "project-1",
+    evidence: "has_gaps",
+  });
+  const chips = buildHistoryFilterChips(filters, [{ id: "project-1", name: "AI Growth" }], { locale: "en" });
+
+  assert.deepEqual(chips.map((chip) => chip.key), ["q", "kind", "status", "range", "projectId", "evidence"]);
+  assert.deepEqual(chips.map((chip) => chip.label), [
+    "Keyword: founder",
+    "Type: Verify",
+    "Status: Needs action",
+    "Time: 7 days",
+    "Role: AI Growth",
+    "Evidence: Has evidence gaps",
+  ]);
+  assert.deepEqual(chips.find((chip) => chip.key === "status")?.clearPatch, { status: "all", needsAction: "" });
+  assert.deepEqual(chips.find((chip) => chip.key === "projectId")?.clearPatch, { projectId: "" });
+});
+
 test("builds history run next actions and evidence summaries", () => {
   const run = buildHistoryRunView({
     id: "run-1",
@@ -86,8 +111,34 @@ test("builds history run next actions and evidence summaries", () => {
   assert.equal(run.evidence_summary.candidate_count, 2);
   assert.equal(run.evidence_summary.high_confidence_count, 1);
   assert.equal(run.evidence_summary.needs_verification_count, 1);
+  assert.equal(run.needs_action, true);
+  assert.match(run.needs_action_reasons.join(" / "), /Candidates need verification/);
   assert.equal(matchesHistoryEvidenceFilter(run, "high_confidence"), true);
   assert.equal(matchesHistoryEvidenceFilter(run, "needs_verification"), true);
+});
+
+test("builds needs action reasons for failed and canceled runs", () => {
+  const failed = buildHistoryRunView({
+    id: "run-failed",
+    kind: "search",
+    status: "error",
+    label: "AI Growth Lead",
+    query_text: "Find AI growth lead",
+    updated_at: "2026-06-21T10:00:00.000Z",
+  }, { locale: "en" });
+  const canceled = buildHistoryRunView({
+    id: "run-canceled",
+    kind: "verify",
+    status: "canceled",
+    label: "Candidate check",
+    query_text: "Ada Growth",
+    updated_at: "2026-06-21T10:00:00.000Z",
+  }, { locale: "en" });
+
+  assert.equal(failed.needs_action, true);
+  assert.deepEqual(failed.needs_action_reasons, ["Failed run"]);
+  assert.equal(canceled.needs_action, true);
+  assert.deepEqual(canceled.needs_action_reasons, ["Canceled run"]);
 });
 
 test("history API and page expose server-side filters and evidence entry points", () => {
@@ -102,7 +153,11 @@ test("history API and page expose server-side filters and evidence entry points"
   assert.match(db, /r\.label ILIKE/);
   assert.match(db, /LEFT JOIN projects/);
   assert.match(page, /writeFiltersToUrl/);
+  assert.match(page, /buildHistoryFilterChips/);
+  assert.match(page, /activeFilterChips/);
+  assert.match(page, /min-h-9/);
   assert.match(page, /projectId/);
   assert.match(page, /high_confidence/);
+  assert.match(page, /needs_action_reasons/);
   assert.match(page, /next_action\.href/);
 });

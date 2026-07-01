@@ -28,7 +28,7 @@ import { buildEvidenceDrivenOutreachSequence } from "@/lib/outreach-draft.mjs";
 import { latestFollowUpDraftState } from "@/lib/outreach-followups.mjs";
 import { buildRoleOutreachSettings } from "@/lib/outreach-settings.mjs";
 import { parseNetworkSeedCsv } from "@/lib/referral-paths.mjs";
-import { sourceTypeLabel, sourceTypeTooltip } from "@/lib/source-classifier.mjs";
+import { buildSourceMixUxView, sourceTypeLabel, sourceTypeTooltip } from "@/lib/source-classifier.mjs";
 import type { LeadPreviewView } from "@/lib/lead-preview";
 import type { TalentCandidate } from "@/lib/talent-profile.mjs";
 
@@ -926,6 +926,9 @@ function autonomousCopy(locale: "zh" | "en") {
     enabled: "Enabled",
     disabled: "Disabled",
     sourceMix: "Source mix",
+    evidenceBacked: "Evidence-backed",
+    leadOnly: "Lead-only",
+    totalSources: "Total sources",
     candidateReadiness: "Candidate readiness",
     empty: "No candidates in this role yet.",
     sources: "sources",
@@ -943,6 +946,9 @@ function autonomousCopy(locale: "zh" | "en") {
     enabled: "已启用",
     disabled: "未启用",
     sourceMix: "来源构成",
+    evidenceBacked: "证据来源",
+    leadOnly: "资料线索",
+    totalSources: "来源总数",
     candidateReadiness: "候选人推进状态",
     empty: "这个岗位还没有候选人。",
     sources: "个来源",
@@ -979,6 +985,7 @@ function AutonomousSourcingPanel({
   const [openJobsBusy, setOpenJobsBusy] = useState(false);
   const [providerMessage, setProviderMessage] = useState("");
   if (!graph) return null;
+  const sourceMixUx = buildSourceMixUxView(graph.source_mix, { locale });
 
   async function pullOpenJobsCandidates() {
     setOpenJobsBusy(true);
@@ -1083,6 +1090,24 @@ function AutonomousSourcingPanel({
       <div className="grid gap-3 lg:grid-cols-[280px_minmax(0,1fr)]">
         <div className="rounded-2xl border border-black/10 bg-white/80 p-4">
           <p className="text-sm font-semibold text-[var(--sh-ink)]">{c.sourceMix}</p>
+          <div className="mt-3 rounded-xl bg-gray-50 p-3 ring-1 ring-black/5">
+            <div className="grid grid-cols-3 gap-2 text-xs">
+              <div>
+                <span className="block text-[var(--sh-muted)]">{c.evidenceBacked}</span>
+                <span className="mt-1 block text-lg font-semibold text-emerald-700">{sourceMixUx.evidence_source_count}</span>
+              </div>
+              <div>
+                <span className="block text-[var(--sh-muted)]">{c.leadOnly}</span>
+                <span className="mt-1 block text-lg font-semibold text-amber-700">{sourceMixUx.lead_source_count}</span>
+              </div>
+              <div>
+                <span className="block text-[var(--sh-muted)]">{c.totalSources}</span>
+                <span className="mt-1 block text-lg font-semibold text-[var(--sh-ink)]">{sourceMixUx.total_source_count}</span>
+              </div>
+            </div>
+            <p className="mt-3 text-xs font-semibold text-[var(--sh-ink)]">{sourceMixUx.status_label}</p>
+            <p className="mt-1 text-xs leading-5 text-[var(--sh-muted)]">{sourceMixUx.next_step}</p>
+          </div>
           <div className="mt-3 space-y-2">
             {graph.source_mix.length === 0 ? (
               <p className="text-sm text-[var(--sh-muted)]">{c.empty}</p>

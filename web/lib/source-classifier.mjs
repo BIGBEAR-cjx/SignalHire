@@ -10,6 +10,21 @@ const KNOWN_SOURCE_TYPES = new Set([
   "manual_upload",
 ]);
 
+const EVIDENCE_SOURCE_TYPES = new Set([
+  "github",
+  "paper",
+  "company_page",
+  "personal_site",
+  "internal_resume",
+  "manual_upload",
+  "public_web",
+]);
+
+const LEAD_SOURCE_TYPES = new Set([
+  "people_api",
+  "linkedin_seed",
+]);
+
 const PLATFORM_HOST_PARTS = [
   "github.com",
   "linkedin.com",
@@ -215,6 +230,88 @@ const TOOLTIPS = {
 
 function localeKey(locale) {
   return locale === "zh" ? "zh" : "en";
+}
+
+function sourceCount(value) {
+  const count = Number(value);
+  return Number.isFinite(count) && count > 0 ? count : 0;
+}
+
+function sourceMixCopy(locale, key) {
+  const copy = {
+    en: {
+      blendedStatus: "Evidence-backed with profile leads",
+      evidenceStatus: "Evidence-backed coverage",
+      leadStatus: "Profile leads need evidence",
+      emptyStatus: "No source coverage yet",
+      blendedNext: "Use the evidence-backed sources for recommendation and verify profile leads before outreach.",
+      evidenceNext: "Review the strongest evidence-backed sources before recommendation.",
+      leadNext: "Verify public evidence before recommendation or outreach.",
+      emptyNext: "Add GitHub, paper, company page, resume, or public web evidence before recommendation.",
+    },
+    zh: {
+      blendedStatus: "已有证据并含资料线索",
+      evidenceStatus: "已有证据来源覆盖",
+      leadStatus: "资料线索需补证据",
+      emptyStatus: "暂无来源覆盖",
+      blendedNext: "可用证据来源支撑推荐，但资料线索外联前仍需先验证公开证据。",
+      evidenceNext: "推荐前先复核最强的证据来源。",
+      leadNext: "推荐或外联前需先验证公开证据。",
+      emptyNext: "推荐前先补充 GitHub、论文、公司页面、简历或公开网页证据。",
+    },
+  };
+  return copy[localeKey(locale)][key];
+}
+
+export function buildSourceMixUxView(sourceMix = [], options = {}) {
+  const locale = options?.locale;
+  const evidenceTypes = [];
+  const leadTypes = [];
+  let evidenceCount = 0;
+  let leadCount = 0;
+  let totalCount = 0;
+
+  for (const source of Array.isArray(sourceMix) ? sourceMix : []) {
+    if (!isRecord(source)) continue;
+    const sourceType = normalizeType(source.source_type);
+    const count = sourceCount(source.count);
+    totalCount += count;
+
+    if (EVIDENCE_SOURCE_TYPES.has(sourceType)) {
+      evidenceCount += count;
+      if (count > 0 && !evidenceTypes.includes(sourceType)) evidenceTypes.push(sourceType);
+    } else if (LEAD_SOURCE_TYPES.has(sourceType)) {
+      leadCount += count;
+      if (count > 0 && !leadTypes.includes(sourceType)) leadTypes.push(sourceType);
+    }
+  }
+
+  const hasEvidence = evidenceCount > 0;
+  const hasLeads = leadCount > 0;
+  const statusKey = hasEvidence && hasLeads
+    ? "blendedStatus"
+    : hasEvidence
+      ? "evidenceStatus"
+      : hasLeads
+        ? "leadStatus"
+        : "emptyStatus";
+  const nextStepKey = hasEvidence && hasLeads
+    ? "blendedNext"
+    : hasEvidence
+      ? "evidenceNext"
+      : hasLeads
+        ? "leadNext"
+        : "emptyNext";
+
+  return {
+    evidence_source_count: evidenceCount,
+    lead_source_count: leadCount,
+    total_source_count: totalCount,
+    evidence_types: evidenceTypes,
+    lead_types: leadTypes,
+    status_label: sourceMixCopy(locale, statusKey),
+    next_step: sourceMixCopy(locale, nextStepKey),
+  };
 }
 
 export function sourceTypeLabel(sourceType, locale = "en") {

@@ -23,6 +23,12 @@ function copy(locale: "zh" | "en") {
     nextSearch: "Run next search with constraints",
     source: "Source",
     noOutreach: "Outreach disabled until evidence and contact provenance are verified.",
+    previewLeads: "Preview leads",
+    profileLeads: "Profile leads",
+    evidenceSources: "Evidence-like sources",
+    outreachBlocked: "Outreach blocked",
+    provenanceUnverified: "evidence/contact unverified",
+    blockedReason: "Preview outreach is disabled until public evidence and contact provenance are verified.",
   } : {
     eyebrow: "Profile Lead Layer / 资料线索层",
     title: "研究进行中发现的未核验资料线索",
@@ -38,6 +44,12 @@ function copy(locale: "zh" | "en") {
     nextSearch: "带约束开启下一轮搜索",
     source: "来源",
     noOutreach: "证据和联系方式来源未核验前，不能外联。",
+    previewLeads: "预览线索",
+    profileLeads: "资料线索",
+    evidenceSources: "证据型来源",
+    outreachBlocked: "外联已阻断",
+    provenanceUnverified: "证据/联系方式未核验",
+    blockedReason: "公开证据和联系方式来源核验前，预览线索不能外联。",
   };
 }
 
@@ -81,6 +93,7 @@ export default function LeadPreviewPanel({
   }
 
   if (!view || (status === "verified_results_available" && items.length === 0)) return null;
+  const summary = view.summary;
 
   return (
     <Surface className="space-y-4 p-5">
@@ -96,6 +109,26 @@ export default function LeadPreviewPanel({
             {c.nextSearch}
           </PrimaryAction>
         )}
+      </div>
+
+      <div className="flex flex-wrap items-center gap-2 text-xs text-[var(--sh-muted)]">
+        <span className="rounded-full bg-white/70 px-2.5 py-1 ring-1 ring-black/10">
+          {c.previewLeads}: <strong className="text-[var(--sh-ink)]">{summary.item_count}</strong>
+        </span>
+        <span className="rounded-full bg-amber-50 px-2.5 py-1 text-amber-800 ring-1 ring-amber-100">
+          {c.profileLeads}: <strong>{summary.profile_lead_count}</strong>
+        </span>
+        <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-emerald-800 ring-1 ring-emerald-100">
+          {c.evidenceSources}: <strong>{summary.evidence_source_count}</strong>
+        </span>
+        <span
+          title={c.blockedReason}
+          aria-label={c.blockedReason}
+          className="rounded-full bg-gray-50 px-2.5 py-1 text-gray-700 ring-1 ring-black/10"
+        >
+          {c.outreachBlocked}: <strong>{c.provenanceUnverified}</strong>
+          <span className="sr-only">. {c.blockedReason}</span>
+        </span>
       </div>
 
       {items.length === 0 ? (
