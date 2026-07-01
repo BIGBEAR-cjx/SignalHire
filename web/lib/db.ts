@@ -923,6 +923,7 @@ export interface HistoryRunFilters {
   projectId?: string;
   range?: string;
   evidence?: string;
+  gap?: string;
   needsAction?: boolean;
   limit?: number;
   cursor?: string;

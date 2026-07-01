@@ -27,9 +27,13 @@ import { buildAgencyOutreachActivityDigest } from "@/lib/outreach-activity-diges
 import { buildEvidenceDrivenOutreachSequence } from "@/lib/outreach-draft.mjs";
 import { latestFollowUpDraftState } from "@/lib/outreach-followups.mjs";
 import { buildRoleOutreachSettings } from "@/lib/outreach-settings.mjs";
+import { buildOutreachSequenceWorkspace } from "@/lib/outreach-sequence-workspace.mjs";
 import { parseNetworkSeedCsv } from "@/lib/referral-paths.mjs";
+import { buildRoleAgentGuardrailsView } from "@/lib/role-agent-guardrails.mjs";
 import { buildSourceMixUxView, sourceTypeLabel, sourceTypeTooltip } from "@/lib/source-classifier.mjs";
 import type { LeadPreviewView } from "@/lib/lead-preview";
+import type { OutreachSequenceWorkspaceItem } from "@/lib/outreach-sequence-workspace";
+import type { RoleAgentGuardrailsView } from "@/lib/role-agent-guardrails";
 import type { TalentCandidate } from "@/lib/talent-profile.mjs";
 
 type ProjectStatus = "open" | "paused" | "closed";
@@ -801,6 +805,127 @@ function SequenceAnalyticsPanel({ sequenceAnalytics, locale }: { sequenceAnalyti
               {isEn ? "No action recommended yet." : "暂无建议操作。"}
             </p>
           )}
+        </div>
+      </div>
+    </Surface>
+  );
+}
+
+function guardrailStatusTone(status: RoleAgentGuardrailsView["status"]) {
+  if (status === "active") return "bg-emerald-50 text-emerald-700 ring-emerald-200";
+  if (status === "paused") return "bg-amber-50 text-amber-800 ring-amber-200";
+  if (status === "review_required") return "bg-rose-50 text-rose-700 ring-rose-200";
+  return "bg-gray-100 text-gray-700 ring-gray-200";
+}
+
+function guardrailStatusLabel(status: RoleAgentGuardrailsView["status"], locale: "zh" | "en") {
+  const labels = {
+    draft: { en: "Draft", zh: "草稿" },
+    active: { en: "Active", zh: "运行中" },
+    paused: { en: "Paused", zh: "已暂停" },
+    review_required: { en: "Review required", zh: "需要复核" },
+  };
+  return labels[status]?.[locale] ?? status;
+}
+
+function guardrailReasonLabel(reason: { code: string; label: string }, locale: "zh" | "en") {
+  const labels: Record<string, { en: string; zh: string }> = {
+    first_email_manual: { en: "First email manual", zh: "首封人工发送" },
+    first_email_candidates_manual: { en: "Step 1 requires approval", zh: "Step 1 需人工批准" },
+    high_confidence_auto_send_blocked: { en: "High-confidence auto-send blocked", zh: "高置信自动发送已禁用" },
+    candidate_stop_state: { en: "Stopped/replied candidates excluded", zh: "已回复或停止候选人不再自动推进" },
+    missing_contact: { en: "Missing contact", zh: "缺少联系方式" },
+    low_confidence_contact: { en: "Low-confidence contact", zh: "低置信联系方式" },
+    source_less_contact: { en: "Source-less contact", zh: "缺少来源的联系方式" },
+    contact_not_sendable: { en: "Bounced or invalid contact", zh: "退信或无效联系方式" },
+    evidence_review_required: { en: "Evidence review required", zh: "证据需要复核" },
+    follow_up_not_auto_eligible: { en: "Follow-up not auto-eligible", zh: "跟进不符合自动条件" },
+  };
+  return labels[reason.code]?.[locale] ?? reason.label;
+}
+
+function RoleAgentGuardrailsPanel({
+  project,
+  queue,
+  sequenceAnalytics,
+  locale,
+}: {
+  project: ProjectDetail["project"];
+  queue?: OutreachQueueView;
+  sequenceAnalytics?: SequenceAnalyticsView;
+  locale: "zh" | "en";
+}) {
+  const isEn = locale === "en";
+  const view = buildRoleAgentGuardrailsView({
+    role: { id: project.id, status: project.status },
+    settings: project.outreach_settings,
+    threads: queue?.items ?? [],
+    sequenceAnalytics,
+    locale,
+  }) as RoleAgentGuardrailsView;
+  const counters = [
+    { key: "contacted", label: isEn ? "Contacted" : "已触达", value: view.current_counts.contacted },
+    { key: "replied", label: isEn ? "Replied" : "已回复", value: view.current_counts.replied },
+    { key: "interested", label: isEn ? "Interested" : "有意向", value: view.current_counts.interested },
+    { key: "interview_ready", label: isEn ? "Interview-ready" : "可约面", value: view.current_counts.interview_ready },
+  ];
+
+  return (
+    <Surface className="space-y-4 p-5">
+      <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+        <div>
+          <div className="flex flex-wrap items-center gap-2">
+            <FiCheckCircle className="h-4 w-4 text-[var(--sh-blue)]" aria-hidden="true" />
+            <h2 className="text-base font-semibold text-[var(--sh-ink)]">Role Agent Guardrails</h2>
+            <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ring-1 ${guardrailStatusTone(view.status)}`}>
+              {guardrailStatusLabel(view.status, locale)}
+            </span>
+          </div>
+          <p className="mt-1 text-sm leading-6 text-[var(--sh-muted)]">
+            {isEn
+              ? "SignalHire keeps this role moving with visible approval boundaries. First emails stay manual; only reviewed follow-ups can use auto-follow-up settings."
+              : "SignalHire 用可见的审批边界推进岗位。首封邮件保持人工发送；只有已审核的跟进才可进入跟进草稿流程。"}
+          </p>
+        </div>
+        <div className="rounded-2xl bg-[var(--sh-canvas)] px-3 py-2 text-xs leading-5 text-[var(--sh-muted)] ring-1 ring-black/5">
+          <span className="block font-semibold text-[var(--sh-ink)]">{isEn ? "Approval mode" : "审批模式"}</span>
+          {view.approval_mode.mode === "auto_follow_up_only"
+            ? (isEn ? "Follow-up review drafts" : "跟进草稿复核")
+            : (isEn ? "Manual approval required" : "需要人工批准")}
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
+        {counters.map((counter) => (
+          <div key={counter.key} className="rounded-2xl bg-white/72 px-3 py-3 ring-1 ring-black/10">
+            <p className="text-xs font-semibold text-[var(--sh-muted)]">{counter.label}</p>
+            <p className="mt-1 text-xl font-semibold text-[var(--sh-ink)]">{counter.value}</p>
+          </div>
+        ))}
+      </div>
+
+      <div className="grid gap-3 lg:grid-cols-2">
+        <div className="rounded-2xl border border-black/10 bg-white/72 p-4">
+          <p className="text-xs font-semibold text-[var(--sh-muted)]">{isEn ? "Next tasks" : "下一步任务"}</p>
+          {view.next_tasks.length > 0 ? (
+            <ul className="mt-2 space-y-2 text-xs leading-5 text-[var(--sh-ink)]">
+              {view.next_tasks.slice(0, 4).map((task) => (
+                <li key={task.id} className="rounded-xl bg-[var(--sh-canvas)] px-3 py-2 ring-1 ring-black/5">{task.label}</li>
+              ))}
+            </ul>
+          ) : (
+            <p className="mt-2 text-xs text-[var(--sh-muted)]">{isEn ? "No urgent agent task right now." : "当前没有紧急 agent 任务。"}</p>
+          )}
+        </div>
+        <div className="rounded-2xl border border-black/10 bg-white/72 p-4">
+          <p className="text-xs font-semibold text-[var(--sh-muted)]">{isEn ? "Blocked automation" : "自动化护栏"}</p>
+          <div className="mt-2 flex flex-wrap gap-2">
+            {view.blocked_automation_reasons.slice(0, 6).map((reason) => (
+              <span key={reason.code} className="rounded-full bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-800 ring-1 ring-amber-100">
+                {guardrailReasonLabel(reason, locale)}{reason.count > 1 ? ` · ${reason.count}` : ""}
+              </span>
+            ))}
+          </div>
         </div>
       </div>
     </Surface>
@@ -1645,12 +1770,45 @@ function fallbackSequence(item: OutreachQueueView["items"][number]): OutreachSeq
   }));
 }
 
+function sequenceNextActionLabel(action: OutreachSequenceWorkspaceItem["next_action"] | undefined, locale: "zh" | "en") {
+  const labels: Record<string, { en: string; zh: string }> = {
+    "approve draft": { en: "Approve draft", zh: "批准草稿" },
+    "send first email": { en: "Send first email", zh: "发送首封" },
+    "review follow-up": { en: "Review follow-up", zh: "复核跟进" },
+    "resolve contact": { en: "Resolve contact", zh: "解析联系方式" },
+    "stop sequence": { en: "Stop sequence", zh: "停止序列" },
+  };
+  return labels[action || ""]?.[locale] ?? action ?? "";
+}
+
+function sequenceBlockReasonLabel(reason: string, locale: "zh" | "en") {
+  const labels: Record<string, { en: string; zh: string }> = {
+    no_email: { en: "No sourced email", zh: "缺少带来源邮箱" },
+    low_confidence_email: { en: "Low-confidence email", zh: "邮箱置信度低" },
+    bounced_email: { en: "Bounced email", zh: "邮箱已退信" },
+    no_sendable_email: { en: "No sendable email", zh: "无可发送邮箱" },
+    unapproved_thread: { en: "Thread not approved", zh: "触达未批准" },
+  };
+  return labels[reason]?.[locale] ?? reason;
+}
+
+function sequenceStepStateLabel(state: OutreachSequenceWorkspaceItem["steps"][number]["state"], locale: "zh" | "en") {
+  const labels = {
+    ready: { en: "Ready", zh: "可执行" },
+    blocked: { en: "Blocked", zh: "阻塞" },
+    sent: { en: "Sent", zh: "已发送" },
+    review: { en: "Review", zh: "待审核" },
+  };
+  return labels[state]?.[locale] ?? state;
+}
+
 function GmailOutreachPanel({
   queue,
   projectId,
   projectName,
   persistedSettings,
   projectSyncSummary,
+  sequenceAnalytics,
   locale,
   onChanged,
 }: {
@@ -1659,6 +1817,7 @@ function GmailOutreachPanel({
   projectName: string;
   persistedSettings?: ProjectDetail["project"]["outreach_settings"];
   projectSyncSummary?: ProjectInboxSyncSummaryView;
+  sequenceAnalytics?: SequenceAnalyticsView;
   locale: "zh" | "en";
   onChanged: () => void;
 }) {
@@ -1689,6 +1848,13 @@ function GmailOutreachPanel({
       reply_summary: item.send_error ? (isEn ? "Send error recorded" : "已记录发送错误") : "",
     })),
   });
+  const sequenceWorkspace = buildOutreachSequenceWorkspace({
+    queue,
+    settings: roleOutreachSettings,
+    digest,
+    sequenceAnalytics,
+  });
+  const sequenceWorkspaceById = new Map(sequenceWorkspace.items.map((item) => [item.id, item]));
 
   useEffect(() => {
     setRoleOutreachSettings(buildRoleOutreachSettings(persistedSettings));
@@ -2036,8 +2202,8 @@ function GmailOutreachPanel({
               className="mt-1"
             />
             <span>
-              <span className="block font-semibold text-[var(--sh-ink)]">
-                {isEn ? "Auto follow-up only" : "仅自动跟进"}
+                <span className="block font-semibold text-[var(--sh-ink)]">
+                {isEn ? "Follow-up review drafts" : "跟进草稿复核"}
               </span>
               {isEn
                 ? "The first email still requires manual approval and Gmail send. Due follow-ups become Gmail review drafts, not sent messages."
@@ -2144,6 +2310,19 @@ function GmailOutreachPanel({
           )}
         </div>
       )}
+      <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
+        {[
+          { key: "total", label: isEn ? "Sequence items" : "序列项", value: sequenceWorkspace.summary.total },
+          { key: "ready", label: isEn ? "Ready" : "可执行", value: sequenceWorkspace.summary.ready },
+          { key: "review", label: isEn ? "Review" : "待审核", value: sequenceWorkspace.summary.review },
+          { key: "blocked", label: isEn ? "Blocked" : "阻塞", value: sequenceWorkspace.summary.blocked },
+        ].map((metric) => (
+          <div key={metric.key} className="rounded-2xl bg-white/72 px-3 py-3 ring-1 ring-black/10">
+            <p className="text-xs font-semibold text-[var(--sh-muted)]">{metric.label}</p>
+            <p className="mt-1 text-xl font-semibold text-[var(--sh-ink)]">{metric.value}</p>
+          </div>
+        ))}
+      </div>
       {items.length === 0 ? (
         <p className="rounded-2xl border border-dashed border-black/10 bg-white/60 p-4 text-sm text-[var(--sh-muted)]">
           {isEn ? "No saved outreach threads yet." : "还没有保存的触达记录。"}
@@ -2158,6 +2337,7 @@ function GmailOutreachPanel({
               ? (isEn ? "Due follow-up draft" : "到期跟进草稿")
               : (isEn ? "First email draft" : "首封草稿");
             const isDueDisplay = isDueFollowUpDraft || item.queue_state === "due";
+            const sequenceItem = sequenceWorkspaceById.get(item.id);
             return (
             <li key={item.id} className="rounded-2xl border border-black/10 bg-white/80 p-4">
               <div className="flex items-start justify-between gap-3">
@@ -2171,6 +2351,32 @@ function GmailOutreachPanel({
                   className={isDueDisplay ? "bg-amber-50 text-amber-800 ring-amber-200" : "bg-blue-50 text-blue-700 ring-blue-200"}
                 />
               </div>
+              {sequenceItem && (
+                <div className="mt-3 rounded-xl bg-[var(--sh-canvas)] px-3 py-2 text-xs leading-5 text-[var(--sh-muted)] ring-1 ring-black/5">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="font-semibold text-[var(--sh-ink)]">
+                      {isEn ? `Current step ${sequenceItem.current_step}` : `当前 Step ${sequenceItem.current_step}`}
+                    </span>
+                    <span className="rounded-full bg-white px-2 py-0.5 font-semibold text-gray-700 ring-1 ring-black/10">
+                      {isEn ? "Next" : "下一步"}: {sequenceNextActionLabel(sequenceItem.next_action, locale)}
+                    </span>
+                    {sequenceItem.evidence_ref_count > 0 && (
+                      <span className="rounded-full bg-white px-2 py-0.5 font-semibold text-gray-700 ring-1 ring-black/10">
+                        {isEn ? `${sequenceItem.evidence_ref_count} evidence refs` : `${sequenceItem.evidence_ref_count} 条证据引用`}
+                      </span>
+                    )}
+                  </div>
+                  {sequenceItem.block_reasons.length > 0 && (
+                    <div className="mt-2 flex flex-wrap gap-1.5">
+                      {sequenceItem.block_reasons.map((reason) => (
+                        <span key={reason} className="rounded-full bg-amber-50 px-2 py-0.5 font-semibold text-amber-800 ring-1 ring-amber-100">
+                          {sequenceBlockReasonLabel(reason, locale)}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
               {(isDueFollowUpDraft || isFirstEmailDraft) && (
                 <p className={`mt-3 rounded-xl px-3 py-2 text-xs leading-5 ring-1 ${
                   isDueFollowUpDraft
@@ -2285,9 +2491,19 @@ function GmailOutreachPanel({
                       <div className="flex flex-wrap items-center gap-2">
                         <span className="font-semibold text-gray-800">#{message.step}</span>
                         <span className="text-gray-600">{message.subject}</span>
+                        {sequenceItem?.steps.find((step) => step.step === message.step)?.state && (
+                          <span className="rounded-full bg-white px-2 py-0.5 text-[11px] font-medium text-gray-600 ring-1 ring-black/10">
+                            {sequenceStepStateLabel(sequenceItem.steps.find((step) => step.step === message.step)!.state, locale)}
+                          </span>
+                        )}
                         <span className="rounded-full bg-white px-2 py-0.5 text-[11px] font-medium text-gray-600 ring-1 ring-black/10">
                           {message.step === 1 ? (isEn ? "manual approval" : "人工批准") : (isEn ? "draft for review" : "草稿待审核")}
                         </span>
+                        {sequenceItem?.steps.find((step) => step.step === message.step)?.auto_sendable && (
+                          <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-medium text-emerald-700 ring-1 ring-emerald-100">
+                            {isEn ? "reviewed follow-up draft" : "已审核跟进草稿"}
+                          </span>
+                        )}
                         {message.delay_days && (
                           <span className="rounded-full bg-white px-2 py-0.5 text-[11px] font-medium text-gray-600 ring-1 ring-black/10">
                             {isEn ? `${message.delay_days}d follow-up` : `${message.delay_days} 天后跟进`}
@@ -3165,12 +3381,20 @@ export default function ProjectDetailPage() {
         onChanged={reloadDetail}
       />
 
+      <RoleAgentGuardrailsPanel
+        project={detail.project}
+        queue={detail.outreachQueue}
+        sequenceAnalytics={detail.sequenceAnalytics}
+        locale={locale}
+      />
+
       <GmailOutreachPanel
         queue={detail.outreachQueue}
         projectId={detail.project.id}
         projectName={detail.project.name}
         persistedSettings={detail.project.outreach_settings}
         projectSyncSummary={detail.project.inbox_sync_summary}
+        sequenceAnalytics={detail.sequenceAnalytics}
         locale={locale}
         onChanged={reloadDetail}
       />

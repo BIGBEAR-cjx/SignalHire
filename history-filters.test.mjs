@@ -6,6 +6,7 @@ import {
   buildHistoryRunView,
   historyRangeStart,
   matchesHistoryEvidenceFilter,
+  normalizeHistoryGapType,
   normalizeHistoryFilters,
 } from "./web/lib/history.mjs";
 
@@ -30,6 +31,8 @@ const talentSearchResult = {
       evidence_audit: {
         overall_evidence_quality: "high",
       },
+      status: "outreach_drafted",
+      outreach_draft: "Hi Ada, your AI growth loop work looked relevant.",
     },
     {
       name: "Ben Maybe",
@@ -52,7 +55,8 @@ test("normalizes history filters and date ranges", () => {
     kind: "search",
     status: "needs_action",
     range: "7d",
-    evidence: "has_gaps",
+    evidence: "has_outreach_drafts",
+    gap: "工作经历",
     limit: "500",
   });
 
@@ -60,8 +64,11 @@ test("normalizes history filters and date ranges", () => {
   assert.equal(filters.kind, "search");
   assert.equal(filters.status, "all");
   assert.equal(filters.needsAction, true);
-  assert.equal(filters.evidence, "has_gaps");
+  assert.equal(filters.evidence, "has_outreach_drafts|gap:work_history");
+  assert.equal(filters.evidenceFilter, "has_outreach_drafts");
+  assert.equal(filters.gap, "work_history");
   assert.equal(filters.limit, 100);
+  assert.equal(normalizeHistoryGapType("Public voice"), "public_voice");
   assert.match(historyRangeStart("7d", new Date("2026-06-23T12:00:00.000Z")), /^2026-06-16T12:00:00\.000Z$/);
 });
 
@@ -73,10 +80,11 @@ test("builds removable active history filter chips", () => {
     range: "7d",
     projectId: "project-1",
     evidence: "has_gaps",
+    gap: "practice",
   });
   const chips = buildHistoryFilterChips(filters, [{ id: "project-1", name: "AI Growth" }], { locale: "en" });
 
-  assert.deepEqual(chips.map((chip) => chip.key), ["q", "kind", "status", "range", "projectId", "evidence"]);
+  assert.deepEqual(chips.map((chip) => chip.key), ["q", "kind", "status", "range", "projectId", "evidence", "gap"]);
   assert.deepEqual(chips.map((chip) => chip.label), [
     "Keyword: founder",
     "Type: Verify",
@@ -84,9 +92,11 @@ test("builds removable active history filter chips", () => {
     "Time: 7 days",
     "Role: AI Growth",
     "Evidence: Has evidence gaps",
+    "Gap type: Practice",
   ]);
   assert.deepEqual(chips.find((chip) => chip.key === "status")?.clearPatch, { status: "all", needsAction: "" });
   assert.deepEqual(chips.find((chip) => chip.key === "projectId")?.clearPatch, { projectId: "" });
+  assert.deepEqual(chips.find((chip) => chip.key === "gap")?.clearPatch, { gap: "" });
 });
 
 test("builds history run next actions and evidence summaries", () => {
@@ -111,10 +121,17 @@ test("builds history run next actions and evidence summaries", () => {
   assert.equal(run.evidence_summary.candidate_count, 2);
   assert.equal(run.evidence_summary.high_confidence_count, 1);
   assert.equal(run.evidence_summary.needs_verification_count, 1);
+  assert.deepEqual(run.evidence_summary.gap_types, ["research", "public_voice"]);
+  assert.equal(run.evidence_summary.outreach_draft_count, 1);
+  assert.equal(run.evidence_summary.has_outreach_drafts, true);
   assert.equal(run.needs_action, true);
   assert.match(run.needs_action_reasons.join(" / "), /Candidates need verification/);
+  assert.match(run.needs_action_reasons.join(" / "), /Low-evidence candidates/);
   assert.equal(matchesHistoryEvidenceFilter(run, "high_confidence"), true);
   assert.equal(matchesHistoryEvidenceFilter(run, "needs_verification"), true);
+  assert.equal(matchesHistoryEvidenceFilter(run, "has_outreach_drafts"), true);
+  assert.equal(matchesHistoryEvidenceFilter(run, "all|gap:public_voice"), true);
+  assert.equal(matchesHistoryEvidenceFilter(run, "all|gap:practice"), false);
 });
 
 test("builds needs action reasons for failed and canceled runs", () => {
@@ -158,6 +175,9 @@ test("history API and page expose server-side filters and evidence entry points"
   assert.match(page, /min-h-9/);
   assert.match(page, /projectId/);
   assert.match(page, /high_confidence/);
+  assert.match(page, /has_outreach_drafts/);
+  assert.match(page, /gapType/);
+  assert.match(page, /params\.set\("gap"/);
   assert.match(page, /needs_action_reasons/);
   assert.match(page, /next_action\.href/);
 });

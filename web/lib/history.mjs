@@ -3,10 +3,30 @@ import { buildEvidenceCoverage, buildSearchResultWorkspace } from "./talent-prof
 export const HISTORY_KINDS = ["all", "search", "verify"];
 export const HISTORY_STATUSES = ["all", "queued", "running", "retrying", "done", "error", "canceled"];
 export const HISTORY_RANGES = ["all", "today", "7d", "30d"];
-export const HISTORY_EVIDENCE_FILTERS = ["all", "high_confidence", "needs_verification", "low_evidence", "has_gaps", "shortlist_ready"];
+export const HISTORY_EVIDENCE_FILTERS = ["all", "high_confidence", "needs_verification", "low_evidence", "has_gaps", "shortlist_ready", "has_outreach_drafts"];
 
 const ACTIVE_STATUSES = new Set(["queued", "running", "retrying"]);
 const FINAL_ERROR_STATUSES = new Set(["error", "canceled"]);
+const GAP_TYPE_LABELS = {
+  research: { en: "Research", zh: "研究" },
+  practice: { en: "Practice", zh: "实践" },
+  work_history: { en: "Work history", zh: "工作经历" },
+  public_voice: { en: "Public voice", zh: "公开表达" },
+};
+const GAP_TYPE_ALIASES = new Map([
+  ["research", "research"],
+  ["研究", "research"],
+  ["practice", "practice"],
+  ["实践", "practice"],
+  ["work_history", "work_history"],
+  ["work history", "work_history"],
+  ["work-history", "work_history"],
+  ["工作经历", "work_history"],
+  ["public_voice", "public_voice"],
+  ["public voice", "public_voice"],
+  ["public-voice", "public_voice"],
+  ["公开表达", "public_voice"],
+]);
 
 function cleanString(value) {
   return String(value ?? "").trim();
@@ -23,11 +43,23 @@ function boundedLimit(value, fallback = 30) {
   return Math.max(1, Math.min(100, Math.floor(n)));
 }
 
+export function normalizeHistoryGapType(value) {
+  const clean = cleanString(value).normalize("NFKC").replace(/\s+/g, " ").toLowerCase();
+  if (!clean) return "";
+  const slug = clean.replace(/[-\s]+/g, "_");
+  return GAP_TYPE_ALIASES.get(clean) || GAP_TYPE_ALIASES.get(slug) || slug.replace(/[^\p{L}\p{N}_]+/gu, "").slice(0, 60);
+}
+
+function derivedEvidenceFilter(evidence, gap) {
+  return gap ? `${evidence}|gap:${gap}` : evidence;
+}
+
 export function normalizeHistoryFilters(searchParams) {
   const get = (key) => typeof searchParams?.get === "function" ? searchParams.get(key) : searchParams?.[key];
   const rawStatus = get("status");
   const status = oneOf(rawStatus, HISTORY_STATUSES);
   const evidence = oneOf(get("evidence"), HISTORY_EVIDENCE_FILTERS);
+  const gap = normalizeHistoryGapType(get("gap"));
   const needsActionValue = get("needsAction");
   return {
     q: cleanString(get("q")).slice(0, 120),
@@ -35,7 +67,9 @@ export function normalizeHistoryFilters(searchParams) {
     status,
     projectId: cleanString(get("projectId")).slice(0, 80),
     range: oneOf(get("range"), HISTORY_RANGES),
-    evidence,
+    evidence: derivedEvidenceFilter(evidence, gap),
+    evidenceFilter: evidence,
+    gap,
     needsAction: needsActionValue === true || needsActionValue === "1" || rawStatus === "needs_action",
     limit: boundedLimit(get("limit"), 30),
     cursor: cleanString(get("cursor")).slice(0, 80),
@@ -99,8 +133,16 @@ function evidenceLabel(evidence, locale) {
     low_evidence: en ? "Low evidence" : "低证据",
     has_gaps: en ? "Has evidence gaps" : "有证据缺口",
     shortlist_ready: en ? "Shortlist ready" : "可交付名单",
+    has_outreach_drafts: en ? "Has outreach drafts" : "有外联草稿",
   };
   return labels[evidence] ?? evidence;
+}
+
+function gapLabel(gap, locale) {
+  const normalized = normalizeHistoryGapType(gap);
+  const labels = GAP_TYPE_LABELS[normalized];
+  if (labels) return locale === "en" ? labels.en : labels.zh;
+  return cleanString(gap).replace(/_/g, " ");
 }
 
 function chipLabel(name, value, locale) {
@@ -112,6 +154,7 @@ function chipLabel(name, value, locale) {
     range: en ? "Time" : "时间",
     projectId: en ? "Role" : "岗位",
     evidence: en ? "Evidence" : "证据",
+    gap: en ? "Gap type" : "缺口类型",
   };
   return `${names[name] ?? name}: ${value}`;
 }
@@ -129,7 +172,8 @@ export function buildHistoryFilterChips(filters, projects = [], { locale = "zh" 
   const needsAction = filters?.needsAction === true || rawStatus === "needs_action";
   const range = oneOf(filters?.range, HISTORY_RANGES);
   const projectId = cleanString(filters?.projectId).slice(0, 80);
-  const evidence = oneOf(filters?.evidence, HISTORY_EVIDENCE_FILTERS);
+  const evidence = oneOf(filters?.evidenceFilter ?? filters?.evidence, HISTORY_EVIDENCE_FILTERS);
+  const gap = normalizeHistoryGapType(filters?.gap);
 
   if (q) {
     chips.push({ key: "q", label: chipLabel("q", q, locale), clearPatch: { q: "" } });
@@ -150,6 +194,9 @@ export function buildHistoryFilterChips(filters, projects = [], { locale = "zh" 
   }
   if (evidence !== "all") {
     chips.push({ key: "evidence", label: chipLabel("evidence", evidenceLabel(evidence, locale), locale), clearPatch: { evidence: "all" } });
+  }
+  if (gap) {
+    chips.push({ key: "gap", label: chipLabel("gap", gapLabel(gap, locale), locale), clearPatch: { gap: "" } });
   }
   return chips;
 }
@@ -184,25 +231,68 @@ export function buildHistoryEvidenceSummary(result, { locale = "zh" } = {}) {
     if (!candidateCount) return null;
     const highConfidence = workspace.groups?.find((group) => group.key === "high_confidence")?.count ?? 0;
     const needsVerification = workspace.groups?.find((group) => group.key === "needs_verification")?.count ?? 0;
-    const lowEvidence = (workspace.groups?.find((group) => group.key === "lower_confidence")?.count ?? 0)
+    const lowEvidenceByBucket = (workspace.groups?.find((group) => group.key === "lower_confidence")?.count ?? 0)
       + (workspace.groups?.find((group) => group.key === "adjacent_pool")?.count ?? 0);
-    const primaryGaps = (buildEvidenceCoverage(result) ?? [])
-      .filter((group) => group.status === "missing")
+    const lowEvidenceByAudit = Array.isArray(workspace.candidates)
+      ? workspace.candidates.filter((candidate) => candidate?.evidence_quality === "low").length
+      : 0;
+    const lowEvidence = Math.max(lowEvidenceByBucket, lowEvidenceByAudit);
+    const missingCoverage = (buildEvidenceCoverage(result) ?? []).filter((group) => group.status === "missing");
+    const primaryGaps = missingCoverage
       .map((group) => group.label)
       .filter(Boolean)
       .slice(0, 3);
+    const gapTypes = missingCoverage
+      .map((group) => normalizeHistoryGapType(group.key || group.label))
+      .filter(Boolean);
+    const outreachDraftCount = countOutreachDrafts(result);
     return {
       candidate_count: candidateCount,
       high_confidence_count: highConfidence,
       needs_verification_count: needsVerification,
       low_evidence_count: lowEvidence,
       primary_gaps: primaryGaps,
+      gap_types: Array.from(new Set(gapTypes)),
       has_gaps: primaryGaps.length > 0,
       shortlist_ready: highConfidence > 0,
+      outreach_draft_count: outreachDraftCount,
+      has_outreach_drafts: outreachDraftCount > 0,
     };
   } catch {
     return null;
   }
+}
+
+function countOutreachDrafts(result) {
+  const source = result && typeof result === "object" ? result : {};
+  const explicitCount = Number(source.outreach_draft_count ?? source.outreach_drafts_count ?? 0);
+  const explicit = Number.isFinite(explicitCount) ? explicitCount : 0;
+  const candidates = Array.isArray(source.candidates) ? source.candidates : [];
+  const candidateCount = candidates.filter(candidateHasOutreachDraft).length;
+  const draftRows = [
+    ...(Array.isArray(source.outreach_drafts) ? source.outreach_drafts : []),
+    ...(Array.isArray(source.drafts) ? source.drafts : []),
+    ...(Array.isArray(source.outreach_queue?.items) ? source.outreach_queue.items.filter(candidateHasOutreachDraft) : []),
+  ].length;
+  return Math.max(0, explicit, candidateCount, draftRows);
+}
+
+function candidateHasOutreachDraft(candidate) {
+  if (!candidate || typeof candidate !== "object") return false;
+  const status = cleanString(candidate.status || candidate.outreach_status).toLowerCase();
+  if (status === "drafted" || status === "outreach_drafted") return true;
+  const draftFields = [
+    candidate.outreach_draft,
+    candidate.email_draft,
+    candidate.reply_draft,
+    candidate.suggested_reply,
+    candidate.saved_scheduling_draft,
+    candidate.gmail_draft_id,
+    candidate.outreach_thread?.gmail_draft_id,
+  ];
+  if (draftFields.some((value) => cleanString(value))) return true;
+  const sequence = Array.isArray(candidate.outreach_sequence) ? candidate.outreach_sequence : [];
+  return sequence.some((message) => cleanString(message?.send_mode) === "draft_for_review" && (cleanString(message?.subject) || cleanString(message?.body)));
 }
 
 function buildNeedsActionReasons(status, evidenceSummary, locale) {
@@ -213,6 +303,9 @@ function buildNeedsActionReasons(status, evidenceSummary, locale) {
   if (evidenceSummary?.has_gaps) reasons.push(en ? "Evidence gaps" : "证据缺口");
   if (evidenceSummary?.needs_verification_count) {
     reasons.push(en ? "Candidates need verification" : "候选人待核验");
+  }
+  if (evidenceSummary?.low_evidence_count) {
+    reasons.push(en ? "Low-evidence candidates" : "低证据候选人");
   }
   return reasons;
 }
@@ -245,6 +338,9 @@ export function buildHistoryRunView(row, { locale = "zh" } = {}) {
 }
 
 export function matchesHistoryEvidenceFilter(run, filter) {
+  const parsed = parseHistoryEvidenceFilter(filter);
+  if (!matchesHistoryGapFilter(run, parsed.gap)) return false;
+  filter = parsed.evidence;
   if (!filter || filter === "all") return true;
   const evidence = run.evidence_summary;
   if (filter === "high_confidence") return Boolean(evidence?.high_confidence_count);
@@ -252,5 +348,28 @@ export function matchesHistoryEvidenceFilter(run, filter) {
   if (filter === "low_evidence") return Boolean(evidence?.low_evidence_count);
   if (filter === "has_gaps") return Boolean(evidence?.has_gaps);
   if (filter === "shortlist_ready") return Boolean(evidence?.shortlist_ready);
+  if (filter === "has_outreach_drafts") return Boolean(evidence?.has_outreach_drafts);
   return true;
+}
+
+function parseHistoryEvidenceFilter(filter) {
+  const raw = cleanString(filter);
+  if (!raw) return { evidence: "all", gap: "" };
+  const parts = raw.split("|");
+  const evidence = oneOf(parts[0], HISTORY_EVIDENCE_FILTERS);
+  const gap = parts
+    .map((part) => part.startsWith("gap:") ? normalizeHistoryGapType(part.slice(4)) : "")
+    .find(Boolean) || "";
+  return { evidence, gap };
+}
+
+function matchesHistoryGapFilter(run, gap) {
+  const normalized = normalizeHistoryGapType(gap);
+  if (!normalized) return true;
+  const summary = run?.evidence_summary;
+  const candidates = [
+    ...(Array.isArray(summary?.gap_types) ? summary.gap_types : []),
+    ...(Array.isArray(summary?.primary_gaps) ? summary.primary_gaps : []),
+  ].map(normalizeHistoryGapType);
+  return candidates.includes(normalized);
 }

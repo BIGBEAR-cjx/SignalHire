@@ -10,7 +10,7 @@ import { buildHistoryFilterChips } from "@/lib/history.mjs";
 type HistoryStatus = "all" | "queued" | "running" | "retrying" | "done" | "error" | "canceled" | "needs_action";
 type HistoryKind = "all" | "search" | "verify";
 type HistoryRange = "all" | "today" | "7d" | "30d";
-type EvidenceFilter = "all" | "high_confidence" | "needs_verification" | "low_evidence" | "has_gaps" | "shortlist_ready";
+type EvidenceFilter = "all" | "high_confidence" | "needs_verification" | "low_evidence" | "has_gaps" | "shortlist_ready" | "has_outreach_drafts";
 
 type HistoryFilters = {
   q: string;
@@ -19,6 +19,7 @@ type HistoryFilters = {
   range: HistoryRange;
   projectId: string;
   evidence: EvidenceFilter;
+  gap: string;
 };
 
 type HistoryItem = {
@@ -43,8 +44,11 @@ type HistoryItem = {
     needs_verification_count: number;
     low_evidence_count: number;
     primary_gaps: string[];
+    gap_types: string[];
     has_gaps: boolean;
     shortlist_ready: boolean;
+    outreach_draft_count: number;
+    has_outreach_drafts: boolean;
   };
   needs_action: boolean;
   needs_action_reasons?: string[];
@@ -60,6 +64,7 @@ const DEFAULT_FILTERS: HistoryFilters = {
   range: "all",
   projectId: "",
   evidence: "all",
+  gap: "",
 };
 
 const QUICK_FILTERS: Array<{ key: string; patch: Partial<HistoryFilters>; zh: string; en: string }> = [
@@ -81,6 +86,7 @@ function readFiltersFromUrl(): HistoryFilters {
     range: (params.get("range") as HistoryRange) || "all",
     projectId: params.get("projectId") ?? "",
     evidence: (params.get("evidence") as EvidenceFilter) || "all",
+    gap: params.get("gap") ?? "",
   };
 }
 
@@ -92,6 +98,7 @@ function filtersToParams(filters: HistoryFilters, locale: string, cursor?: strin
   if (filters.range !== "all") params.set("range", filters.range);
   if (filters.projectId) params.set("projectId", filters.projectId);
   if (filters.evidence !== "all") params.set("evidence", filters.evidence);
+  if (filters.gap) params.set("gap", filters.gap);
   if (cursor) params.set("cursor", cursor);
   return params;
 }
@@ -105,6 +112,7 @@ function writeFiltersToUrl(filters: HistoryFilters) {
   if (filters.range !== "all") params.set("range", filters.range);
   if (filters.projectId) params.set("projectId", filters.projectId);
   if (filters.evidence !== "all") params.set("evidence", filters.evidence);
+  if (filters.gap) params.set("gap", filters.gap);
   const query = params.toString();
   const next = query ? `${window.location.pathname}?${query}` : window.location.pathname;
   window.history.replaceState(null, "", next);
@@ -134,6 +142,19 @@ function statusDot(status: string) {
   if (status === "running" || status === "retrying") return "bg-blue-500";
   return "bg-amber-500";
 }
+
+function gapTypeFallbackLabel(value: string, locale: string) {
+  const labels: Record<string, { en: string; zh: string }> = {
+    research: { en: "Research", zh: "研究" },
+    practice: { en: "Practice", zh: "实践" },
+    work_history: { en: "Work history", zh: "工作经历" },
+    public_voice: { en: "Public voice", zh: "公开表达" },
+  };
+  const label = labels[value];
+  return label ? label[locale === "en" ? "en" : "zh"] : value.replace(/_/g, " ");
+}
+
+const DEFAULT_GAP_TYPES = ["research", "practice", "work_history", "public_voice"];
 
 export default function HistoryPage() {
   const { locale, t } = useI18n();
@@ -173,7 +194,7 @@ export default function HistoryPage() {
   }, [filters, fetchHistory, hydrated]);
 
   const hasFilters = useMemo(() => (
-    filters.q.trim() || filters.kind !== "all" || filters.status !== "all" || filters.range !== "all" || filters.projectId || filters.evidence !== "all"
+    filters.q.trim() || filters.kind !== "all" || filters.status !== "all" || filters.range !== "all" || filters.projectId || filters.evidence !== "all" || filters.gap
   ), [filters]);
 
   const copy = locale === "en" ? {
@@ -200,6 +221,8 @@ export default function HistoryPage() {
     lowEvidence: "Low evidence",
     hasGaps: "Has evidence gaps",
     shortlistReady: "Shortlist ready",
+    hasOutreachDrafts: "Has outreach drafts",
+    gapType: "Gap type",
     noMatchesTitle: "No matching research history",
     noMatchesDesc: "Clear filters or broaden the keyword to find more runs.",
     resultCount: "runs",
@@ -209,6 +232,7 @@ export default function HistoryPage() {
     high: "high confidence",
     verifyNeeded: "need verification",
     gaps: "gaps",
+    outreachDrafts: "outreach drafts",
   } : {
     searchPlaceholder: "搜索岗位、候选人、查询词或证据摘要",
     filters: "筛选",
@@ -233,6 +257,8 @@ export default function HistoryPage() {
     lowEvidence: "低证据",
     hasGaps: "有证据缺口",
     shortlistReady: "可交付名单",
+    hasOutreachDrafts: "有外联草稿",
+    gapType: "缺口类型",
     noMatchesTitle: "没有匹配的历史记录",
     noMatchesDesc: "清空筛选或放宽关键词后再试。",
     resultCount: "条记录",
@@ -242,6 +268,7 @@ export default function HistoryPage() {
     high: "高置信",
     verifyNeeded: "待核验",
     gaps: "缺口",
+    outreachDrafts: "外联草稿",
   };
 
   const setFilter = (patch: Partial<HistoryFilters>) => setFilters((current) => ({ ...current, ...patch }));
@@ -260,8 +287,26 @@ export default function HistoryPage() {
       range: has("range") ? clearPatch.range as HistoryRange : current.range,
       projectId: has("projectId") ? clearPatch.projectId : current.projectId,
       evidence: has("evidence") ? clearPatch.evidence as EvidenceFilter : current.evidence,
+      gap: has("gap") ? clearPatch.gap : current.gap,
     }));
   };
+  const gapFilterOptions = useMemo(() => {
+    const byType = new Map<string, string>();
+    DEFAULT_GAP_TYPES.forEach((gapType) => {
+      byType.set(gapType, gapTypeFallbackLabel(gapType, locale));
+    });
+    for (const item of items ?? []) {
+      const summary = item.evidence_summary;
+      summary?.gap_types?.forEach((gapType, index) => {
+        if (!gapType || byType.has(gapType)) return;
+        byType.set(gapType, summary.primary_gaps[index] || gapTypeFallbackLabel(gapType, locale));
+      });
+    }
+    if (filters.gap && !byType.has(filters.gap)) {
+      byType.set(filters.gap, gapTypeFallbackLabel(filters.gap, locale));
+    }
+    return Array.from(byType.entries());
+  }, [items, filters.gap, locale]);
 
   return (
     <div className="space-y-6">
@@ -356,6 +401,10 @@ export default function HistoryPage() {
             <FilterSelect label={copy.evidence} value={filters.evidence} onChange={(value) => setFilter({ evidence: value as EvidenceFilter })} options={[
               ["all", copy.all], ["high_confidence", copy.highConfidence], ["needs_verification", copy.needsVerification],
               ["low_evidence", copy.lowEvidence], ["has_gaps", copy.hasGaps], ["shortlist_ready", copy.shortlistReady],
+              ["has_outreach_drafts", copy.hasOutreachDrafts],
+            ]} />
+            <FilterSelect label={copy.gapType} value={filters.gap} onChange={(value) => setFilter({ gap: value })} options={[
+              ["", copy.all], ...gapFilterOptions,
             ]} />
           </div>
         )}
@@ -424,10 +473,13 @@ export default function HistoryPage() {
                           <span>{h.evidence_summary.candidate_count} {copy.candidates}</span>
                           <span>{h.evidence_summary.high_confidence_count} {copy.high}</span>
                           <span>{h.evidence_summary.needs_verification_count} {copy.verifyNeeded}</span>
+                          {h.evidence_summary.outreach_draft_count > 0 && (
+                            <span>{h.evidence_summary.outreach_draft_count} {copy.outreachDrafts}</span>
+                          )}
                           {h.evidence_summary.primary_gaps.length > 0 && (
-                            <span className="inline-flex items-center gap-1 text-amber-700">
+                            <span className="inline-flex max-w-full items-center gap-1 text-amber-700" title={h.evidence_summary.primary_gaps.join(" / ")}>
                               <FiAlertCircle className="h-3.5 w-3.5" aria-hidden="true" />
-                              {h.evidence_summary.primary_gaps.length} {copy.gaps}
+                              <span className="truncate">{h.evidence_summary.primary_gaps.slice(0, 2).join(" / ")}</span>
                             </span>
                           )}
                         </div>
