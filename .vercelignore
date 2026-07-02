@@ -1,8 +1,4 @@
-web/.next
-web/node_modules
-web/.env.local
-web/*.tsbuildinfo
-.next
-node_modules
-.env.local
-*.tsbuildinfo
+**/.next/**
+**/node_modules/**
+**/.env.local
+**/*.tsbuildinfo
