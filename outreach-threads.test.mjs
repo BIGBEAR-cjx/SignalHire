@@ -72,6 +72,22 @@ test("normalizes outreach patches and converts contacted without a date to now",
   assert.equal(patch.next_follow_up_at, "2026-06-20T10:00:00.000Z");
 });
 
+test("normalizes patched sequence messages safely through outreach patch", () => {
+  const patch = normalizeOutreachThreadPatch({
+    sequence_messages: [
+      { step: 1, subject: "  First  ", body: "  First body  ", send_mode: "draft_for_review", audit_events: [{ action: "saved", at: "2026-07-01T09:00:00.000Z", summary: "Saved step 1." }] },
+      { step: 2, subject: "Follow-up", body: "Follow-up body", send_mode: "draft_for_review", approved: true, skipped: true },
+      { step: "not-a-step", subject: "Bad", body: "Bad" },
+      null,
+    ],
+  });
+
+  assert.deepEqual(patch.sequence_messages, [
+    { step: 1, subject: "First", body: "First body", send_mode: "manual_approval_required", audit_events: [{ action: "saved", at: "2026-07-01T09:00:00.000Z", summary: "Saved step 1." }] },
+    { step: 2, subject: "Follow-up", body: "Follow-up body", send_mode: "draft_for_review", approved: true, skipped: true },
+  ]);
+});
+
 test("builds an action-first outreach queue with due follow-ups first", () => {
   const queue = buildOutreachQueue({
     threads: [

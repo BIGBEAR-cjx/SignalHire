@@ -32,6 +32,7 @@ import {
 } from "./talent-profile.mjs";
 import { mergeSearchFeedbackIntoResult } from "./research-loop.mjs";
 import {
+  buildHistoryFacetCounts,
   buildHistoryRunView,
   historyRangeStart,
   matchesHistoryEvidenceFilter,
@@ -932,6 +933,64 @@ export interface HistoryRunFilters {
 export interface HistoryRunsResult {
   runs: RecentRun[];
   nextCursor: string | null;
+  facetCounts: {
+    status: Record<string, number>;
+    kind: Record<string, number>;
+    evidence: Record<string, number>;
+    gap: Record<string, number>;
+    needs_action: number;
+  };
+}
+
+type HistoryNormalizedFilters = ReturnType<typeof normalizeHistoryFilters>;
+type HistorySqlParam = (value: unknown) => string;
+
+function addHistoryBaseScopeFilters(
+  where: string[],
+  addParam: HistorySqlParam,
+  normalized: HistoryNormalizedFilters,
+) {
+  if (normalized.projectId) where.push(`r.project_id = ${addParam(normalized.projectId)}`);
+  const rangeStart = historyRangeStart(normalized.range);
+  if (rangeStart) where.push(`r.updated_at >= ${addParam(rangeStart)}`);
+  if (normalized.q) {
+    const query = `%${normalized.q}%`;
+    where.push(`(
+      r.label ILIKE ${addParam(query)}
+      OR r.summary ILIKE ${addParam(query)}
+      OR r.query_text ILIKE ${addParam(query)}
+      OR p.name ILIKE ${addParam(query)}
+    )`);
+  }
+}
+
+async function historyFacetCounts(
+  userId: string,
+  normalized: HistoryNormalizedFilters,
+  locale: string,
+): Promise<HistoryRunsResult["facetCounts"]> {
+  const facetWhere = ["r.user_id = $1"];
+  const facetParams: unknown[] = [userId];
+  const addFacetParam = (value: unknown) => {
+    facetParams.push(value);
+    return `$${facetParams.length}`;
+  };
+  addHistoryBaseScopeFilters(facetWhere, addFacetParam, normalized);
+
+  const facetRows = await runSQL<Record<string, unknown>>(
+    `SELECT
+        r.id, r.kind, r.status, r.label, r.summary, r.query_text, r.project_id, r.search_task_id,
+        r.created_at, r.updated_at, r.finished_at, r.result,
+        p.name AS project_name
+      FROM research_runs r
+      LEFT JOIN projects p ON p.id = r.project_id AND p.user_id = r.user_id
+      WHERE ${facetWhere.join(" AND ")}
+      ORDER BY r.updated_at DESC`,
+    facetParams,
+  );
+  if (!facetRows) return buildHistoryFacetCounts([]);
+  const facetViews = facetRows.map((row) => buildHistoryRunView(row, { locale }) as RecentRun);
+  return buildHistoryFacetCounts(facetViews);
 }
 
 // 历史面板: 可筛选的运行记录。历史页是工作入口, 不只显示已完成记录。
@@ -946,19 +1005,8 @@ export async function historyRuns(userId: string, filters: HistoryRunFilters | U
   };
   if (normalized.kind !== "all") where.push(`r.kind = ${addParam(normalized.kind)}`);
   if (normalized.status !== "all") where.push(`r.status = ${addParam(normalized.status)}`);
-  if (normalized.projectId) where.push(`r.project_id = ${addParam(normalized.projectId)}`);
-  const rangeStart = historyRangeStart(normalized.range);
-  if (rangeStart) where.push(`r.updated_at >= ${addParam(rangeStart)}`);
+  addHistoryBaseScopeFilters(where, addParam, normalized);
   if (normalized.cursor) where.push(`r.updated_at < ${addParam(normalized.cursor)}`);
-  if (normalized.q) {
-    const query = `%${normalized.q}%`;
-    where.push(`(
-      r.label ILIKE ${addParam(query)}
-      OR r.summary ILIKE ${addParam(query)}
-      OR r.query_text ILIKE ${addParam(query)}
-      OR p.name ILIKE ${addParam(query)}
-    )`);
-  }
 
   const needsDerivedFilter = normalized.evidence !== "all" || normalized.needsAction;
   const rawLimit = needsDerivedFilter ? Math.min(120, normalized.limit * 4) : normalized.limit + 1;
@@ -974,16 +1022,18 @@ export async function historyRuns(userId: string, filters: HistoryRunFilters | U
       LIMIT ${addParam(rawLimit)}`,
     params,
   );
-  if (!rows) return { runs: [], nextCursor: null };
-  const views = rows
-    .map((row) => buildHistoryRunView(row, { locale }) as RecentRun)
+  const facetCounts = await historyFacetCounts(userId, normalized, locale);
+  if (!rows) return { runs: [], nextCursor: null, facetCounts };
+  const baseViews = rows.map((row) => buildHistoryRunView(row, { locale }) as RecentRun);
+  const views = baseViews
     .filter((run) => matchesHistoryEvidenceFilter(run, normalized.evidence))
     .filter((run) => !normalized.needsAction || run.needs_action)
     .slice(0, normalized.limit);
+  const scannedAllAvailableRows = rows.length < rawLimit;
   const nextCursor = rows.length > views.length && views.length > 0
     ? views[views.length - 1].updated_at
-    : null;
-  return { runs: views, nextCursor };
+    : (!scannedAllAvailableRows && rows.length > 0 ? String(rows[rows.length - 1].updated_at ?? "") || null : null);
+  return { runs: views, nextCursor, facetCounts };
 }
 
 // Backward-compatible helper for existing callers.

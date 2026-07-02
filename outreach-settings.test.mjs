@@ -7,16 +7,77 @@ test("builds role outreach settings with conservative defaults", () => {
     auto_follow_up_only: false,
     follow_up_interval_days: 7,
     client_visible_digest: true,
+    agent_status: "active",
+    approval_mode: "manual_all",
+    capacity_goal: {
+      contacted: 0,
+      replied: 0,
+      interested: 0,
+      interview_ready: 0,
+    },
   });
 
   assert.deepEqual(buildRoleOutreachSettings({
     auto_follow_up_only: true,
     follow_up_interval_days: 14,
     client_visible_digest: false,
+    agent_status: "paused",
+    approval_mode: "auto_follow_up_only",
+    capacity_goal: {
+      contacted: "12.9",
+      replied: 4.2,
+      interested: -3,
+      interview_ready: "bad",
+    },
   }), {
     auto_follow_up_only: true,
     follow_up_interval_days: 7,
     client_visible_digest: false,
+    agent_status: "paused",
+    approval_mode: "auto_follow_up_only",
+    capacity_goal: {
+      contacted: 12,
+      replied: 4,
+      interested: 0,
+      interview_ready: 0,
+    },
+  });
+});
+
+test("normalizes unsafe approval modes into manual persisted settings", () => {
+  assert.deepEqual(buildRoleOutreachSettings({
+    auto_follow_up_only: true,
+    approval_mode: "auto_high_confidence",
+    auto_high_confidence: true,
+  }), {
+    auto_follow_up_only: false,
+    follow_up_interval_days: 7,
+    client_visible_digest: true,
+    agent_status: "active",
+    approval_mode: "manual_all",
+    capacity_goal: {
+      contacted: 0,
+      replied: 0,
+      interested: 0,
+      interview_ready: 0,
+    },
+  });
+
+  assert.deepEqual(buildRoleOutreachSettings({
+    auto_follow_up_only: true,
+    approval_mode: "manual_all",
+  }), {
+    auto_follow_up_only: false,
+    follow_up_interval_days: 7,
+    client_visible_digest: true,
+    agent_status: "active",
+    approval_mode: "manual_all",
+    capacity_goal: {
+      contacted: 0,
+      replied: 0,
+      interested: 0,
+      interview_ready: 0,
+    },
   });
 });
 

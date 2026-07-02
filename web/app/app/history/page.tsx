@@ -2,10 +2,16 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { FiAlertCircle, FiCheckCircle, FiChevronRight, FiClock, FiFilter, FiRefreshCw, FiSearch, FiX } from "react-icons/fi";
+import { FiAlertCircle, FiBookmark, FiCheckCircle, FiChevronRight, FiClock, FiFilter, FiRefreshCw, FiSearch, FiTrash2, FiX } from "react-icons/fi";
 import { useI18n } from "@/components/LanguageProvider";
 import { EmptyState, LoadingState, PageIntro, PrimaryAction, SecondaryAction, StatusBadge, Surface } from "@/components/ui/signal-ui";
-import { buildHistoryFilterChips } from "@/lib/history.mjs";
+import {
+  HISTORY_SAVED_VIEWS_STORAGE_KEY,
+  buildHistoryFilterChips,
+  buildSavedHistoryView,
+  parseSavedHistoryViews,
+  serializeSavedHistoryViews,
+} from "@/lib/history.mjs";
 
 type HistoryStatus = "all" | "queued" | "running" | "retrying" | "done" | "error" | "canceled" | "needs_action";
 type HistoryKind = "all" | "search" | "verify";
@@ -20,6 +26,21 @@ type HistoryFilters = {
   projectId: string;
   evidence: EvidenceFilter;
   gap: string;
+};
+
+type HistoryFacetCounts = {
+  status: Record<string, number>;
+  kind: Record<string, number>;
+  evidence: Record<string, number>;
+  gap: Record<string, number>;
+  needs_action: number;
+};
+
+type SavedHistoryView = {
+  id: string;
+  name: string;
+  filters: HistoryFilters;
+  created_at: string;
 };
 
 type HistoryItem = {
@@ -67,6 +88,14 @@ const DEFAULT_FILTERS: HistoryFilters = {
   gap: "",
 };
 
+const EMPTY_FACET_COUNTS: HistoryFacetCounts = {
+  status: {},
+  kind: {},
+  evidence: {},
+  gap: {},
+  needs_action: 0,
+};
+
 const QUICK_FILTERS: Array<{ key: string; patch: Partial<HistoryFilters>; zh: string; en: string }> = [
   { key: "all", patch: DEFAULT_FILTERS, zh: "全部", en: "All" },
   { key: "search", patch: { kind: "search" }, zh: "搜人", en: "Search" },
@@ -88,6 +117,11 @@ function readFiltersFromUrl(): HistoryFilters {
     evidence: (params.get("evidence") as EvidenceFilter) || "all",
     gap: params.get("gap") ?? "",
   };
+}
+
+function readSavedViewsFromStorage(): SavedHistoryView[] {
+  if (typeof window === "undefined") return [];
+  return parseSavedHistoryViews(localStorage.getItem(HISTORY_SAVED_VIEWS_STORAGE_KEY)) as SavedHistoryView[];
 }
 
 function filtersToParams(filters: HistoryFilters, locale: string, cursor?: string | null) {
@@ -116,6 +150,22 @@ function writeFiltersToUrl(filters: HistoryFilters) {
   const query = params.toString();
   const next = query ? `${window.location.pathname}?${query}` : window.location.pathname;
   window.history.replaceState(null, "", next);
+}
+
+function formatCountLabel(label: string, count?: number) {
+  return typeof count === "number" ? `${label} (${count})` : label;
+}
+
+function facetTotal(facetCounts: HistoryFacetCounts) {
+  return Object.values(facetCounts.status).reduce((total, count) => total + count, 0);
+}
+
+function quickFilterCount(patch: Partial<HistoryFilters>, facetCounts: HistoryFacetCounts) {
+  if (patch.kind && patch.kind !== "all") return facetCounts.kind[patch.kind] ?? 0;
+  if (patch.status === "needs_action") return facetCounts.needs_action;
+  if (patch.status && patch.status !== "all") return facetCounts.status[patch.status] ?? 0;
+  if (Object.keys(patch).length > 1) return facetTotal(facetCounts);
+  return undefined;
 }
 
 function dateLabel(value: string, locale: string) {
@@ -155,6 +205,7 @@ function gapTypeFallbackLabel(value: string, locale: string) {
 }
 
 const DEFAULT_GAP_TYPES = ["research", "practice", "work_history", "public_voice"];
+const SAVED_VIEW_INLINE_LIMIT = 4;
 
 export default function HistoryPage() {
   const { locale, t } = useI18n();
@@ -162,13 +213,21 @@ export default function HistoryPage() {
   const [items, setItems] = useState<HistoryItem[] | null>(null);
   const [projects, setProjects] = useState<ProjectOption[]>([]);
   const [nextCursor, setNextCursor] = useState<string | null>(null);
+  const [facetCounts, setFacetCounts] = useState<HistoryFacetCounts>(EMPTY_FACET_COUNTS);
+  const [savedViews, setSavedViews] = useState<SavedHistoryView[]>([]);
+  const [savedViewName, setSavedViewName] = useState("");
   const [error, setError] = useState("");
   const [moreOpen, setMoreOpen] = useState(false);
+  const [savedViewsOverflowOpen, setSavedViewsOverflowOpen] = useState(false);
   const [hydrated, setHydrated] = useState(false);
 
   useEffect(() => {
-    setFilters(readFiltersFromUrl());
-    setHydrated(true);
+    const frame = window.requestAnimationFrame(() => {
+      setFilters(readFiltersFromUrl());
+      setSavedViews(readSavedViewsFromStorage());
+      setHydrated(true);
+    });
+    return () => window.cancelAnimationFrame(frame);
   }, []);
 
   const fetchHistory = useCallback(async (cursor: string | null = null, append = false) => {
@@ -179,18 +238,22 @@ export default function HistoryPage() {
       const payload = await response.json();
       if (!response.ok) throw new Error(payload.error || `HTTP ${response.status}`);
       setItems((current) => append ? [...(current ?? []), ...(payload.runs ?? [])] : (payload.runs ?? []));
+      if (!append) setFacetCounts(payload.facetCounts ?? EMPTY_FACET_COUNTS);
       setProjects(payload.projects ?? []);
       setNextCursor(payload.nextCursor ?? null);
     } catch (e) {
       setError((e as Error).message);
-      if (!append) setItems([]);
+      if (!append) {
+        setItems([]);
+        setFacetCounts(EMPTY_FACET_COUNTS);
+      }
     }
   }, [filters, locale]);
 
   useEffect(() => {
     if (!hydrated) return;
     writeFiltersToUrl(filters);
-    fetchHistory();
+    void Promise.resolve().then(() => fetchHistory());
   }, [filters, fetchHistory, hydrated]);
 
   const hasFilters = useMemo(() => (
@@ -227,6 +290,14 @@ export default function HistoryPage() {
     noMatchesDesc: "Clear filters or broaden the keyword to find more runs.",
     resultCount: "runs",
     loadMore: "Load more",
+    savedViews: "Saved views",
+    savedViewName: "View name",
+    saveView: "Save view",
+    applySavedView: "Apply saved view",
+    deleteSavedView: "Delete saved view",
+    showMoreSavedViews: "Show more",
+    hideSavedViews: "Hide saved views",
+    facetScopeHint: "Counts reflect the current keyword, role, and time scope before type, status, and evidence filters.",
     projectFallback: "No role",
     candidates: "candidates",
     high: "high confidence",
@@ -263,6 +334,14 @@ export default function HistoryPage() {
     noMatchesDesc: "清空筛选或放宽关键词后再试。",
     resultCount: "条记录",
     loadMore: "加载更多",
+    savedViews: "保存视图",
+    savedViewName: "视图名称",
+    saveView: "保存视图",
+    applySavedView: "应用保存视图",
+    deleteSavedView: "删除保存视图",
+    showMoreSavedViews: "展开更多",
+    hideSavedViews: "收起保存视图",
+    facetScopeHint: "计数基于当前关键词、岗位和时间范围，不会被类型、状态、证据筛选压缩。",
     projectFallback: "无岗位",
     candidates: "候选人",
     high: "高置信",
@@ -273,6 +352,27 @@ export default function HistoryPage() {
 
   const setFilter = (patch: Partial<HistoryFilters>) => setFilters((current) => ({ ...current, ...patch }));
   const clearFilters = () => setFilters(DEFAULT_FILTERS);
+  const persistSavedViews = useCallback((views: SavedHistoryView[]) => {
+    const next = parseSavedHistoryViews(serializeSavedHistoryViews(views)) as SavedHistoryView[];
+    setSavedViews(next);
+    localStorage.setItem(HISTORY_SAVED_VIEWS_STORAGE_KEY, serializeSavedHistoryViews(next));
+  }, []);
+  const saveCurrentView = () => {
+    if (!savedViewName.trim()) return;
+    const saved = buildSavedHistoryView(savedViewName, filters) as SavedHistoryView;
+    persistSavedViews([saved, ...savedViews]);
+    setSavedViewName("");
+  };
+  const applySavedView = (view: SavedHistoryView) => {
+    setFilters(view.filters);
+    setMoreOpen(false);
+    setSavedViewsOverflowOpen(false);
+  };
+  const deleteSavedView = (id: string) => {
+    const next = savedViews.filter((view) => view.id !== id);
+    persistSavedViews(next);
+    if (next.length <= SAVED_VIEW_INLINE_LIMIT) setSavedViewsOverflowOpen(false);
+  };
   const activeFilterChips = useMemo(
     () => buildHistoryFilterChips(filters, projects, { locale }) as HistoryFilterChip[],
     [filters, projects, locale],
@@ -307,6 +407,30 @@ export default function HistoryPage() {
     }
     return Array.from(byType.entries());
   }, [items, filters.gap, locale]);
+  const inlineSavedViews = savedViews.slice(0, SAVED_VIEW_INLINE_LIMIT);
+  const overflowSavedViews = savedViews.slice(SAVED_VIEW_INLINE_LIMIT);
+  const savedViewsOverflowLabel = savedViewsOverflowOpen ? copy.hideSavedViews : `${copy.showMoreSavedViews} (${overflowSavedViews.length})`;
+  const renderSavedViewChip = (view: SavedHistoryView) => (
+    <span key={view.id} className="inline-flex max-w-full items-center rounded-full bg-neutral-100 text-xs font-semibold text-neutral-700 ring-1 ring-black/5">
+      <button
+        type="button"
+        onClick={() => applySavedView(view)}
+        className="min-h-9 max-w-44 truncate px-3 py-1.5 hover:text-neutral-950"
+        aria-label={`${copy.applySavedView}: ${view.name}`}
+        title={view.name}
+      >
+        {view.name}
+      </button>
+      <button
+        type="button"
+        onClick={() => deleteSavedView(view.id)}
+        className="min-h-9 px-2 text-neutral-400 hover:text-red-600"
+        aria-label={`${copy.deleteSavedView}: ${view.name}`}
+      >
+        <FiTrash2 className="h-3.5 w-3.5" aria-hidden="true" />
+      </button>
+    </span>
+  );
 
   return (
     <div className="space-y-6">
@@ -335,6 +459,7 @@ export default function HistoryPage() {
         <div className="flex flex-wrap items-center gap-2">
           {QUICK_FILTERS.map((item) => {
             const active = Object.entries(item.patch).every(([key, value]) => filters[key as keyof HistoryFilters] === value);
+            const label = locale === "en" ? item.en : item.zh;
             return (
               <button
                 key={item.key}
@@ -344,7 +469,7 @@ export default function HistoryPage() {
                   active ? "bg-neutral-950 text-white ring-neutral-950" : "bg-white text-neutral-600 ring-black/10 hover:bg-neutral-50"
                 }`}
               >
-                {locale === "en" ? item.en : item.zh}
+                {formatCountLabel(label, quickFilterCount(item.patch, facetCounts))}
               </button>
             );
           })}
@@ -360,6 +485,47 @@ export default function HistoryPage() {
             <button type="button" onClick={clearFilters} className="rounded-full px-3 py-1.5 text-xs font-semibold text-neutral-500 hover:bg-neutral-100">
               {copy.clear}
             </button>
+          )}
+        </div>
+        <p className="text-xs leading-5 text-neutral-500">{copy.facetScopeHint}</p>
+
+        <div className="flex flex-wrap items-center gap-2 border-t border-black/10 pt-4">
+          <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-neutral-500">
+            <FiBookmark className="h-3.5 w-3.5" aria-hidden="true" />
+            {copy.savedViews}
+          </span>
+          <input
+            value={savedViewName}
+            onChange={(event) => setSavedViewName(event.target.value)}
+            placeholder={copy.savedViewName}
+            className="h-9 min-w-0 flex-1 rounded-full border border-black/10 bg-white px-3 text-xs text-[var(--sh-ink)] outline-none placeholder:text-neutral-400 focus:border-black/20 sm:flex-none sm:basis-44"
+          />
+          <button
+            type="button"
+            onClick={saveCurrentView}
+            disabled={!savedViewName.trim()}
+            className="inline-flex min-h-9 items-center gap-1.5 rounded-full bg-neutral-950 px-3 py-1.5 text-xs font-semibold text-white disabled:cursor-not-allowed disabled:bg-neutral-300"
+          >
+            <FiBookmark className="h-3.5 w-3.5" aria-hidden="true" />
+            {copy.saveView}
+          </button>
+          {inlineSavedViews.map(renderSavedViewChip)}
+          {overflowSavedViews.length > 0 && (
+            <button
+              type="button"
+              onClick={() => setSavedViewsOverflowOpen((value) => !value)}
+              className="inline-flex min-h-9 items-center rounded-full bg-white px-3 py-1.5 text-xs font-semibold text-neutral-600 ring-1 ring-black/10 hover:bg-neutral-50"
+              aria-label={savedViewsOverflowLabel}
+              aria-expanded={savedViewsOverflowOpen}
+              aria-controls="history-saved-views-overflow"
+            >
+              {savedViewsOverflowLabel}
+            </button>
+          )}
+          {savedViewsOverflowOpen && overflowSavedViews.length > 0 && (
+            <div id="history-saved-views-overflow" className="flex max-h-44 w-full flex-wrap items-center gap-2 overflow-y-auto rounded-2xl border border-black/10 bg-neutral-50 p-2">
+              {overflowSavedViews.map(renderSavedViewChip)}
+            </div>
           )}
         </div>
 
@@ -384,13 +550,19 @@ export default function HistoryPage() {
         {moreOpen && (
           <div className="grid gap-3 border-t border-black/10 pt-4 md:grid-cols-2 xl:grid-cols-4">
             <FilterSelect label={copy.type} value={filters.kind} onChange={(value) => setFilter({ kind: value as HistoryKind })} options={[
-              ["all", copy.all], ["search", copy.search], ["verify", copy.verify],
+              ["all", formatCountLabel(copy.all, facetTotal(facetCounts))],
+              ["search", formatCountLabel(copy.search, facetCounts.kind.search ?? 0)],
+              ["verify", formatCountLabel(copy.verify, facetCounts.kind.verify ?? 0)],
             ]} />
             <FilterSelect label={copy.status} value={filters.status} onChange={(value) => setFilter({ status: value as HistoryStatus })} options={[
-              ["all", copy.all], ["queued", locale === "en" ? "Queued" : "排队中"], ["running", locale === "en" ? "Running" : "运行中"],
-              ["retrying", locale === "en" ? "Retrying" : "重试中"], ["done", locale === "en" ? "Done" : "已完成"],
-              ["error", locale === "en" ? "Failed" : "失败"], ["canceled", locale === "en" ? "Canceled" : "已取消"],
-              ["needs_action", locale === "en" ? "Needs action" : "需要处理"],
+              ["all", formatCountLabel(copy.all, facetTotal(facetCounts))],
+              ["queued", formatCountLabel(locale === "en" ? "Queued" : "排队中", facetCounts.status.queued ?? 0)],
+              ["running", formatCountLabel(locale === "en" ? "Running" : "运行中", facetCounts.status.running ?? 0)],
+              ["retrying", formatCountLabel(locale === "en" ? "Retrying" : "重试中", facetCounts.status.retrying ?? 0)],
+              ["done", formatCountLabel(locale === "en" ? "Done" : "已完成", facetCounts.status.done ?? 0)],
+              ["error", formatCountLabel(locale === "en" ? "Failed" : "失败", facetCounts.status.error ?? 0)],
+              ["canceled", formatCountLabel(locale === "en" ? "Canceled" : "已取消", facetCounts.status.canceled ?? 0)],
+              ["needs_action", formatCountLabel(locale === "en" ? "Needs action" : "需要处理", facetCounts.needs_action)],
             ]} />
             <FilterSelect label={copy.time} value={filters.range} onChange={(value) => setFilter({ range: value as HistoryRange })} options={[
               ["all", copy.all], ["today", copy.today], ["7d", copy.sevenDays], ["30d", copy.thirtyDays],
@@ -399,12 +571,17 @@ export default function HistoryPage() {
               ["", copy.allRoles], ...projects.map((project) => [project.id, project.name] as [string, string]),
             ]} />
             <FilterSelect label={copy.evidence} value={filters.evidence} onChange={(value) => setFilter({ evidence: value as EvidenceFilter })} options={[
-              ["all", copy.all], ["high_confidence", copy.highConfidence], ["needs_verification", copy.needsVerification],
-              ["low_evidence", copy.lowEvidence], ["has_gaps", copy.hasGaps], ["shortlist_ready", copy.shortlistReady],
-              ["has_outreach_drafts", copy.hasOutreachDrafts],
+              ["all", copy.all],
+              ["high_confidence", formatCountLabel(copy.highConfidence, facetCounts.evidence.high_confidence ?? 0)],
+              ["needs_verification", formatCountLabel(copy.needsVerification, facetCounts.evidence.needs_verification ?? 0)],
+              ["low_evidence", formatCountLabel(copy.lowEvidence, facetCounts.evidence.low_evidence ?? 0)],
+              ["has_gaps", formatCountLabel(copy.hasGaps, facetCounts.evidence.has_gaps ?? 0)],
+              ["shortlist_ready", formatCountLabel(copy.shortlistReady, facetCounts.evidence.shortlist_ready ?? 0)],
+              ["has_outreach_drafts", formatCountLabel(copy.hasOutreachDrafts, facetCounts.evidence.has_outreach_drafts ?? 0)],
             ]} />
             <FilterSelect label={copy.gapType} value={filters.gap} onChange={(value) => setFilter({ gap: value })} options={[
-              ["", copy.all], ...gapFilterOptions,
+              ["", copy.all],
+              ...gapFilterOptions.map(([value, label]) => [value, formatCountLabel(label, facetCounts.gap[value] ?? 0)] as [string, string]),
             ]} />
           </div>
         )}

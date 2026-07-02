@@ -3,11 +3,15 @@ import { readFileSync } from "node:fs";
 import test from "node:test";
 import {
   buildHistoryFilterChips,
+  buildHistoryFacetCounts,
   buildHistoryRunView,
+  buildSavedHistoryView,
   historyRangeStart,
   matchesHistoryEvidenceFilter,
   normalizeHistoryGapType,
   normalizeHistoryFilters,
+  parseSavedHistoryViews,
+  serializeSavedHistoryViews,
 } from "./web/lib/history.mjs";
 
 const talentSearchResult = {
@@ -158,19 +162,106 @@ test("builds needs action reasons for failed and canceled runs", () => {
   assert.deepEqual(canceled.needs_action_reasons, ["Canceled run"]);
 });
 
-test("history API and page expose server-side filters and evidence entry points", () => {
+test("builds history facet counts from run views", () => {
+  const searchRun = buildHistoryRunView({
+    id: "run-search",
+    kind: "search",
+    status: "done",
+    label: "AI Growth Lead",
+    query_text: "Find AI growth lead",
+    updated_at: "2026-06-21T10:00:00.000Z",
+    result: talentSearchResult,
+  }, { locale: "en" });
+  const failedRun = buildHistoryRunView({
+    id: "run-failed",
+    kind: "verify",
+    status: "error",
+    label: "Candidate check",
+    query_text: "Ada Growth",
+    updated_at: "2026-06-21T10:00:00.000Z",
+  }, { locale: "en" });
+
+  const facets = buildHistoryFacetCounts([searchRun, failedRun]);
+
+  assert.equal(facets.status.done, 1);
+  assert.equal(facets.status.error, 1);
+  assert.equal(facets.kind.search, 1);
+  assert.equal(facets.kind.verify, 1);
+  assert.equal(facets.evidence.high_confidence, 1);
+  assert.equal(facets.evidence.needs_verification, 1);
+  assert.equal(facets.evidence.low_evidence, 1);
+  assert.equal(facets.evidence.has_gaps, 1);
+  assert.equal(facets.evidence.shortlist_ready, 1);
+  assert.equal(facets.evidence.has_outreach_drafts, 1);
+  assert.equal(facets.gap.research, 1);
+  assert.equal(facets.gap.public_voice, 1);
+  assert.equal(facets.needs_action, 2);
+});
+
+test("serializes local saved history views with stable filter fields", () => {
+  const saved = buildSavedHistoryView(" Needs action ", {
+    q: " founder ",
+    kind: "search",
+    status: "needs_action",
+    range: "7d",
+    projectId: "project-1",
+    evidence: "has_gaps",
+    gap: "Public voice",
+  }, { now: "2026-07-01T00:00:00.000Z", id: "view-1" });
+  const parsed = parseSavedHistoryViews(serializeSavedHistoryViews([saved]));
+
+  assert.equal(parsed.length, 1);
+  assert.equal(parsed[0].id, "view-1");
+  assert.equal(parsed[0].name, "Needs action");
+  assert.deepEqual(parsed[0].filters, {
+    q: "founder",
+    kind: "search",
+    status: "needs_action",
+    range: "7d",
+    projectId: "project-1",
+    evidence: "has_gaps",
+    gap: "public_voice",
+  });
+  assert.equal(parsed[0].created_at, "2026-07-01T00:00:00.000Z");
+  assert.deepEqual(parseSavedHistoryViews("not-json"), []);
+});
+
+test("history API and page expose server-side filters, facets, and saved views", () => {
   const apiRoute = readFileSync("web/app/api/history/route.ts", "utf8");
   const db = readFileSync("web/lib/db.ts", "utf8");
   const page = readFileSync("web/app/app/history/page.tsx", "utf8");
 
   assert.match(apiRoute, /historyRuns\(user\.id, url\.searchParams, locale\)/);
   assert.match(apiRoute, /listProjects\(user\.id\)/);
+  assert.match(apiRoute, /facetCounts/);
   assert.doesNotMatch(apiRoute, /recentRuns\(user\.id, 20\)/);
   assert.match(db, /r\.status =/);
   assert.match(db, /r\.label ILIKE/);
   assert.match(db, /LEFT JOIN projects/);
+  assert.match(db, /facetCounts/);
+  assert.match(db, /async function historyFacetCounts\(/);
+  assert.match(db, /const facetCounts = await historyFacetCounts\(/);
+  assert.match(db, /buildHistoryFacetCounts\(facetViews\)/);
+  assert.doesNotMatch(db, /const facetCounts = buildHistoryFacetCounts\(baseViews\)/);
   assert.match(page, /writeFiltersToUrl/);
   assert.match(page, /buildHistoryFilterChips/);
+  assert.match(page, /HISTORY_SAVED_VIEWS_STORAGE_KEY/);
+  assert.match(page, /localStorage\.getItem/);
+  assert.match(page, /localStorage\.setItem/);
+  assert.match(page, /serializeSavedHistoryViews/);
+  assert.match(page, /parseSavedHistoryViews/);
+  assert.match(page, /const SAVED_VIEW_INLINE_LIMIT = 4/);
+  assert.match(page, /savedViews\.slice\(0, SAVED_VIEW_INLINE_LIMIT\)/);
+  assert.match(page, /savedViews\.slice\(SAVED_VIEW_INLINE_LIMIT\)/);
+  assert.match(page, /overflowSavedViews\.length > 0/);
+  assert.match(page, /aria-expanded=\{savedViewsOverflowOpen\}/);
+  assert.match(page, /history-saved-views-overflow/);
+  assert.match(page, /facetScopeHint/);
+  assert.match(page, /setSavedViewsOverflowOpen\(false\)/);
+  assert.match(page, /max-h-44/);
+  assert.match(page, /overflow-y-auto/);
+  assert.match(page, /facetCounts/);
+  assert.match(page, /formatCountLabel/);
   assert.match(page, /activeFilterChips/);
   assert.match(page, /min-h-9/);
   assert.match(page, /projectId/);

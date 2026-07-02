@@ -19,6 +19,7 @@ export async function GET(req: Request) {
   return Response.json({
     runs: history.runs,
     nextCursor: history.nextCursor,
+    facetCounts: history.facetCounts,
     projects: projects.map((project) => ({ id: project.id, name: project.name })),
   });
 }

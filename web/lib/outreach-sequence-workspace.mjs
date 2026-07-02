@@ -18,6 +18,14 @@ function cleanStringArray(value, limit = 20) {
   return Array.isArray(value) ? value.map(cleanString).filter(Boolean).slice(0, limit) : [];
 }
 
+function validDate(value) {
+  if (value instanceof Date) return Number.isFinite(value.getTime()) ? value : null;
+  const clean = cleanString(value);
+  if (!clean) return null;
+  const date = new Date(clean);
+  return Number.isFinite(date.getTime()) ? date : null;
+}
+
 function bodyPreview(value) {
   return cleanString(value).replace(/\s+/g, " ").slice(0, 240);
 }
@@ -43,6 +51,88 @@ function messageEvidenceRefs(message) {
   const refs = cleanStringArray(message?.evidence_refs, 8);
   if (refs.length) return refs;
   return cleanStringArray(message?.evidence_hooks, 8);
+}
+
+function normalizedAuditEvents(value) {
+  const allowed = new Set(["saved", "reviewed", "skipped"]);
+  return Array.isArray(value)
+    ? value.filter(isRecord).map((event) => ({
+      action: cleanString(event.action),
+      at: validDate(event.at)?.toISOString() ?? "",
+      summary: cleanString(event.summary),
+    })).filter((event) => allowed.has(event.action) && event.at && event.summary)
+    : [];
+}
+
+export function normalizeOutreachSequenceMessages(value = []) {
+  const messagesByStep = new Map();
+  for (const message of Array.isArray(value) ? value : []) {
+    if (!isRecord(message)) continue;
+    const step = Number(message.step);
+    if (step !== 1 && step !== 2 && step !== 3) continue;
+    const next = {
+      ...message,
+      step,
+      subject: cleanString(message.subject),
+      body: cleanString(message.body),
+      send_mode: step === 1 ? "manual_approval_required" : "draft_for_review",
+    };
+    const auditEvents = normalizedAuditEvents(message.audit_events);
+    if (auditEvents.length) next.audit_events = auditEvents;
+    messagesByStep.set(step, next);
+  }
+  return [1, 2, 3].map((step) => messagesByStep.get(step)).filter(Boolean);
+}
+
+function auditActionForPatch(patch) {
+  if (patch?.skipped === true) return "skipped";
+  if (patch?.reviewed === true) return "reviewed";
+  if (patch?.subject !== undefined || patch?.body !== undefined) return "saved";
+  return "";
+}
+
+function auditSummaryFor(action, step, summary) {
+  const clean = cleanString(summary);
+  if (clean) return clean;
+  if (action === "reviewed") return `Reviewed step ${step}.`;
+  if (action === "skipped") return `Skipped step ${step}.`;
+  return `Saved step ${step}.`;
+}
+
+export function patchOutreachSequenceStep(sequenceMessages = [], patch = {}) {
+  const step = Number(patch?.step);
+  if (step !== 1 && step !== 2 && step !== 3) return normalizeOutreachSequenceMessages(sequenceMessages);
+
+  const now = validDate(patch?.now) ?? new Date();
+  const messages = normalizeOutreachSequenceMessages(sequenceMessages);
+  const existing = messages.find((message) => Number(message.step) === step) ?? { step, subject: "", body: "" };
+  const next = { ...existing, step };
+
+  if (patch.subject !== undefined) next.subject = cleanString(patch.subject);
+  if (patch.body !== undefined) next.body = cleanString(patch.body);
+  if (patch.reviewed !== undefined) {
+    next.approved = patch.reviewed === true;
+    if (patch.reviewed === true) next.reviewed_at = now.toISOString();
+    else delete next.reviewed_at;
+  }
+  if (patch.skipped !== undefined) next.skipped = patch.skipped === true;
+
+  const action = auditActionForPatch(patch);
+  if (action) {
+    next.audit_events = [
+      ...normalizedAuditEvents(next.audit_events),
+      {
+        action,
+        at: now.toISOString(),
+        summary: auditSummaryFor(action, step, patch.audit_summary),
+      },
+    ];
+  }
+
+  return normalizeOutreachSequenceMessages([
+    ...messages.filter((message) => Number(message.step) !== step),
+    next,
+  ]);
 }
 
 function sendableEmail(contactProfile) {
@@ -99,11 +189,7 @@ function nextActionFor({ item, blockReasons, currentStep }) {
 }
 
 function normalizedMessage(message, step) {
-  return {
-    ...message,
-    step,
-    send_mode: step === 1 ? "manual_approval_required" : cleanString(message?.send_mode) || "draft_for_review",
-  };
+  return normalizeOutreachSequenceMessages([{ ...message, step }])[0] ?? { step, subject: "", body: "", send_mode: step === 1 ? "manual_approval_required" : "draft_for_review" };
 }
 
 export function buildOutreachSequenceWorkspaceItem({ item = {}, settings = {} } = {}) {
@@ -135,10 +221,14 @@ export function buildOutreachSequenceWorkspaceItem({ item = {}, settings = {} } 
       evidence_refs: refs,
       delay_days: step === 1 ? undefined : Number(message.delay_days) || normalizedSettings.follow_up_interval_days,
       send_mode: message.send_mode,
+      approved: message.approved === true,
+      reviewed: message.approved === true || Boolean(cleanString(message.reviewed_at)),
+      skipped: message.skipped === true,
+      audit_events: normalizedAuditEvents(message.audit_events),
       state: step === 1
         ? firstStepState({ step, item: source, blocked: hardBlocked })
-        : followUpStepState({ step, currentStep, stopped, blocked: hardBlocked }),
-      auto_sendable: step === 1 || hardBlocked ? false : canAutoSendFollowUp({
+        : (message.skipped === true ? "skipped" : followUpStepState({ step, currentStep, stopped, blocked: hardBlocked })),
+      auto_sendable: step === 1 || hardBlocked || message.skipped === true ? false : canAutoSendFollowUp({
         settings: normalizedSettings,
         message,
         thread: source,

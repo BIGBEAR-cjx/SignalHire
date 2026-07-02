@@ -34,10 +34,22 @@ export type RoleAgentGuardrailsView = {
   approval_mode: RoleAgentApprovalMode;
   capacity_summary: {
     goal: number | null;
+    capacity_goal: {
+      contacted: number;
+      replied: number;
+      interested: number;
+      interview_ready: number;
+    };
     contacted: number;
     replied: number;
     interested: number;
     interview_ready: number;
+    remaining_by_stage: {
+      contacted: number;
+      replied: number;
+      interested: number;
+      interview_ready: number;
+    };
     remaining_to_goal: number | null;
     pressure: "not_set" | "met" | "on_track" | "needs_pipeline";
   };
@@ -60,7 +72,12 @@ export function buildRoleAgentGuardrailsView(input?: {
   settings?: unknown;
   threads?: unknown[];
   sequenceAnalytics?: unknown;
-  capacityGoal?: number | string | null;
+  capacityGoal?: number | string | {
+    contacted?: number | string | null;
+    replied?: number | string | null;
+    interested?: number | string | null;
+    interview_ready?: number | string | null;
+  } | null;
   activityLimit?: number;
   now?: Date | string;
   locale?: "zh" | "en" | string;

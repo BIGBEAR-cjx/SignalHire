@@ -4,6 +4,7 @@ import { buildSequenceAnalyticsView } from "./sequence-analytics.mjs";
 const ROLE_STATUSES = new Set(["draft", "active", "paused", "review_required"]);
 const STOP_STATUSES = new Set(["replied", "bounced", "stopped", "not_interested"]);
 const BLOCKED_DELIVERABILITY = new Set(["bounced", "invalid", "undeliverable", "failed"]);
+const CAPACITY_GOAL_KEYS = ["contacted", "replied", "interested", "interview_ready"];
 
 function isRecord(value) {
   return Boolean(value && typeof value === "object" && !Array.isArray(value));
@@ -107,8 +108,15 @@ function addReason(reasons, code, label, count = 1) {
 function capacityGoal(role, inputGoal) {
   const source = isRecord(role) ? role : {};
   const raw = inputGoal ?? source.capacity_goal ?? source.capacityGoal ?? source.target_candidates ?? source.targetCandidates;
-  const goal = asNumber(raw, 0);
-  return goal > 0 ? goal : null;
+  return buildRoleOutreachSettings({ capacity_goal: raw }).capacity_goal;
+}
+
+function persistedCapacityGoal(rawSettings, normalizedSettings) {
+  const source = isRecord(rawSettings) ? rawSettings : {};
+  if (Object.hasOwn(source, "capacity_goal") || Object.hasOwn(source, "capacityGoal")) {
+    return normalizedSettings.capacity_goal;
+  }
+  return null;
 }
 
 function buildCurrentCounts(threads, sequenceAnalytics) {
@@ -122,18 +130,25 @@ function buildCurrentCounts(threads, sequenceAnalytics) {
 }
 
 function buildCapacitySummary(goal, counts) {
-  const remaining = goal == null ? null : Math.max(0, goal - counts.interested);
+  const capacity = isRecord(goal) ? goal : buildRoleOutreachSettings({ capacity_goal: goal }).capacity_goal;
+  const remainingByStage = Object.fromEntries(
+    CAPACITY_GOAL_KEYS.map((key) => [key, Math.max(0, asNumber(capacity[key]) - asNumber(counts[key]))]),
+  );
+  const legacyGoal = capacity.interested > 0 ? capacity.interested : null;
+  const remaining = legacyGoal == null ? null : remainingByStage.interested;
   let pressure = "not_set";
-  if (goal != null) {
-    const ratio = goal > 0 ? counts.interested / goal : 0;
+  if (legacyGoal != null) {
+    const ratio = counts.interested / legacyGoal;
     pressure = ratio >= 1 ? "met" : ratio >= 0.6 ? "on_track" : "needs_pipeline";
   }
   return {
-    goal,
+    goal: legacyGoal,
+    capacity_goal: capacity,
     contacted: counts.contacted,
     replied: counts.replied,
     interested: counts.interested,
     interview_ready: counts.interview_ready,
+    remaining_by_stage: remainingByStage,
     remaining_to_goal: remaining,
     pressure,
   };
@@ -173,6 +188,7 @@ function normalizeApprovalMode(settings, locale = "en") {
   const highConfidenceRequested = settings.auto_high_confidence === true
     || settings.autoHighConfidence === true
     || cleanStatus(settings.approval_mode || settings.approvalMode) === "auto_high_confidence";
+  const normalized = buildRoleOutreachSettings(settings);
 
   if (highConfidenceRequested) {
     return {
@@ -184,8 +200,7 @@ function normalizeApprovalMode(settings, locale = "en") {
     };
   }
 
-  const normalized = buildRoleOutreachSettings(settings);
-  if (normalized.auto_follow_up_only) {
+  if (normalized.approval_mode === "auto_follow_up_only") {
     return {
       mode: "auto_follow_up_only",
       label: isZh ? "跟进草稿复核" : "Follow-up review drafts",
@@ -284,11 +299,19 @@ function buildNextTasks({ threads, sequenceAnalytics, capacity, blockedReasons, 
   return tasks.slice(0, 5);
 }
 
-function viewStatus(role, approvalMode, blockedReasons, threads) {
+function hasPersistedAgentStatus(settings) {
+  const source = isRecord(settings) ? settings : {};
+  return Object.hasOwn(source, "agent_status") || Object.hasOwn(source, "agentStatus");
+}
+
+function viewStatus(role, settings, approvalMode, blockedReasons, threads) {
   const source = isRecord(role) ? role : {};
+  const normalizedSettings = buildRoleOutreachSettings(settings);
+  if (hasPersistedAgentStatus(settings) && normalizedSettings.agent_status === "paused") return "paused";
   const explicit = cleanStatus(source.status);
-  if (explicit === "paused" || source.paused === true) return "paused";
   if (approvalMode.high_confidence_auto_send_blocked) return "review_required";
+  if (hasPersistedAgentStatus(settings) && normalizedSettings.agent_status === "active") return "active";
+  if (explicit === "paused" || source.paused === true) return "paused";
   if (blockedReasons.some((reason) => !["first_email_manual", "first_email_candidates_manual"].includes(reason.code))) return "review_required";
   if (ROLE_STATUSES.has(explicit)) return explicit;
   return threads.length > 0 ? "active" : "draft";
@@ -309,20 +332,22 @@ export function buildRoleAgentGuardrailsView({
   const sourceRole = isRecord(role) ? role : {};
   const id = cleanString(roleId || sourceRole.id || sourceRole.role_id || sourceRole.roleId);
   const normalizedLocale = locale === "zh" ? "zh" : "en";
-  const approvalMode = normalizeApprovalMode(isRecord(settings) ? settings : {}, normalizedLocale);
-  const safeSettings = approvalMode.high_confidence_auto_send_blocked ? { ...settings, auto_follow_up_only: false } : settings;
+  const rawSettings = isRecord(settings) ? settings : {};
+  const normalizedSettings = buildRoleOutreachSettings(rawSettings);
+  const approvalMode = normalizeApprovalMode(rawSettings, normalizedLocale);
+  const safeSettings = approvalMode.high_confidence_auto_send_blocked ? { ...normalizedSettings, auto_follow_up_only: false } : normalizedSettings;
   const analytics = isRecord(sequenceAnalytics)
     ? sequenceAnalytics
     : buildSequenceAnalyticsView({ roleId: id, threads: rows, now, locale });
   const counts = buildCurrentCounts(rows, analytics);
-  const capacity = buildCapacitySummary(capacityGoal(sourceRole, inputCapacityGoal), counts);
+  const capacity = buildCapacitySummary(persistedCapacityGoal(rawSettings, normalizedSettings) ?? capacityGoal(sourceRole, inputCapacityGoal), counts);
   const blockedReasons = buildBlockedReasons({ threads: rows, settings: safeSettings, approvalMode });
   const nextTasks = buildNextTasks({ threads: rows, sequenceAnalytics: analytics, capacity, blockedReasons, locale: normalizedLocale });
 
   return {
     panel_title: "Role Agent Guardrails",
     role_id: id,
-    status: viewStatus(sourceRole, approvalMode, blockedReasons, rows),
+    status: viewStatus(sourceRole, rawSettings, approvalMode, blockedReasons, rows),
     approval_mode: approvalMode,
     capacity_summary: capacity,
     current_counts: counts,

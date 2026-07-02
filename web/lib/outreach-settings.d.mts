@@ -2,6 +2,14 @@ export type RoleOutreachSettings = {
   auto_follow_up_only: boolean;
   follow_up_interval_days: 7;
   client_visible_digest: boolean;
+  agent_status: "active" | "paused";
+  approval_mode: "manual_all" | "auto_follow_up_only";
+  capacity_goal: {
+    contacted: number;
+    replied: number;
+    interested: number;
+    interview_ready: number;
+  };
 };
 
 export type OutreachSequenceMessageForSendCheck = {

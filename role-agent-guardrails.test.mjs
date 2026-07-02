@@ -5,7 +5,15 @@ import { buildRoleAgentGuardrailsView } from "./web/lib/role-agent-guardrails.mj
 test("builds a conservative role agent guardrail view model", () => {
   const view = buildRoleAgentGuardrailsView({
     role: { id: "role-1", status: "active", capacity_goal: 3 },
-    settings: { auto_follow_up_only: false },
+    settings: {
+      auto_follow_up_only: false,
+      capacity_goal: {
+        contacted: 4,
+        replied: 2,
+        interested: 3,
+        interview_ready: 1,
+      },
+    },
     now: new Date("2026-07-01T12:00:00.000Z"),
     threads: [
       {
@@ -45,10 +53,22 @@ test("builds a conservative role agent guardrail view model", () => {
   });
   assert.deepEqual(view.capacity_summary, {
     goal: 3,
+    capacity_goal: {
+      contacted: 4,
+      replied: 2,
+      interested: 3,
+      interview_ready: 1,
+    },
     contacted: 2,
     replied: 0,
     interested: 1,
     interview_ready: 1,
+    remaining_by_stage: {
+      contacted: 2,
+      replied: 2,
+      interested: 2,
+      interview_ready: 0,
+    },
     remaining_to_goal: 2,
     pressure: "needs_pipeline",
   });
@@ -82,6 +102,80 @@ test("normalizes auto_high_confidence into blocked manual-safe mode", () => {
   assert.equal(view.approval_mode.high_confidence_auto_send_blocked, true);
   assert.ok(view.blocked_automation_reasons.some((reason) => reason.code === "high_confidence_auto_send_blocked"));
   assert.ok(view.blocked_automation_reasons.some((reason) => reason.code === "follow_up_not_auto_eligible"));
+});
+
+test("uses persisted paused role agent status and capacity goals", () => {
+  const view = buildRoleAgentGuardrailsView({
+    role: { id: "role-paused", status: "active", capacity_goal: 99 },
+    settings: {
+      agent_status: "paused",
+      approval_mode: "auto_follow_up_only",
+      capacity_goal: {
+        contacted: 5,
+        replied: 2,
+        interested: 1,
+        interview_ready: 1,
+      },
+    },
+    threads: [
+      {
+        id: "contacted",
+        candidate_name: "Contacted",
+        status: "sent",
+        sequence_step: 2,
+        approved: true,
+        send_mode: "draft_for_review",
+        evidence_angle: "Strong match",
+        contact_profile: { emails: [{ value: "contacted@example.ai", source: "manual", confidence: "high", deliverability_status: "valid" }] },
+      },
+      {
+        id: "interview",
+        candidate_name: "Interview",
+        status: "interview_ready",
+        sequence_step: 2,
+        approved: true,
+        send_mode: "draft_for_review",
+        evidence_angle: "Strong match",
+        contact_profile: { emails: [{ value: "interview@example.ai", source: "manual", confidence: "high", deliverability_status: "valid" }] },
+      },
+    ],
+  });
+
+  assert.equal(view.status, "paused");
+  assert.equal(view.approval_mode.mode, "auto_follow_up_only");
+  assert.deepEqual(view.capacity_summary.capacity_goal, {
+    contacted: 5,
+    replied: 2,
+    interested: 1,
+    interview_ready: 1,
+  });
+  assert.deepEqual(view.capacity_summary.remaining_by_stage, {
+    contacted: 3,
+    replied: 2,
+    interested: 0,
+    interview_ready: 0,
+  });
+  assert.equal(view.capacity_summary.goal, 1);
+  assert.equal(view.capacity_summary.remaining_to_goal, 0);
+});
+
+test("uses persisted active role agent status when resumed", () => {
+  const view = buildRoleAgentGuardrailsView({
+    role: { id: "role-active", status: "paused", paused: true },
+    settings: {
+      agent_status: "active",
+      approval_mode: "manual_all",
+      capacity_goal: {
+        contacted: 0,
+        replied: 0,
+        interested: 0,
+        interview_ready: 0,
+      },
+    },
+    threads: [],
+  });
+
+  assert.equal(view.status, "active");
 });
 
 test("keeps first email manual while allowing existing auto follow-up-only semantics", () => {

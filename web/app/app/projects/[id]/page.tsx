@@ -27,7 +27,7 @@ import { buildAgencyOutreachActivityDigest } from "@/lib/outreach-activity-diges
 import { buildEvidenceDrivenOutreachSequence } from "@/lib/outreach-draft.mjs";
 import { latestFollowUpDraftState } from "@/lib/outreach-followups.mjs";
 import { buildRoleOutreachSettings } from "@/lib/outreach-settings.mjs";
-import { buildOutreachSequenceWorkspace } from "@/lib/outreach-sequence-workspace.mjs";
+import { buildOutreachSequenceWorkspace, patchOutreachSequenceStep } from "@/lib/outreach-sequence-workspace.mjs";
 import { parseNetworkSeedCsv } from "@/lib/referral-paths.mjs";
 import { buildRoleAgentGuardrailsView } from "@/lib/role-agent-guardrails.mjs";
 import { buildSourceMixUxView, sourceTypeLabel, sourceTypeTooltip } from "@/lib/source-classifier.mjs";
@@ -332,6 +332,14 @@ interface ProjectDetail {
       auto_follow_up_only: boolean;
       follow_up_interval_days: 7;
       client_visible_digest: boolean;
+      agent_status?: "active" | "paused";
+      approval_mode?: "manual_all" | "auto_follow_up_only";
+      capacity_goal?: {
+        contacted?: number;
+        replied?: number;
+        interested?: number;
+        interview_ready?: number;
+      };
     };
     network_seeds?: NetworkSeedView[];
     candidates_total: number;
@@ -560,6 +568,10 @@ type OutreachSequenceMessage = {
   evidence_refs?: string[];
   send_mode?: string;
   delay_days?: number;
+  approved?: boolean;
+  skipped?: boolean;
+  reviewed_at?: string;
+  audit_events?: Array<{ action: "saved" | "reviewed" | "skipped"; at: string; summary: string }>;
 };
 
 type GmailStatusView = {
@@ -849,16 +861,22 @@ function RoleAgentGuardrailsPanel({
   queue,
   sequenceAnalytics,
   locale,
+  onChanged,
 }: {
   project: ProjectDetail["project"];
   queue?: OutreachQueueView;
   sequenceAnalytics?: SequenceAnalyticsView;
   locale: "zh" | "en";
+  onChanged: () => void;
 }) {
   const isEn = locale === "en";
+  const [draftSettings, setDraftSettings] = useState(() => buildRoleOutreachSettings(project.outreach_settings));
+  const [capacityDraft, setCapacityDraft] = useState(() => buildRoleOutreachSettings(project.outreach_settings).capacity_goal);
+  const [settingsSaving, setSettingsSaving] = useState(false);
+  const agentPaused = draftSettings.agent_status === "paused";
   const view = buildRoleAgentGuardrailsView({
     role: { id: project.id, status: project.status },
-    settings: project.outreach_settings,
+    settings: draftSettings,
     threads: queue?.items ?? [],
     sequenceAnalytics,
     locale,
@@ -869,6 +887,36 @@ function RoleAgentGuardrailsPanel({
     { key: "interested", label: isEn ? "Interested" : "有意向", value: view.current_counts.interested },
     { key: "interview_ready", label: isEn ? "Interview-ready" : "可约面", value: view.current_counts.interview_ready },
   ];
+
+  async function saveRoleAgentSettings(next: Partial<ReturnType<typeof buildRoleOutreachSettings>>) {
+    const previous = draftSettings;
+    const updated = buildRoleOutreachSettings({ ...draftSettings, ...next });
+    setDraftSettings(updated);
+    setSettingsSaving(true);
+    try {
+      const r = await fetch(`/api/projects/${project.id}/outreach-settings`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ settings: updated, locale }),
+      });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(String(j.error || "settings_update_failed"));
+      const saved = buildRoleOutreachSettings(j.settings);
+      setDraftSettings(saved);
+      setCapacityDraft(saved.capacity_goal);
+      onChanged();
+    } catch {
+      setDraftSettings(previous);
+      setCapacityDraft(previous.capacity_goal);
+    } finally {
+      setSettingsSaving(false);
+    }
+  }
+
+  function updateCapacityDraft(key: keyof typeof capacityDraft, value: string) {
+    const number = Math.max(0, Math.floor(Number(value) || 0));
+    setCapacityDraft((prev) => ({ ...prev, [key]: number }));
+  }
 
   return (
     <Surface className="space-y-4 p-5">
@@ -884,14 +932,37 @@ function RoleAgentGuardrailsPanel({
           <p className="mt-1 text-sm leading-6 text-[var(--sh-muted)]">
             {isEn
               ? "SignalHire keeps this role moving with visible approval boundaries. First emails stay manual; only reviewed follow-ups can use auto-follow-up settings."
-              : "SignalHire 用可见的审批边界推进岗位。首封邮件保持人工发送；只有已审核的跟进才可进入跟进草稿流程。"}
+            : "SignalHire 用可见的审批边界推进岗位。首封邮件保持人工发送；只有已审核的跟进才可进入跟进草稿流程。"}
           </p>
         </div>
-        <div className="rounded-2xl bg-[var(--sh-canvas)] px-3 py-2 text-xs leading-5 text-[var(--sh-muted)] ring-1 ring-black/5">
-          <span className="block font-semibold text-[var(--sh-ink)]">{isEn ? "Approval mode" : "审批模式"}</span>
-          {view.approval_mode.mode === "auto_follow_up_only"
-            ? (isEn ? "Follow-up review drafts" : "跟进草稿复核")
-            : (isEn ? "Manual approval required" : "需要人工批准")}
+        <div className="grid gap-2 rounded-2xl bg-[var(--sh-canvas)] px-3 py-2 text-xs leading-5 text-[var(--sh-muted)] ring-1 ring-black/5 sm:min-w-[280px]">
+          <div className="flex items-center justify-between gap-2">
+            <span className="font-semibold text-[var(--sh-ink)]">{isEn ? "Agent control" : "Agent 控制"}</span>
+            <button
+              type="button"
+              onClick={() => saveRoleAgentSettings({ agent_status: agentPaused ? "active" : "paused" })}
+              disabled={settingsSaving}
+              className="inline-flex min-h-8 items-center gap-1 rounded-full bg-white px-3 text-xs font-semibold text-gray-700 ring-1 ring-black/10 hover:bg-gray-50 disabled:opacity-50"
+            >
+              {agentPaused ? <FiPlay className="h-3.5 w-3.5" aria-hidden="true" /> : <FiPauseCircle className="h-3.5 w-3.5" aria-hidden="true" />}
+              {agentPaused ? (isEn ? "Resume" : "恢复") : (isEn ? "Pause" : "暂停")}
+            </button>
+          </div>
+          <select
+            value={draftSettings.approval_mode}
+            onChange={(event) => saveRoleAgentSettings({ approval_mode: event.target.value as "manual_all" | "auto_follow_up_only" })}
+            disabled={settingsSaving}
+            className="min-h-9 rounded-xl border border-black/10 bg-white px-2 text-xs font-semibold text-[var(--sh-ink)] outline-none focus:border-[var(--sh-blue)]"
+            aria-label={isEn ? "Approval mode" : "审批模式"}
+          >
+            <option value="manual_all">{isEn ? "Manual approval required" : "全部人工批准"}</option>
+            <option value="auto_follow_up_only">{isEn ? "Follow-up review drafts" : "跟进草稿复核"}</option>
+          </select>
+          <p>
+            {view.approval_mode.high_confidence_auto_send_blocked
+              ? (isEn ? "High-confidence auto-send is blocked." : "高置信自动发送已禁用。")
+              : (isEn ? "No email is sent without a human action." : "没有人工动作不会发送邮件。")}
+          </p>
         </div>
       </div>
 
@@ -904,9 +975,52 @@ function RoleAgentGuardrailsPanel({
         ))}
       </div>
 
+      <div className="rounded-2xl border border-black/10 bg-white/72 p-4">
+        <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+          <div>
+            <p className="text-xs font-semibold text-[var(--sh-muted)]">{isEn ? "Capacity targets" : "容量目标"}</p>
+            <p className="mt-1 text-xs leading-5 text-[var(--sh-muted)]">
+              {isEn ? "Targets guide next tasks and pipeline pressure; they do not trigger auto-send." : "目标用于提示下一步和 pipeline 压力，不触发自动发送。"}
+            </p>
+          </div>
+          <SecondaryAction
+            onClick={() => saveRoleAgentSettings({ capacity_goal: capacityDraft })}
+            disabled={settingsSaving}
+            className="min-h-9 px-3 py-2 text-xs"
+          >
+            {settingsSaving ? (isEn ? "Saving..." : "保存中...") : (isEn ? "Save targets" : "保存目标")}
+          </SecondaryAction>
+        </div>
+        <div className="mt-3 grid gap-2 md:grid-cols-4">
+          {counters.map((counter) => {
+            const key = counter.key as keyof typeof capacityDraft;
+            return (
+              <label key={counter.key} className="rounded-xl bg-[var(--sh-canvas)] px-3 py-2 text-xs ring-1 ring-black/5">
+                <span className="block font-semibold text-[var(--sh-ink)]">{counter.label}</span>
+                <input
+                  type="number"
+                  min={0}
+                  value={capacityDraft[key]}
+                  onChange={(event) => updateCapacityDraft(key, event.target.value)}
+                  className="mt-2 min-h-9 w-full rounded-lg border border-black/10 bg-white px-2 text-xs text-[var(--sh-ink)] outline-none focus:border-[var(--sh-blue)]"
+                />
+                <span className="mt-1 block text-[11px] text-[var(--sh-muted)]">
+                  {isEn ? "Remaining" : "剩余"}: {view.capacity_summary.remaining_by_stage[key]}
+                </span>
+              </label>
+            );
+          })}
+        </div>
+      </div>
+
       <div className="grid gap-3 lg:grid-cols-2">
         <div className="rounded-2xl border border-black/10 bg-white/72 p-4">
           <p className="text-xs font-semibold text-[var(--sh-muted)]">{isEn ? "Next tasks" : "下一步任务"}</p>
+          {agentPaused && (
+            <p className="mt-2 rounded-xl bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-900 ring-1 ring-amber-100">
+              {isEn ? "Agent is paused. These are suggestions for manual review only." : "Agent 已暂停。以下仅作为人工复核建议，不会自动推进。"}
+            </p>
+          )}
           {view.next_tasks.length > 0 ? (
             <ul className="mt-2 space-y-2 text-xs leading-5 text-[var(--sh-ink)]">
               {view.next_tasks.slice(0, 4).map((task) => (
@@ -1798,6 +1912,7 @@ function sequenceStepStateLabel(state: OutreachSequenceWorkspaceItem["steps"][nu
     blocked: { en: "Blocked", zh: "阻塞" },
     sent: { en: "Sent", zh: "已发送" },
     review: { en: "Review", zh: "待审核" },
+    skipped: { en: "Skipped", zh: "已跳过" },
   };
   return labels[state]?.[locale] ?? state;
 }
@@ -1822,11 +1937,11 @@ function GmailOutreachPanel({
   onChanged: () => void;
 }) {
   const isEn = locale === "en";
-  const items = queue?.items ?? [];
   const [busyId, setBusyId] = useState<string | null>(null);
   const [gmail, setGmail] = useState<GmailStatusView | null>(null);
   const [contactProvider, setContactProvider] = useState<ContactProviderStatusView | null>(null);
-  const [editing, setEditing] = useState<Record<string, { subject: string; body: string }>>({});
+  const [sequenceEditing, setSequenceEditing] = useState<Record<string, { subject: string; body: string }>>({});
+  const [sequenceMessagesByThread, setSequenceMessagesByThread] = useState<Record<string, OutreachSequenceMessage[]>>({});
   const [sendErrors, setSendErrors] = useState<Record<string, string>>({});
   const [bulkBusy, setBulkBusy] = useState(false);
   const [contactBulkBusy, setContactBulkBusy] = useState(false);
@@ -1834,8 +1949,18 @@ function GmailOutreachPanel({
   const [approvalRetryBusy, setApprovalRetryBusy] = useState(false);
   const [bulkContactResult, setBulkContactResult] = useState<BulkContactResolutionView | null>(null);
   const [approvalOutcome, setApprovalOutcome] = useState<OutreachApprovalOutcomeView | null>(null);
-  const [roleOutreachSettings, setRoleOutreachSettings] = useState(() => buildRoleOutreachSettings(persistedSettings));
-  const [settingsSaving, setSettingsSaving] = useState(false);
+  const roleOutreachSettings = useMemo(() => buildRoleOutreachSettings(persistedSettings), [persistedSettings]);
+  const items = useMemo(
+    () => (queue?.items ?? []).map((item) => (
+      sequenceMessagesByThread[item.id]
+        ? { ...item, sequence_messages: sequenceMessagesByThread[item.id] }
+        : item
+    )),
+    [queue?.items, sequenceMessagesByThread],
+  );
+  const effectiveQueue = useMemo(() => (
+    queue ? { ...queue, items } : queue
+  ), [items, queue]);
   const digest = buildAgencyOutreachActivityDigest({
     roleName: projectName,
     threads: items.map((item) => ({
@@ -1849,38 +1974,12 @@ function GmailOutreachPanel({
     })),
   });
   const sequenceWorkspace = buildOutreachSequenceWorkspace({
-    queue,
+    queue: effectiveQueue,
     settings: roleOutreachSettings,
     digest,
     sequenceAnalytics,
   });
   const sequenceWorkspaceById = new Map(sequenceWorkspace.items.map((item) => [item.id, item]));
-
-  useEffect(() => {
-    setRoleOutreachSettings(buildRoleOutreachSettings(persistedSettings));
-  }, [persistedSettings]);
-
-  async function updateRoleOutreachSettings(next: { auto_follow_up_only?: boolean; client_visible_digest?: boolean }) {
-    const previous = roleOutreachSettings;
-    const updated = buildRoleOutreachSettings({ ...roleOutreachSettings, ...next });
-    setRoleOutreachSettings(updated);
-    setSettingsSaving(true);
-    try {
-      const r = await fetch(`/api/projects/${projectId}/outreach-settings`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ settings: updated, locale }),
-      });
-      const j = await r.json().catch(() => ({}));
-      if (!r.ok) throw new Error(String(j.error || "settings_update_failed"));
-      setRoleOutreachSettings(buildRoleOutreachSettings(j.settings));
-      onChanged();
-    } catch {
-      setRoleOutreachSettings(previous);
-    } finally {
-      setSettingsSaving(false);
-    }
-  }
 
   useEffect(() => {
     let cancelled = false;
@@ -1920,13 +2019,62 @@ function GmailOutreachPanel({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ ...patch, locale }),
       });
-      if (r.ok) onChanged();
+      if (!r.ok) return false;
+      if (patch.sequence_messages) {
+        setSequenceMessagesByThread((prev) => ({ ...prev, [id]: patch.sequence_messages ?? [] }));
+      }
+      onChanged();
+      return true;
+    } catch {
+      return false;
     } finally {
       setBusyId(null);
     }
   }
+  function sequenceDraftKey(itemId: string, step: number) {
+    return `${itemId}:${step}`;
+  }
+  function sequenceStepDraft(item: OutreachQueueView["items"][number], message: OutreachSequenceMessage) {
+    return sequenceEditing[sequenceDraftKey(item.id, message.step)] ?? { subject: message.subject ?? "", body: message.body ?? "" };
+  }
+  async function updateSequenceStep(
+    item: OutreachQueueView["items"][number],
+    message: OutreachSequenceMessage,
+    patch: { subject?: string; body?: string; reviewed?: boolean; skipped?: boolean; audit_summary?: string },
+  ) {
+    const nextMessages = patchOutreachSequenceStep(fallbackSequence(item), {
+      step: message.step,
+      now: new Date().toISOString(),
+      ...patch,
+    });
+    const firstStepPatch = message.step === 1 && (patch.subject !== undefined || patch.body !== undefined)
+      ? { subject: patch.subject ?? message.subject, body: patch.body ?? message.body }
+      : {};
+    const saved = await updateOutreachThread(item.id, { ...firstStepPatch, sequence_messages: nextMessages });
+    if (saved) {
+      setSequenceEditing((prev) => {
+        const next = { ...prev };
+        delete next[sequenceDraftKey(item.id, message.step)];
+        return next;
+      });
+    }
+  }
+  function approvedFirstEmailSequence(item: OutreachQueueView["items"][number]) {
+    return patchOutreachSequenceStep(fallbackSequence(item), {
+      step: 1,
+      reviewed: true,
+      audit_summary: isEn ? "Approved first email draft." : "批准首封草稿。",
+      now: new Date().toISOString(),
+    });
+  }
   async function approveOutreachThread(item: OutreachQueueView["items"][number]) {
-    await updateOutreachThread(item.id, { status: "approved", sequence_messages: fallbackSequence(item) });
+    const firstMessage = fallbackSequence(item)[0];
+    await updateOutreachThread(item.id, {
+      status: "approved",
+      sequence_messages: approvedFirstEmailSequence(item),
+      subject: firstMessage?.subject ?? item.subject ?? "",
+      body: firstMessage?.body ?? item.body ?? "",
+    });
   }
   async function sendOutreachThread(id: string) {
     setBusyId(id);
@@ -2065,12 +2213,18 @@ function GmailOutreachPanel({
         const item = items.find((queueItem) => queueItem.id === id);
         if (!item) continue;
         try {
+          const sequenceMessages = approvedFirstEmailSequence(item);
           const patch = await fetch(`/api/outreach-threads/${id}`, {
             method: "PATCH",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ status: "approved", sequence_messages: fallbackSequence(item), locale }),
+            body: JSON.stringify({
+              status: "approved",
+              sequence_messages: sequenceMessages,
+              locale,
+            }),
           });
           if (patch.ok) {
+            setSequenceMessagesByThread((prev) => ({ ...prev, [id]: sequenceMessages }));
             approved.push(id);
           } else {
             const errorBody = await patch.json().catch(() => ({}));
@@ -2101,12 +2255,18 @@ function GmailOutreachPanel({
         const item = items.find((queueItem) => queueItem.id === id);
         if (!item) continue;
         try {
+          const sequenceMessages = approvedFirstEmailSequence(item);
           const patch = await fetch(`/api/outreach-threads/${id}`, {
             method: "PATCH",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ status: "approved", sequence_messages: fallbackSequence(item), locale }),
+            body: JSON.stringify({
+              status: "approved",
+              sequence_messages: sequenceMessages,
+              locale,
+            }),
           });
           if (patch.ok) {
+            setSequenceMessagesByThread((prev) => ({ ...prev, [id]: sequenceMessages }));
             approved.push(id);
           } else {
             const errorBody = await patch.json().catch(() => ({}));
@@ -2127,11 +2287,19 @@ function GmailOutreachPanel({
     setBulkBusy(true);
     try {
       for (const item of targets) {
-        await fetch(`/api/outreach-threads/${item.id}`, {
+        const sequenceMessages = approvedFirstEmailSequence(item);
+        const patch = await fetch(`/api/outreach-threads/${item.id}`, {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ status: "approved", sequence_messages: fallbackSequence(item), locale }),
+          body: JSON.stringify({
+            status: "approved",
+            sequence_messages: sequenceMessages,
+            locale,
+          }),
         });
+        if (patch.ok) {
+          setSequenceMessagesByThread((prev) => ({ ...prev, [item.id]: sequenceMessages }));
+        }
       }
       onChanged();
     } finally {
@@ -2193,23 +2361,16 @@ function GmailOutreachPanel({
       <div className="grid gap-3 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
         <div className="rounded-2xl border border-black/10 bg-white/72 p-4">
           <p className="text-xs font-semibold text-[var(--sh-muted)]">{isEn ? "Role-level outreach settings" : "岗位级外联设置"}</p>
-          <label className="mt-3 flex items-start gap-3 rounded-xl bg-[var(--sh-canvas)] px-3 py-3 text-xs leading-5 text-[var(--sh-muted)] ring-1 ring-black/5">
-            <input
-              type="checkbox"
-              checked={roleOutreachSettings.auto_follow_up_only}
-              onChange={(event) => updateRoleOutreachSettings({ auto_follow_up_only: event.target.checked })}
-              disabled={settingsSaving}
-              className="mt-1"
-            />
-            <span>
-                <span className="block font-semibold text-[var(--sh-ink)]">
-                {isEn ? "Follow-up review drafts" : "跟进草稿复核"}
-              </span>
-              {isEn
-                ? "The first email still requires manual approval and Gmail send. Due follow-ups become Gmail review drafts, not sent messages."
-                : "首封邮件仍需人工批准并通过 Gmail 发送。到期跟进只会变成 Gmail 待审核草稿，不会自动发送。"}
+          <div className="mt-3 rounded-xl bg-[var(--sh-canvas)] px-3 py-3 text-xs leading-5 text-[var(--sh-muted)] ring-1 ring-black/5">
+            <span className="block font-semibold text-[var(--sh-ink)]">
+              {roleOutreachSettings.approval_mode === "auto_follow_up_only"
+                ? (isEn ? "Follow-up review drafts" : "跟进草稿复核")
+                : (isEn ? "Manual approval required" : "全部人工批准")}
             </span>
-          </label>
+            {isEn
+              ? "Change this in Role Agent Guardrails above. First email still requires manual approval and Gmail send."
+              : "请在上方 Role Agent Guardrails 修改。首封邮件仍需人工批准并通过 Gmail 发送。"}
+          </div>
           <p className="mt-3 rounded-xl bg-blue-50 px-3 py-2 text-xs leading-5 text-blue-800 ring-1 ring-blue-100">
             {isEn
               ? `Default follow-up interval: ${roleOutreachSettings.follow_up_interval_days} days.`
@@ -2469,54 +2630,117 @@ function GmailOutreachPanel({
                   </div>
                 )}
               </div>
-              <div className="mt-3 grid gap-2">
-                <input
-                  value={editing[item.id]?.subject ?? item.subject ?? ""}
-                  onChange={(event) => setEditing((prev) => ({ ...prev, [item.id]: { subject: event.target.value, body: prev[item.id]?.body ?? item.body ?? "" } }))}
-                  className="min-h-9 rounded-xl border border-black/10 bg-white px-3 text-xs text-[var(--sh-ink)] outline-none focus:border-[var(--sh-blue)]"
-                  aria-label={isDueFollowUpDraft ? (isEn ? "Follow-up subject" : "跟进邮件标题") : (isEn ? "First email subject" : "首封邮件标题")}
-                />
-                <textarea
-                  value={editing[item.id]?.body ?? item.body ?? ""}
-                  onChange={(event) => setEditing((prev) => ({ ...prev, [item.id]: { subject: prev[item.id]?.subject ?? item.subject ?? "", body: event.target.value } }))}
-                  className="min-h-[88px] resize-y rounded-xl border border-black/10 bg-white px-3 py-2 text-xs leading-5 text-[var(--sh-ink)] outline-none focus:border-[var(--sh-blue)]"
-                  aria-label={isDueFollowUpDraft ? (isEn ? "Follow-up body" : "跟进邮件正文") : (isEn ? "First email body" : "首封邮件正文")}
-                />
-              </div>
               <div className="mt-3 rounded-xl border border-black/10 bg-white px-3 py-2">
                 <p className="text-xs font-semibold text-[var(--sh-muted)]">{isEn ? "Sequence" : "外联序列"}</p>
-                <div className="mt-2 space-y-1.5">
-                  {fallbackSequence(item).slice(0, 3).map((message) => (
-                    <div key={message.step} className="rounded-lg bg-gray-50 px-2 py-1.5 text-xs ring-1 ring-black/5">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <span className="font-semibold text-gray-800">#{message.step}</span>
-                        <span className="text-gray-600">{message.subject}</span>
-                        {sequenceItem?.steps.find((step) => step.step === message.step)?.state && (
+                <div className="mt-2 space-y-2">
+                  {fallbackSequence(item).slice(0, 3).map((message) => {
+                    const stepView = sequenceItem?.steps.find((step) => step.step === message.step);
+                    const draft = sequenceStepDraft(item, message);
+                    const auditEvents = (stepView?.audit_events ?? message.audit_events ?? []).slice(-2).reverse();
+                    return (
+                      <div key={message.step} className="rounded-lg bg-gray-50 px-2 py-2 text-xs ring-1 ring-black/5">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="font-semibold text-gray-800">#{message.step}</span>
+                          {stepView?.state && (
+                            <span className="rounded-full bg-white px-2 py-0.5 text-[11px] font-medium text-gray-600 ring-1 ring-black/10">
+                              {sequenceStepStateLabel(stepView.state, locale)}
+                            </span>
+                          )}
                           <span className="rounded-full bg-white px-2 py-0.5 text-[11px] font-medium text-gray-600 ring-1 ring-black/10">
-                            {sequenceStepStateLabel(sequenceItem.steps.find((step) => step.step === message.step)!.state, locale)}
+                            {message.step === 1 ? (isEn ? "manual approval" : "人工批准") : (isEn ? "draft for review" : "草稿待审核")}
                           </span>
+                          {stepView?.auto_sendable && (
+                            <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-medium text-emerald-700 ring-1 ring-emerald-100">
+                              {isEn ? "reviewed follow-up draft" : "已审核跟进草稿"}
+                            </span>
+                          )}
+                          {stepView?.skipped && (
+                            <span className="rounded-full bg-gray-100 px-2 py-0.5 text-[11px] font-medium text-gray-600 ring-1 ring-gray-200">
+                              {isEn ? "skipped" : "已跳过"}
+                            </span>
+                          )}
+                          {message.delay_days && (
+                            <span className="rounded-full bg-white px-2 py-0.5 text-[11px] font-medium text-gray-600 ring-1 ring-black/10">
+                              {isEn ? `${message.delay_days}d follow-up` : `${message.delay_days} 天后跟进`}
+                            </span>
+                          )}
+                        </div>
+                        <div className="mt-2 grid gap-2">
+                          <input
+                            value={draft.subject}
+                            onChange={(event) => setSequenceEditing((prev) => ({
+                              ...prev,
+                              [sequenceDraftKey(item.id, message.step)]: { subject: event.target.value, body: prev[sequenceDraftKey(item.id, message.step)]?.body ?? message.body ?? "" },
+                            }))}
+                            disabled={busyId === item.id}
+                            className="min-h-8 rounded-lg border border-black/10 bg-white px-2 text-xs text-[var(--sh-ink)] outline-none focus:border-[var(--sh-blue)]"
+                            aria-label={isEn ? `Sequence step ${message.step} subject` : `序列 Step ${message.step} 标题`}
+                          />
+                          <textarea
+                            value={draft.body}
+                            onChange={(event) => setSequenceEditing((prev) => ({
+                              ...prev,
+                              [sequenceDraftKey(item.id, message.step)]: { subject: prev[sequenceDraftKey(item.id, message.step)]?.subject ?? message.subject ?? "", body: event.target.value },
+                            }))}
+                            disabled={busyId === item.id}
+                            className="min-h-[72px] resize-y rounded-lg border border-black/10 bg-white px-2 py-1.5 text-xs leading-5 text-[var(--sh-ink)] outline-none focus:border-[var(--sh-blue)]"
+                            aria-label={isEn ? `Sequence step ${message.step} body` : `序列 Step ${message.step} 正文`}
+                          />
+                        </div>
+                        {((message.evidence_hooks ?? message.evidence_refs ?? []).length > 0) && (
+                          <p className="mt-2 truncate text-[11px] text-gray-500">
+                            {isEn ? "Evidence angle" : "证据角度"}: {(message.evidence_hooks ?? message.evidence_refs ?? []).join("; ")}
+                          </p>
                         )}
-                        <span className="rounded-full bg-white px-2 py-0.5 text-[11px] font-medium text-gray-600 ring-1 ring-black/10">
-                          {message.step === 1 ? (isEn ? "manual approval" : "人工批准") : (isEn ? "draft for review" : "草稿待审核")}
-                        </span>
-                        {sequenceItem?.steps.find((step) => step.step === message.step)?.auto_sendable && (
-                          <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-medium text-emerald-700 ring-1 ring-emerald-100">
-                            {isEn ? "reviewed follow-up draft" : "已审核跟进草稿"}
-                          </span>
+                        {auditEvents.length > 0 && (
+                          <div className="mt-2 space-y-1 rounded-lg bg-white px-2 py-1.5 text-[11px] leading-4 text-gray-500 ring-1 ring-black/5">
+                            {auditEvents.map((event) => (
+                              <p key={`${event.action}:${event.at}`} className="truncate">
+                                {event.summary} · {new Date(event.at).toLocaleString(isEn ? "en-US" : "zh-CN")}
+                              </p>
+                            ))}
+                          </div>
                         )}
-                        {message.delay_days && (
-                          <span className="rounded-full bg-white px-2 py-0.5 text-[11px] font-medium text-gray-600 ring-1 ring-black/10">
-                            {isEn ? `${message.delay_days}d follow-up` : `${message.delay_days} 天后跟进`}
-                          </span>
-                        )}
+                        <div className="mt-2 flex flex-wrap gap-2">
+                          <SecondaryAction
+                            onClick={() => updateSequenceStep(item, message, {
+                              subject: draft.subject,
+                              body: draft.body,
+                              audit_summary: isEn ? `Saved step ${message.step}.` : `保存 Step ${message.step}。`,
+                            })}
+                            disabled={busyId === item.id}
+                            className="min-h-8 px-2.5 py-1.5 text-[11px]"
+                          >
+                            {isEn ? "Save step" : "保存 Step"}
+                          </SecondaryAction>
+                          <SecondaryAction
+                            onClick={() => updateSequenceStep(item, message, {
+                              subject: draft.subject,
+                              body: draft.body,
+                              reviewed: true,
+                              audit_summary: isEn ? `Reviewed step ${message.step}.` : `已复核 Step ${message.step}。`,
+                            })}
+                            disabled={busyId === item.id || stepView?.skipped}
+                            className="min-h-8 px-2.5 py-1.5 text-[11px]"
+                          >
+                            {isEn ? "Mark reviewed" : "标记复核"}
+                          </SecondaryAction>
+                          {message.step > 1 && (
+                            <SecondaryAction
+                              onClick={() => updateSequenceStep(item, message, {
+                                skipped: true,
+                                audit_summary: isEn ? `Skipped step ${message.step}.` : `跳过 Step ${message.step}。`,
+                              })}
+                              disabled={busyId === item.id || stepView?.skipped}
+                              className="min-h-8 px-2.5 py-1.5 text-[11px]"
+                            >
+                              {isEn ? "Skip follow-up" : "跳过跟进"}
+                            </SecondaryAction>
+                          )}
+                        </div>
                       </div>
-                      {((message.evidence_hooks ?? message.evidence_refs ?? []).length > 0) && (
-                        <p className="mt-1 truncate text-[11px] text-gray-500">
-                          {isEn ? "Evidence angle" : "证据角度"}: {(message.evidence_hooks ?? message.evidence_refs ?? []).join("; ")}
-                        </p>
-                      )}
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
               <p className="mt-3 text-xs text-[var(--sh-muted)]">
@@ -2575,17 +2799,6 @@ function GmailOutreachPanel({
                 />
               </div>
               <div className="mt-3 flex flex-wrap gap-2">
-                <SecondaryAction
-                  onClick={() => updateOutreachThread(item.id, {
-                    subject: editing[item.id]?.subject ?? item.subject,
-                    body: editing[item.id]?.body ?? item.body ?? "",
-                    sequence_messages: fallbackSequence({ ...item, subject: editing[item.id]?.subject ?? item.subject, body: editing[item.id]?.body ?? item.body }),
-                  })}
-                  disabled={busyId === item.id}
-                  className="min-h-9 px-3 py-2 text-xs"
-                >
-                  {isEn ? "Save edits" : "保存修改"}
-                </SecondaryAction>
                 <PrimaryAction onClick={() => approveOutreachThread(item)} disabled={busyId === item.id || !primaryEmail(item.contact_profile) || item.status !== "drafted"} className="min-h-9 px-3 py-2 text-xs">
                   {isEn ? "Approve" : "批准"}
                 </PrimaryAction>
@@ -3382,10 +3595,12 @@ export default function ProjectDetailPage() {
       />
 
       <RoleAgentGuardrailsPanel
+        key={`${detail.project.id}:${JSON.stringify(detail.project.outreach_settings ?? {})}`}
         project={detail.project}
         queue={detail.outreachQueue}
         sequenceAnalytics={detail.sequenceAnalytics}
         locale={locale}
+        onChanged={reloadDetail}
       />
 
       <GmailOutreachPanel

@@ -4,6 +4,7 @@ export const HISTORY_KINDS = ["all", "search", "verify"];
 export const HISTORY_STATUSES = ["all", "queued", "running", "retrying", "done", "error", "canceled"];
 export const HISTORY_RANGES = ["all", "today", "7d", "30d"];
 export const HISTORY_EVIDENCE_FILTERS = ["all", "high_confidence", "needs_verification", "low_evidence", "has_gaps", "shortlist_ready", "has_outreach_drafts"];
+export const HISTORY_SAVED_VIEWS_STORAGE_KEY = "signalhire.history.savedViews.v1";
 
 const ACTIVE_STATUSES = new Set(["queued", "running", "retrying"]);
 const FINAL_ERROR_STATUSES = new Set(["error", "canceled"]);
@@ -41,6 +42,88 @@ function boundedLimit(value, fallback = 30) {
   const n = Number(value);
   if (!Number.isFinite(n)) return fallback;
   return Math.max(1, Math.min(100, Math.floor(n)));
+}
+
+function emptyHistoryFacetCounts() {
+  return {
+    status: {},
+    kind: {},
+    evidence: {},
+    gap: {},
+    needs_action: 0,
+  };
+}
+
+function incrementCount(target, key) {
+  const clean = cleanString(key);
+  if (!clean) return;
+  target[clean] = (target[clean] ?? 0) + 1;
+}
+
+export function buildHistoryFacetCounts(runs = []) {
+  const counts = emptyHistoryFacetCounts();
+  for (const run of Array.isArray(runs) ? runs : []) {
+    incrementCount(counts.status, run?.status);
+    incrementCount(counts.kind, run?.kind);
+    const evidence = run?.evidence_summary;
+    if (evidence?.high_confidence_count) incrementCount(counts.evidence, "high_confidence");
+    if (evidence?.needs_verification_count) incrementCount(counts.evidence, "needs_verification");
+    if (evidence?.low_evidence_count) incrementCount(counts.evidence, "low_evidence");
+    if (evidence?.has_gaps) incrementCount(counts.evidence, "has_gaps");
+    if (evidence?.shortlist_ready) incrementCount(counts.evidence, "shortlist_ready");
+    if (evidence?.has_outreach_drafts) incrementCount(counts.evidence, "has_outreach_drafts");
+    for (const gap of Array.isArray(evidence?.gap_types) ? evidence.gap_types : []) {
+      incrementCount(counts.gap, normalizeHistoryGapType(gap));
+    }
+    if (run?.needs_action) counts.needs_action += 1;
+  }
+  return counts;
+}
+
+function normalizeSavedHistoryViewFilters(filters = {}) {
+  const normalized = normalizeHistoryFilters(filters);
+  return {
+    q: normalized.q,
+    kind: normalized.kind,
+    status: normalized.needsAction ? "needs_action" : normalized.status,
+    range: normalized.range,
+    projectId: normalized.projectId,
+    evidence: normalized.evidenceFilter,
+    gap: normalized.gap,
+  };
+}
+
+export function buildSavedHistoryView(name, filters = {}, { now = new Date().toISOString(), id = "" } = {}) {
+  const cleanName = cleanString(name).slice(0, 60);
+  return {
+    id: cleanString(id) || `history-view-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`,
+    name: cleanName || "Saved view",
+    filters: normalizeSavedHistoryViewFilters(filters),
+    created_at: cleanString(now) || new Date().toISOString(),
+  };
+}
+
+export function serializeSavedHistoryViews(views = []) {
+  const clean = (Array.isArray(views) ? views : [])
+    .map((view) => ({
+      id: cleanString(view?.id).slice(0, 80),
+      name: cleanString(view?.name).slice(0, 60),
+      filters: normalizeSavedHistoryViewFilters(view?.filters),
+      created_at: cleanString(view?.created_at),
+    }))
+    .filter((view) => view.id && view.name && view.created_at)
+    .slice(0, 20);
+  return JSON.stringify(clean);
+}
+
+export function parseSavedHistoryViews(raw) {
+  try {
+    const parsed = JSON.parse(cleanString(raw) || "[]");
+    if (!Array.isArray(parsed)) return [];
+    return JSON.parse(serializeSavedHistoryViews(parsed));
+  } catch {
+    return [];
+  }
 }
 
 export function normalizeHistoryGapType(value) {

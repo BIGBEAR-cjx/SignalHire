@@ -1,3 +1,23 @@
+export type OutreachSequenceAuditEvent = {
+  action: "saved" | "reviewed" | "skipped";
+  at: string;
+  summary: string;
+};
+
+export type OutreachSequenceMessage = {
+  step: 1 | 2 | 3;
+  subject: string;
+  body: string;
+  send_mode: "manual_approval_required" | "draft_for_review";
+  evidence_refs?: string[];
+  evidence_hooks?: string[];
+  delay_days?: number;
+  approved?: boolean;
+  skipped?: boolean;
+  reviewed_at?: string;
+  audit_events?: OutreachSequenceAuditEvent[];
+};
+
 export type OutreachSequenceWorkspaceStep = {
   step: number;
   subject: string;
@@ -5,7 +25,11 @@ export type OutreachSequenceWorkspaceStep = {
   evidence_refs: string[];
   delay_days?: number;
   send_mode: string;
-  state: "ready" | "blocked" | "sent" | "review";
+  approved: boolean;
+  reviewed: boolean;
+  skipped: boolean;
+  audit_events: OutreachSequenceAuditEvent[];
+  state: "ready" | "blocked" | "sent" | "review" | "skipped";
   auto_sendable: boolean;
 };
 
@@ -28,6 +52,14 @@ export type OutreachSequenceWorkspace = {
     auto_follow_up_only: boolean;
     follow_up_interval_days: 7;
     client_visible_digest: boolean;
+    agent_status: "active" | "paused";
+    approval_mode: "manual_all" | "auto_follow_up_only";
+    capacity_goal: {
+      contacted: number;
+      replied: number;
+      interested: number;
+      interview_ready: number;
+    };
   };
   summary: {
     total: number;
@@ -54,3 +86,15 @@ export function buildOutreachSequenceWorkspace(input?: {
   digest?: unknown;
   sequenceAnalytics?: unknown;
 }): OutreachSequenceWorkspace;
+
+export function normalizeOutreachSequenceMessages(value?: unknown): OutreachSequenceMessage[];
+
+export function patchOutreachSequenceStep(sequenceMessages?: unknown, patch?: {
+  step?: number;
+  subject?: unknown;
+  body?: unknown;
+  reviewed?: boolean;
+  skipped?: boolean;
+  audit_summary?: unknown;
+  now?: Date | string;
+}): OutreachSequenceMessage[];

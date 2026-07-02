@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import {
   buildOutreachSequenceWorkspace,
   buildOutreachSequenceWorkspaceItem,
+  patchOutreachSequenceStep,
 } from "./web/lib/outreach-sequence-workspace.mjs";
 
 function candidate() {
@@ -143,6 +144,80 @@ test("preserves existing sequence messages instead of rebuilding them", () => {
   assert.equal(item.steps[0].body_preview, "Stored first body");
   assert.deepEqual(item.steps[0].evidence_refs, ["stored evidence"]);
   assert.equal(item.steps[1].subject, "Stored follow-up");
+});
+
+test("patches one sequence step without changing neighboring steps and appends audit events", () => {
+  const sequence = [
+    { step: 1, subject: "First", body: "First body", send_mode: "manual_approval_required", approved: false },
+    { step: 2, subject: "Follow-up", body: "Follow-up body", send_mode: "draft_for_review", audit_events: [{ action: "saved", at: "2026-06-30T10:00:00.000Z", summary: "Initial save" }] },
+    { step: 3, subject: "Last", body: "Last body", send_mode: "draft_for_review", approved: false },
+  ];
+
+  const patched = patchOutreachSequenceStep(sequence, {
+    step: 2,
+    subject: "  Updated follow-up  ",
+    body: "  Updated follow-up body  ",
+    now: new Date("2026-07-01T09:00:00.000Z"),
+  });
+
+  assert.deepEqual(patched[0], sequence[0]);
+  assert.equal(patched[1].subject, "Updated follow-up");
+  assert.equal(patched[1].body, "Updated follow-up body");
+  assert.deepEqual(patched[1].audit_events, [
+    { action: "saved", at: "2026-06-30T10:00:00.000Z", summary: "Initial save" },
+    { action: "saved", at: "2026-07-01T09:00:00.000Z", summary: "Saved step 2." },
+  ]);
+  assert.deepEqual(patched[2], sequence[2]);
+  assert.notEqual(patched[1], sequence[1]);
+});
+
+test("reviewing step 1 never makes it auto-sendable", () => {
+  const patched = patchOutreachSequenceStep([
+    { step: 1, subject: "First", body: "First body", send_mode: "draft_for_review" },
+    { step: 2, subject: "Follow-up", body: "Follow-up body", send_mode: "draft_for_review" },
+  ], {
+    step: 1,
+    reviewed: true,
+    now: new Date("2026-07-01T10:00:00.000Z"),
+  });
+  const item = buildOutreachSequenceWorkspaceItem({
+    item: queueItem({ status: "approved", sequence_messages: patched }),
+    settings: { auto_follow_up_only: true },
+  });
+
+  assert.equal(patched[0].send_mode, "manual_approval_required");
+  assert.equal(patched[0].approved, true);
+  assert.equal(patched[0].reviewed_at, "2026-07-01T10:00:00.000Z");
+  assert.equal(item.steps[0].send_mode, "manual_approval_required");
+  assert.equal(item.steps[0].auto_sendable, false);
+});
+
+test("skipped follow-up exposes review metadata without active review work", () => {
+  const sequence = patchOutreachSequenceStep([
+    { step: 1, subject: "First", body: "First body", send_mode: "manual_approval_required", approved: true },
+    { step: 2, subject: "Follow-up", body: "Follow-up body", send_mode: "draft_for_review", approved: true },
+    { step: 3, subject: "Last", body: "Last body", send_mode: "draft_for_review", approved: false },
+  ], {
+    step: 2,
+    skipped: true,
+    now: new Date("2026-07-01T11:00:00.000Z"),
+  });
+
+  const workspace = buildOutreachSequenceWorkspace({
+    queue: { items: [queueItem({ status: "follow_up_due", gmail_thread_id: "gmail-thread-1", sequence_messages: sequence })] },
+    settings: { auto_follow_up_only: true },
+  });
+  const step = workspace.items[0].steps[1];
+
+  assert.equal(step.state, "skipped");
+  assert.equal(step.approved, true);
+  assert.equal(step.reviewed, true);
+  assert.equal(step.skipped, true);
+  assert.equal(step.auto_sendable, false);
+  assert.deepEqual(step.audit_events, [
+    { action: "skipped", at: "2026-07-01T11:00:00.000Z", summary: "Skipped step 2." },
+  ]);
+  assert.equal(workspace.summary.review, 0);
 });
 
 test("falls back to evidence-driven sequence when stored sequence is missing", () => {

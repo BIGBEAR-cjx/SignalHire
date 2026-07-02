@@ -1,3 +1,5 @@
+import { normalizeOutreachSequenceMessages } from "./outreach-sequence-workspace.mjs";
+
 export const OUTREACH_THREAD_STATUSES = [
   "drafted",
   "approved",
@@ -122,7 +124,7 @@ export function normalizeOutreachThreadPatch(input = {}, { now = new Date() } = 
   if (input.body !== undefined) patch.body = cleanString(input.body);
   if (input.notes !== undefined) patch.notes = cleanString(input.notes);
   if (input.contact_profile !== undefined) patch.contact_profile = isRecord(input.contact_profile) ? input.contact_profile : {};
-  if (input.sequence_messages !== undefined) patch.sequence_messages = Array.isArray(input.sequence_messages) ? input.sequence_messages : [];
+  if (input.sequence_messages !== undefined) patch.sequence_messages = normalizeOutreachSequenceMessages(input.sequence_messages);
   if (input.next_follow_up_at !== undefined) patch.next_follow_up_at = validIso(input.next_follow_up_at);
   if (input.last_contacted_at !== undefined) patch.last_contacted_at = validIso(input.last_contacted_at);
   if (input.approved_at !== undefined) patch.approved_at = validIso(input.approved_at);
