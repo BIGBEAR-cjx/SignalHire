@@ -1,5 +1,6 @@
 import { createClient } from "@insforge/sdk";
 import { buildInboxQueue, mergeInboxThreadsWithDueFollowUps } from "./inbox-agent.mjs";
+import { buildTwoSidedMessageHistory } from "./message-history.mjs";
 import { syncGmailInboxForProjectCore } from "./inbox-sync-core.mjs";
 import { getGmailConnectionStatus, getGmailThreadMessages, type GmailThreadMessage } from "./gmail";
 import { listOutreachThreads, updateOutreachThread, type OutreachThread } from "./outreach-threads";
@@ -29,6 +30,11 @@ export type InboxThread = {
 
 function cleanString(value: unknown) {
   return typeof value === "string" ? value.trim() : "";
+}
+
+function rawPayloadMessages(value: unknown): unknown[] {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return [];
+  return [value];
 }
 
 export async function listRoleRelatedOutreachThreads(input: { userId: string; projectId: string }): Promise<OutreachThread[]> {
@@ -123,6 +129,11 @@ export async function buildProjectInboxQueueView(userId: string, projectId: stri
       candidate_snapshot: outreach?.candidate_snapshot ?? {},
       sequence_messages: outreach?.sequence_messages ?? [],
       role_brief: outreach?.role_brief ?? "",
+      message_history: buildTwoSidedMessageHistory({
+        outreachThread: outreach ?? {},
+        inboxThread: thread,
+        gmailMessages: rawPayloadMessages(thread.raw_payload),
+      }),
     };
   });
   return buildInboxQueue({

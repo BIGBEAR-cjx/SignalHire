@@ -30,10 +30,12 @@ import { buildRoleOutreachSettings } from "@/lib/outreach-settings.mjs";
 import { buildOutreachSequenceWorkspace, patchOutreachSequenceStep } from "@/lib/outreach-sequence-workspace.mjs";
 import { parseNetworkSeedCsv } from "@/lib/referral-paths.mjs";
 import { buildRoleAgentGuardrailsView } from "@/lib/role-agent-guardrails.mjs";
+import { buildRoleAgentWorkspaceView } from "@/lib/role-agent-workspace.mjs";
 import { buildSourceMixUxView, sourceTypeLabel, sourceTypeTooltip } from "@/lib/source-classifier.mjs";
 import type { LeadPreviewView } from "@/lib/lead-preview";
 import type { OutreachSequenceWorkspaceItem } from "@/lib/outreach-sequence-workspace";
 import type { RoleAgentGuardrailsView } from "@/lib/role-agent-guardrails";
+import type { RoleAgentWorkspaceView } from "@/lib/role-agent-workspace";
 import type { TalentCandidate } from "@/lib/talent-profile.mjs";
 
 type ProjectStatus = "open" | "paused" | "closed";
@@ -167,13 +169,15 @@ type ProjectResearchRoundsView = {
     badge: string;
     label: string;
     summary: string;
-    status: string;
-    queryText: string;
-    description: string;
-    nextSearchInput: string;
-    feedbackSummary: null | {
-      title: string;
-      items: Array<{ key: string; label: string; value: string }>;
+	    status: string;
+	    queryText: string;
+	    description: string;
+	    nextSearchInput: string;
+	    clientDeliveryReportHref?: string;
+	    clientDeliveryShareToken?: string;
+	    feedbackSummary: null | {
+	      title: string;
+	      items: Array<{ key: string; label: string; value: string }>;
     };
   }>;
 };
@@ -321,6 +325,18 @@ type ProfileLeadLayerView = {
   };
 };
 
+type ClientDeliveryAuditEventView = {
+  id?: string;
+  event_type: "report_view" | "feedback" | string;
+  action_type: string;
+  report_href?: string | null;
+  actor?: string | null;
+  sentiment?: string | null;
+  note?: string | null;
+  detail?: string | null;
+  event_at: string;
+};
+
 interface ProjectDetail {
   project: {
     id: string;
@@ -332,6 +348,12 @@ interface ProjectDetail {
       auto_follow_up_only: boolean;
       follow_up_interval_days: 7;
       client_visible_digest: boolean;
+      client_delivery_visibility?: {
+        delivery_loop?: boolean;
+        smart_report?: boolean;
+        candidate_details?: boolean;
+        feedback_form?: boolean;
+      };
       agent_status?: "active" | "paused";
       approval_mode?: "manual_all" | "auto_follow_up_only";
       capacity_goal?: {
@@ -366,6 +388,7 @@ interface ProjectDetail {
   referralPaths?: ReferralPathView[];
   sequenceAnalytics?: SequenceAnalyticsView;
   profileLeadLayer?: ProfileLeadLayerView;
+  clientDeliveryAuditEvents?: ClientDeliveryAuditEventView[];
 }
 
 type SearchTaskView = {
@@ -419,7 +442,21 @@ type OutreachQueueView = {
   }>;
 };
 
-type InboxActionStatus = "pending" | "draft_saved" | "scheduled" | "interview_ready" | "stopped" | "reviewed" | "sent";
+type CalendarSlotView = { start: string; end: string; label: string };
+type InterviewEventView = {
+  status?: string;
+  starts_at?: string;
+  ends_at?: string;
+  label?: string;
+  calendar_event_id?: string;
+};
+type CalendarAvailabilityStateView = {
+  status?: string;
+  slots_count?: number;
+  last_checked_at?: string;
+  slots?: CalendarSlotView[];
+};
+type InboxActionStatus = "pending" | "draft_saved" | "slot_held" | "confirmed" | "rescheduled" | "canceled" | "scheduled" | "interview_ready" | "stopped" | "reviewed" | "sent";
 
 type InboxQueueView = {
   summary: {
@@ -453,7 +490,12 @@ type InboxQueueView = {
       reply_draft?: string;
       follow_up_at?: string;
       scheduling_message?: string;
+      calendar_slot?: CalendarSlotView;
+      calendar_event_id?: string;
+      interview_event?: InterviewEventView;
     } | null;
+    calendar_availability?: CalendarAvailabilityStateView | null;
+    interview_event?: InterviewEventView | null;
     updated_at: string;
     gmail_thread_id?: string;
     outreach_thread_id?: string;
@@ -481,12 +523,17 @@ type InboxQueueView = {
       reply_draft?: string;
       follow_up_at?: string;
       scheduling_message?: string;
+      calendar_slot?: CalendarSlotView;
+      calendar_event_id?: string;
+      interview_event?: InterviewEventView;
     } | null;
+    calendar_availability?: CalendarAvailabilityStateView | null;
+    interview_event?: InterviewEventView | null;
     outreach_thread_id?: string;
     updated_at: string;
     today_rank?: number;
     today_reason?: string;
-    readiness: "needs_scheduling";
+    readiness: "needs_scheduling" | "interview_ready";
     recommended_next_step: string;
     scheduling_packet?: {
       candidate_summary: string;
@@ -523,7 +570,7 @@ type InboxSyncResultView = {
 type CalendarSchedulingResultView = {
   ok: boolean;
   skipped_reason?: string;
-  slots: Array<{ start: string; end: string; label: string }>;
+  slots: CalendarSlotView[];
   draft: { subject: string; body: string; slots: string[] };
 };
 
@@ -545,6 +592,7 @@ type ProjectInboxSyncSummaryView = {
     failed?: number;
     reasons?: Record<string, number>;
   };
+  role_agent_metrics?: unknown;
 };
 
 type ContactProfileView = {
@@ -581,6 +629,7 @@ type GmailStatusView = {
   scope: string;
   can_read_inbox?: boolean;
   can_read_calendar?: boolean;
+  can_create_calendar_event?: boolean;
   expires_at: string | null;
 };
 
@@ -856,16 +905,116 @@ function guardrailReasonLabel(reason: { code: string; label: string }, locale: "
   return labels[reason.code]?.[locale] ?? reason.label;
 }
 
+function roleAgentBlockedActionLabel(code: string, locale: "zh" | "en") {
+  const labels: Record<string, { en: string; zh: string }> = {
+    candidate_gap: { en: "Candidate gap", zh: "候选人缺口" },
+    missing_contact: { en: "Contact gap", zh: "联系方式缺口" },
+    low_confidence_contact: { en: "Low-confidence contact", zh: "低置信联系方式" },
+    unapproved_draft: { en: "Unapproved draft", zh: "未批准草稿" },
+    no_preview_leads: { en: "No preview leads", zh: "没有预览线索" },
+    no_active_search_task: { en: "No active search task", zh: "没有运行中的搜索任务" },
+    reply_gap: { en: "Reply gap", zh: "回复缺口" },
+    interview_gap: { en: "Interview gap", zh: "约面缺口" },
+    due_follow_up: { en: "Due follow-up", zh: "到期跟进" },
+    needs_human_reply: { en: "Needs human reply", zh: "需要人工回复" },
+  };
+  return labels[code]?.[locale] ?? code;
+}
+
+function roleAgentStatusTone(status: RoleAgentWorkspaceView["status"]) {
+  if (status === "paused") return "bg-amber-50 text-amber-800 ring-amber-100";
+  if (status === "review_required") return "bg-rose-50 text-rose-700 ring-rose-100";
+  return "bg-emerald-50 text-emerald-700 ring-emerald-100";
+}
+
+function roleAgentStatusLabel(status: RoleAgentWorkspaceView["status"], locale: "zh" | "en") {
+  const labels: Record<RoleAgentWorkspaceView["status"], { en: string; zh: string }> = {
+    active: { en: "Active", zh: "运行中" },
+    paused: { en: "Paused", zh: "已暂停" },
+    review_required: { en: "Needs review", zh: "需要复核" },
+  };
+  return labels[status][locale];
+}
+
+function roleAgentActivityTimeLabel(value: string, locale: "zh" | "en") {
+  const date = new Date(value);
+  if (!Number.isFinite(date.getTime())) return locale === "zh" ? "时间未知" : "Time unknown";
+  return date.toLocaleString(locale === "zh" ? "zh-CN" : "en-US", {
+    month: "short",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+function roleAgentBlockedReasonLabel(reason: string, locale: "zh" | "en") {
+  const labels: Record<string, { en: string; zh: string }> = {
+    agent_paused: { en: "Agent is paused. Resume it before running this action.", zh: "Agent 已暂停。恢复后才能执行这个动作。" },
+    active_search_running: { en: "A search is already running for this role.", zh: "这个岗位已有搜索正在运行。" },
+    stale_live_signals: { en: "Some live signals are stale or expired.", zh: "部分实时信号已变旧或过期。" },
+  };
+  return labels[reason]?.[locale] ?? reason;
+}
+
+function roleAgentActionHref(type: RoleAgentWorkspaceView["next_actions"][number]["type"], projectId: string) {
+  if (type === "run_sourcing") return `/app/search?project=${projectId}`;
+  if (type === "review_preview_leads") return "#lead-preview";
+  if (type === "review_interested_candidates") return "#inbox-agent";
+  if (type === "refresh_live_signals") return "#role-agent";
+  return "#gmail-outreach";
+}
+
+function roleAgentSettingsActionType(next: Partial<ReturnType<typeof buildRoleOutreachSettings>>) {
+  if (Object.hasOwn(next, "capacity_goal")) return "capacity_goal";
+  if (Object.hasOwn(next, "approval_mode")) return "approval_mode";
+  if (Object.hasOwn(next, "agent_status")) return "agent_status";
+  if (Object.hasOwn(next, "client_delivery_visibility")) return "client_delivery_visibility";
+  if (Object.hasOwn(next, "client_delivery_access")) return "client_delivery_visibility";
+  return "settings";
+}
+
+function roleAgentInboxActionPayload(step: RoleAgentWorkspaceView["inbox_pipeline"]["next_steps"][number]) {
+  return {
+    outreach_thread_id: step.action_target_id,
+    action: step.action,
+    reply_draft: step.action === "reply" || step.action === "save_follow_up_draft" ? step.detail : "",
+  };
+}
+
+function roleAgentInboxActionSuccessLabel(step: RoleAgentWorkspaceView["inbox_pipeline"]["next_steps"][number], locale: "zh" | "en") {
+  const isEn = locale === "en";
+  if (step.action === "stop") return isEn ? "Sequence stopped." : "序列已停止。";
+  if (step.action === "save_follow_up_draft") return isEn ? "Follow-up draft saved." : "跟进草稿已保存。";
+  if (step.action === "reply") return isEn ? "Reply draft saved." : "回复草稿已保存。";
+  return isEn ? "Inbox action saved." : "收件箱动作已保存。";
+}
+
 function RoleAgentGuardrailsPanel({
   project,
   queue,
   sequenceAnalytics,
+  candidateGraph,
+  leadPreview,
+  inboxQueue,
+  smartReport,
+  roleAgentMetrics,
+  clientDeliveryAuditEvents,
+  searchTasks,
+  latestRun,
   locale,
   onChanged,
 }: {
   project: ProjectDetail["project"];
   queue?: OutreachQueueView;
   sequenceAnalytics?: SequenceAnalyticsView;
+  candidateGraph?: CandidateGraphView;
+  leadPreview?: LeadPreviewView;
+  inboxQueue?: InboxQueueView;
+  smartReport?: unknown;
+  roleAgentMetrics?: unknown;
+  clientDeliveryAuditEvents?: ClientDeliveryAuditEventView[];
+  searchTasks?: SearchTaskView[];
+  latestRun?: ProjectDetail["runs"][number] | null;
   locale: "zh" | "en";
   onChanged: () => void;
 }) {
@@ -873,6 +1022,12 @@ function RoleAgentGuardrailsPanel({
   const [draftSettings, setDraftSettings] = useState(() => buildRoleOutreachSettings(project.outreach_settings));
   const [capacityDraft, setCapacityDraft] = useState(() => buildRoleOutreachSettings(project.outreach_settings).capacity_goal);
   const [settingsSaving, setSettingsSaving] = useState(false);
+  const [inboxActionBusyId, setInboxActionBusyId] = useState("");
+  const [inboxActionErrors, setInboxActionErrors] = useState<Record<string, string>>({});
+  const [inboxActionSuccess, setInboxActionSuccess] = useState<Record<string, string>>({});
+  const [roleAgentActionBusy, setRoleAgentActionBusy] = useState("");
+  const [roleAgentActionErrors, setRoleAgentActionErrors] = useState<Record<string, string>>({});
+  const [roleAgentActionSuccess, setRoleAgentActionSuccess] = useState<Record<string, string>>({});
   const agentPaused = draftSettings.agent_status === "paused";
   const view = buildRoleAgentGuardrailsView({
     role: { id: project.id, status: project.status },
@@ -881,12 +1036,538 @@ function RoleAgentGuardrailsPanel({
     sequenceAnalytics,
     locale,
   }) as RoleAgentGuardrailsView;
+  const roleAgentWorkspace = buildRoleAgentWorkspaceView({
+    role: { id: project.id, status: project.status },
+    settings: draftSettings,
+    candidateGraph,
+    leadPreview,
+    outreachQueue: queue,
+    sequenceAnalytics,
+    inboxQueue,
+    smartReport,
+    roleAgentMetrics,
+    clientDeliveryAuditEvents,
+    searchTasks,
+    latestRun,
+    locale,
+  }) as RoleAgentWorkspaceView;
   const counters = [
-    { key: "contacted", label: isEn ? "Contacted" : "已触达", value: view.current_counts.contacted },
-    { key: "replied", label: isEn ? "Replied" : "已回复", value: view.current_counts.replied },
-    { key: "interested", label: isEn ? "Interested" : "有意向", value: view.current_counts.interested },
-    { key: "interview_ready", label: isEn ? "Interview-ready" : "可约面", value: view.current_counts.interview_ready },
+    { key: "candidates", label: isEn ? "Candidates" : "候选人", value: roleAgentWorkspace.counts.candidates },
+    { key: "preview_leads", label: isEn ? "Preview leads" : "预览线索", value: roleAgentWorkspace.counts.preview_leads },
+    { key: "contacted", label: isEn ? "Contacted" : "已触达", value: roleAgentWorkspace.counts.contacted },
+    { key: "replied", label: isEn ? "Replied" : "已回复", value: roleAgentWorkspace.counts.replied },
+    { key: "interested", label: isEn ? "Interested" : "有意向", value: roleAgentWorkspace.counts.interested },
+    { key: "interview_ready", label: isEn ? "Interview-ready" : "可约面", value: roleAgentWorkspace.counts.interview_ready },
   ];
+  const capacityCounters = counters.filter((counter) => ["contacted", "replied", "interested", "interview_ready"].includes(counter.key));
+  const clientDeliveryVisibilityOptions = [
+    { key: "delivery_loop", label: isEn ? "Delivery loop" : "交付循环" },
+    { key: "smart_report", label: isEn ? "Smart Report" : "智能报告" },
+    { key: "candidate_details", label: isEn ? "Candidate details" : "候选人详情" },
+    { key: "feedback_form", label: isEn ? "Feedback form" : "反馈表单" },
+  ] as const;
+  const roleAgentProjectTarget = { id: project.id, candidate_name: project.name };
+  const roleAgentOutreachTarget = (item?: OutreachQueueView["items"][number]) => ({
+    id: String(item?.id || ""),
+    candidate_name: String(item?.candidate_name || "Candidate"),
+  });
+  const roleAgentFailedItems = (failed: Array<{ id: string; error: string }>, items: OutreachQueueView["items"]) => failed.map((entry) => ({
+    id: entry.id,
+    candidate_name: roleAgentOutreachTarget(items.find((item) => item.id === entry.id)).candidate_name,
+    error: entry.error,
+  }));
+  const roleAgentSignalRefreshTarget = (item: RoleAgentWorkspaceView["signal_refresh"]["targets"][number]) => ({
+    id: item.candidate_id,
+    candidate_name: item.candidate_name,
+  });
+
+  const recordRoleAgentMetricEvent = useCallback((event: {
+    event_type: "panel_view" | "next_action_click" | "settings_update" | "next_action_execution";
+    action_type?: string;
+    action_status?: "started" | "succeeded" | "failed" | "blocked";
+    run_id?: string;
+    workflow_step?: string;
+    guardrail?: string;
+    detail?: string;
+    targets?: Array<{ id?: string; candidate_name?: string; name?: string }>;
+    result?: Record<string, string | number | boolean>;
+    failed_items?: Array<{ id?: string; candidate_name?: string; name?: string; error?: string; reason?: string }>;
+    retryable?: boolean;
+  }) => {
+    void fetch(`/api/projects/${project.id}/role-agent-events`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ...event, at: new Date().toISOString(), locale }),
+    }).catch(() => {});
+  }, [locale, project.id]);
+
+  const recordRoleAgentActionStart = useCallback((actionType: string, detail: string) => {
+    const runId = `role-agent-${actionType}-${Date.now()}`;
+    recordRoleAgentMetricEvent({ event_type: "next_action_click", action_type: actionType });
+    recordRoleAgentMetricEvent({
+      event_type: "next_action_execution",
+      action_type: actionType,
+      action_status: "started",
+      run_id: runId,
+      workflow_step: actionType,
+      detail,
+    });
+    return runId;
+  }, [recordRoleAgentMetricEvent]);
+
+  async function runRoleAgentSourcingAction(action: RoleAgentWorkspaceView["next_actions"][number]) {
+    const actionType = "run_sourcing";
+    const brief = (project.brief || project.name || "").trim();
+    if (!brief || roleAgentActionBusy) return;
+    setRoleAgentActionBusy(actionType);
+    setRoleAgentActionErrors((prev) => ({ ...prev, [actionType]: "" }));
+    setRoleAgentActionSuccess((prev) => ({ ...prev, [actionType]: "" }));
+    const runId = recordRoleAgentActionStart("run_sourcing", action.cta);
+    try {
+      const createResponse = await fetch("/api/search-tasks", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          project_id: project.id,
+          name: isEn ? "Role Agent sourcing" : "Role Agent 搜人",
+          brief,
+          frequency: "manual",
+          locale,
+        }),
+      });
+      const createBody = (await createResponse.json().catch(() => ({}))) as { error?: unknown; task?: { id?: unknown } };
+      if (!createResponse.ok) throw new Error(String(createBody.error || "search_task_create_failed"));
+      const taskId = typeof createBody.task?.id === "string" ? createBody.task.id : "";
+      if (!taskId) throw new Error("search_task_missing_id");
+
+      const runResponse = await fetch(`/api/search-tasks/${taskId}/run`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ locale }),
+      });
+      const runBody = (await runResponse.json().catch(() => ({}))) as { error?: unknown };
+      if (!runResponse.ok) throw new Error(String(runBody.error || "search_task_run_failed"));
+
+      const success = isEn ? "Sourcing started." : "搜人已启动。";
+      setRoleAgentActionSuccess((prev) => ({ ...prev, [actionType]: success }));
+      recordRoleAgentMetricEvent({
+        event_type: "next_action_execution",
+        action_type: "run_sourcing",
+        action_status: "succeeded",
+        run_id: runId,
+        workflow_step: actionType,
+        detail: success,
+        targets: [{ id: taskId, candidate_name: project.name }],
+        result: { search_task_created: true, search_task_run_started: true },
+      });
+      onChanged();
+    } catch (e) {
+      const message = (e as Error).message;
+      setRoleAgentActionErrors((prev) => ({ ...prev, [actionType]: message }));
+      recordRoleAgentMetricEvent({
+        event_type: "next_action_execution",
+        action_type: "run_sourcing",
+        action_status: "failed",
+        run_id: runId,
+        workflow_step: actionType,
+        detail: message,
+        targets: [roleAgentProjectTarget],
+        result: { failed: 1 },
+        retryable: true,
+      });
+    } finally {
+      setRoleAgentActionBusy("");
+    }
+  }
+
+  async function runRoleAgentContactResolutionAction(action: RoleAgentWorkspaceView["next_actions"][number]) {
+    const actionType = "resolve_contacts";
+    if (roleAgentActionBusy) return;
+    setRoleAgentActionBusy(actionType);
+    setRoleAgentActionErrors((prev) => ({ ...prev, [actionType]: "" }));
+    setRoleAgentActionSuccess((prev) => ({ ...prev, [actionType]: "" }));
+    const runId = recordRoleAgentActionStart("resolve_contacts", action.cta);
+    try {
+      const response = await fetch("/api/contact-resolution/bulk", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ project_id: project.id, locale }),
+      });
+      const result = (await response.json().catch(() => ({}))) as Partial<BulkContactResolutionView> & { error?: unknown };
+      if (!response.ok || result.status === "disabled" || result.status === "error") {
+        throw new Error(String(result.reason || result.error || (isEn ? "Contact resolution failed." : "联系方式解析失败。")));
+      }
+      const summary = result.summary ?? { resolved: 0, skipped: 0, failed: 0, cost_units: 0 };
+      const success = isEn
+        ? `${summary.resolved} resolved, ${summary.skipped} skipped, ${summary.failed} failed.`
+        : `已解析 ${summary.resolved} 个，跳过 ${summary.skipped} 个，失败 ${summary.failed} 个。`;
+      setRoleAgentActionSuccess((prev) => ({ ...prev, [actionType]: success }));
+      recordRoleAgentMetricEvent({
+        event_type: "next_action_execution",
+        action_type: "resolve_contacts",
+        action_status: "succeeded",
+        run_id: runId,
+        workflow_step: actionType,
+        detail: success,
+        targets: [roleAgentProjectTarget],
+        result: {
+          resolved: summary.resolved,
+          skipped: summary.skipped,
+          failed: summary.failed,
+        },
+        retryable: summary.failed > 0,
+      });
+      onChanged();
+    } catch (e) {
+      const message = (e as Error).message;
+      setRoleAgentActionErrors((prev) => ({ ...prev, [actionType]: message }));
+      recordRoleAgentMetricEvent({
+        event_type: "next_action_execution",
+        action_type: "resolve_contacts",
+        action_status: "failed",
+        run_id: runId,
+        workflow_step: actionType,
+        detail: message,
+        targets: [roleAgentProjectTarget],
+        result: { failed: 1 },
+        retryable: true,
+      });
+    } finally {
+      setRoleAgentActionBusy("");
+    }
+  }
+
+  function approvedFirstEmailSequenceForRoleAgent(item: OutreachQueueView["items"][number]) {
+    return patchOutreachSequenceStep(fallbackSequence(item), {
+      step: 1,
+      reviewed: true,
+      audit_summary: isEn ? "Approved first email draft from Role Agent." : "Role Agent 批准首封草稿。",
+      now: new Date().toISOString(),
+    });
+  }
+
+  async function runRoleAgentOutreachApprovalAction(action: RoleAgentWorkspaceView["next_actions"][number]) {
+    const actionType = "approve_or_send_outreach";
+    if (roleAgentActionBusy) return;
+    const items = queue?.items ?? [];
+    setRoleAgentActionBusy(actionType);
+    setRoleAgentActionErrors((prev) => ({ ...prev, [actionType]: "" }));
+    setRoleAgentActionSuccess((prev) => ({ ...prev, [actionType]: "" }));
+    const runId = recordRoleAgentActionStart("approve_or_send_outreach", action.cta);
+    try {
+      const response = await fetch("/api/contact-resolution/bulk", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ project_id: project.id, locale }),
+      });
+      const result = (await response.json().catch(() => ({}))) as Partial<BulkContactResolutionView> & { error?: unknown };
+      if (!response.ok || result.status === "disabled" || result.status === "error") {
+        throw new Error(String(result.reason || result.error || (isEn ? "Contact resolution failed." : "联系方式解析失败。")));
+      }
+
+      const targets = selectOutreachReadinessTargets({ items, contactResult: result });
+      const approved: string[] = [];
+      const failed: Array<{ id: string; error: string }> = [];
+      for (const id of targets) {
+        const item = items.find((queueItem) => queueItem.id === id);
+        if (!item) continue;
+        try {
+          const patch = await fetch(`/api/outreach-threads/${id}`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              status: "approved",
+              sequence_messages: approvedFirstEmailSequenceForRoleAgent(item),
+              locale,
+            }),
+          });
+          if (patch.ok) {
+            approved.push(id);
+          } else {
+            const errorBody = await patch.json().catch(() => ({}));
+            failed.push({ id, error: String(errorBody.error || "approval_failed") });
+          }
+        } catch (e) {
+          failed.push({ id, error: e instanceof Error ? e.message : "approval_failed" });
+        }
+      }
+      if (approved.length === 0 && failed.length > 0) throw new Error(failed[0]?.error || "approval_failed");
+      const success = isEn
+        ? `${approved.length} ready drafts approved, ${failed.length} failed. No emails were sent.`
+        : `已批准 ${approved.length} 条可发送草稿，失败 ${failed.length} 条。未发送邮件。`;
+      setRoleAgentActionSuccess((prev) => ({ ...prev, [actionType]: success }));
+      recordRoleAgentMetricEvent({
+        event_type: "next_action_execution",
+        action_type: "approve_or_send_outreach",
+        action_status: "succeeded",
+        run_id: runId,
+        workflow_step: actionType,
+        guardrail: isEn ? "First-email send requires manual confirmation." : "首封邮件仍需要人工确认发送。",
+        detail: success,
+        targets: approved.map((id) => roleAgentOutreachTarget(items.find((item) => item.id === id))),
+        result: { approved: approved.length, failed: failed.length, sent: 0 },
+        failed_items: roleAgentFailedItems(failed, items),
+        retryable: failed.length > 0,
+      });
+      onChanged();
+    } catch (e) {
+      const message = (e as Error).message;
+      setRoleAgentActionErrors((prev) => ({ ...prev, [actionType]: message }));
+      recordRoleAgentMetricEvent({
+        event_type: "next_action_execution",
+        action_type: "approve_or_send_outreach",
+        action_status: "failed",
+        run_id: runId,
+        workflow_step: actionType,
+        guardrail: isEn ? "First-email send requires manual confirmation." : "首封邮件仍需要人工确认发送。",
+        detail: message,
+        targets: items.slice(0, Math.max(1, action.affected_count)).map((item) => roleAgentOutreachTarget(item)),
+        result: { approved: 0, failed: action.affected_count || 1, sent: 0 },
+        retryable: true,
+      });
+    } finally {
+      setRoleAgentActionBusy("");
+    }
+  }
+
+  async function runRoleAgentFollowUpAction(action: RoleAgentWorkspaceView["next_actions"][number]) {
+    const actionType = "follow_up";
+    if (roleAgentActionBusy) return;
+    const targets = (queue?.items ?? []).filter((item) => item.status === "follow_up_due" || item.queue_state === "due");
+    setRoleAgentActionBusy(actionType);
+    setRoleAgentActionErrors((prev) => ({ ...prev, [actionType]: "" }));
+    setRoleAgentActionSuccess((prev) => ({ ...prev, [actionType]: "" }));
+    const runId = recordRoleAgentActionStart("follow_up", action.cta);
+    try {
+      if (targets.length === 0) throw new Error(isEn ? "No due follow-up thread found." : "没有到期跟进线程。");
+      const saved: string[] = [];
+      const failed: Array<{ id: string; error: string }> = [];
+      for (const item of targets) {
+        try {
+          const response = await fetch(`/api/outreach-threads/${item.id}/draft`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ locale }),
+          });
+          if (response.ok) {
+            saved.push(item.id);
+          } else {
+            const errorBody = await response.json().catch(() => ({}));
+            failed.push({ id: item.id, error: String(errorBody.error || "follow_up_draft_failed") });
+          }
+        } catch (e) {
+          failed.push({ id: item.id, error: e instanceof Error ? e.message : "follow_up_draft_failed" });
+        }
+      }
+      if (saved.length === 0 && failed.length > 0) throw new Error(failed[0]?.error || "follow_up_draft_failed");
+      const success = isEn
+        ? `${saved.length} follow-up Gmail drafts saved, ${failed.length} failed. No emails were sent.`
+        : `已保存 ${saved.length} 个 Gmail 跟进草稿，失败 ${failed.length} 个。未发送邮件。`;
+      setRoleAgentActionSuccess((prev) => ({ ...prev, [actionType]: success }));
+      recordRoleAgentMetricEvent({
+        event_type: "next_action_execution",
+        action_type: "follow_up",
+        action_status: "succeeded",
+        run_id: runId,
+        workflow_step: actionType,
+        detail: success,
+        targets: saved.map((id) => roleAgentOutreachTarget(targets.find((item) => item.id === id))),
+        result: { drafts_saved: saved.length, failed: failed.length, sent: 0 },
+        failed_items: roleAgentFailedItems(failed, targets),
+        retryable: failed.length > 0,
+      });
+      onChanged();
+    } catch (e) {
+      const message = (e as Error).message;
+      setRoleAgentActionErrors((prev) => ({ ...prev, [actionType]: message }));
+      recordRoleAgentMetricEvent({
+        event_type: "next_action_execution",
+        action_type: "follow_up",
+        action_status: "failed",
+        run_id: runId,
+        workflow_step: actionType,
+        detail: message,
+        targets: targets.map((item) => roleAgentOutreachTarget(item)),
+        result: { drafts_saved: 0, failed: targets.length || 1, sent: 0 },
+        retryable: true,
+      });
+    } finally {
+      setRoleAgentActionBusy("");
+    }
+  }
+
+  async function runRoleAgentRetryFailedOutreachAction(action: RoleAgentWorkspaceView["next_actions"][number]) {
+    const actionType = "retry_failed_outreach";
+    if (roleAgentActionBusy) return;
+    const targets = (queue?.items ?? []).filter((item) => item.status === "approved" && item.send_error);
+    setRoleAgentActionBusy(actionType);
+    setRoleAgentActionErrors((prev) => ({ ...prev, [actionType]: "" }));
+    setRoleAgentActionSuccess((prev) => ({ ...prev, [actionType]: "" }));
+    const runId = recordRoleAgentActionStart("retry_failed_outreach", action.cta);
+    try {
+      if (targets.length === 0) throw new Error(isEn ? "No failed approved outreach found." : "没有可重试的失败外联。");
+      const sent: string[] = [];
+      const failed: Array<{ id: string; error: string }> = [];
+      for (const item of targets) {
+        try {
+          const response = await fetch(`/api/outreach-threads/${item.id}/send`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ locale }),
+          });
+          if (response.ok) {
+            sent.push(item.id);
+          } else {
+            const errorBody = await response.json().catch(() => ({}));
+            failed.push({ id: item.id, error: String(errorBody.error || "retry_send_failed") });
+          }
+        } catch (e) {
+          failed.push({ id: item.id, error: e instanceof Error ? e.message : "retry_send_failed" });
+        }
+      }
+      if (sent.length === 0 && failed.length > 0) throw new Error(failed[0]?.error || "retry_send_failed");
+      const success = isEn
+        ? `${sent.length} failed sends retried, ${failed.length} still failed.`
+        : `已重试发送 ${sent.length} 个，仍失败 ${failed.length} 个。`;
+      setRoleAgentActionSuccess((prev) => ({ ...prev, [actionType]: success }));
+      recordRoleAgentMetricEvent({
+        event_type: "next_action_execution",
+        action_type: "retry_failed_outreach",
+        action_status: "succeeded",
+        run_id: runId,
+        workflow_step: actionType,
+        detail: success,
+        targets: sent.map((id) => roleAgentOutreachTarget(targets.find((item) => item.id === id))),
+        result: { retried: sent.length, failed: failed.length },
+        failed_items: roleAgentFailedItems(failed, targets),
+        retryable: failed.length > 0,
+      });
+      onChanged();
+    } catch (e) {
+      const message = (e as Error).message;
+      setRoleAgentActionErrors((prev) => ({ ...prev, [actionType]: message }));
+      recordRoleAgentMetricEvent({
+        event_type: "next_action_execution",
+        action_type: "retry_failed_outreach",
+        action_status: "failed",
+        run_id: runId,
+        workflow_step: actionType,
+        detail: message,
+        targets: targets.map((item) => roleAgentOutreachTarget(item)),
+        result: { retried: 0, failed: targets.length || 1 },
+        retryable: true,
+      });
+    } finally {
+      setRoleAgentActionBusy("");
+    }
+  }
+
+  async function runRoleAgentLiveSignalRefreshAction(action: RoleAgentWorkspaceView["next_actions"][number]) {
+    const actionType = "refresh_live_signals";
+    if (roleAgentActionBusy) return;
+    const targets = roleAgentWorkspace.signal_refresh.targets;
+    setRoleAgentActionBusy(actionType);
+    setRoleAgentActionErrors((prev) => ({ ...prev, [actionType]: "" }));
+    setRoleAgentActionSuccess((prev) => ({ ...prev, [actionType]: "" }));
+    const runId = recordRoleAgentActionStart(actionType, action.cta);
+    try {
+      const response = await fetch(`/api/projects/${project.id}/role-agent-runs`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action_type: actionType, locale }),
+      });
+      const body = (await response.json().catch(() => ({}))) as { error?: unknown; run?: { status?: string; result?: { refreshed?: number; failed?: number } } };
+      if (!response.ok) throw new Error(String(body.error || "live_signal_refresh_failed"));
+      const refreshed = Number(body.run?.result?.refreshed ?? 0);
+      const failed = Number(body.run?.result?.failed ?? 0);
+      const detail = isEn
+        ? `${refreshed} live signals refreshed, ${failed} failed.`
+        : `已刷新 ${refreshed} 条实时信号，失败 ${failed} 条。`;
+      setRoleAgentActionSuccess((prev) => ({ ...prev, [actionType]: detail }));
+      onChanged();
+    } catch (e) {
+      const guardrail = isEn
+        ? "Connect a live signal provider or scheduled refresh job."
+        : "需要先接入实时信号 provider 或定时刷新任务。";
+      const detail = (e as Error).message || (isEn
+        ? "Live signal refresh is queued but no provider is configured yet."
+        : "实时信号刷新已记录，但还没有配置 provider。");
+      recordRoleAgentMetricEvent({
+        event_type: "next_action_execution",
+        action_type: actionType,
+        action_status: "blocked",
+        run_id: runId,
+        workflow_step: actionType,
+        guardrail,
+        detail,
+        targets: targets.map(roleAgentSignalRefreshTarget),
+        result: {
+          provider_ready: false,
+          due: roleAgentWorkspace.signal_refresh.due_count,
+          stale: roleAgentWorkspace.signal_refresh.stale_count,
+          expired: roleAgentWorkspace.signal_refresh.expired_count,
+        },
+        failed_items: targets.map((item) => ({
+          ...roleAgentSignalRefreshTarget(item),
+          error: "provider_not_configured",
+        })),
+        retryable: true,
+      });
+      setRoleAgentActionErrors((prev) => ({ ...prev, [actionType]: detail }));
+    } finally {
+      setRoleAgentActionBusy("");
+    }
+  }
+
+  async function runRoleAgentInterestedReviewAction(action: RoleAgentWorkspaceView["next_actions"][number]) {
+    const actionType = "review_interested_candidates";
+    if (roleAgentActionBusy) return;
+    const step = roleAgentWorkspace.inbox_pipeline.next_steps.find((step) => step.can_apply);
+    setRoleAgentActionBusy(actionType);
+    setRoleAgentActionErrors((prev) => ({ ...prev, [actionType]: "" }));
+    setRoleAgentActionSuccess((prev) => ({ ...prev, [actionType]: "" }));
+    const runId = recordRoleAgentActionStart(actionType, action.cta);
+    if (!step) {
+      const message = isEn ? "No applicable inbox next step." : "没有可执行的收件箱下一步。";
+      setRoleAgentActionErrors((prev) => ({ ...prev, [actionType]: message }));
+      recordRoleAgentMetricEvent({
+        event_type: "next_action_execution",
+        action_type: "review_interested_candidates",
+        action_status: "failed",
+        run_id: runId,
+        workflow_step: actionType,
+        detail: message,
+        targets: [roleAgentProjectTarget],
+        result: { failed: 1 },
+        retryable: true,
+      });
+      setRoleAgentActionBusy("");
+      return;
+    }
+    try {
+      const applied = await applyRoleAgentInboxStep(step, runId, false);
+      if (!applied) throw new Error(isEn ? "Inbox action failed." : "收件箱动作失败。");
+      const success = roleAgentInboxActionSuccessLabel(step, locale);
+      setRoleAgentActionSuccess((prev) => ({ ...prev, [actionType]: success }));
+    } catch (e) {
+      const message = (e as Error).message;
+      setRoleAgentActionErrors((prev) => ({ ...prev, [actionType]: message }));
+      recordRoleAgentMetricEvent({
+        event_type: "next_action_execution",
+        action_type: "review_interested_candidates",
+        action_status: "failed",
+        run_id: runId,
+        workflow_step: actionType,
+        detail: message,
+      });
+    } finally {
+      setRoleAgentActionBusy("");
+    }
+  }
+
+  useEffect(() => {
+    recordRoleAgentMetricEvent({ event_type: "panel_view" });
+  }, [recordRoleAgentMetricEvent]);
 
   async function saveRoleAgentSettings(next: Partial<ReturnType<typeof buildRoleOutreachSettings>>) {
     const previous = draftSettings;
@@ -904,6 +1585,7 @@ function RoleAgentGuardrailsPanel({
       const saved = buildRoleOutreachSettings(j.settings);
       setDraftSettings(saved);
       setCapacityDraft(saved.capacity_goal);
+      recordRoleAgentMetricEvent({ event_type: "settings_update", action_type: roleAgentSettingsActionType(next) });
       onChanged();
     } catch {
       setDraftSettings(previous);
@@ -913,9 +1595,88 @@ function RoleAgentGuardrailsPanel({
     }
   }
 
+  function updateClientDeliveryVisibility(key: keyof typeof draftSettings.client_delivery_visibility, visible: boolean) {
+    saveRoleAgentSettings({
+      client_delivery_visibility: {
+        ...draftSettings.client_delivery_visibility,
+        [key]: visible,
+      },
+    });
+  }
+
+  function updateClientDeliveryAccess(next: Partial<typeof draftSettings.client_delivery_access>) {
+    saveRoleAgentSettings({
+      client_delivery_access: {
+        ...draftSettings.client_delivery_access,
+        ...next,
+      },
+    });
+  }
+
+  function csvList(value: string) {
+    return value.split(",").map((item) => item.trim()).filter(Boolean);
+  }
+
   function updateCapacityDraft(key: keyof typeof capacityDraft, value: string) {
     const number = Math.max(0, Math.floor(Number(value) || 0));
     setCapacityDraft((prev) => ({ ...prev, [key]: number }));
+  }
+
+  async function applyRoleAgentInboxStep(step: RoleAgentWorkspaceView["inbox_pipeline"]["next_steps"][number], runId = `role-agent-review_interested_candidates-${Date.now()}`, recordStart = true) {
+    if (!step.can_apply) return false;
+    setInboxActionBusyId(step.id);
+    setInboxActionErrors((prev) => ({ ...prev, [step.id]: "" }));
+    setInboxActionSuccess((prev) => ({ ...prev, [step.id]: "" }));
+    if (recordStart) {
+      recordRoleAgentMetricEvent({
+        event_type: "next_action_execution",
+        action_type: "review_interested_candidates",
+        action_status: "started",
+        run_id: runId,
+        workflow_step: "review_interested_candidates",
+        detail: step.cta,
+      });
+    }
+    try {
+      const r = await fetch("/api/inbox/actions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(roleAgentInboxActionPayload(step)),
+      });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(String(j.error || "inbox_action_failed"));
+      setInboxActionSuccess((prev) => ({ ...prev, [step.id]: roleAgentInboxActionSuccessLabel(step, locale) }));
+      recordRoleAgentMetricEvent({ event_type: "next_action_click", action_type: `inbox_pipeline:${step.type}:apply` });
+      recordRoleAgentMetricEvent({
+        event_type: "next_action_execution",
+        action_type: "review_interested_candidates",
+        action_status: "succeeded",
+        run_id: runId,
+        workflow_step: "review_interested_candidates",
+        detail: roleAgentInboxActionSuccessLabel(step, locale),
+        targets: [{ id: step.action_target_id || step.id, candidate_name: step.candidate_name }],
+        result: { applied: 1, failed: 0 },
+      });
+      onChanged();
+      return true;
+    } catch (e) {
+      const message = (e as Error).message;
+      setInboxActionErrors((prev) => ({ ...prev, [step.id]: message }));
+      recordRoleAgentMetricEvent({
+        event_type: "next_action_execution",
+        action_type: "review_interested_candidates",
+        action_status: "failed",
+        run_id: runId,
+        workflow_step: "review_interested_candidates",
+        detail: message,
+        targets: [{ id: step.action_target_id || step.id, candidate_name: step.candidate_name }],
+        result: { applied: 0, failed: 1 },
+        retryable: true,
+      });
+      return false;
+    } finally {
+      setInboxActionBusyId("");
+    }
   }
 
   return (
@@ -963,10 +1724,60 @@ function RoleAgentGuardrailsPanel({
               ? (isEn ? "High-confidence auto-send is blocked." : "高置信自动发送已禁用。")
               : (isEn ? "No email is sent without a human action." : "没有人工动作不会发送邮件。")}
           </p>
+          <div className="rounded-xl bg-white px-2.5 py-2 ring-1 ring-black/10">
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--sh-muted)]">
+              {isEn ? "Client-visible report fields" : "客户可见报告字段"}
+            </p>
+            <div className="mt-2 grid gap-1.5">
+              {clientDeliveryVisibilityOptions.map((option) => (
+                <label key={option.key} className="flex items-center gap-2 text-xs font-semibold text-[var(--sh-ink)]">
+                  <input
+                    type="checkbox"
+                    checked={draftSettings.client_delivery_visibility[option.key]}
+                    onChange={(event) => updateClientDeliveryVisibility(option.key, event.target.checked)}
+                    disabled={settingsSaving}
+                    className="h-3.5 w-3.5 rounded border-gray-300 text-[var(--sh-blue)] focus:ring-[var(--sh-blue)]"
+                  />
+                  {option.label}
+                </label>
+              ))}
+            </div>
+          </div>
+          <div className="rounded-xl bg-white px-2.5 py-2 ring-1 ring-black/10">
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--sh-muted)]">
+              {isEn ? "Customer account access" : "客户账号权限"}
+            </p>
+            <select
+              value={draftSettings.client_delivery_access.mode}
+              onChange={(event) => updateClientDeliveryAccess({ mode: event.target.value as "token_only" | "token_or_customer_account" })}
+              disabled={settingsSaving}
+              className="mt-2 min-h-8 w-full rounded-lg border border-black/10 bg-white px-2 text-xs font-semibold text-[var(--sh-ink)] outline-none focus:border-[var(--sh-blue)]"
+              aria-label={isEn ? "Customer account access" : "客户账号权限"}
+            >
+              <option value="token_only">{isEn ? "Share link only" : "仅分享链接"}</option>
+              <option value="token_or_customer_account">{isEn ? "Share link or invited account" : "分享链接或受邀账号"}</option>
+            </select>
+            <input
+              defaultValue={draftSettings.client_delivery_access.allowed_emails.join(", ")}
+              onBlur={(event) => updateClientDeliveryAccess({ allowed_emails: csvList(event.target.value) })}
+              disabled={settingsSaving}
+              className="mt-2 min-h-8 w-full rounded-lg border border-black/10 bg-white px-2 text-xs text-[var(--sh-ink)] outline-none focus:border-[var(--sh-blue)]"
+              placeholder={isEn ? "client@example.com, hm@example.com" : "client@example.com, hm@example.com"}
+              aria-label={isEn ? "Allowed customer emails" : "允许的客户邮箱"}
+            />
+            <input
+              defaultValue={draftSettings.client_delivery_access.allowed_domains.join(", ")}
+              onBlur={(event) => updateClientDeliveryAccess({ allowed_domains: csvList(event.target.value) })}
+              disabled={settingsSaving}
+              className="mt-2 min-h-8 w-full rounded-lg border border-black/10 bg-white px-2 text-xs text-[var(--sh-ink)] outline-none focus:border-[var(--sh-blue)]"
+              placeholder={isEn ? "example.com" : "example.com"}
+              aria-label={isEn ? "Allowed customer domains" : "允许的客户域名"}
+            />
+          </div>
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
+      <div className="grid grid-cols-2 gap-2 md:grid-cols-6">
         {counters.map((counter) => (
           <div key={counter.key} className="rounded-2xl bg-white/72 px-3 py-3 ring-1 ring-black/10">
             <p className="text-xs font-semibold text-[var(--sh-muted)]">{counter.label}</p>
@@ -978,7 +1789,14 @@ function RoleAgentGuardrailsPanel({
       <div className="rounded-2xl border border-black/10 bg-white/72 p-4">
         <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
           <div>
-            <p className="text-xs font-semibold text-[var(--sh-muted)]">{isEn ? "Capacity targets" : "容量目标"}</p>
+            <div className="flex flex-wrap items-center gap-2">
+              <p className="text-xs font-semibold text-[var(--sh-muted)]">{isEn ? "Capacity targets" : "容量目标"}</p>
+              {!roleAgentWorkspace.goals_configured && (
+                <span className="rounded-full bg-amber-50 px-2 py-0.5 text-[11px] font-semibold text-amber-800 ring-1 ring-amber-100">
+                  {isEn ? "Goals not set" : "未设置目标"}
+                </span>
+              )}
+            </div>
             <p className="mt-1 text-xs leading-5 text-[var(--sh-muted)]">
               {isEn ? "Targets guide next tasks and pipeline pressure; they do not trigger auto-send." : "目标用于提示下一步和 pipeline 压力，不触发自动发送。"}
             </p>
@@ -992,7 +1810,7 @@ function RoleAgentGuardrailsPanel({
           </SecondaryAction>
         </div>
         <div className="mt-3 grid gap-2 md:grid-cols-4">
-          {counters.map((counter) => {
+          {capacityCounters.map((counter) => {
             const key = counter.key as keyof typeof capacityDraft;
             return (
               <label key={counter.key} className="rounded-xl bg-[var(--sh-canvas)] px-3 py-2 text-xs ring-1 ring-black/5">
@@ -1013,6 +1831,582 @@ function RoleAgentGuardrailsPanel({
         </div>
       </div>
 
+      <div className="rounded-2xl border border-black/10 bg-white/72 p-4">
+        <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+          <div>
+            <p className="text-xs font-semibold text-[var(--sh-muted)]">{isEn ? "Role health" : "岗位健康度"}</p>
+            <p className="mt-1 text-xs leading-5 text-[var(--sh-muted)]">
+              {isEn ? "Shows the gaps that keep this role from producing interview-ready candidates." : "展示阻碍该岗位产出可约面候选人的缺口。"}
+            </p>
+          </div>
+          <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ring-1 ${roleAgentStatusTone(roleAgentWorkspace.status)}`}>
+            {roleAgentStatusLabel(roleAgentWorkspace.status, locale)}
+          </span>
+        </div>
+        <div className="mt-3 flex flex-wrap gap-2">
+          {roleAgentWorkspace.health.blocked_actions.length > 0 ? roleAgentWorkspace.health.blocked_actions.map((code) => (
+            <span key={code} className="rounded-full bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-800 ring-1 ring-amber-100">
+              {roleAgentBlockedActionLabel(code, locale)}
+            </span>
+          )) : (
+            <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700 ring-1 ring-emerald-100">
+              {isEn ? "No active gap" : "暂无明显缺口"}
+            </span>
+          )}
+        </div>
+      </div>
+
+      {roleAgentWorkspace.why_now.length > 0 && (
+        <div className="rounded-2xl border border-black/10 bg-white/72 p-4">
+          <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+            <div>
+              <p className="text-xs font-semibold text-[var(--sh-muted)]">{isEn ? "Why now" : "现在优先联系"}</p>
+              <p className="mt-1 text-xs leading-5 text-[var(--sh-muted)]">
+                {isEn ? "Ranked from replies, follow-ups, contactability, and fresh evidence already in this role." : "基于当前岗位已有的回复、跟进、可触达度和新鲜证据排序。"}
+              </p>
+            </div>
+          </div>
+          <ul className="mt-3 grid gap-2 md:grid-cols-3">
+            {roleAgentWorkspace.why_now.slice(0, 3).map((candidate) => (
+              <li key={`${candidate.candidate_id}:${candidate.next_best_action}`} className="rounded-xl bg-[var(--sh-canvas)] px-3 py-2 text-xs leading-5 ring-1 ring-black/5">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <span className="font-semibold text-[var(--sh-ink)]">{candidate.candidate_name}</span>
+                  <span className="rounded-full bg-white px-2 py-0.5 text-[11px] font-semibold text-[var(--sh-muted)] ring-1 ring-black/10">
+                    {candidate.score}
+                  </span>
+                </div>
+                <p className="mt-1 text-[var(--sh-muted)]">{candidate.why_now}</p>
+                <div className="mt-2 flex flex-wrap items-center gap-1">
+                  <span className="rounded-full bg-white px-2 py-0.5 text-[11px] font-semibold text-[var(--sh-blue)] ring-1 ring-black/10">
+                    {candidate.contact_timing.urgency === "now"
+                      ? (isEn ? "Contact now" : "现在联系")
+                      : candidate.contact_timing.urgency === "this_week"
+                        ? (isEn ? "This week" : "本周联系")
+                        : (isEn ? "Later" : "稍后")}
+                  </span>
+                  <span className="text-[11px] text-[var(--sh-muted)]">{candidate.contact_timing.reason}</span>
+                </div>
+                {candidate.signal_sources.length > 0 && (
+                  <div className="mt-2 flex flex-wrap gap-1">
+                    {candidate.signal_sources.slice(0, 4).map((source) => (
+                      <span key={source} className="rounded-full bg-white px-2 py-0.5 text-[11px] font-semibold text-[var(--sh-muted)] ring-1 ring-black/10">
+                        {source}
+                      </span>
+                    ))}
+                  </div>
+                )}
+                {candidate.signal_contract.length > 0 && (
+                  <div className="mt-2 grid gap-1">
+                    {candidate.signal_contract.slice(0, 2).map((signal) => (
+                      <div key={`${signal.type}:${signal.source}:${signal.label}`} className="rounded-lg bg-white px-2 py-1 text-[11px] leading-4 text-[var(--sh-muted)] ring-1 ring-black/10">
+                        <span className="font-semibold text-[var(--sh-ink)]">{signal.type}</span>
+                        <span> · {signal.freshness}</span>
+                        <span> · {signal.confidence}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                <Link
+                  href={roleAgentActionHref(candidate.next_best_action, project.id)}
+                  onClick={() => recordRoleAgentMetricEvent({ event_type: "next_action_click", action_type: candidate.next_best_action })}
+                  className="mt-2 inline-flex min-h-8 items-center rounded-full bg-white px-3 text-xs font-semibold text-[var(--sh-blue)] ring-1 ring-black/10 hover:bg-blue-50"
+                >
+                  {isEn ? "Open next action" : "打开下一步"}
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      <div className="rounded-2xl border border-black/10 bg-white/72 p-4">
+        <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+          <div>
+            <p className="text-xs font-semibold text-[var(--sh-muted)]">{isEn ? "Autopilot path" : "自动推进路径"}</p>
+            <p className="mt-1 text-xs leading-5 text-[var(--sh-muted)]">{roleAgentWorkspace.autopilot_path.summary}</p>
+          </div>
+          {roleAgentWorkspace.autopilot_path.recoverable_count > 0 && (
+            <span className="rounded-full bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-800 ring-1 ring-amber-100">
+              {isEn ? `${roleAgentWorkspace.autopilot_path.recoverable_count} recoverable` : `${roleAgentWorkspace.autopilot_path.recoverable_count} 个可恢复`}
+            </span>
+          )}
+        </div>
+        <ul className="mt-3 grid gap-2 md:grid-cols-5">
+          {roleAgentWorkspace.autopilot_path.stages.map((stage) => (
+            <li key={stage.type} className="rounded-xl bg-[var(--sh-canvas)] px-3 py-2 text-xs leading-5 ring-1 ring-black/5">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <span className="font-semibold text-[var(--sh-ink)]">{stage.label}</span>
+                <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ring-1 ${
+                  stage.status === "blocked"
+                    ? "bg-amber-50 text-amber-800 ring-amber-100"
+                    : stage.status === "ready"
+                      ? "bg-blue-50 text-blue-700 ring-blue-100"
+                      : "bg-white text-[var(--sh-muted)] ring-black/10"
+                }`}>
+                  {stage.count}
+                </span>
+              </div>
+              {stage.auto_eligible_count !== undefined && (
+                <p className="mt-1 text-[var(--sh-muted)]">
+                  {isEn ? `${stage.auto_eligible_count} auto-eligible` : `${stage.auto_eligible_count} 个可自动跟进`}
+                </p>
+              )}
+              <Link
+                href="#gmail-outreach"
+                onClick={() => recordRoleAgentMetricEvent({ event_type: "next_action_click", action_type: stage.type })}
+                className="mt-2 inline-flex min-h-7 items-center rounded-full bg-white px-2.5 text-[11px] font-semibold text-[var(--sh-blue)] ring-1 ring-black/10 hover:bg-blue-50"
+              >
+                {stage.cta}
+              </Link>
+            </li>
+          ))}
+        </ul>
+        {roleAgentWorkspace.autopilot_path.workflow.steps.some((step) => step.count > 0) && (
+          <div className="mt-3 rounded-xl bg-[var(--sh-canvas)] px-3 py-2 ring-1 ring-black/5">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div>
+                <p className="text-xs font-semibold text-[var(--sh-ink)]">{isEn ? "Run plan" : "运行计划"}</p>
+                <p className="mt-1 text-[11px] leading-4 text-[var(--sh-muted)]">{roleAgentWorkspace.autopilot_path.workflow.summary}</p>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {roleAgentWorkspace.autopilot_path.workflow.next_step && (
+                  <span className="rounded-full bg-blue-50 px-2.5 py-1 text-[11px] font-semibold text-blue-700 ring-1 ring-blue-100">
+                    {isEn ? "Next" : "下一步"} · {roleAgentWorkspace.autopilot_path.workflow.next_step}
+                  </span>
+                )}
+                {roleAgentWorkspace.autopilot_path.workflow.blocked_count > 0 && (
+                  <span className="rounded-full bg-amber-50 px-2.5 py-1 text-[11px] font-semibold text-amber-800 ring-1 ring-amber-100">
+                    {roleAgentWorkspace.autopilot_path.workflow.blocked_count} {isEn ? "blocked" : "受限"}
+                  </span>
+                )}
+              </div>
+            </div>
+            <ul className="mt-2 grid gap-2 md:grid-cols-5">
+              {roleAgentWorkspace.autopilot_path.workflow.steps.filter((step) => step.count > 0).map((step) => (
+                <li key={`workflow:${step.type}`} className="rounded-lg bg-white px-2.5 py-2 text-[11px] leading-4 ring-1 ring-black/5">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="font-semibold text-[var(--sh-ink)]">{step.label}</span>
+                    <span className={`rounded-full px-2 py-0.5 font-semibold ring-1 ${
+                      step.status === "blocked"
+                        ? "bg-amber-50 text-amber-800 ring-amber-100"
+                        : "bg-blue-50 text-blue-700 ring-blue-100"
+                    }`}>
+                      {step.count}
+                    </span>
+                  </div>
+                  {step.targets.length > 0 && (
+                    <p className="mt-1 truncate text-[var(--sh-muted)]">{step.targets.map((target) => target.candidate_name).join(", ")}</p>
+                  )}
+                  {step.guardrail && (
+                    <p className="mt-1 text-amber-700">{step.guardrail}</p>
+                  )}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+      </div>
+
+      {(roleAgentWorkspace.autopilot_recovery.history.length > 0
+        || roleAgentWorkspace.autopilot_recovery.last_run
+        || roleAgentWorkspace.autopilot_recovery.runs.length > 0
+        || roleAgentWorkspace.autopilot_recovery.retryable_items.length > 0) && (
+        <div className="rounded-2xl border border-black/10 bg-white/72 p-4">
+          <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+            <div>
+              <p className="text-xs font-semibold text-[var(--sh-muted)]">{isEn ? "Recovery history" : "恢复历史"}</p>
+              <p className="mt-1 text-xs leading-5 text-[var(--sh-muted)]">{roleAgentWorkspace.autopilot_recovery.summary}</p>
+            </div>
+          </div>
+          {roleAgentWorkspace.autopilot_recovery.last_run && (
+            <div className="mt-3 rounded-xl bg-[var(--sh-canvas)] px-3 py-2 text-xs leading-5 ring-1 ring-black/5">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <span className="font-semibold text-[var(--sh-ink)]">{isEn ? "Latest execution" : "最近执行"}</span>
+                <span className="text-[11px] text-[var(--sh-muted)]">{roleAgentActivityTimeLabel(roleAgentWorkspace.autopilot_recovery.last_run.at, locale)}</span>
+              </div>
+              <p className="mt-1 text-[var(--sh-muted)]">
+                {roleAgentWorkspace.autopilot_recovery.last_run.status} · {roleAgentWorkspace.autopilot_recovery.last_run.detail}
+              </p>
+            </div>
+          )}
+          {roleAgentWorkspace.autopilot_recovery.runs.length > 0 && (
+            <div className="mt-3 rounded-xl bg-[var(--sh-canvas)] px-3 py-2 text-xs leading-5 ring-1 ring-black/5">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <span className="font-semibold text-[var(--sh-ink)]">{isEn ? "Run manifest" : "运行记录"}</span>
+                <span className="text-[11px] text-[var(--sh-muted)]">{roleAgentActivityTimeLabel(roleAgentWorkspace.autopilot_recovery.runs[0].updated_at, locale)}</span>
+              </div>
+              <p className="mt-1 text-[var(--sh-muted)]">
+                {roleAgentWorkspace.autopilot_recovery.runs[0].status} · {roleAgentWorkspace.autopilot_recovery.runs[0].workflow_step || roleAgentWorkspace.autopilot_recovery.runs[0].action_type}
+              </p>
+              {roleAgentWorkspace.autopilot_recovery.runs[0].failed_items.length > 0 && (
+                <p className="mt-1 text-amber-700">
+                  {roleAgentWorkspace.autopilot_recovery.runs[0].failed_items[0].candidate_name}: {roleAgentWorkspace.autopilot_recovery.runs[0].failed_items[0].error}
+                </p>
+              )}
+              {roleAgentWorkspace.autopilot_recovery.runs[0].guardrail && (
+                <p className="mt-1 text-[var(--sh-muted)]">{roleAgentWorkspace.autopilot_recovery.runs[0].guardrail}</p>
+              )}
+            </div>
+          )}
+          {roleAgentWorkspace.autopilot_recovery.retryable_items.length > 0 && (
+            <div className="mt-3 rounded-xl bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-900 ring-1 ring-amber-100">
+              <p className="font-semibold">{isEn ? "Retryable failed items" : "可重试失败项"}</p>
+              <ul className="mt-2 grid gap-1">
+                {roleAgentWorkspace.autopilot_recovery.retryable_items.slice(0, 3).map((item) => (
+                  <li key={`${item.action_type}:${item.at}:${item.candidate_name}`} className="flex flex-wrap items-center justify-between gap-2">
+                    <span>{item.candidate_name}</span>
+                    <span className="text-[11px]">{item.error || item.action_type}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+          <ul className="mt-3 grid gap-2 md:grid-cols-2">
+            {roleAgentWorkspace.autopilot_recovery.history.slice(0, 4).map((entry) => (
+              <li key={`${entry.type}:${entry.at}:${entry.candidate_name}`} className="rounded-xl bg-[var(--sh-canvas)] px-3 py-2 text-xs leading-5 ring-1 ring-black/5">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <span className="font-semibold text-[var(--sh-ink)]">{entry.candidate_name}</span>
+                  <span className="text-[11px] text-[var(--sh-muted)]">{roleAgentActivityTimeLabel(entry.at, locale)}</span>
+                </div>
+                <p className="mt-1 text-[var(--sh-muted)]">{entry.label} · {entry.status}</p>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {(roleAgentWorkspace.inbox_pipeline.interested_queue.length > 0
+        || roleAgentWorkspace.inbox_pipeline.interview_ready_queue.length > 0
+        || roleAgentWorkspace.inbox_pipeline.next_steps.length > 0) && (
+        <div className="rounded-2xl border border-black/10 bg-white/72 p-4">
+          <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
+            <div>
+              <p className="text-xs font-semibold text-[var(--sh-muted)]">{isEn ? "Inbox-to-interview" : "收件箱到约面"}</p>
+              <p className="mt-1 text-xs leading-5 text-[var(--sh-muted)]">
+                {isEn
+                  ? `${roleAgentWorkspace.inbox_pipeline.summary.interested} interested, ${roleAgentWorkspace.inbox_pipeline.summary.scheduling} scheduling, ${roleAgentWorkspace.inbox_pipeline.summary.ready_to_confirm} ready to confirm, ${roleAgentWorkspace.inbox_pipeline.summary.confirmed} confirmed.`
+                  : `${roleAgentWorkspace.inbox_pipeline.summary.interested} 个有意向，${roleAgentWorkspace.inbox_pipeline.summary.scheduling} 个待约面，${roleAgentWorkspace.inbox_pipeline.summary.ready_to_confirm} 个待确认，${roleAgentWorkspace.inbox_pipeline.summary.confirmed} 个已确认。`}
+              </p>
+            </div>
+            <Link
+              href="#inbox-agent"
+              onClick={() => recordRoleAgentMetricEvent({ event_type: "next_action_click", action_type: "inbox_pipeline" })}
+              className="inline-flex min-h-8 items-center rounded-full bg-white px-3 text-xs font-semibold text-[var(--sh-blue)] ring-1 ring-black/10 hover:bg-blue-50"
+            >
+              {isEn ? "Open inbox" : "打开收件箱"}
+            </Link>
+          </div>
+          <div className="mt-3 grid grid-cols-2 gap-2 md:grid-cols-4">
+            {[
+              { key: "interested", label: isEn ? "Interested" : "有意向", value: roleAgentWorkspace.inbox_pipeline.summary.interested },
+              { key: "scheduling", label: isEn ? "Scheduling" : "待约面", value: roleAgentWorkspace.inbox_pipeline.summary.scheduling },
+              { key: "waiting_on_candidate", label: isEn ? "Candidate" : "等候选人", value: roleAgentWorkspace.inbox_pipeline.summary.waiting_on_candidate },
+              { key: "waiting_on_manager", label: isEn ? "Manager" : "等 manager", value: roleAgentWorkspace.inbox_pipeline.summary.waiting_on_manager },
+              { key: "ready_to_confirm", label: isEn ? "Confirm" : "待确认", value: roleAgentWorkspace.inbox_pipeline.summary.ready_to_confirm },
+              { key: "interview_ready", label: isEn ? "Interview-ready" : "可约面", value: roleAgentWorkspace.inbox_pipeline.summary.interview_ready },
+              { key: "confirmed", label: isEn ? "Confirmed" : "已确认", value: roleAgentWorkspace.inbox_pipeline.summary.confirmed },
+              { key: "needs_recovery", label: isEn ? "Recovery" : "需恢复", value: roleAgentWorkspace.inbox_pipeline.summary.needs_recovery },
+            ].map((metric) => (
+              <div key={metric.key} className="rounded-xl bg-[var(--sh-canvas)] px-3 py-2 ring-1 ring-black/5">
+                <p className="text-[11px] font-semibold text-[var(--sh-muted)]">{metric.label}</p>
+                <p className="mt-1 text-lg font-semibold text-[var(--sh-ink)]">{metric.value}</p>
+              </div>
+            ))}
+          </div>
+          <div className="mt-3 grid gap-2 lg:grid-cols-3">
+            {roleAgentWorkspace.inbox_pipeline.interested_queue.length > 0 && (
+              <div className="rounded-xl bg-[var(--sh-canvas)] px-3 py-2 text-xs leading-5 ring-1 ring-black/5">
+                <p className="font-semibold text-[var(--sh-ink)]">{isEn ? "Interested queue" : "有意向队列"}</p>
+                <ul className="mt-2 space-y-2">
+                  {roleAgentWorkspace.inbox_pipeline.interested_queue.slice(0, 3).map((item) => (
+                    <li key={`interested:${item.id}`} className="rounded-lg bg-white px-2.5 py-2 ring-1 ring-black/5">
+                      <span className="font-semibold text-[var(--sh-ink)]">{item.candidate_name}</span>
+                      <p className="mt-1 font-semibold text-[var(--sh-blue)]">{item.scheduling_state.label}</p>
+                      <p className="mt-1 text-[var(--sh-muted)]">{item.detail}</p>
+                      {item.activity_timeline.length > 0 && (
+                        <ul className="mt-2 space-y-1">
+                          {item.activity_timeline.slice(0, 2).map((event) => (
+                            <li key={`${item.id}:${event.type}:${event.at}`} className="rounded-md bg-[var(--sh-canvas)] px-2 py-1 text-[11px] leading-4 text-[var(--sh-muted)] ring-1 ring-black/5">
+                              <span className="font-semibold text-[var(--sh-ink)]">{event.label}</span>
+                              <span> · {roleAgentActivityTimeLabel(event.at, locale)}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                      {item.message_history.summary.total > 0 && (
+                        <p className="mt-2 rounded-md bg-[var(--sh-canvas)] px-2 py-1 text-[11px] text-[var(--sh-muted)] ring-1 ring-black/5">
+                          {isEn ? "Message history" : "消息历史"} · {item.message_history.summary.inbound} {isEn ? "inbound" : "候选人消息"} / {item.message_history.summary.outbound} {isEn ? "outbound" : "团队消息"}
+                        </p>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+            {roleAgentWorkspace.inbox_pipeline.interview_ready_queue.length > 0 && (
+              <div className="rounded-xl bg-[var(--sh-canvas)] px-3 py-2 text-xs leading-5 ring-1 ring-black/5">
+                <p className="font-semibold text-[var(--sh-ink)]">{isEn ? "Interview-ready queue" : "可约面队列"}</p>
+                <ul className="mt-2 space-y-2">
+                  {roleAgentWorkspace.inbox_pipeline.interview_ready_queue.slice(0, 3).map((item) => (
+                    <li key={`interview-ready:${item.id}`} className="rounded-lg bg-white px-2.5 py-2 ring-1 ring-black/5">
+                      <span className="font-semibold text-[var(--sh-ink)]">{item.candidate_name}</span>
+                      <p className="mt-1 font-semibold text-[var(--sh-blue)]">{item.scheduling_state.label}</p>
+                      <p className="mt-1 text-[var(--sh-muted)]">{item.detail}</p>
+                      {item.scheduling_state.event?.starts_at && (
+                        <p className="mt-1 text-[var(--sh-muted)]">
+                          {isEn ? "Interview" : "面试"}: {roleAgentActivityTimeLabel(item.scheduling_state.event.starts_at, locale)}
+                        </p>
+                      )}
+                      {item.handoff && (
+                        <p className="mt-1 text-[var(--sh-muted)]">
+                          {isEn ? "Handoff" : "交付包"}: {item.handoff.title || item.handoff.manager_note || item.handoff.candidate_reply}
+                        </p>
+                      )}
+                      {item.calendar_status && (
+                        <p className="mt-1 text-[var(--sh-muted)]">
+                          {isEn ? "Calendar" : "日历"}: {item.calendar_status.status}
+                          {item.calendar_status.slots_count > 0 ? ` · ${item.calendar_status.slots_count} ${isEn ? "slots" : "个时间"}` : ""}
+                        </p>
+                      )}
+                      {item.activity_timeline.length > 0 && (
+                        <ul className="mt-2 space-y-1">
+                          {item.activity_timeline.slice(0, 2).map((event) => (
+                            <li key={`${item.id}:${event.type}:${event.at}`} className="rounded-md bg-[var(--sh-canvas)] px-2 py-1 text-[11px] leading-4 text-[var(--sh-muted)] ring-1 ring-black/5">
+                              <span className="font-semibold text-[var(--sh-ink)]">{event.label}</span>
+                              <span> · {roleAgentActivityTimeLabel(event.at, locale)}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                      {item.message_history.summary.total > 0 && (
+                        <p className="mt-2 rounded-md bg-[var(--sh-canvas)] px-2 py-1 text-[11px] text-[var(--sh-muted)] ring-1 ring-black/5">
+                          {isEn ? "Message history" : "消息历史"} · {item.message_history.summary.inbound} {isEn ? "inbound" : "候选人消息"} / {item.message_history.summary.outbound} {isEn ? "outbound" : "团队消息"}
+                        </p>
+                      )}
+                      {item.recovery_next_step && (
+                        <p className="mt-1 text-[var(--sh-muted)]">{item.recovery_next_step}</p>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+            {roleAgentWorkspace.inbox_pipeline.next_steps.length > 0 && (
+              <div className="rounded-xl bg-[var(--sh-canvas)] px-3 py-2 text-xs leading-5 ring-1 ring-black/5">
+                <p className="font-semibold text-[var(--sh-ink)]">{isEn ? "Inbox next steps" : "收件箱下一步"}</p>
+                <ul className="mt-2 space-y-2">
+                  {roleAgentWorkspace.inbox_pipeline.next_steps.slice(0, 3).map((step) => (
+                    <li key={`inbox-step:${step.type}:${step.id}`} className="rounded-lg bg-white px-2.5 py-2 ring-1 ring-black/5">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <span className="font-semibold text-[var(--sh-ink)]">{step.candidate_name}</span>
+                        <span className="rounded-full bg-blue-50 px-2 py-0.5 text-[11px] font-semibold text-blue-700 ring-1 ring-blue-100">
+                          {step.cta}
+                        </span>
+                      </div>
+                      <p className="mt-1 text-[var(--sh-muted)]">{step.detail}</p>
+                      {step.message_history.summary.total > 0 && (
+                        <p className="mt-2 rounded-md bg-[var(--sh-canvas)] px-2 py-1 text-[11px] text-[var(--sh-muted)] ring-1 ring-black/5">
+                          {isEn ? "Message history" : "消息历史"} · {step.message_history.summary.inbound} {isEn ? "inbound" : "候选人消息"} / {step.message_history.summary.outbound} {isEn ? "outbound" : "团队消息"}
+                        </p>
+                      )}
+                      <div className="mt-2 flex flex-wrap gap-2">
+                        <button
+                          type="button"
+                          onClick={() => applyRoleAgentInboxStep(step)}
+                          disabled={inboxActionBusyId === step.id || !step.can_apply}
+                          className="inline-flex min-h-7 items-center rounded-full bg-[var(--sh-blue)] px-2.5 text-[11px] font-semibold text-white disabled:cursor-not-allowed disabled:bg-gray-300"
+                        >
+                          {inboxActionBusyId === step.id ? (isEn ? "Saving..." : "保存中...") : (isEn ? "Apply inbox action" : "执行收件箱动作")}
+                        </button>
+                        <Link
+                          href="#inbox-agent"
+                          onClick={() => recordRoleAgentMetricEvent({ event_type: "next_action_click", action_type: `inbox_pipeline:${step.type}` })}
+                          className="inline-flex min-h-7 items-center rounded-full bg-[var(--sh-canvas)] px-2.5 text-[11px] font-semibold text-[var(--sh-blue)] ring-1 ring-black/10 hover:bg-blue-50"
+                        >
+                          {isEn ? "Open inbox" : "打开收件箱"}
+                        </Link>
+                      </div>
+                      {inboxActionErrors[step.id] && (
+                        <p className="mt-2 rounded-lg bg-rose-50 px-2 py-1.5 text-rose-700 ring-1 ring-rose-100">{inboxActionErrors[step.id]}</p>
+                      )}
+                      {inboxActionSuccess[step.id] && (
+                        <p className="mt-2 rounded-lg bg-emerald-50 px-2 py-1.5 text-emerald-800 ring-1 ring-emerald-100">{inboxActionSuccess[step.id]}</p>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {roleAgentWorkspace.delivery_summary && (
+        <div className="rounded-2xl border border-black/10 bg-white/72 p-4">
+          <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
+            <div>
+              <p className="text-xs font-semibold text-[var(--sh-muted)]">{isEn ? "Client delivery" : "客户交付"}</p>
+              <p className="mt-1 text-xs leading-5 text-[var(--sh-muted)]">{roleAgentWorkspace.delivery_summary.brief_summary}</p>
+            </div>
+            <span className="rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-[var(--sh-ink)] ring-1 ring-black/10">
+              {roleAgentWorkspace.delivery_summary.title}
+            </span>
+          </div>
+          <div className="mt-3 grid grid-cols-2 gap-2 md:grid-cols-4">
+            {[
+              { key: "candidates", label: isEn ? "Candidates" : "候选人", value: roleAgentWorkspace.delivery_summary.metrics.candidates },
+              { key: "strong_evidence", label: isEn ? "Strong evidence" : "强证据", value: roleAgentWorkspace.delivery_summary.metrics.strong_evidence },
+              { key: "ready_for_outreach", label: isEn ? "Ready outreach" : "可外联", value: roleAgentWorkspace.delivery_summary.metrics.ready_for_outreach },
+              { key: "needs_scheduling", label: isEn ? "Needs scheduling" : "待约面", value: roleAgentWorkspace.delivery_summary.metrics.needs_scheduling },
+            ].map((metric) => (
+              <div key={metric.key} className="rounded-xl bg-[var(--sh-canvas)] px-3 py-2 ring-1 ring-black/5">
+                <p className="text-[11px] font-semibold text-[var(--sh-muted)]">{metric.label}</p>
+                <p className="mt-1 text-lg font-semibold text-[var(--sh-ink)]">{metric.value}</p>
+              </div>
+            ))}
+          </div>
+          <div className="mt-3 rounded-xl bg-[var(--sh-canvas)] px-3 py-2 ring-1 ring-black/5">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <p className="text-xs font-semibold text-[var(--sh-ink)]">{isEn ? "This week" : "本周"}</p>
+              <span className="text-[11px] font-semibold text-[var(--sh-muted)]">{roleAgentWorkspace.delivery_summary.weekly_progress.window_label}</span>
+            </div>
+            <div className="mt-2 grid grid-cols-2 gap-2 md:grid-cols-4">
+              {[
+                { key: "new_candidates", label: isEn ? "New" : "新增", value: roleAgentWorkspace.delivery_summary.weekly_progress.metrics.new_candidates },
+                { key: "contacted", label: isEn ? "Contacted" : "已联系", value: roleAgentWorkspace.delivery_summary.weekly_progress.metrics.contacted },
+                { key: "replied", label: isEn ? "Replied" : "已回复", value: roleAgentWorkspace.delivery_summary.weekly_progress.metrics.replied },
+                { key: "interview_ready", label: isEn ? "Interview-ready" : "可约面", value: roleAgentWorkspace.delivery_summary.weekly_progress.metrics.interview_ready },
+              ].map((metric) => (
+                <div key={metric.key} className="rounded-lg bg-white px-2.5 py-2 ring-1 ring-black/5">
+                  <p className="text-[11px] font-semibold text-[var(--sh-muted)]">{metric.label}</p>
+                  <p className="mt-1 text-base font-semibold text-[var(--sh-ink)]">{metric.value}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+          <div className="mt-3 rounded-xl bg-[var(--sh-canvas)] px-3 py-2 ring-1 ring-black/5">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <p className="text-xs font-semibold text-[var(--sh-ink)]">{roleAgentWorkspace.delivery_summary.client_delivery_loop.title}</p>
+              <span className="text-[11px] font-semibold text-[var(--sh-muted)]">{roleAgentWorkspace.delivery_summary.client_delivery_loop.window_label}</span>
+            </div>
+            <div className="mt-2 grid grid-cols-2 gap-2 md:grid-cols-4">
+              {roleAgentWorkspace.delivery_summary.client_delivery_loop.metrics.map((metric) => (
+                <div key={`client-loop:${metric.key}`} className="rounded-lg bg-white px-2.5 py-2 ring-1 ring-black/5">
+                  <p className="text-[11px] font-semibold text-[var(--sh-muted)]">{metric.label}</p>
+                  <p className="mt-1 text-base font-semibold text-[var(--sh-ink)]">{metric.value}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+          {roleAgentWorkspace.delivery_summary.source_mix.length > 0 && (
+            <div className="mt-3 flex flex-wrap gap-2">
+              {roleAgentWorkspace.delivery_summary.source_mix.map((source) => (
+                <span key={source.label} className="rounded-full bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-700 ring-1 ring-blue-100">
+                  {source.label} · {source.count}
+                </span>
+              ))}
+            </div>
+          )}
+          <div className="mt-3 grid gap-2 md:grid-cols-2">
+            <div className="rounded-xl bg-[var(--sh-canvas)] px-3 py-2 text-xs leading-5 ring-1 ring-black/5">
+              <p className="font-semibold text-[var(--sh-ink)]">{isEn ? "Risks" : "风险"}</p>
+              <p className="mt-1 text-[var(--sh-muted)]">
+                {roleAgentWorkspace.delivery_summary.client_delivery_loop.risks[0]}
+              </p>
+            </div>
+            <div className="rounded-xl bg-[var(--sh-canvas)] px-3 py-2 text-xs leading-5 ring-1 ring-black/5">
+              <p className="font-semibold text-[var(--sh-ink)]">{isEn ? "Delivery next" : "交付下一步"}</p>
+              <p className="mt-1 text-[var(--sh-muted)]">
+                {roleAgentWorkspace.delivery_summary.client_delivery_loop.next_steps[0]}
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {(roleAgentWorkspace.client_delivery_audit.counts.report_views > 0
+        || roleAgentWorkspace.client_delivery_audit.counts.feedback > 0) && (
+        <div className="rounded-2xl border border-black/10 bg-white/72 p-4">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <p className="text-xs font-semibold text-[var(--sh-muted)]">{isEn ? "Client delivery audit" : "客户交付审计"}</p>
+              <p className="mt-1 text-xs leading-5 text-[var(--sh-muted)]">{roleAgentWorkspace.client_delivery_audit.summary}</p>
+            </div>
+            {roleAgentWorkspace.client_delivery_audit.latest_report_href ? (
+              <Link href={roleAgentWorkspace.client_delivery_audit.latest_report_href} className="inline-flex min-h-8 items-center rounded-full bg-white px-3 text-xs font-semibold text-[var(--sh-blue)] ring-1 ring-black/10 hover:bg-blue-50">
+                {isEn ? "Latest report" : "最新报告"}
+              </Link>
+            ) : null}
+          </div>
+          <div className="mt-3 grid grid-cols-2 gap-2">
+            {[
+              { key: "report_views", label: isEn ? "Report views" : "报告查看", value: roleAgentWorkspace.client_delivery_audit.counts.report_views },
+              { key: "feedback", label: isEn ? "Feedback" : "反馈", value: roleAgentWorkspace.client_delivery_audit.counts.feedback },
+            ].map((metric) => (
+              <div key={metric.key} className="rounded-xl bg-[var(--sh-canvas)] px-3 py-2 ring-1 ring-black/5">
+                <p className="text-[11px] font-semibold text-[var(--sh-muted)]">{metric.label}</p>
+                <p className="mt-1 text-lg font-semibold text-[var(--sh-ink)]">{metric.value}</p>
+              </div>
+            ))}
+          </div>
+          {roleAgentWorkspace.client_delivery_audit.timeline.length > 0 && (
+            <ul className="mt-3 max-h-72 space-y-2 overflow-y-auto text-xs leading-5 text-[var(--sh-ink)]">
+              {roleAgentWorkspace.client_delivery_audit.timeline.slice(0, 6).map((entry) => (
+                <li key={`${entry.type}:${entry.at}:${entry.report_href}`} className="rounded-xl bg-[var(--sh-canvas)] px-3 py-2 ring-1 ring-black/5">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <span className="font-semibold">{entry.label}</span>
+                    <span className="text-[11px] text-[var(--sh-muted)]">{roleAgentActivityTimeLabel(entry.at, locale)}</span>
+                  </div>
+                  <p className="mt-1 text-[var(--sh-muted)]">{entry.actor}{entry.detail ? ` · ${entry.detail}` : ""}</p>
+                  {entry.report_href ? (
+                    <Link href={entry.report_href} className="mt-1 inline-flex text-[11px] font-semibold text-blue-700 hover:text-blue-900">
+                      {isEn ? "View report" : "查看报告"}
+                    </Link>
+                  ) : null}
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
+
+      {roleAgentWorkspace.client_feedback_audit.count > 0 && (
+        <div className="rounded-2xl border border-black/10 bg-white/72 p-4">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <p className="text-xs font-semibold text-[var(--sh-muted)]">{isEn ? "Client feedback" : "客户反馈"}</p>
+              <p className="mt-1 text-xs leading-5 text-[var(--sh-muted)]">
+                {isEn ? "Feedback submitted from token-gated delivery reports." : "来自带 token 客户交付报告的反馈。"}
+              </p>
+            </div>
+            <span className="rounded-full bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-700 ring-1 ring-blue-100">
+              {roleAgentWorkspace.client_feedback_audit.count}
+            </span>
+          </div>
+          <ul className="mt-3 max-h-80 space-y-2 overflow-y-auto text-xs leading-5 text-[var(--sh-ink)]">
+            {roleAgentWorkspace.client_feedback_audit.history.map((feedback) => (
+              <li key={`${feedback.at}:${feedback.sentiment}:${feedback.reviewer}`} className="rounded-xl bg-[var(--sh-canvas)] px-3 py-2 ring-1 ring-black/5">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <span className="font-semibold">{feedback.reviewer}</span>
+                  <span className="rounded-full bg-white px-2 py-0.5 text-[11px] font-semibold text-[var(--sh-muted)] ring-1 ring-black/10">
+                    {feedback.sentiment}
+                  </span>
+                </div>
+                <p className="mt-1 text-[var(--sh-muted)]">{feedback.note}</p>
+                <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-[11px] text-[var(--sh-muted)]">
+                  <span>{roleAgentActivityTimeLabel(feedback.at, locale)}</span>
+                  {feedback.report_href ? (
+                    <Link href={feedback.report_href} className="font-semibold text-blue-700 hover:text-blue-900">
+                      {isEn ? "View report" : "查看报告"}
+                    </Link>
+                  ) : null}
+                </div>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
       <div className="grid gap-3 lg:grid-cols-2">
         <div className="rounded-2xl border border-black/10 bg-white/72 p-4">
           <p className="text-xs font-semibold text-[var(--sh-muted)]">{isEn ? "Next tasks" : "下一步任务"}</p>
@@ -1021,10 +2415,106 @@ function RoleAgentGuardrailsPanel({
               {isEn ? "Agent is paused. These are suggestions for manual review only." : "Agent 已暂停。以下仅作为人工复核建议，不会自动推进。"}
             </p>
           )}
-          {view.next_tasks.length > 0 ? (
+          {roleAgentWorkspace.next_actions.length > 0 ? (
             <ul className="mt-2 space-y-2 text-xs leading-5 text-[var(--sh-ink)]">
-              {view.next_tasks.slice(0, 4).map((task) => (
-                <li key={task.id} className="rounded-xl bg-[var(--sh-canvas)] px-3 py-2 ring-1 ring-black/5">{task.label}</li>
+              {roleAgentWorkspace.next_actions.map((action) => (
+                <li key={action.type} className="rounded-xl bg-[var(--sh-canvas)] px-3 py-2 ring-1 ring-black/5">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <span className="font-semibold">{action.label}</span>
+                    <span className="rounded-full bg-white px-2 py-0.5 text-[11px] font-semibold text-[var(--sh-muted)] ring-1 ring-black/10">
+                      {action.affected_count}
+                    </span>
+                  </div>
+                  <p className="mt-1 text-[var(--sh-muted)]">{action.reason}</p>
+                  {action.blocked_reason && (
+                    <p className="mt-1 text-amber-800">{roleAgentBlockedReasonLabel(action.blocked_reason, locale)}</p>
+                  )}
+                  {action.blocked_reason ? (
+                    <span
+                      aria-disabled="true"
+                      className="mt-2 inline-flex min-h-8 cursor-not-allowed items-center rounded-full bg-white px-3 text-xs font-semibold text-[var(--sh-muted)] opacity-70 ring-1 ring-black/10"
+                    >
+                      {action.cta}
+                    </span>
+                  ) : action.type === "run_sourcing" ? (
+                    <button
+                      type="button"
+                      onClick={() => runRoleAgentSourcingAction(action)}
+                      disabled={roleAgentActionBusy === action.type}
+                      className="mt-2 inline-flex min-h-8 items-center rounded-full bg-white px-3 text-xs font-semibold text-[var(--sh-blue)] ring-1 ring-black/10 hover:bg-blue-50 disabled:pointer-events-none disabled:opacity-60"
+                    >
+                      {roleAgentActionBusy === action.type ? (isEn ? "Starting..." : "启动中...") : action.cta}
+                    </button>
+                  ) : action.type === "resolve_contacts" ? (
+                    <button
+                      type="button"
+                      onClick={() => runRoleAgentContactResolutionAction(action)}
+                      disabled={roleAgentActionBusy === action.type}
+                      className="mt-2 inline-flex min-h-8 items-center rounded-full bg-white px-3 text-xs font-semibold text-[var(--sh-blue)] ring-1 ring-black/10 hover:bg-blue-50 disabled:pointer-events-none disabled:opacity-60"
+                    >
+                      {roleAgentActionBusy === action.type ? (isEn ? "Resolving..." : "解析中...") : action.cta}
+                    </button>
+                  ) : action.type === "approve_or_send_outreach" ? (
+                    <button
+                      type="button"
+                      onClick={() => runRoleAgentOutreachApprovalAction(action)}
+                      disabled={roleAgentActionBusy === action.type}
+                      className="mt-2 inline-flex min-h-8 items-center rounded-full bg-white px-3 text-xs font-semibold text-[var(--sh-blue)] ring-1 ring-black/10 hover:bg-blue-50 disabled:pointer-events-none disabled:opacity-60"
+                    >
+                      {roleAgentActionBusy === action.type ? (isEn ? "Approving..." : "批准中...") : action.cta}
+                    </button>
+                  ) : action.type === "follow_up" ? (
+                    <button
+                      type="button"
+                      onClick={() => runRoleAgentFollowUpAction(action)}
+                      disabled={roleAgentActionBusy === action.type}
+                      className="mt-2 inline-flex min-h-8 items-center rounded-full bg-white px-3 text-xs font-semibold text-[var(--sh-blue)] ring-1 ring-black/10 hover:bg-blue-50 disabled:pointer-events-none disabled:opacity-60"
+                    >
+                      {roleAgentActionBusy === action.type ? (isEn ? "Saving..." : "保存中...") : action.cta}
+                    </button>
+                  ) : action.type === "retry_failed_outreach" ? (
+                    <button
+                      type="button"
+                      onClick={() => runRoleAgentRetryFailedOutreachAction(action)}
+                      disabled={roleAgentActionBusy === action.type}
+                      className="mt-2 inline-flex min-h-8 items-center rounded-full bg-white px-3 text-xs font-semibold text-[var(--sh-blue)] ring-1 ring-black/10 hover:bg-blue-50 disabled:pointer-events-none disabled:opacity-60"
+                    >
+                      {roleAgentActionBusy === action.type ? (isEn ? "Retrying..." : "重试中...") : action.cta}
+                    </button>
+                  ) : action.type === "refresh_live_signals" ? (
+                    <button
+                      type="button"
+                      onClick={() => runRoleAgentLiveSignalRefreshAction(action)}
+                      disabled={roleAgentActionBusy === action.type}
+                      className="mt-2 inline-flex min-h-8 items-center rounded-full bg-white px-3 text-xs font-semibold text-[var(--sh-blue)] ring-1 ring-black/10 hover:bg-blue-50 disabled:pointer-events-none disabled:opacity-60"
+                    >
+                      {roleAgentActionBusy === action.type ? (isEn ? "Recording..." : "记录中...") : action.cta}
+                    </button>
+                  ) : action.type === "review_interested_candidates" ? (
+                    <button
+                      type="button"
+                      onClick={() => runRoleAgentInterestedReviewAction(action)}
+                      disabled={roleAgentActionBusy === action.type}
+                      className="mt-2 inline-flex min-h-8 items-center rounded-full bg-white px-3 text-xs font-semibold text-[var(--sh-blue)] ring-1 ring-black/10 hover:bg-blue-50 disabled:pointer-events-none disabled:opacity-60"
+                    >
+                      {roleAgentActionBusy === action.type ? (isEn ? "Applying..." : "执行中...") : action.cta}
+                    </button>
+                  ) : (
+                    <Link
+                      href={roleAgentActionHref(action.type, project.id)}
+                      onClick={() => recordRoleAgentActionStart(action.type, action.cta)}
+                      className="mt-2 inline-flex min-h-8 items-center rounded-full bg-white px-3 text-xs font-semibold text-[var(--sh-blue)] ring-1 ring-black/10 hover:bg-blue-50"
+                    >
+                      {action.cta}
+                    </Link>
+                  )}
+                  {roleAgentActionErrors[action.type] && (
+                    <p className="mt-1 text-xs text-rose-700">{roleAgentActionErrors[action.type]}</p>
+                  )}
+                  {roleAgentActionSuccess[action.type] && (
+                    <p className="mt-1 text-xs text-emerald-700">{roleAgentActionSuccess[action.type]}</p>
+                  )}
+                </li>
               ))}
             </ul>
           ) : (
@@ -1041,6 +2531,26 @@ function RoleAgentGuardrailsPanel({
             ))}
           </div>
         </div>
+      </div>
+      <div className="rounded-2xl border border-black/10 bg-white/72 p-4">
+        <p className="text-xs font-semibold text-[var(--sh-muted)]">{isEn ? "Recent activity" : "最近活动"}</p>
+        {roleAgentWorkspace.activity.length > 0 ? (
+          <ul className="mt-2 space-y-2 text-xs leading-5 text-[var(--sh-ink)]">
+            {roleAgentWorkspace.activity.slice(0, 4).map((entry, index) => (
+              <li key={`${entry.at}:${entry.label}:${index}`} className="rounded-xl bg-[var(--sh-canvas)] px-3 py-2 ring-1 ring-black/5">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <span className="font-semibold">{entry.context || entry.label}</span>
+                  <span className="text-[11px] text-[var(--sh-muted)]">
+                    {roleAgentActivityTimeLabel(entry.at, locale)} · {entry.status || entry.label}
+                  </span>
+                </div>
+                <p className="mt-1 text-[var(--sh-muted)]">{entry.label}</p>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="mt-2 text-xs text-[var(--sh-muted)]">{isEn ? "No role activity yet." : "暂无岗位活动。"}</p>
+        )}
       </div>
     </Surface>
   );
@@ -1678,6 +3188,10 @@ function inboxActionStatusLabel(status: InboxActionStatus | undefined, locale: "
   const labels: Record<InboxActionStatus, string> = {
     pending: isEn ? "Pending" : "待处理",
     draft_saved: isEn ? "Draft saved" : "草稿已保存",
+    slot_held: isEn ? "Slot held" : "已暂留时间",
+    confirmed: isEn ? "Confirmed" : "已确认",
+    rescheduled: isEn ? "Rescheduled" : "已改期",
+    canceled: isEn ? "Canceled" : "已取消",
     scheduled: isEn ? "Follow-up scheduled" : "已安排稍后跟进",
     interview_ready: isEn ? "Interview-ready" : "可安排面试",
     stopped: isEn ? "Stopped" : "已停止跟进",
@@ -1689,8 +3203,8 @@ function inboxActionStatusLabel(status: InboxActionStatus | undefined, locale: "
 
 function inboxActionButtonLabel(item: InboxActionItemView, locale: "zh" | "en") {
   const isEn = locale === "en";
-  if (item.next_action === "schedule") return isEn ? "Mark interview-ready" : "标记可约面";
   if (item.action_status && item.action_status !== "pending") return inboxActionStatusLabel(item.action_status, locale);
+  if (item.next_action === "schedule") return isEn ? "Mark interview-ready" : "标记可约面";
   if (item.next_action === "reply") return isEn ? "Save suggested draft" : "保存建议草稿";
   if (item.next_action === "save_follow_up_draft") return isEn ? "Save follow-up draft" : "保存跟进草稿";
   if (item.next_action === "follow_up_later") return isEn ? "Schedule follow-up" : "安排稍后跟进";
@@ -1743,6 +3257,21 @@ function inboxActionPayload(item: InboxActionItemView, calendarAvailabilityById:
   };
 }
 
+function firstSchedulingSlot(candidate: InboxQueueView["interested_candidates"][number], calendarAvailabilityById: Record<string, CalendarSchedulingResultView> = {}) {
+  return calendarAvailabilityById[candidate.id]?.slots?.[0]
+    || candidate.action_state?.calendar_slot
+    || candidate.calendar_availability?.slots?.[0]
+    || null;
+}
+
+function manualInterviewEventId(candidate: InboxQueueView["interested_candidates"][number], slot: CalendarSlotView) {
+  return `signalhire:${candidate.id}:${slot.start}`;
+}
+
+function interviewEventId(candidate: InboxQueueView["interested_candidates"][number]) {
+  return candidate.action_state?.calendar_event_id || candidate.action_state?.interview_event?.calendar_event_id || candidate.interview_event?.calendar_event_id || "";
+}
+
 function inboxActionSuccessLabel(item: InboxActionItemView, locale: "zh" | "en") {
   const isEn = locale === "en";
   if (item.next_action === "schedule") return isEn ? "Handoff marked interview-ready." : "交付包已标记为可约面。";
@@ -1786,6 +3315,24 @@ function calendarAvailabilityLabel(value: unknown, locale: "zh" | "en") {
   }
   if (key === "calendar_freebusy_failed") {
     return isEn ? "Calendar availability lookup failed." : "Calendar 可用时间读取失败。";
+  }
+  if (key === "calendar_event_scope_missing") {
+    return isEn ? "Reconnect Google Calendar event access before confirming." : "请重新授权 Google Calendar 事件权限后再确认。";
+  }
+  if (key === "calendar_event_create_failed") {
+    return isEn ? "Calendar event creation failed." : "Google Calendar 事件创建失败。";
+  }
+  if (key === "calendar_event_update_failed") {
+    return isEn ? "Calendar event update failed." : "Google Calendar 事件更新失败。";
+  }
+  if (key === "calendar_event_cancel_failed") {
+    return isEn ? "Calendar event cancellation failed." : "Google Calendar 事件取消失败。";
+  }
+  if (key === "missing_calendar_event_id") {
+    return isEn ? "This interview has no Calendar event id yet." : "这场面试还没有 Calendar 事件 ID。";
+  }
+  if (key === "missing_calendar_slot") {
+    return isEn ? "Select a calendar slot before confirming." : "请先选择一个可约时间。";
   }
   return isEn ? "Calendar availability unavailable." : "Calendar 可用时间不可用。";
 }
@@ -2860,7 +4407,7 @@ function InboxAgentPanel({
         const j = await r.json();
         if (!cancelled && r.ok) setGmail(j as GmailStatusView);
       } catch {
-        if (!cancelled) setGmail({ configured: false, connected: false, gmail_address: "", scope: "", can_read_calendar: false, expires_at: null });
+        if (!cancelled) setGmail({ configured: false, connected: false, gmail_address: "", scope: "", can_read_calendar: false, can_create_calendar_event: false, expires_at: null });
       }
     }
     void loadGoogleStatus();
@@ -3004,6 +4551,150 @@ function InboxAgentPanel({
       onChanged();
     } catch (e) {
       setActionErrors((prev) => ({ ...prev, [candidate.id]: (e as Error).message }));
+    } finally {
+      setBusyActionId("");
+    }
+  }
+
+  async function holdCalendarSlot(candidate: InboxQueueView["interested_candidates"][number]) {
+    const slot = firstSchedulingSlot(candidate, calendarAvailabilityById);
+    const schedulingMessage = calendarAvailabilityById[candidate.id]?.draft.body
+      || candidate.saved_scheduling_draft
+      || candidate.scheduling_packet?.candidate_reply
+      || candidate.scheduling_packet?.suggested_scheduling_message
+      || "";
+    if (!candidate.outreach_thread_id || !slot) {
+      setActionErrors((prev) => ({
+        ...prev,
+        [candidate.id]: isEn ? "Generate or select a slot before holding it." : "请先生成或选择一个可约时间。",
+      }));
+      return;
+    }
+    setBusyActionId(`hold-slot:${candidate.id}`);
+    setActionErrors((prev) => ({ ...prev, [candidate.id]: "" }));
+    setSuccessMessages((prev) => ({ ...prev, [candidate.id]: "" }));
+    try {
+      const r = await fetch("/api/inbox/actions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          outreach_thread_id: candidate.outreach_thread_id,
+          action: "hold_calendar_slot",
+          scheduling_message: schedulingMessage,
+          calendar_slot: slot,
+        }),
+      });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(j.error || (isEn ? "Calendar slot hold failed." : "可约时间暂留失败。"));
+      setSuccessMessages((prev) => ({ ...prev, [candidate.id]: isEn ? "Calendar slot held." : "已暂留可约时间。" }));
+      onChanged();
+    } catch (e) {
+      setActionErrors((prev) => ({ ...prev, [candidate.id]: (e as Error).message }));
+    } finally {
+      setBusyActionId("");
+    }
+  }
+
+  async function confirmInterviewEvent(candidate: InboxQueueView["interested_candidates"][number]) {
+    const slot = firstSchedulingSlot(candidate, calendarAvailabilityById);
+    if (!candidate.outreach_thread_id || !slot) {
+      setActionErrors((prev) => ({
+        ...prev,
+        [candidate.id]: isEn ? "Hold or select a slot before confirming the interview." : "请先暂留或选择一个可约时间。",
+      }));
+      return;
+    }
+    setBusyActionId(`confirm-interview:${candidate.id}`);
+    setActionErrors((prev) => ({ ...prev, [candidate.id]: "" }));
+    setSuccessMessages((prev) => ({ ...prev, [candidate.id]: "" }));
+    try {
+      const r = await fetch("/api/inbox/actions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          outreach_thread_id: candidate.outreach_thread_id,
+          action: "confirm_interview_event",
+          scheduling_message: candidate.saved_scheduling_draft || candidate.scheduling_packet?.candidate_reply || "",
+          calendar_slot: slot,
+          calendar_event_id: candidate.action_state?.calendar_event_id || candidate.interview_event?.calendar_event_id || manualInterviewEventId(candidate, slot),
+        }),
+      });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(j.error || (isEn ? "Interview confirmation failed." : "面试确认失败。"));
+      setSuccessMessages((prev) => ({ ...prev, [candidate.id]: isEn ? "Interview confirmed for client delivery." : "面试已确认，并会进入客户交付统计。" }));
+      onChanged();
+    } catch (e) {
+      setActionErrors((prev) => ({ ...prev, [candidate.id]: calendarAvailabilityLabel((e as Error).message, locale) }));
+    } finally {
+      setBusyActionId("");
+    }
+  }
+
+  async function rescheduleInterviewEvent(candidate: InboxQueueView["interested_candidates"][number]) {
+    const slot = firstSchedulingSlot(candidate, calendarAvailabilityById);
+    const eventId = interviewEventId(candidate);
+    if (!candidate.outreach_thread_id || !slot || !eventId) {
+      setActionErrors((prev) => ({
+        ...prev,
+        [candidate.id]: !eventId ? calendarAvailabilityLabel("missing_calendar_event_id", locale) : (isEn ? "Select a new slot before rescheduling." : "请先选择新的可约时间。"),
+      }));
+      return;
+    }
+    setBusyActionId(`reschedule-interview:${candidate.id}`);
+    setActionErrors((prev) => ({ ...prev, [candidate.id]: "" }));
+    setSuccessMessages((prev) => ({ ...prev, [candidate.id]: "" }));
+    try {
+      const r = await fetch("/api/inbox/actions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          outreach_thread_id: candidate.outreach_thread_id,
+          action: "reschedule_interview_event",
+          scheduling_message: calendarAvailabilityById[candidate.id]?.draft.body || candidate.saved_scheduling_draft || candidate.scheduling_packet?.candidate_reply || "",
+          calendar_slot: slot,
+          calendar_event_id: eventId,
+        }),
+      });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(j.error || (isEn ? "Interview reschedule failed." : "面试改期失败。"));
+      setSuccessMessages((prev) => ({ ...prev, [candidate.id]: isEn ? "Interview event rescheduled." : "面试事件已改期。" }));
+      onChanged();
+    } catch (e) {
+      setActionErrors((prev) => ({ ...prev, [candidate.id]: calendarAvailabilityLabel((e as Error).message, locale) }));
+    } finally {
+      setBusyActionId("");
+    }
+  }
+
+  async function cancelInterviewEvent(candidate: InboxQueueView["interested_candidates"][number]) {
+    const eventId = interviewEventId(candidate);
+    if (!candidate.outreach_thread_id || !eventId) {
+      setActionErrors((prev) => ({
+        ...prev,
+        [candidate.id]: calendarAvailabilityLabel("missing_calendar_event_id", locale),
+      }));
+      return;
+    }
+    setBusyActionId(`cancel-interview:${candidate.id}`);
+    setActionErrors((prev) => ({ ...prev, [candidate.id]: "" }));
+    setSuccessMessages((prev) => ({ ...prev, [candidate.id]: "" }));
+    try {
+      const r = await fetch("/api/inbox/actions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          outreach_thread_id: candidate.outreach_thread_id,
+          action: "cancel_interview_event",
+          scheduling_message: candidate.saved_scheduling_draft || candidate.scheduling_packet?.candidate_reply || "",
+          calendar_event_id: eventId,
+        }),
+      });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(j.error || (isEn ? "Interview cancellation failed." : "面试取消失败。"));
+      setSuccessMessages((prev) => ({ ...prev, [candidate.id]: isEn ? "Interview event canceled." : "面试事件已取消。" }));
+      onChanged();
+    } catch (e) {
+      setActionErrors((prev) => ({ ...prev, [candidate.id]: calendarAvailabilityLabel((e as Error).message, locale) }));
     } finally {
       setBusyActionId("");
     }
@@ -3295,6 +4986,48 @@ function InboxAgentPanel({
                             {isEn ? "Saving this draft does not send email or create a calendar invite." : "保存草稿不会发送邮件，也不会创建日历邀请。"}
                           </p>
                         </div>
+                        <div className="mt-2 flex flex-wrap items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => holdCalendarSlot(candidate)}
+                            disabled={busyActionId === `hold-slot:${candidate.id}` || !candidate.outreach_thread_id || !firstSchedulingSlot(candidate, calendarAvailabilityById) || candidate.action_status === "confirmed"}
+                            className="rounded-full bg-white px-2.5 py-1 font-semibold text-emerald-800 ring-1 ring-emerald-100 disabled:cursor-not-allowed disabled:bg-emerald-100 disabled:text-emerald-400"
+                          >
+                            {busyActionId === `hold-slot:${candidate.id}` ? (isEn ? "Holding..." : "暂留中...") : (isEn ? "Hold first slot" : "暂留首个时间")}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => confirmInterviewEvent(candidate)}
+                            disabled={busyActionId === `confirm-interview:${candidate.id}` || !gmail?.can_create_calendar_event || !candidate.outreach_thread_id || !firstSchedulingSlot(candidate, calendarAvailabilityById) || candidate.action_status === "confirmed"}
+                            className="rounded-full bg-emerald-900 px-2.5 py-1 font-semibold text-white disabled:cursor-not-allowed disabled:bg-emerald-200"
+                          >
+                            {busyActionId === `confirm-interview:${candidate.id}` ? (isEn ? "Confirming..." : "确认中...") : (isEn ? "Confirm interview" : "确认面试")}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => rescheduleInterviewEvent(candidate)}
+                            disabled={busyActionId === `reschedule-interview:${candidate.id}` || !gmail?.can_create_calendar_event || !candidate.outreach_thread_id || !interviewEventId(candidate) || !firstSchedulingSlot(candidate, calendarAvailabilityById) || candidate.action_status === "canceled"}
+                            className="rounded-full bg-white px-2.5 py-1 font-semibold text-emerald-800 ring-1 ring-emerald-100 disabled:cursor-not-allowed disabled:bg-emerald-100 disabled:text-emerald-400"
+                          >
+                            {busyActionId === `reschedule-interview:${candidate.id}` ? (isEn ? "Rescheduling..." : "改期中...") : (isEn ? "Reschedule event" : "改期事件")}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => cancelInterviewEvent(candidate)}
+                            disabled={busyActionId === `cancel-interview:${candidate.id}` || !gmail?.can_create_calendar_event || !candidate.outreach_thread_id || !interviewEventId(candidate) || candidate.action_status === "canceled"}
+                            className="rounded-full bg-white px-2.5 py-1 font-semibold text-rose-700 ring-1 ring-rose-100 disabled:cursor-not-allowed disabled:bg-rose-50 disabled:text-rose-300"
+                          >
+                            {busyActionId === `cancel-interview:${candidate.id}` ? (isEn ? "Canceling..." : "取消中...") : (isEn ? "Cancel event" : "取消事件")}
+                          </button>
+                          {!gmail?.can_create_calendar_event && (
+                            <SecondaryAction href="/api/integrations/gmail/connect" className="min-h-7 px-2 py-1 text-xs">
+                              {isEn ? "Reconnect Calendar events" : "重新授权 Calendar 事件"}
+                            </SecondaryAction>
+                          )}
+                          <p className="break-words text-[11px] leading-5 text-emerald-800">
+                            {isEn ? "Hold saves SignalHire state. Confirm creates a Google Calendar event; reschedule and cancel update the same event." : "暂留会保存 SignalHire 状态；确认会创建 Google Calendar 事件，改期和取消会更新同一个事件。"}
+                          </p>
+                        </div>
                         {calendarAvailabilityById[candidate.id] && (
                           <div className="mt-2 rounded-lg bg-white px-2 py-1.5 text-xs ring-1 ring-emerald-100">
                             {!calendarAvailabilityById[candidate.id].ok && (
@@ -3519,6 +5252,7 @@ export default function ProjectDetailPage() {
   const decisionQueue = buildProjectCandidateDecisionQueue({ items: items ?? [], locale });
   const actionBrief = showActionBrief ? buildProjectActionBrief({ items: items ?? [], locale }) as ProjectActionBriefView : null;
   const candidateFeedbackSummary = showCandidateFeedbackSummary ? buildProjectCandidateFeedbackSummary({ items: items ?? [], locale }) as ProjectCandidateFeedbackSummaryView : null;
+  const latestSmartReportResult = detail.runs.find((run) => run.result)?.result;
 
   return (
     <div className="space-y-6">
@@ -3562,12 +5296,31 @@ export default function ProjectDetailPage() {
         showBrief={showSearchConsoleBrief}
       />
 
-      <LeadPreviewPanel
-        view={detail.leadPreview}
+      <RoleAgentGuardrailsPanel
+        key={`${detail.project.id}:${JSON.stringify(detail.project.outreach_settings ?? {})}`}
+        project={detail.project}
+        queue={detail.outreachQueue}
+        sequenceAnalytics={detail.sequenceAnalytics}
+        candidateGraph={detail.candidateGraph}
+        leadPreview={detail.leadPreview}
+        inboxQueue={detail.inboxQueue}
+        smartReport={latestSmartReportResult}
+        roleAgentMetrics={detail.project.inbox_sync_summary}
+        clientDeliveryAuditEvents={detail.clientDeliveryAuditEvents ?? []}
+        searchTasks={detail.searchTasks ?? []}
+        latestRun={detail.runs[0] ?? null}
         locale={locale}
-        projectId={id}
-        baseSearchInput={projectConsole.nextSearchInput || briefForSearch}
+        onChanged={reloadDetail}
       />
+
+      <div id="lead-preview">
+        <LeadPreviewPanel
+          view={detail.leadPreview}
+          locale={locale}
+          projectId={id}
+          baseSearchInput={projectConsole.nextSearchInput || briefForSearch}
+        />
+      </div>
 
       <AutonomousSourcingPanel
         graph={detail.candidateGraph}
@@ -3594,39 +5347,34 @@ export default function ProjectDetailPage() {
         onChanged={reloadDetail}
       />
 
-      <RoleAgentGuardrailsPanel
-        key={`${detail.project.id}:${JSON.stringify(detail.project.outreach_settings ?? {})}`}
-        project={detail.project}
-        queue={detail.outreachQueue}
-        sequenceAnalytics={detail.sequenceAnalytics}
-        locale={locale}
-        onChanged={reloadDetail}
-      />
-
-      <GmailOutreachPanel
-        queue={detail.outreachQueue}
-        projectId={detail.project.id}
-        projectName={detail.project.name}
-        persistedSettings={detail.project.outreach_settings}
-        projectSyncSummary={detail.project.inbox_sync_summary}
-        sequenceAnalytics={detail.sequenceAnalytics}
-        locale={locale}
-        onChanged={reloadDetail}
-      />
+      <div id="gmail-outreach">
+        <GmailOutreachPanel
+          queue={detail.outreachQueue}
+          projectId={detail.project.id}
+          projectName={detail.project.name}
+          persistedSettings={detail.project.outreach_settings}
+          projectSyncSummary={detail.project.inbox_sync_summary}
+          sequenceAnalytics={detail.sequenceAnalytics}
+          locale={locale}
+          onChanged={reloadDetail}
+        />
+      </div>
 
       <SequenceAnalyticsPanel
         sequenceAnalytics={detail.sequenceAnalytics}
         locale={locale}
       />
 
-      <InboxAgentPanel
-        queue={detail.inboxQueue}
-        projectId={id}
-        projectBrief={briefForSearch}
-        projectSyncSummary={detail.project.inbox_sync_summary}
-        locale={locale}
-        onChanged={reloadDetail}
-      />
+      <div id="inbox-agent">
+        <InboxAgentPanel
+          queue={detail.inboxQueue}
+          projectId={id}
+          projectBrief={briefForSearch}
+          projectSyncSummary={detail.project.inbox_sync_summary}
+          locale={locale}
+          onChanged={reloadDetail}
+        />
+      </div>
 
       {showKpiStrip && (
         <section className="grid grid-cols-2 gap-3 sm:grid-cols-5">
@@ -4024,7 +5772,7 @@ function ProjectResearchRoundsPanel({
             const continueHref = round.kind === "search" && round.nextSearchInput
               ? `/app/search?project=${projectId}&q=${encodeURIComponent(round.nextSearchInput)}`
               : "";
-            const reportHref = `/r/${round.id}`;
+	            const reportHref = round.clientDeliveryReportHref || `/r/${round.id}`;
             return (
               <li key={round.id} className="rounded-3xl border border-black/10 bg-white/84 p-4">
                 <div className="flex flex-wrap items-start justify-between gap-3">

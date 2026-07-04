@@ -11,13 +11,27 @@ export type InboxQueueItem = {
   gmail_thread_id?: string;
   outreach_thread_id?: string;
   saved_scheduling_draft?: string;
+  action_status?: "pending" | "draft_saved" | "slot_held" | "confirmed" | "rescheduled" | "canceled" | "scheduled" | "interview_ready" | "stopped" | "reviewed" | "sent" | string;
+  calendar_availability?: {
+    status?: string;
+    slots_count?: number;
+    last_checked_at?: string;
+    slots?: Array<{ start: string; end: string; label: string }>;
+  } | null;
+  interview_event?: {
+    status?: string;
+    starts_at?: string;
+    ends_at?: string;
+    label?: string;
+    calendar_event_id?: string;
+  } | null;
 };
 
 export type InboxQueueView = {
-  summary: { total: number; interested: number; needs_human_reply: number; due_follow_up?: number };
+  summary: { total: number; interested: number; needs_human_reply: number; needs_scheduling?: number; confirmed?: number; canceled?: number; due_follow_up?: number };
   items: InboxQueueItem[];
   interested_candidates: Array<InboxQueueItem & {
-    readiness: "needs_scheduling";
+    readiness: "needs_scheduling" | "interview_ready";
     recommended_next_step: string;
     saved_scheduling_draft?: string;
     scheduling_packet?: {

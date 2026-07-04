@@ -1,4 +1,5 @@
 export const GOOGLE_CALENDAR_FREEBUSY_SCOPE = "https://www.googleapis.com/auth/calendar.freebusy";
+export const GOOGLE_CALENDAR_EVENTS_SCOPE = "https://www.googleapis.com/auth/calendar.events";
 const DEFAULT_CALENDAR_ID = "primary";
 const DEFAULT_DURATION_MINUTES = 30;
 const DEFAULT_MAX_SLOTS = 3;
@@ -41,8 +42,10 @@ function rangesOverlap(aStart, aEnd, bStart, bEnd) {
 export function calendarScopeStatus(scope = "") {
   const scopes = cleanString(scope).split(/\s+/).filter(Boolean);
   const canRead = scopes.includes(GOOGLE_CALENDAR_FREEBUSY_SCOPE);
+  const canCreate = scopes.includes(GOOGLE_CALENDAR_EVENTS_SCOPE);
   return {
     can_read_calendar: canRead,
+    can_create_calendar_event: canCreate,
     missing_reason: canRead ? "" : "calendar_scope_missing",
   };
 }
@@ -66,6 +69,92 @@ export function buildCalendarFreeBusyRequest({
       timeMax: cleanString(timeMax),
       items: [{ id: cleanString(calendarId) || DEFAULT_CALENDAR_ID }],
     }),
+  };
+}
+
+export function buildCalendarEventInsertRequest({
+  accessToken = "",
+  calendarId = DEFAULT_CALENDAR_ID,
+  url = "https://www.googleapis.com/calendar/v3/calendars",
+  candidateName = "",
+  candidateEmail = "",
+  calendarSlot = {},
+  description = "",
+  sendUpdates = "all",
+} = {}) {
+  const cleanCalendarId = cleanString(calendarId) || DEFAULT_CALENDAR_ID;
+  const slotStart = cleanString(calendarSlot?.start);
+  const slotEnd = cleanString(calendarSlot?.end);
+  const cleanName = cleanString(candidateName) || "Candidate";
+  const attendeeEmail = cleanString(candidateEmail);
+  const params = new URLSearchParams({ sendUpdates: cleanString(sendUpdates) || "all" });
+  const body = {
+    summary: `Interview: ${cleanName}`,
+    description: cleanString(description),
+    start: { dateTime: slotStart },
+    end: { dateTime: slotEnd },
+    attendees: attendeeEmail ? [{ email: attendeeEmail }] : [],
+    extendedProperties: {
+      private: {
+        source: "signalhire",
+      },
+    },
+  };
+  return {
+    url: `${cleanString(url) || "https://www.googleapis.com/calendar/v3/calendars"}/${encodeURIComponent(cleanCalendarId)}/events?${params.toString()}`,
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${cleanString(accessToken)}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(body),
+  };
+}
+
+export function buildCalendarEventPatchRequest({
+  accessToken = "",
+  calendarId = DEFAULT_CALENDAR_ID,
+  calendarEventId = "",
+  url = "https://www.googleapis.com/calendar/v3/calendars",
+  calendarSlot = {},
+  description = "",
+  sendUpdates = "all",
+} = {}) {
+  const cleanCalendarId = cleanString(calendarId) || DEFAULT_CALENDAR_ID;
+  const cleanEventId = cleanString(calendarEventId);
+  const params = new URLSearchParams({ sendUpdates: cleanString(sendUpdates) || "all" });
+  return {
+    url: `${cleanString(url) || "https://www.googleapis.com/calendar/v3/calendars"}/${encodeURIComponent(cleanCalendarId)}/events/${encodeURIComponent(cleanEventId)}?${params.toString()}`,
+    method: "PATCH",
+    headers: {
+      Authorization: `Bearer ${cleanString(accessToken)}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      description: cleanString(description),
+      start: { dateTime: cleanString(calendarSlot?.start) },
+      end: { dateTime: cleanString(calendarSlot?.end) },
+    }),
+  };
+}
+
+export function buildCalendarEventDeleteRequest({
+  accessToken = "",
+  calendarId = DEFAULT_CALENDAR_ID,
+  calendarEventId = "",
+  url = "https://www.googleapis.com/calendar/v3/calendars",
+  sendUpdates = "all",
+} = {}) {
+  const cleanCalendarId = cleanString(calendarId) || DEFAULT_CALENDAR_ID;
+  const cleanEventId = cleanString(calendarEventId);
+  const params = new URLSearchParams({ sendUpdates: cleanString(sendUpdates) || "all" });
+  return {
+    url: `${cleanString(url) || "https://www.googleapis.com/calendar/v3/calendars"}/${encodeURIComponent(cleanCalendarId)}/events/${encodeURIComponent(cleanEventId)}?${params.toString()}`,
+    method: "DELETE",
+    headers: {
+      Authorization: `Bearer ${cleanString(accessToken)}`,
+      "Content-Type": "application/json",
+    },
   };
 }
 

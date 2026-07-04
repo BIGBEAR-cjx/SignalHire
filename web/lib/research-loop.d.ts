@@ -409,17 +409,17 @@ export function buildProjectSearchConsole(input?: {
   project?: {
     name?: string;
     brief?: string | null;
-  };
-  runs?: Array<{
-    id?: string;
-    kind?: string;
-    label?: string;
-    summary?: string | null;
-    status?: string;
-    query_text?: string;
-    updated_at?: string;
-    result?: unknown;
-  }>;
+	  };
+	  runs?: Array<{
+	    id?: string;
+	    kind?: string;
+	    label?: string;
+	    summary?: string | null;
+	    status?: string;
+	    query_text?: string;
+	    updated_at?: string;
+	    result?: unknown;
+	  }>;
   items?: unknown[];
   candidateCount?: number;
   hasFilter?: boolean;
@@ -429,17 +429,17 @@ export function buildProjectControlRoom(input?: {
   project?: {
     name?: string;
     brief?: string | null;
-  };
-  runs?: Array<{
-    id?: string;
-    kind?: string;
-    label?: string;
-    summary?: string | null;
-    status?: string;
-    query_text?: string;
-    updated_at?: string;
-    result?: unknown;
-  }>;
+	  };
+	  runs?: Array<{
+	    id?: string;
+	    kind?: string;
+	    label?: string;
+	    summary?: string | null;
+	    status?: string;
+	    query_text?: string;
+	    updated_at?: string;
+	    result?: unknown;
+	  }>;
   items?: unknown[];
   candidateCount?: number;
   hasFilter?: boolean;
@@ -478,6 +478,8 @@ export function buildProjectResearchRounds(input?: {
     query_text?: string;
     updated_at?: string;
     result?: unknown;
+    clientDeliveryReportHref?: string;
+    client_delivery_share_token?: string;
   }>;
   locale?: ResearchLoopLocale | string;
 }): ProjectResearchRounds;

@@ -80,6 +80,7 @@ type JobStatusView = {
 type StatusResponse = {
   runId?: string;
   status?: string;
+  clientDeliveryReportHref?: string;
   progress?: { searches?: number; fetches?: number; recent?: Array<{ kind: "search" | "fetch"; info: string }> } | null;
   result?: AppResult;
   error?: string | null;
@@ -436,6 +437,7 @@ export default function ResearchTool({
   const [feed, setFeed] = useState<FeedItem[]>([]);
   const [live, setLive] = useState<{ searches: number; fetches: number } | null>(null);
   const [runId, setRunId] = useState<string | null>(null);
+  const [clientDeliveryShareHref, setClientDeliveryShareHref] = useState<string | null>(null);
   const [jobStatus, setJobStatus] = useState<JobStatusView | null>(null);
   const [currentJobId, setCurrentJobId] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
@@ -519,9 +521,10 @@ export default function ResearchTool({
             }));
           }
           setResult(j.result);
-          setStats(p ? { searches: p.searches ?? 0, fetches: p.fetches ?? 0 } : null);
-          setRunId(j.runId ?? jobId);
-          setLoading(false);
+	          setStats(p ? { searches: p.searches ?? 0, fetches: p.fetches ?? 0 } : null);
+	          setRunId(j.runId ?? jobId);
+	          setClientDeliveryShareHref(j.clientDeliveryReportHref ?? null);
+	          setLoading(false);
           syncRunParam(null);
         } else if (j.status === "canceled") {
           stopPolling();
@@ -564,7 +567,7 @@ export default function ResearchTool({
     stopPolling();
     setLoading(true); setError(""); setResult(null); setStats(null);
     setSelectedCandidateIndex(null); setShortlist([]);
-    setFeed([]); setLive(null); setRunId(null); setCurrentJobId(null);
+	    setFeed([]); setLive(null); setRunId(null); setClientDeliveryShareHref(null); setCurrentJobId(null);
     setJobStatus(null); setCopied(false); setBackfillContext(null); setBackfillMergeSummary(null);
     syncRunParam(null);
     setMergingBackfill(false); setMergedOriginalRunId(null);
@@ -608,11 +611,12 @@ export default function ResearchTool({
             if (ev.type === "step") {
               setLive({ searches: ev.searches, fetches: ev.fetches });
               setFeed((f) => [...f, { id: idRef.current++, kind: ev.kind, info: ev.info }].slice(-50));
-            } else if (ev.type === "done") {
-              setResult(ev.data);
-              setStats(ev.stats ?? null);
-              setRunId(ev.runId ?? null);
-              setBackfillMergeSummary(null);
+	            } else if (ev.type === "done") {
+	              setResult(ev.data);
+	              setStats(ev.stats ?? null);
+	              setRunId(ev.runId ?? null);
+	              setClientDeliveryShareHref(null);
+	              setBackfillMergeSummary(null);
               setMergedOriginalRunId(null);
             } else if (ev.type === "error") {
               setError(ev.error || t("research.error.generic"));
@@ -1422,15 +1426,15 @@ export default function ResearchTool({
       {/* 结果区 */}
       {result && (
         <ResearchResultShell>
-          <ResearchShareBar
-            statsText={stats ? t("research.stats", { searches: stats.searches, fetches: stats.fetches }) : undefined}
-            cached={Boolean(stats?.cached)}
-            copied={copied}
-            onCopy={runId ? () => {
-                  navigator.clipboard?.writeText(`${location.origin}/r/${runId}`);
-                  setCopied(true);
-                  setTimeout(() => setCopied(false), 2000);
-                } : undefined}
+	          <ResearchShareBar
+	            statsText={stats ? t("research.stats", { searches: stats.searches, fetches: stats.fetches }) : undefined}
+	            cached={Boolean(stats?.cached)}
+	            copied={copied}
+	            onCopy={runId ? () => {
+	                  navigator.clipboard?.writeText(`${location.origin}${clientDeliveryShareHref || `/r/${runId}`}`);
+	                  setCopied(true);
+	                  setTimeout(() => setCopied(false), 2000);
+	                } : undefined}
           />
           {isTalentSearchResult(result) ? (
             <>

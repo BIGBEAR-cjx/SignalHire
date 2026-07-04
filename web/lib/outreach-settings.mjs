@@ -1,5 +1,8 @@
+import { normalizeClientDeliveryAccessPolicy } from "./report-share-access.mjs";
+
 const STOPPED_THREAD_STATUSES = new Set(["stopped", "replied", "bounced", "not_interested"]);
 const CAPACITY_GOAL_KEYS = ["contacted", "replied", "interested", "interview_ready"];
+const CLIENT_DELIVERY_VISIBILITY_KEYS = ["delivery_loop", "smart_report", "candidate_details", "feedback_form"];
 
 function cleanString(value) {
   return typeof value === "string" ? value.trim() : "";
@@ -56,16 +59,35 @@ function normalizeApprovalSettings(settings) {
   return { approval_mode: "manual_all", auto_follow_up_only: false };
 }
 
+function normalizeClientDeliveryVisibility(settings) {
+  const visibility = asObject(settings.client_delivery_visibility || settings.clientDeliveryVisibility);
+  const legacyDigestVisible = settings.client_visible_digest !== false;
+  const defaults = {
+    delivery_loop: legacyDigestVisible,
+    smart_report: legacyDigestVisible,
+    candidate_details: true,
+    feedback_form: legacyDigestVisible,
+  };
+  return Object.fromEntries(
+    CLIENT_DELIVERY_VISIBILITY_KEYS.map((key) => [key, visibility[key] === undefined ? defaults[key] : visibility[key] !== false]),
+  );
+}
+
 export function buildRoleOutreachSettings(source = {}) {
   const settings = asObject(source);
   const approval = normalizeApprovalSettings(settings);
   const agentStatus = cleanStatus(settings.agent_status || settings.agentStatus);
+  const capacityGoalConfigured = Object.hasOwn(settings, "capacity_goal") || Object.hasOwn(settings, "capacityGoal");
+  const clientDeliveryVisibility = normalizeClientDeliveryVisibility(settings);
   return {
     auto_follow_up_only: approval.auto_follow_up_only,
     follow_up_interval_days: 7,
-    client_visible_digest: settings.client_visible_digest !== false,
+    client_visible_digest: clientDeliveryVisibility.delivery_loop || clientDeliveryVisibility.smart_report || clientDeliveryVisibility.feedback_form,
+    client_delivery_visibility: clientDeliveryVisibility,
+    client_delivery_access: normalizeClientDeliveryAccessPolicy(settings.client_delivery_access || settings.clientDeliveryAccess),
     agent_status: agentStatus === "paused" ? "paused" : "active",
     approval_mode: approval.approval_mode,
+    capacity_goal_configured: capacityGoalConfigured,
     capacity_goal: normalizeCapacityGoal(settings.capacity_goal ?? settings.capacityGoal),
   };
 }

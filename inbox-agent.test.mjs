@@ -199,6 +199,56 @@ test("saved scheduling draft remains in needs scheduling and is exposed on inter
   assert.match(queue.interested_candidates[0].recommended_next_step, /saved scheduling draft/i);
 });
 
+test("held and confirmed calendar events become scheduling pipeline state", () => {
+  const heldNotes = mergeInboxActionNotes("", {
+    action: "hold_calendar_slot",
+    action_status: "slot_held",
+    action_applied_at: "2026-06-26T10:00:00.000Z",
+    scheduling_message: "Candidate prefers the first slot.",
+    calendar_slot: {
+      start: "2026-07-05T16:00:00.000Z",
+      end: "2026-07-05T16:30:00.000Z",
+      label: "Jul 5, 4:00 PM - 4:30 PM",
+    },
+  });
+  const confirmedNotes = mergeInboxActionNotes("", {
+    action: "confirm_interview_event",
+    action_status: "confirmed",
+    action_applied_at: "2026-06-26T11:00:00.000Z",
+    scheduling_message: "Confirmed for Jul 5.",
+    calendar_event_id: "evt-123",
+    calendar_slot: {
+      start: "2026-07-05T16:00:00.000Z",
+      end: "2026-07-05T16:30:00.000Z",
+      label: "Jul 5, 4:00 PM - 4:30 PM",
+    },
+    interview_event: {
+      status: "confirmed",
+      starts_at: "2026-07-05T16:00:00.000Z",
+      ends_at: "2026-07-05T16:30:00.000Z",
+      label: "Jul 5, 4:00 PM - 4:30 PM",
+      calendar_event_id: "evt-123",
+    },
+  });
+  const queue = buildInboxQueue({
+    threads: [
+      { id: "1", candidate_name: "Held", classification: "interested", notes: heldNotes },
+      { id: "2", candidate_name: "Confirmed", classification: "interested", notes: confirmedNotes },
+    ],
+  });
+
+  assert.equal(queue.summary.needs_scheduling, 1);
+  assert.equal(queue.summary.confirmed, 1);
+  assert.deepEqual(queue.interested_candidates.map((item) => [item.candidate_name, item.readiness, item.action_status]), [
+    ["Held", "needs_scheduling", "slot_held"],
+    ["Confirmed", "interview_ready", "confirmed"],
+  ]);
+  assert.equal(queue.interested_candidates[0].calendar_availability.status, "slot_held");
+  assert.equal(queue.interested_candidates[0].calendar_availability.slots_count, 1);
+  assert.equal(queue.interested_candidates[1].interview_event.calendar_event_id, "evt-123");
+  assert.equal(queue.interested_candidates[1].interview_event.starts_at, "2026-07-05T16:00:00.000Z");
+});
+
 test("builds no-reply due follow-up draft from sequence messages", () => {
   const queue = buildInboxQueue({
     threads: [

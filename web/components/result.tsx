@@ -454,6 +454,60 @@ function ReportMetric({ label, value, sublabel }: { label: string; value: string
   );
 }
 
+export function ClientDeliveryLoopPanel({ result, locale }: { result: TalentSearchResult } & ResultLocaleProps) {
+  const report: SmartReportViewModel = buildSmartReportView(result, { locale });
+  if (report.metrics.candidates === 0) return null;
+  const isEn = locale === "en";
+  const loop = report.client_delivery_loop;
+  return (
+    <ResultSurface>
+      <section aria-label={isEn ? "Client Delivery Loop" : "客户持续交付"}>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-400">
+            {isEn ? "Client delivery page" : "客户交付页"}
+          </p>
+          <h2 className="mt-1 text-lg font-semibold text-gray-900">{loop.title}</h2>
+          <p className="mt-1 text-sm leading-relaxed text-gray-600">{loop.summary}</p>
+        </div>
+        <span className="rounded-full bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-700 ring-1 ring-blue-100">
+          {loop.weekly_progress.window_label}
+        </span>
+      </div>
+      <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+        <ReportMetric label={isEn ? "New candidates" : "新增候选人"} value={loop.weekly_progress.metrics.new_candidates} />
+        <ReportMetric label={isEn ? "Contacted" : "已联系"} value={loop.weekly_progress.metrics.contacted} />
+        <ReportMetric label={isEn ? "Replied" : "已回复"} value={loop.weekly_progress.metrics.replied} />
+        <ReportMetric label={isEn ? "Interview-ready" : "可约面"} value={loop.weekly_progress.metrics.interview_ready} />
+        <ReportMetric label={isEn ? "Confirmed" : "已确认"} value={loop.weekly_progress.metrics.confirmed} />
+      </div>
+      <div className="mt-4 grid gap-3 md:grid-cols-3">
+        <div className="rounded-2xl border border-emerald-100 bg-emerald-50/60 p-4">
+          <p className="text-sm font-semibold text-emerald-950">{isEn ? "Evidence strength" : "证据强弱"}</p>
+          <p className="mt-2 text-sm leading-relaxed text-emerald-900">{loop.evidence_summary}</p>
+        </div>
+        <div className="rounded-2xl border border-amber-100 bg-amber-50/60 p-4">
+          <p className="text-sm font-semibold text-amber-900">{isEn ? "Risks" : "风险"}</p>
+          <ul className="mt-2 list-disc space-y-1 pl-5 text-sm leading-relaxed text-amber-800">
+            {(loop.risks.length ? loop.risks : [isEn ? "No major delivery risk recorded." : "暂无明显交付风险。"]).map((risk) => (
+              <li key={risk}>{risk}</li>
+            ))}
+          </ul>
+        </div>
+        <div className="rounded-2xl border border-blue-100 bg-blue-50/60 p-4">
+          <p className="text-sm font-semibold text-blue-900">{isEn ? "Next actions" : "下一步"}</p>
+          <ul className="mt-2 list-disc space-y-1 pl-5 text-sm leading-relaxed text-blue-900/80">
+            {(loop.next_actions.length ? loop.next_actions : [isEn ? "Review this delivery with the hiring manager." : "与招聘经理复核本次交付。"]).map((action) => (
+              <li key={action}>{action}</li>
+            ))}
+          </ul>
+        </div>
+      </div>
+      </section>
+    </ResultSurface>
+  );
+}
+
 export function SmartReportPanel({ result, locale }: { result: TalentSearchResult } & ResultLocaleProps) {
   const report: SmartReportViewModel = buildSmartReportView(result, { locale });
   if (report.metrics.candidates === 0) return null;

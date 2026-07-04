@@ -7,8 +7,20 @@ test("builds role outreach settings with conservative defaults", () => {
     auto_follow_up_only: false,
     follow_up_interval_days: 7,
     client_visible_digest: true,
+    client_delivery_visibility: {
+      delivery_loop: true,
+      smart_report: true,
+      candidate_details: true,
+      feedback_form: true,
+    },
+    client_delivery_access: {
+      mode: "token_only",
+      allowed_emails: [],
+      allowed_domains: [],
+    },
     agent_status: "active",
     approval_mode: "manual_all",
+    capacity_goal_configured: false,
     capacity_goal: {
       contacted: 0,
       replied: 0,
@@ -33,8 +45,20 @@ test("builds role outreach settings with conservative defaults", () => {
     auto_follow_up_only: true,
     follow_up_interval_days: 7,
     client_visible_digest: false,
+    client_delivery_visibility: {
+      delivery_loop: false,
+      smart_report: false,
+      candidate_details: true,
+      feedback_form: false,
+    },
+    client_delivery_access: {
+      mode: "token_only",
+      allowed_emails: [],
+      allowed_domains: [],
+    },
     agent_status: "paused",
     approval_mode: "auto_follow_up_only",
+    capacity_goal_configured: true,
     capacity_goal: {
       contacted: 12,
       replied: 4,
@@ -53,8 +77,20 @@ test("normalizes unsafe approval modes into manual persisted settings", () => {
     auto_follow_up_only: false,
     follow_up_interval_days: 7,
     client_visible_digest: true,
+    client_delivery_visibility: {
+      delivery_loop: true,
+      smart_report: true,
+      candidate_details: true,
+      feedback_form: true,
+    },
+    client_delivery_access: {
+      mode: "token_only",
+      allowed_emails: [],
+      allowed_domains: [],
+    },
     agent_status: "active",
     approval_mode: "manual_all",
+    capacity_goal_configured: false,
     capacity_goal: {
       contacted: 0,
       replied: 0,
@@ -70,14 +106,67 @@ test("normalizes unsafe approval modes into manual persisted settings", () => {
     auto_follow_up_only: false,
     follow_up_interval_days: 7,
     client_visible_digest: true,
+    client_delivery_visibility: {
+      delivery_loop: true,
+      smart_report: true,
+      candidate_details: true,
+      feedback_form: true,
+    },
+    client_delivery_access: {
+      mode: "token_only",
+      allowed_emails: [],
+      allowed_domains: [],
+    },
     agent_status: "active",
     approval_mode: "manual_all",
+    capacity_goal_configured: false,
     capacity_goal: {
       contacted: 0,
       replied: 0,
       interested: 0,
       interview_ready: 0,
     },
+  });
+});
+
+test("normalizes client delivery visibility controls", () => {
+  assert.deepEqual(buildRoleOutreachSettings({
+    client_delivery_visibility: {
+      delivery_loop: false,
+      smart_report: false,
+      candidate_details: false,
+      feedback_form: false,
+    },
+  }).client_delivery_visibility, {
+    delivery_loop: false,
+    smart_report: false,
+    candidate_details: false,
+    feedback_form: false,
+  });
+
+  assert.deepEqual(buildRoleOutreachSettings({
+    client_visible_digest: false,
+  }).client_delivery_visibility, {
+    delivery_loop: false,
+    smart_report: false,
+    candidate_details: true,
+    feedback_form: false,
+  });
+});
+
+test("normalizes client delivery customer account access controls", () => {
+  const settings = buildRoleOutreachSettings({
+    client_delivery_access: {
+      mode: "token_or_customer_account",
+      allowed_emails: ["Client@Example.com", "client@example.com"],
+      allowed_domains: ["Example.org"],
+    },
+  });
+
+  assert.deepEqual(settings.client_delivery_access, {
+    mode: "token_or_customer_account",
+    allowed_emails: ["client@example.com"],
+    allowed_domains: ["example.org"],
   });
 });
 

@@ -1023,7 +1023,7 @@ export function buildLatestProjectFeedbackPreference({ runs = [], baseInput = ""
 }
 
 /**
- * @param {{ runs?: Array<{ id?: string; kind?: string; label?: string; summary?: string | null; status?: string; query_text?: string; updated_at?: string; result?: unknown }>; locale?: string }} input
+ * @param {{ runs?: Array<{ id?: string; kind?: string; label?: string; summary?: string | null; status?: string; query_text?: string; updated_at?: string; result?: unknown; clientDeliveryReportHref?: string; client_delivery_share_token?: string }>; locale?: string }} input
  */
 export function buildProjectResearchRounds({ runs = [], locale = "zh" } = {}) {
   const normalizedLocale = normalizeLocale(locale);
@@ -1055,6 +1055,8 @@ export function buildProjectResearchRounds({ runs = [], locale = "zh" } = {}) {
       status: cleanString(run?.status),
       queryText,
       updatedAt: cleanString(run?.updated_at),
+      clientDeliveryReportHref: cleanString(run?.clientDeliveryReportHref),
+      clientDeliveryShareToken: cleanString(run?.client_delivery_share_token),
       description,
       nextSearchInput: run?.kind === "verify" ? "" : queryText,
       feedbackSummary: buildRoundFeedbackSummary(run, normalizedLocale),

@@ -98,6 +98,98 @@ test("schedule action can promote a previously saved scheduling draft to intervi
   assert.equal(parseInboxActionState(result.patch.notes).scheduling_message, "Saved calendar-aware draft");
 });
 
+test("calendar slot hold and confirmation persist interview event state", () => {
+  const now = new Date("2026-06-26T10:00:00.000Z");
+  const held = buildInboxActionPatch({
+    action: "hold_calendar_slot",
+    scheduling_message: "Candidate prefers the first slot.",
+    calendar_slot: {
+      start: "2026-07-05T16:00:00.000Z",
+      end: "2026-07-05T16:30:00.000Z",
+      label: "Jul 5, 4:00 PM - 4:30 PM",
+    },
+    now,
+  });
+
+  assert.equal(held.ok, true);
+  assert.equal(held.patch.status, "replied");
+  assert.equal(held.action_state.action_status, "slot_held");
+  assert.deepEqual(held.action_state.calendar_slot, {
+    start: "2026-07-05T16:00:00.000Z",
+    end: "2026-07-05T16:30:00.000Z",
+    label: "Jul 5, 4:00 PM - 4:30 PM",
+  });
+  assert.equal(parseInboxActionState(held.patch.notes).calendar_slot.start, "2026-07-05T16:00:00.000Z");
+
+  const confirmed = buildInboxActionPatch({
+    action: "confirm_interview_event",
+    notes: held.patch.notes,
+    scheduling_message: "Confirmed for Jul 5.",
+    calendar_event_id: "evt-123",
+    calendar_slot: {
+      start: "2026-07-05T16:00:00.000Z",
+      end: "2026-07-05T16:30:00.000Z",
+      label: "Jul 5, 4:00 PM - 4:30 PM",
+    },
+    now: new Date("2026-06-26T11:00:00.000Z"),
+  });
+
+  assert.equal(confirmed.ok, true);
+  assert.equal(confirmed.patch.status, "interview_ready");
+  assert.equal(confirmed.action_state.action_status, "confirmed");
+  assert.equal(confirmed.action_state.calendar_event_id, "evt-123");
+  assert.equal(confirmed.action_state.interview_event.status, "confirmed");
+  assert.equal(confirmed.action_state.interview_event.starts_at, "2026-07-05T16:00:00.000Z");
+  assert.equal(parseInboxActionState(confirmed.patch.notes).interview_event.calendar_event_id, "evt-123");
+});
+
+test("calendar event reschedule and cancel persist lifecycle state", () => {
+  const confirmedNotes = mergeInboxActionNotes("", {
+    action: "confirm_interview_event",
+    action_status: "confirmed",
+    action_applied_at: "2026-06-26T11:00:00.000Z",
+    scheduling_message: "Confirmed for Jul 5.",
+    calendar_event_id: "evt-123",
+    calendar_slot: {
+      start: "2026-07-05T16:00:00.000Z",
+      end: "2026-07-05T16:30:00.000Z",
+      label: "Jul 5, 4:00 PM",
+    },
+  });
+  const rescheduled = buildInboxActionPatch({
+    action: "reschedule_interview_event",
+    notes: confirmedNotes,
+    scheduling_message: "Rescheduled to Jul 6.",
+    calendar_event_id: "evt-123",
+    calendar_slot: {
+      start: "2026-07-06T16:00:00.000Z",
+      end: "2026-07-06T16:30:00.000Z",
+      label: "Jul 6, 4:00 PM",
+    },
+    now: new Date("2026-06-26T12:00:00.000Z"),
+  });
+
+  assert.equal(rescheduled.ok, true);
+  assert.equal(rescheduled.patch.status, "interview_ready");
+  assert.equal(rescheduled.action_state.action_status, "rescheduled");
+  assert.equal(rescheduled.action_state.interview_event.status, "rescheduled");
+  assert.equal(parseInboxActionState(rescheduled.patch.notes).interview_event.starts_at, "2026-07-06T16:00:00.000Z");
+
+  const canceled = buildInboxActionPatch({
+    action: "cancel_interview_event",
+    notes: rescheduled.patch.notes,
+    scheduling_message: "Candidate canceled.",
+    calendar_event_id: "evt-123",
+    now: new Date("2026-06-26T13:00:00.000Z"),
+  });
+
+  assert.equal(canceled.ok, true);
+  assert.equal(canceled.patch.status, "replied");
+  assert.equal(canceled.action_state.action_status, "canceled");
+  assert.equal(canceled.action_state.interview_event.status, "canceled");
+  assert.equal(parseInboxActionState(canceled.patch.notes).interview_event.calendar_event_id, "evt-123");
+});
+
 test("save follow-up draft persists body without sending", () => {
   const now = new Date("2026-06-26T10:00:00.000Z");
   const result = buildInboxActionPatch({
@@ -201,4 +293,139 @@ test("runInboxAction checks auth, ownership lookup, invalid action, and update",
   assert.equal(calls.at(-1)[1].userId, "user-1");
   assert.equal(calls.at(-1)[1].status, "replied");
   assert.equal(calls.at(-1)[1].body, "Draft");
+});
+
+test("runInboxAction creates a Google Calendar event before confirmed interview writeback", async () => {
+  const calls = [];
+  const deps = {
+    user: { id: "user-1" },
+    getOutreachThread: async (input) => {
+      calls.push(["get", input]);
+      return { id: input.id, user_id: input.userId, notes: "Existing", candidate_name: "Ada" };
+    },
+    updateOutreachThread: async (input) => {
+      calls.push(["update", input]);
+      return { id: input.id, status: input.status, notes: input.notes };
+    },
+    createCalendarEvent: async (input) => {
+      calls.push(["calendar", input]);
+      return {
+        ok: true,
+        event: {
+          id: "google-event-1",
+          htmlLink: "https://calendar.google.com/event?eid=1",
+          starts_at: input.calendar_slot.start,
+          ends_at: input.calendar_slot.end,
+        },
+      };
+    },
+    now: new Date("2026-06-26T10:00:00.000Z"),
+  };
+
+  const result = await runInboxAction({
+    body: {
+      outreach_thread_id: "t1",
+      action: "confirm_interview_event",
+      scheduling_message: "Confirmed with Ada.",
+      calendar_slot: {
+        start: "2026-07-05T16:00:00.000Z",
+        end: "2026-07-05T16:30:00.000Z",
+        label: "Jul 5, 4:00 PM",
+      },
+    },
+    ...deps,
+  });
+
+  assert.equal(result.status, 200);
+  assert.equal(calls[1][0], "calendar");
+  assert.equal(calls[1][1].userId, "user-1");
+  assert.equal(calls[1][1].thread.id, "t1");
+  assert.equal(result.body.action_state.calendar_event_id, "google-event-1");
+  assert.equal(parseInboxActionState(calls.at(-1)[1].notes).interview_event.calendar_event_id, "google-event-1");
+});
+
+test("runInboxAction reschedules and cancels existing Google Calendar events", async () => {
+  const confirmedNotes = mergeInboxActionNotes("Existing", {
+    action: "confirm_interview_event",
+    action_status: "confirmed",
+    action_applied_at: "2026-06-26T11:00:00.000Z",
+    calendar_event_id: "evt-123",
+    calendar_slot: {
+      start: "2026-07-05T16:00:00.000Z",
+      end: "2026-07-05T16:30:00.000Z",
+      label: "Jul 5, 4:00 PM",
+    },
+    interview_event: {
+      status: "confirmed",
+      starts_at: "2026-07-05T16:00:00.000Z",
+      ends_at: "2026-07-05T16:30:00.000Z",
+      label: "Jul 5, 4:00 PM",
+      calendar_event_id: "evt-123",
+    },
+  });
+  const calls = [];
+  const deps = {
+    user: { id: "user-1" },
+    getOutreachThread: async (input) => {
+      calls.push(["get", input]);
+      return { id: input.id, user_id: input.userId, notes: confirmedNotes, candidate_name: "Ada" };
+    },
+    updateOutreachThread: async (input) => {
+      calls.push(["update", input]);
+      return { id: input.id, status: input.status, notes: input.notes };
+    },
+    updateCalendarEvent: async (input) => {
+      calls.push(["calendar-update", input]);
+      return {
+        ok: true,
+        event: {
+          id: input.calendar_event_id,
+          starts_at: input.calendar_slot.start,
+          ends_at: input.calendar_slot.end,
+        },
+      };
+    },
+    cancelCalendarEvent: async (input) => {
+      calls.push(["calendar-cancel", input]);
+      return { ok: true, event: { id: input.calendar_event_id, status: "canceled" } };
+    },
+    now: new Date("2026-06-26T12:00:00.000Z"),
+  };
+
+  const rescheduled = await runInboxAction({
+    body: {
+      outreach_thread_id: "t1",
+      action: "reschedule_interview_event",
+      scheduling_message: "Rescheduled with Ada.",
+      calendar_event_id: "evt-123",
+      calendar_slot: {
+        start: "2026-07-06T16:00:00.000Z",
+        end: "2026-07-06T16:30:00.000Z",
+        label: "Jul 6, 4:00 PM",
+      },
+    },
+    ...deps,
+  });
+
+  assert.equal(rescheduled.status, 200);
+  assert.equal(calls[1][0], "calendar-update");
+  assert.equal(rescheduled.body.action_state.action_status, "rescheduled");
+  assert.equal(parseInboxActionState(calls.at(-1)[1].notes).interview_event.starts_at, "2026-07-06T16:00:00.000Z");
+
+  calls.length = 0;
+  const canceled = await runInboxAction({
+    body: {
+      outreach_thread_id: "t1",
+      action: "cancel_interview_event",
+      scheduling_message: "Candidate canceled.",
+      calendar_event_id: "evt-123",
+    },
+    ...deps,
+    now: new Date("2026-06-26T13:00:00.000Z"),
+  });
+
+  assert.equal(canceled.status, 200);
+  assert.equal(calls[1][0], "calendar-cancel");
+  assert.equal(canceled.body.action_state.action_status, "canceled");
+  assert.equal(parseInboxActionState(calls.at(-1)[1].notes).interview_event.status, "canceled");
 });

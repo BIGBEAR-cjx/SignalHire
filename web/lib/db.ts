@@ -38,6 +38,7 @@ import {
   matchesHistoryEvidenceFilter,
   normalizeHistoryFilters,
 } from "./history.mjs";
+import { buildClientDeliveryShareHref } from "./report-share-access.mjs";
 
 const BASE = process.env.INSFORGE_API_BASE_URL;
 const KEY = process.env.INSFORGE_API_KEY; // 服务端 access key, 绝不进 NEXT_PUBLIC
@@ -204,6 +205,7 @@ export interface RunStatus {
   started_at: string | null;
   finished_at: string | null;
   updated_at: string | null;
+  clientDeliveryReportHref?: string;
   status_view: {
     phase: "queued" | "running" | "retrying" | "done" | "error" | "canceled";
     label: string;
@@ -396,13 +398,13 @@ export async function findRunId(kind: RunKind, flatKey: string, userId: string):
 // 按 id 取整行 (可分享报告页 /r/[id] 用)。
 export async function getRunById(id: string): Promise<{
   kind: RunKind; query_text: string; label: string; summary: string;
-  result: unknown; stats: unknown; updated_at: string;
+  result: unknown; stats: unknown; updated_at: string; user_id?: string | null; project_id?: string | null;
 } | null> {
   if (!client) return null;
   try {
     const { data, error } = await client.database
       .from(TABLE)
-      .select("kind,query_text,label,summary,result,stats,updated_at")
+      .select("kind,query_text,label,summary,result,stats,updated_at,user_id,project_id")
       .eq("id", id)
       .limit(1);
     if (error || !data || data.length === 0) return null;
@@ -719,16 +721,16 @@ export async function getStatus(id: string, userId: string, locale?: string): Pr
   try {
     const { data, error } = await client.database
       .from(TABLE)
-      .select("status,progress,result,error,last_error,attempt_count,max_attempts,locked_at,started_at,finished_at,updated_at,user_id")
+      .select("id,kind,status,progress,result,error,last_error,attempt_count,max_attempts,locked_at,started_at,finished_at,updated_at,user_id,project_id")
       .eq("id", id)
       .eq("user_id", userId)
       .limit(1);
     if (error || !data || data.length === 0) return null;
     const r = data[0] as {
-      status?: string; progress?: unknown; result?: unknown; error?: string | null;
+      id?: string; kind?: RunKind; status?: string; progress?: unknown; result?: unknown; error?: string | null;
       last_error?: string | null; attempt_count?: number | null; max_attempts?: number | null;
       locked_at?: string | null; started_at?: string | null; finished_at?: string | null;
-      updated_at?: string | null;
+      updated_at?: string | null; user_id?: string | null; project_id?: string | null;
     };
     const normalized = {
       status: r.status ?? "done",
@@ -743,7 +745,17 @@ export async function getStatus(id: string, userId: string, locale?: string): Pr
       finished_at: r.finished_at ?? null,
       updated_at: r.updated_at ?? null,
     };
-    return { ...normalized, status_view: describeJobStatus(normalized, locale) as RunStatus["status_view"] };
+    return {
+      ...normalized,
+      clientDeliveryReportHref: buildClientDeliveryShareHref({
+        id,
+        kind: r.kind,
+        user_id: r.user_id,
+        project_id: r.project_id,
+        updated_at: r.updated_at,
+      }),
+      status_view: describeJobStatus(normalized, locale) as RunStatus["status_view"],
+    };
   } catch {
     return null;
   }

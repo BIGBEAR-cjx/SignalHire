@@ -11,8 +11,14 @@ import { buildCandidateGraph } from "./candidate-graph.mjs";
 import { buildLeadPreviewView } from "./lead-preview.mjs";
 import type { LeadPreviewView } from "./lead-preview";
 import { buildRoleOutreachSettings } from "./outreach-settings.mjs";
+import { buildRoleAgentMetricsSummary } from "./role-agent-metrics.mjs";
+import type { RoleAgentMetricEvent } from "./role-agent-metrics";
+import { buildClientDeliveryAuditEvent } from "./client-delivery-audit.mjs";
+import { buildClientDeliveryWeeklyArchiveRow } from "./client-delivery-weekly-archive.mjs";
+import type { ClientDeliveryWeeklyArchiveRow } from "./client-delivery-weekly-archive";
 import { buildPeopleProviderConfig, providerRowsToSourceLeads } from "./people-providers.mjs";
 import { buildReferralPathViews, normalizeNetworkSeed } from "./referral-paths.mjs";
+import { buildClientDeliveryShareHref, buildClientDeliveryShareToken } from "./report-share-access.mjs";
 import { listItems } from "./shortlist";
 
 const BASE = process.env.INSFORGE_API_BASE_URL;
@@ -20,6 +26,8 @@ const KEY = process.env.INSFORGE_API_KEY;
 const client = BASE && KEY ? createClient({ baseUrl: BASE, anonKey: KEY, isServerMode: true }) : null;
 
 const TABLE = "projects";
+const CLIENT_DELIVERY_AUDIT_TABLE = "client_delivery_audit_events";
+const CLIENT_DELIVERY_WEEKLY_ARCHIVE_TABLE = "client_delivery_weekly_archives";
 
 export type ProjectStatus = "open" | "paused" | "closed";
 export const PROJECT_STATUSES: ProjectStatus[] = ["open", "paused", "closed"];
@@ -173,6 +181,63 @@ export async function getProject(userId: string, id: string): Promise<ProjectWit
   };
 }
 
+export async function listClientPortalCandidateProjects(limit = 200): Promise<ProjectWithKpi[]> {
+  const rows = await runSQL<{
+    id: string; user_id: string; name: string; brief: string | null;
+    status: ProjectStatus; color: string | null;
+    inbox_sync_summary?: unknown;
+    outreach_settings?: unknown;
+    network_seeds?: unknown;
+    created_at: string; updated_at: string;
+    candidates_total: string; candidates_active: string;
+    runs_total: string; runs_active: string;
+  }>(
+    `SELECT
+        p.id, p.user_id, p.name, p.brief, p.status, p.color, p.inbox_sync_summary, p.outreach_settings, p.network_seeds, p.created_at, p.updated_at,
+        COALESCE(s.candidates_total, 0)  AS candidates_total,
+        COALESCE(s.candidates_active, 0) AS candidates_active,
+        COALESCE(r.runs_total, 0)        AS runs_total,
+        COALESCE(r.runs_active, 0)       AS runs_active
+     FROM projects p
+     LEFT JOIN (
+       SELECT user_id, project_id,
+         COUNT(*) AS candidates_total,
+         COUNT(*) FILTER (WHERE status NOT IN ('passed','hired','rejected')) AS candidates_active
+       FROM shortlist_items WHERE project_id IS NOT NULL
+       GROUP BY user_id, project_id
+     ) s ON s.user_id = p.user_id AND s.project_id = p.id
+     LEFT JOIN (
+       SELECT user_id, project_id,
+         COUNT(*) AS runs_total,
+         COUNT(*) FILTER (WHERE status IN ('queued','running','retrying')) AS runs_active
+       FROM research_runs WHERE project_id IS NOT NULL
+       GROUP BY user_id, project_id
+     ) r ON r.user_id = p.user_id AND r.project_id = p.id
+     WHERE p.outreach_settings->'client_delivery_access'->>'mode' = 'token_or_customer_account'
+     ORDER BY p.updated_at DESC
+     LIMIT $1`,
+    [Math.max(1, Math.min(500, Math.floor(Number(limit) || 200)))],
+  );
+  if (!rows) return [];
+  return rows.map((r) => ({
+    id: r.id,
+    user_id: r.user_id,
+    name: r.name,
+    brief: r.brief,
+    status: r.status,
+    color: r.color,
+    inbox_sync_summary: r.inbox_sync_summary ?? {},
+    outreach_settings: buildRoleOutreachSettings(r.outreach_settings),
+    network_seeds: normalizeProjectNetworkSeeds(r.network_seeds),
+    created_at: r.created_at,
+    updated_at: r.updated_at,
+    candidates_total: Number(r.candidates_total),
+    candidates_active: Number(r.candidates_active),
+    runs_total: Number(r.runs_total),
+    runs_active: Number(r.runs_active),
+  }));
+}
+
 export function normalizeProjectNetworkSeeds(value: unknown): unknown[] {
   const seeds = Array.isArray(value) ? value : [];
   return seeds
@@ -216,6 +281,197 @@ export async function recordProjectOutreachFollowUpSummary(input: {
   return true;
 }
 
+export async function recordProjectRoleAgentEvent(input: {
+  userId: string; id: string; event: RoleAgentMetricEvent;
+}): Promise<unknown | null> {
+  const project = await getProject(input.userId, input.id);
+  if (!project) return null;
+  const currentSummary = project.inbox_sync_summary && typeof project.inbox_sync_summary === "object" && !Array.isArray(project.inbox_sync_summary)
+    ? project.inbox_sync_summary as Record<string, unknown>
+    : {};
+  const roleAgentMetrics = buildRoleAgentMetricsSummary(currentSummary.role_agent_metrics, input.event);
+  const nextSummary = { ...currentSummary, role_agent_metrics: roleAgentMetrics };
+  await updateProjectInboxSyncSummary({ userId: input.userId, id: input.id, summary: nextSummary });
+  await recordClientDeliveryAuditEvent({
+    userId: input.userId,
+    projectId: input.id,
+    event: input.event,
+  });
+  return roleAgentMetrics;
+}
+
+export interface ClientDeliveryAuditEventRow {
+  id?: string;
+  user_id: string;
+  project_id: string;
+  event_type: "report_view" | "feedback" | string;
+  action_type: string;
+  report_href?: string | null;
+  actor?: string | null;
+  sentiment?: string | null;
+  note?: string | null;
+  detail?: string | null;
+  event_at: string;
+  created_at?: string;
+}
+
+export async function listClientDeliveryAuditEvents(input: {
+  userId: string;
+  projectId: string;
+  limit?: number;
+}): Promise<ClientDeliveryAuditEventRow[]> {
+  if (!client) return [];
+  try {
+    const { data, error } = await client.database
+      .from(CLIENT_DELIVERY_AUDIT_TABLE)
+      .select("id,user_id,project_id,event_type,action_type,report_href,actor,sentiment,note,detail,event_at,created_at")
+      .eq("user_id", input.userId)
+      .eq("project_id", input.projectId)
+      .order("event_at", { ascending: false })
+      .limit(Math.max(1, Math.min(100, Math.floor(Number(input.limit ?? 50)))));
+    if (error || !data) return [];
+    return data as ClientDeliveryAuditEventRow[];
+  } catch {
+    return [];
+  }
+}
+
+export async function listUserClientDeliveryAuditEvents(input: {
+  userId: string;
+  projectId?: string;
+  limit?: number;
+}): Promise<ClientDeliveryAuditEventRow[]> {
+  if (!client) return [];
+  try {
+    let query = client.database
+      .from(CLIENT_DELIVERY_AUDIT_TABLE)
+      .select("id,user_id,project_id,event_type,action_type,report_href,actor,sentiment,note,detail,event_at,created_at")
+      .eq("user_id", input.userId)
+      .order("event_at", { ascending: false })
+      .limit(Math.max(1, Math.min(500, Math.floor(Number(input.limit ?? 300)))));
+    if (input.projectId) query = query.eq("project_id", input.projectId);
+    const { data, error } = await query;
+    if (error || !data) return [];
+    return data as ClientDeliveryAuditEventRow[];
+  } catch {
+    return [];
+  }
+}
+
+export async function upsertProjectClientDeliveryWeeklyArchive(input: {
+  userId: string;
+  projectId: string;
+  items: unknown[];
+}): Promise<number> {
+  let saved = 0;
+  for (const item of Array.isArray(input.items) ? input.items : []) {
+    const row = buildClientDeliveryWeeklyArchiveRow({
+      userId: input.userId,
+      projectId: input.projectId,
+      item,
+    });
+    if (!row) continue;
+    const rows = await runSQL<{ archive_id: string }>(
+      `INSERT INTO ${CLIENT_DELIVERY_WEEKLY_ARCHIVE_TABLE} (
+        user_id, project_id, archive_id, week_start, week_end, label,
+        latest_report_id, latest_snapshot_id, metrics, risks, next_actions,
+        reports, latest_report_at, updated_at
+      )
+      VALUES ($1, $2, $3, $4::date, $5::date, $6, $7, $8, $9::jsonb, $10::jsonb, $11::jsonb, $12::jsonb, NULLIF($13, '')::timestamptz, now())
+      ON CONFLICT (user_id, project_id, archive_id)
+      DO UPDATE SET
+        week_start = EXCLUDED.week_start,
+        week_end = EXCLUDED.week_end,
+        label = EXCLUDED.label,
+        latest_report_id = EXCLUDED.latest_report_id,
+        latest_snapshot_id = EXCLUDED.latest_snapshot_id,
+        metrics = EXCLUDED.metrics,
+        risks = EXCLUDED.risks,
+        next_actions = EXCLUDED.next_actions,
+        reports = EXCLUDED.reports,
+        latest_report_at = EXCLUDED.latest_report_at,
+        updated_at = now()
+      RETURNING archive_id`,
+      [
+        row.user_id,
+        row.project_id,
+        row.archive_id,
+        row.week_start,
+        row.week_end,
+        row.label,
+        row.latest_report_id,
+        row.latest_snapshot_id,
+        JSON.stringify(row.metrics),
+        JSON.stringify(row.risks),
+        JSON.stringify(row.next_actions),
+        JSON.stringify(row.reports),
+        row.latest_report_at,
+      ],
+    );
+    if (rows?.length) saved += 1;
+  }
+  return saved;
+}
+
+export async function listProjectClientDeliveryWeeklyArchives(input: {
+  userId: string;
+  projectId: string;
+  limit?: number;
+}): Promise<ClientDeliveryWeeklyArchiveRow[]> {
+  const rows = await runSQL<ClientDeliveryWeeklyArchiveRow>(
+    `SELECT user_id, project_id, archive_id, week_start::text, week_end::text, label,
+       latest_report_id, latest_snapshot_id, metrics, risks, next_actions, reports,
+       COALESCE(latest_report_at::text, '') AS latest_report_at
+     FROM ${CLIENT_DELIVERY_WEEKLY_ARCHIVE_TABLE}
+     WHERE user_id = $1 AND project_id = $2
+     ORDER BY week_start DESC
+     LIMIT $3`,
+    [input.userId, input.projectId, Math.max(1, Math.min(100, Math.floor(Number(input.limit ?? 50))))],
+  );
+  return rows ?? [];
+}
+
+export async function listUserClientDeliveryWeeklyArchives(input: {
+  userId: string;
+  projectId?: string;
+  limit?: number;
+}): Promise<ClientDeliveryWeeklyArchiveRow[]> {
+  const params: unknown[] = [input.userId];
+  const projectClause = input.projectId ? "AND project_id = $2" : "";
+  if (input.projectId) params.push(input.projectId);
+  params.push(Math.max(1, Math.min(500, Math.floor(Number(input.limit ?? 300)))));
+  const limitParam = input.projectId ? "$3" : "$2";
+  const rows = await runSQL<ClientDeliveryWeeklyArchiveRow>(
+    `SELECT user_id, project_id, archive_id, week_start::text, week_end::text, label,
+       latest_report_id, latest_snapshot_id, metrics, risks, next_actions, reports,
+       COALESCE(latest_report_at::text, '') AS latest_report_at
+     FROM ${CLIENT_DELIVERY_WEEKLY_ARCHIVE_TABLE}
+     WHERE user_id = $1 ${projectClause}
+     ORDER BY week_start DESC
+     LIMIT ${limitParam}`,
+    params,
+  );
+  return rows ?? [];
+}
+
+async function recordClientDeliveryAuditEvent(input: {
+  userId: string;
+  projectId: string;
+  event: RoleAgentMetricEvent;
+}): Promise<boolean> {
+  if (!client) return false;
+  const auditEvent = buildClientDeliveryAuditEvent(input);
+  if (!auditEvent) return false;
+  try {
+    const { error } = await client.database
+      .from(CLIENT_DELIVERY_AUDIT_TABLE)
+      .insert(auditEvent);
+    return !error;
+  } catch {
+    return false;
+  }
+}
+
 export async function updateProjectOutreachSettings(input: {
   userId: string; id: string; settings: unknown;
 }): Promise<unknown | null> {
@@ -253,6 +509,7 @@ export async function createProject(input: {
   userId: string; name: string; brief?: string | null;
 }): Promise<Project | null> {
   if (!client) return null;
+  const roleAgentSettings = buildRoleOutreachSettings();
   try {
     const { data, error } = await client.database
       .from(TABLE)
@@ -261,6 +518,7 @@ export async function createProject(input: {
         name: input.name,
         brief: input.brief ?? null,
         status: "open",
+        outreach_settings: roleAgentSettings,
       })
       .select("*");
     if (error || !data || (data as Array<unknown>).length === 0) return null;
@@ -362,19 +620,27 @@ export interface ProjectRun {
   updated_at: string;
   progress?: unknown;
   result?: unknown;
+  user_id?: string | null;
+  project_id?: string | null;
+  client_delivery_share_token?: string;
+  clientDeliveryReportHref?: string;
 }
 export async function projectRuns(userId: string, projectId: string, limit = 50): Promise<ProjectRun[]> {
   if (!client) return [];
   try {
     const { data, error } = await client.database
       .from("research_runs")
-      .select("id,kind,label,summary,status,query_text,updated_at,progress,result")
+      .select("id,kind,label,summary,status,query_text,updated_at,progress,result,user_id,project_id")
       .eq("user_id", userId)
       .eq("project_id", projectId)
       .order("updated_at", { ascending: false })
       .limit(limit);
     if (error || !data) return [];
-    return data as ProjectRun[];
+    return (data as ProjectRun[]).map((run) => ({
+      ...run,
+      client_delivery_share_token: buildClientDeliveryShareToken(run),
+      clientDeliveryReportHref: buildClientDeliveryShareHref(run),
+    }));
   } catch {
     return [];
   }

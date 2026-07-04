@@ -168,7 +168,7 @@ function actionForClassification(item) {
 }
 
 function todayQueueRank(item) {
-  if (item.next_action === "schedule" && item.action_status !== "interview_ready") return 1;
+  if (item.next_action === "schedule" && !["interview_ready", "confirmed"].includes(item.action_status)) return 1;
   if (item.next_action === "reply" && item.action_status === "pending") return 2;
   if (item.next_action === "save_follow_up_draft" && item.action_status === "pending") return 3;
   if (item.next_action === "review" && item.action_status === "pending") return 4;
@@ -197,6 +197,49 @@ function buildTodayQueue(items) {
     })
     .filter((item) => item.today_rank > 0)
     .sort((a, b) => a.today_rank - b.today_rank || String(b.updated_at).localeCompare(String(a.updated_at)));
+}
+
+function calendarAvailabilityFromAction(actionState) {
+  const slot = isRecord(actionState?.calendar_slot) ? actionState.calendar_slot : {};
+  const status = actionState?.action_status === "slot_held" ? "slot_held" : "";
+  if (!status && !cleanString(slot.start)) return null;
+  return {
+    status: status || "available",
+    slots_count: cleanString(slot.start) ? 1 : 0,
+    last_checked_at: validIso(actionState?.action_applied_at),
+    slots: cleanString(slot.start) ? [slot] : [],
+  };
+}
+
+function interviewEventFromAction(actionState) {
+  const event = isRecord(actionState?.interview_event) ? actionState.interview_event : {};
+  const status = cleanString(event.status || (["confirmed", "rescheduled", "canceled"].includes(actionState?.action_status) ? actionState.action_status : ""));
+  if (!["confirmed", "rescheduled", "canceled"].includes(status)) return null;
+  const startsAt = validIso(event.starts_at);
+  const eventId = cleanString(event.calendar_event_id || actionState?.calendar_event_id);
+  if (!startsAt && !eventId) return null;
+  return {
+    status,
+    starts_at: startsAt,
+    ends_at: validIso(event.ends_at),
+    label: cleanString(event.label),
+    calendar_event_id: eventId,
+  };
+}
+
+function schedulingReadinessFromAction(actionState) {
+  const status = cleanString(actionState?.action_status);
+  if (["confirmed", "rescheduled", "canceled", "interview_ready"].includes(status)) return "interview_ready";
+  return "needs_scheduling";
+}
+
+function schedulingNextStep(item) {
+  if (item.saved_scheduling_draft) return "Review saved scheduling draft, then mark interview-ready.";
+  if (item.action_status === "slot_held") return "Confirm the held slot or send the scheduling draft to the candidate.";
+  if (item.action_status === "confirmed") return "Sync the confirmed interview into the client delivery loop.";
+  if (item.action_status === "rescheduled") return "Confirm the updated interview time with the hiring manager.";
+  if (item.action_status === "canceled") return "Reschedule the interview or stop progression.";
+  return item.scheduling_prompt || "Prepare a scheduling handoff for hiring review.";
 }
 
 function schedulingPacket(item) {
@@ -242,6 +285,8 @@ export function buildInboxQueue({ threads = [] } = {}) {
       const savedSchedulingDraft = actionState?.action === "save_scheduling_draft" && actionState?.action_status === "draft_saved"
         ? cleanString(actionState.scheduling_message)
         : "";
+      const calendarAvailability = calendarAvailabilityFromAction(actionState);
+      const interviewEvent = interviewEventFromAction(actionState);
       const item = {
         id: cleanString(thread.id),
         candidate_name: cleanString(thread.candidate_name) || "Unknown candidate",
@@ -257,6 +302,12 @@ export function buildInboxQueue({ threads = [] } = {}) {
         outreach_thread_id: cleanString(thread.outreach_thread_id),
         action_state: actionState,
         saved_scheduling_draft: savedSchedulingDraft,
+        calendar_availability: calendarAvailability,
+        interview_event: interviewEvent,
+        message_history: isRecord(thread.message_history) ? thread.message_history : {
+          summary: { outbound: 0, inbound: 0, system: 0, total: 0 },
+          messages: [],
+        },
         action_status: actionState?.action_status || defaultActionStatus({
           action: actionState?.action,
           outreachStatus: thread.outreach_status || thread.status,
@@ -269,10 +320,8 @@ export function buildInboxQueue({ threads = [] } = {}) {
     .filter((item) => item.classification === "interested")
     .map((item) => ({
       ...item,
-      readiness: "needs_scheduling",
-      recommended_next_step: item.saved_scheduling_draft
-        ? "Review saved scheduling draft, then mark interview-ready."
-        : item.scheduling_prompt || "Prepare a scheduling handoff for hiring review.",
+      readiness: schedulingReadinessFromAction(item.action_state),
+      recommended_next_step: schedulingNextStep(item),
       scheduling_packet: schedulingPacket(item),
     }));
   return {
@@ -280,7 +329,9 @@ export function buildInboxQueue({ threads = [] } = {}) {
       total: items.length,
       interested: interested_candidates.length,
       needs_human_reply: items.filter(needsHumanReply).length,
-      needs_scheduling: items.filter((item) => item.next_action === "schedule" && item.action_status !== "interview_ready").length,
+      needs_scheduling: items.filter((item) => item.next_action === "schedule" && !["interview_ready", "confirmed"].includes(item.action_status)).length,
+      confirmed: items.filter((item) => item.action_status === "confirmed" || item.interview_event?.status === "confirmed").length,
+      canceled: items.filter((item) => item.action_status === "canceled" || item.interview_event?.status === "canceled").length,
       needs_reply: items.filter((item) => item.next_action === "reply" && item.action_status === "pending").length,
       due_follow_up: items.filter((item) => item.next_action === "save_follow_up_draft" && item.action_status === "pending").length,
       follow_up_later: items.filter((item) => item.next_action === "follow_up_later" && item.action_status !== "scheduled").length,

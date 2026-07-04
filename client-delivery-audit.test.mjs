@@ -1,0 +1,64 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import { buildClientDeliveryAuditEvent } from "./web/lib/client-delivery-audit.mjs";
+
+test("builds a persistent audit event for client report views", () => {
+  const audit = buildClientDeliveryAuditEvent({
+    userId: "user-1",
+    projectId: "project-1",
+    event: {
+      event_type: "client_report_view",
+      action_type: "shareable_client_delivery_loop",
+      detail: "/r/run-1?lang=en&t=token-1",
+      at: "2026-07-03T14:00:00.000Z",
+    },
+  });
+
+  assert.deepEqual(audit, {
+    user_id: "user-1",
+    project_id: "project-1",
+    event_type: "report_view",
+    action_type: "shareable_client_delivery_loop",
+    report_href: "/r/run-1?lang=en&t=token-1",
+    actor: "Client",
+    sentiment: "",
+    note: "",
+    detail: "/r/run-1?lang=en&t=token-1",
+    event_at: "2026-07-03T14:00:00.000Z",
+  });
+});
+
+test("builds a persistent audit event for client delivery feedback", () => {
+  const audit = buildClientDeliveryAuditEvent({
+    userId: "user-1",
+    projectId: "project-1",
+    event: {
+      event_type: "manager_feedback",
+      action_type: "client_delivery_feedback",
+      detail: "Client feedback: needs_more_candidates by Client - Need more staff engineers. (/r/run-2?lang=en&t=token-2)",
+      at: "2026-07-03T14:05:00.000Z",
+    },
+  });
+
+  assert.equal(audit?.event_type, "feedback");
+  assert.equal(audit?.action_type, "client_delivery_feedback");
+  assert.equal(audit?.report_href, "/r/run-2?lang=en&t=token-2");
+  assert.equal(audit?.actor, "Client");
+  assert.equal(audit?.sentiment, "needs_more_candidates");
+  assert.equal(audit?.note, "Need more staff engineers.");
+  assert.equal(audit?.event_at, "2026-07-03T14:05:00.000Z");
+});
+
+test("ignores non-client-delivery role agent events", () => {
+  const audit = buildClientDeliveryAuditEvent({
+    userId: "user-1",
+    projectId: "project-1",
+    event: {
+      event_type: "next_action_click",
+      action_type: "resolve_contacts",
+      at: "2026-07-03T14:10:00.000Z",
+    },
+  });
+
+  assert.equal(audit, null);
+});

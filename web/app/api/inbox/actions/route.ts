@@ -1,4 +1,5 @@
 import { getOutreachThread, updateOutreachThread } from "@/lib/outreach-threads";
+import { cancelCalendarInterviewEvent, createCalendarInterviewEvent, updateCalendarInterviewEvent } from "@/lib/gmail";
 import { runInboxAction } from "@/lib/inbox-actions-route.mjs";
 import { getUser } from "@/lib/session";
 
@@ -13,6 +14,9 @@ export async function POST(req: Request) {
     user,
     getOutreachThread,
     updateOutreachThread,
+    createCalendarEvent: createCalendarInterviewEvent,
+    updateCalendarEvent: updateCalendarInterviewEvent,
+    cancelCalendarEvent: cancelCalendarInterviewEvent,
   });
   return Response.json(result.body, { status: result.status });
 }

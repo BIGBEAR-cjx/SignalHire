@@ -8,6 +8,7 @@ import {
   buildProjectReferralPathView,
   deleteProject,
   getProject,
+  listClientDeliveryAuditEvents,
   projectCandidateBreakdown,
   projectRuns,
   PROJECT_STATUSES,
@@ -34,13 +35,14 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
   const { id } = await ctx.params;
   if (!id) return Response.json({ error: t(locale, "api.error.missingId") }, { status: 400 });
 
-  const [project, breakdown, runs, searchTasks, outreachQueue, outreachThreads] = await Promise.all([
+  const [project, breakdown, runs, searchTasks, outreachQueue, outreachThreads, clientDeliveryAuditEvents] = await Promise.all([
     getProject(user.id, id),
     projectCandidateBreakdown(user.id, id),
     projectRuns(user.id, id, 30),
     listSearchTasks({ userId: user.id, projectId: id }),
     listOutreachQueue({ userId: user.id, projectId: id }),
     listOutreachThreads({ userId: user.id, projectId: id }),
+    listClientDeliveryAuditEvents({ userId: user.id, projectId: id, limit: 50 }),
   ]);
   if (!project) return Response.json({ error: t(locale, "api.error.projectNotFound") }, { status: 404 });
   await Promise.all(runs
@@ -70,6 +72,7 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
     searchTasks,
     outreachQueue,
     inboxQueue,
+    clientDeliveryAuditEvents,
     candidateGraph,
     leadPreview,
     referralPaths,

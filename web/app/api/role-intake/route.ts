@@ -1,4 +1,5 @@
 import { buildRoleBriefDraft } from "@/lib/talent-profile.mjs";
+import { buildRoleOutreachSettings } from "@/lib/outreach-settings.mjs";
 import { normalizeLocale, t } from "@/lib/i18n.mjs";
 import { getUser } from "@/lib/session";
 
@@ -98,9 +99,11 @@ export async function POST(req: Request) {
     ? await fetchRoleSourceText(value)
     : { ok: true, text: value, status: "provided", error: "" };
   const draft = buildRoleBrief(extraction.text || value, { locale, sourceType });
+  const roleAgentDefaults = buildRoleOutreachSettings();
   return Response.json({
     draft: {
       ...draft,
+      role_agent_defaults: roleAgentDefaults,
       intake_source: {
         ...draft.intake_source,
         value,
@@ -111,5 +114,6 @@ export async function POST(req: Request) {
         error: extraction.error,
       },
     },
+    role_agent_defaults: roleAgentDefaults,
   });
 }

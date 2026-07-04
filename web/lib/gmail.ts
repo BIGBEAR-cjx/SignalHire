@@ -1,5 +1,5 @@
 import { createClient } from "@insforge/sdk";
-import { buildCalendarFreeBusyRequest, calendarScopeStatus, slotsFromFreeBusy } from "./calendar-availability.mjs";
+import { buildCalendarEventDeleteRequest, buildCalendarEventInsertRequest, buildCalendarEventPatchRequest, buildCalendarFreeBusyRequest, calendarScopeStatus, slotsFromFreeBusy } from "./calendar-availability.mjs";
 import { primarySendableEmail } from "./contact-profile.mjs";
 import { buildGmailAuthUrl, buildGmailDraftPayload, buildGmailRawMessage, buildGmailSendPayload, decryptTokenBundle, encryptTokenBundle, validateInboxDraftSend, validateOutreachSend } from "./gmail-outreach.mjs";
 import { refreshGmailTokenBundle } from "./gmail-token.mjs";
@@ -16,6 +16,7 @@ const GMAIL_SEND_URL = "https://gmail.googleapis.com/gmail/v1/users/me/messages/
 const GMAIL_DRAFT_URL = "https://gmail.googleapis.com/gmail/v1/users/me/drafts";
 const GMAIL_THREAD_URL = "https://gmail.googleapis.com/gmail/v1/users/me/threads";
 const CALENDAR_FREEBUSY_URL = "https://www.googleapis.com/calendar/v3/freeBusy";
+const CALENDAR_EVENT_INSERT_URL = "https://www.googleapis.com/calendar/v3/calendars";
 
 type GmailTokenBundle = {
   access_token?: string;
@@ -126,6 +127,7 @@ export async function getGmailConnectionStatus(userId: string) {
     scope: connection?.scope ?? "",
     can_read_inbox: Boolean(connection?.scope?.includes("gmail.readonly")),
     can_read_calendar: calendar.can_read_calendar,
+    can_create_calendar_event: calendar.can_create_calendar_event,
     expires_at: connection?.expires_at ?? null,
   };
 }
@@ -337,6 +339,132 @@ export async function getCalendarAvailability(input: {
   } catch (error) {
     const reason = error instanceof Error && error.message === "gmail_reconnect_required" ? "gmail_reconnect_required" : "calendar_freebusy_failed";
     return { ok: false, skipped_reason: reason, slots: [] };
+  }
+}
+
+export async function createCalendarInterviewEvent(input: {
+  userId: string;
+  thread: OutreachThread;
+  calendar_slot?: { start?: string; end?: string; label?: string };
+  scheduling_message?: string;
+}) {
+  const connection = await findConnection(input.userId);
+  if (!connection) return { ok: false, error: "gmail_not_connected" };
+  const scope = calendarScopeStatus(connection.scope);
+  if (!scope.can_create_calendar_event) return { ok: false, error: "calendar_event_scope_missing" };
+  const email = primarySendableEmail(input.thread.contact_profile as never);
+  if (!email) return { ok: false, error: "missing_sendable_email" };
+  const slot = input.calendar_slot ?? {};
+  if (!String(slot.start ?? "").trim() || !String(slot.end ?? "").trim()) return { ok: false, error: "missing_calendar_slot" };
+  try {
+    const request = buildCalendarEventInsertRequest({
+      accessToken: await accessTokenFor(connection),
+      url: CALENDAR_EVENT_INSERT_URL,
+      candidateName: input.thread.candidate_name,
+      candidateEmail: email.value,
+      calendarSlot: slot,
+      description: input.scheduling_message || "Confirmed from SignalHire.",
+      sendUpdates: "all",
+    });
+    const response = await fetch(request.url, {
+      method: request.method,
+      headers: request.headers,
+      body: request.body,
+    });
+    const json = await response.json().catch(() => ({})) as Record<string, unknown>;
+    if (!response.ok) return { ok: false, error: "calendar_event_create_failed" };
+    return {
+      ok: true,
+      event: {
+        id: typeof json.id === "string" ? json.id : "",
+        htmlLink: typeof json.htmlLink === "string" ? json.htmlLink : "",
+        starts_at: typeof (json.start as { dateTime?: unknown } | undefined)?.dateTime === "string" ? (json.start as { dateTime: string }).dateTime : String(slot.start ?? ""),
+        ends_at: typeof (json.end as { dateTime?: unknown } | undefined)?.dateTime === "string" ? (json.end as { dateTime: string }).dateTime : String(slot.end ?? ""),
+      },
+    };
+  } catch (error) {
+    const reason = error instanceof Error && error.message === "gmail_reconnect_required" ? "gmail_reconnect_required" : "calendar_event_create_failed";
+    return { ok: false, error: reason };
+  }
+}
+
+export async function updateCalendarInterviewEvent(input: {
+  userId: string;
+  thread: OutreachThread;
+  calendar_event_id?: string;
+  calendar_slot?: { start?: string; end?: string; label?: string };
+  scheduling_message?: string;
+}) {
+  const connection = await findConnection(input.userId);
+  if (!connection) return { ok: false, error: "gmail_not_connected" };
+  const scope = calendarScopeStatus(connection.scope);
+  if (!scope.can_create_calendar_event) return { ok: false, error: "calendar_event_scope_missing" };
+  if (!String(input.calendar_event_id ?? "").trim()) return { ok: false, error: "missing_calendar_event_id" };
+  const slot = input.calendar_slot ?? {};
+  if (!String(slot.start ?? "").trim() || !String(slot.end ?? "").trim()) return { ok: false, error: "missing_calendar_slot" };
+  try {
+    const request = buildCalendarEventPatchRequest({
+      accessToken: await accessTokenFor(connection),
+      url: CALENDAR_EVENT_INSERT_URL,
+      calendarEventId: input.calendar_event_id,
+      calendarSlot: slot,
+      description: input.scheduling_message || "Rescheduled from SignalHire.",
+      sendUpdates: "all",
+    });
+    const response = await fetch(request.url, {
+      method: request.method,
+      headers: request.headers,
+      body: request.body,
+    });
+    const json = await response.json().catch(() => ({})) as Record<string, unknown>;
+    if (!response.ok) return { ok: false, error: "calendar_event_update_failed" };
+    return {
+      ok: true,
+      event: {
+        id: typeof json.id === "string" ? json.id : String(input.calendar_event_id),
+        htmlLink: typeof json.htmlLink === "string" ? json.htmlLink : "",
+        starts_at: typeof (json.start as { dateTime?: unknown } | undefined)?.dateTime === "string" ? (json.start as { dateTime: string }).dateTime : String(slot.start ?? ""),
+        ends_at: typeof (json.end as { dateTime?: unknown } | undefined)?.dateTime === "string" ? (json.end as { dateTime: string }).dateTime : String(slot.end ?? ""),
+      },
+    };
+  } catch (error) {
+    const reason = error instanceof Error && error.message === "gmail_reconnect_required" ? "gmail_reconnect_required" : "calendar_event_update_failed";
+    return { ok: false, error: reason };
+  }
+}
+
+export async function cancelCalendarInterviewEvent(input: {
+  userId: string;
+  thread: OutreachThread;
+  calendar_event_id?: string;
+}) {
+  const connection = await findConnection(input.userId);
+  if (!connection) return { ok: false, error: "gmail_not_connected" };
+  const scope = calendarScopeStatus(connection.scope);
+  if (!scope.can_create_calendar_event) return { ok: false, error: "calendar_event_scope_missing" };
+  if (!String(input.calendar_event_id ?? "").trim()) return { ok: false, error: "missing_calendar_event_id" };
+  try {
+    const request = buildCalendarEventDeleteRequest({
+      accessToken: await accessTokenFor(connection),
+      url: CALENDAR_EVENT_INSERT_URL,
+      calendarEventId: input.calendar_event_id,
+      sendUpdates: "all",
+    });
+    const response = await fetch(request.url, {
+      method: request.method,
+      headers: request.headers,
+    });
+    if (!response.ok) return { ok: false, error: "calendar_event_cancel_failed" };
+    return {
+      ok: true,
+      event: {
+        id: String(input.calendar_event_id),
+        status: "canceled",
+      },
+    };
+  } catch (error) {
+    const reason = error instanceof Error && error.message === "gmail_reconnect_required" ? "gmail_reconnect_required" : "calendar_event_cancel_failed";
+    return { ok: false, error: reason };
   }
 }
 

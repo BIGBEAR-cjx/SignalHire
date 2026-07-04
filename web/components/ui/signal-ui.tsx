@@ -5,6 +5,7 @@ import {
   FiCheckCircle,
   FiClock,
   FiClipboard,
+  FiFileText,
   FiX,
   FiFolder,
   FiHome,
@@ -25,6 +26,7 @@ export type AppNavItem = {
 export const APP_NAV: AppNavItem[] = [
   { href: "/app", labelKey: "nav.overview", shortLabelKey: "nav.overview", Icon: FiHome },
   { href: "/app/projects", labelKey: "nav.projects", shortLabelKey: "nav.projects", Icon: FiFolder },
+  { href: "/app/client-delivery", labelKey: "nav.clientDelivery", shortLabelKey: "nav.clientDelivery", Icon: FiFileText },
   { href: "/app/search", labelKey: "nav.search", shortLabelKey: "nav.search", Icon: FiSearch },
   { href: "/app/verify", labelKey: "nav.verify", shortLabelKey: "nav.verify", Icon: FiCheckCircle },
   { href: "/app/shortlist", labelKey: "nav.shortlist", shortLabelKey: "nav.shortlist", Icon: FiClipboard },

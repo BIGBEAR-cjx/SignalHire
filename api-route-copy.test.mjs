@@ -2,6 +2,20 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
 
+function extractFunctionSource(source, name) {
+  const start = source.indexOf(`async function ${name}`);
+  if (start === -1) return "";
+  const bodyStart = source.indexOf("{", start);
+  if (bodyStart === -1) return "";
+  let depth = 0;
+  for (let i = bodyStart; i < source.length; i += 1) {
+    if (source[i] === "{") depth += 1;
+    if (source[i] === "}") depth -= 1;
+    if (depth === 0) return source.slice(start, i + 1);
+  }
+  return "";
+}
+
 test("search and verify API error responses stay locale-keyed", () => {
   for (const file of ["web/app/api/search/route.ts", "web/app/api/verify/route.ts"]) {
     const source = readFileSync(file, "utf8");
@@ -180,7 +194,7 @@ test("outreach follow-up cron saves review drafts without Gmail auto-send", () =
   assert.match(projects, /buildRoleOutreachSettings\(r\.outreach_settings\)/);
   assert.match(settingsRoute, /updateProjectOutreachSettings/);
   assert.match(projectPage, /persistedSettings/);
-  assert.match(projectPage, /\/api\/projects\/\$\{projectId\}\/outreach-settings/);
+  assert.match(projectPage, /\/api\/projects\/\$\{(?:projectId|project\.id)\}\/outreach-settings/);
   assert.doesNotMatch(projectPage, /localStorage\.setItem\(`signalhire:outreach-settings/);
 });
 
@@ -295,6 +309,19 @@ test("search intake exposes low-friction role inputs and avoids contact unlock",
   assert.doesNotMatch(`${researchTool}\n${resultComponents}`, /Get email -10|contact enrichment|联系方式富集|commercial_action/);
 });
 
+test("one-prompt role creation activates default Role Agent settings", () => {
+  const projects = readFileSync("web/lib/projects.ts", "utf8");
+  const roleIntakeRoute = readFileSync("web/app/api/role-intake/route.ts", "utf8");
+  const outreachSettings = readFileSync("web/lib/outreach-settings.mjs", "utf8");
+
+  assert.match(projects, /const roleAgentSettings = buildRoleOutreachSettings\(\)/);
+  assert.match(projects, /outreach_settings: roleAgentSettings/);
+  assert.match(roleIntakeRoute, /role_agent_defaults/);
+  assert.match(roleIntakeRoute, /buildRoleOutreachSettings\(\)/);
+  assert.match(outreachSettings, /agent_status: agentStatus === "paused" \? "paused" : "active"/);
+  assert.match(outreachSettings, /capacity_goal: normalizeCapacityGoal/);
+});
+
 test("role workspace exposes PRD candidate statuses and run candidate ingestion", () => {
   const shortlist = readFileSync("web/lib/shortlist.ts", "utf8");
   const projects = readFileSync("web/lib/projects.ts", "utf8");
@@ -364,15 +391,148 @@ test("Lessie-inspired recruiting flow exposes preview, source mix, and follow-up
 test("public report renders SignalHire Smart Report before candidate details", () => {
   const resultComponents = readFileSync("web/components/result.tsx", "utf8");
   const reportPage = readFileSync("web/app/r/[id]/page.tsx", "utf8");
+  const dbSource = readFileSync("web/lib/db.ts", "utf8");
+  const projectSource = readFileSync("web/lib/projects.ts", "utf8");
+  const projectPage = readFileSync("web/app/app/projects/[id]/page.tsx", "utf8");
+  const researchTool = readFileSync("web/components/ResearchTool.tsx", "utf8");
+  const reportFeedbackRoute = readFileSync("web/app/api/reports/[id]/feedback/route.ts", "utf8");
+  const reportFeedbackForm = readFileSync("web/components/ClientReportFeedbackForm.tsx", "utf8");
 
   assert.match(resultComponents, /buildSmartReportView/);
+  assert.match(resultComponents, /export function ClientDeliveryLoopPanel/);
+  assert.match(resultComponents, /Client Delivery Loop|客户持续交付/);
   assert.match(resultComponents, /export function SmartReportPanel/);
   assert.match(resultComponents, /Smart Report|智能交付报告/);
   assert.match(resultComponents, /Ready for outreach|可外联/);
   assert.match(resultComponents, /referral_summary/);
   assert.match(resultComponents, /Warm intro paths|可尝试引荐路径/);
   assert.match(reportPage, /SmartReportPanel/);
+  assert.match(reportPage, /ClientDeliveryLoopPanel/);
+  assert.match(reportPage, /ClientDeliverySnapshotPanel/);
+  assert.match(reportPage, /ClientDeliveryVersionHistoryPanel/);
+  assert.match(reportPage, /ClientDeliveryWeeklyArchivePanel/);
+  assert.ok(reportPage.indexOf("ClientDeliveryLoopPanel") < reportPage.indexOf("SmartReportPanel"));
+  assert.match(reportPage, /buildProjectShareDeliveryView/);
+  assert.match(reportPage, /projectRuns/);
+  assert.match(reportPage, /buildClientDeliverySnapshot/);
+  assert.match(reportPage, /buildClientDeliveryVersionHistory/);
+  assert.match(reportPage, /buildClientDeliveryWeeklyArchive/);
+  assert.match(reportPage, /buildClientDeliveryWeeklyArchiveFromRows/);
+  assert.match(reportPage, /listProjectClientDeliveryWeeklyArchives/);
+  assert.match(reportPage, /upsertProjectClientDeliveryWeeklyArchive/);
+  assert.match(projectSource, /client_delivery_weekly_archives/);
+  assert.match(projectSource, /upsertProjectClientDeliveryWeeklyArchive/);
+  assert.match(projectSource, /listProjectClientDeliveryWeeklyArchives/);
+  assert.match(reportPage, /attachClientDeliveryLoopSnapshot/);
+  assert.match(reportPage, /buildRoleAgentWorkspaceView/);
+  assert.match(reportPage, /recordProjectRoleAgentEvent/);
+  assert.match(reportPage, /client_report_view/);
+  assert.match(reportPage, /verifyClientDeliveryShareAccess/);
+  assert.match(reportPage, /searchParams: Promise<\{ lang\?: string; t\?: string \}>/);
+  assert.match(reportPage, /invalid_share_token/);
+  assert.match(reportPage, /ClientReportFeedbackForm/);
+  assert.match(reportPage, /client_delivery_visibility/);
+  assert.match(reportPage, /visibility\.delivery_loop/);
+  assert.match(reportPage, /visibility\.smart_report/);
+  assert.match(reportPage, /visibility\.candidate_details/);
+  assert.match(reportPage, /visibility\.feedback_form/);
+  assert.match(reportPage, /deliverySnapshot\.snapshot_id/);
+  assert.match(reportPage, /versionHistory\.items\.length/);
+  assert.match(projectSource, /buildClientDeliveryShareToken/);
+  assert.match(projectSource, /client_delivery_share_token/);
+  assert.match(projectPage, /round\.clientDeliveryReportHref/);
+  assert.match(projectPage, /\\?t=/);
+  assert.match(dbSource, /clientDeliveryReportHref/);
+  assert.match(researchTool, /clientDeliveryReportHref/);
+  assert.match(researchTool, /clientDeliveryShareHref/);
+  assert.match(resultComponents, /Confirmed|已确认/);
+  assert.match(dbSource, /user_id,project_id/);
   assert.match(reportPage, /<SmartReportPanel result=\{talentResult\} locale=\{locale\} \/>/);
+  assert.match(reportFeedbackRoute, /verifyClientDeliveryShareAccess/);
+  assert.match(reportFeedbackRoute, /buildClientReportFeedbackEvent/);
+  assert.match(reportFeedbackRoute, /recordProjectRoleAgentEvent/);
+  assert.match(reportFeedbackRoute, /client_delivery_feedback/);
+  assert.match(reportFeedbackForm, /\/api\/reports\/\$\{reportId\}\/feedback/);
+  assert.match(reportFeedbackForm, /manager_feedback/);
+  assert.match(reportFeedbackForm, /needs_more_candidates|ready_to_interview/);
+  assert.match(projectPage, /client_feedback_audit/);
+  assert.match(projectPage, /client_feedback_audit\.history/);
+  assert.match(projectPage, /client_delivery_audit/);
+  assert.match(projectPage, /client_delivery_audit\.timeline/);
+  assert.match(projectPage, /Client delivery audit|客户交付审计/);
+  assert.match(projectPage, /Client feedback|客户反馈/);
+  assert.match(projectPage, /View report|查看报告/);
+  assert.match(projectPage, /client_delivery_visibility/);
+  assert.match(projectPage, /Client-visible report fields|客户可见报告字段/);
+});
+
+test("client delivery audit center exposes dashboard page API and export", () => {
+  const nav = readFileSync("web/components/ui/signal-ui.tsx", "utf8");
+  const appPage = readFileSync("web/app/app/client-delivery/page.tsx", "utf8");
+  const auditRoute = readFileSync("web/app/api/client-delivery/audit/route.ts", "utf8");
+  const exportRoute = readFileSync("web/app/api/client-delivery/audit/export/route.ts", "utf8");
+  const center = readFileSync("web/lib/client-delivery-audit-center.mjs", "utf8");
+  const projects = readFileSync("web/lib/projects.ts", "utf8");
+
+  assert.match(nav, /\/app\/client-delivery/);
+  assert.match(nav, /nav\.clientDelivery/);
+  assert.match(appPage, /Client delivery audit|客户交付审计/);
+  assert.match(appPage, /\/api\/client-delivery\/audit/);
+  assert.match(appPage, /\/api\/client-delivery\/audit\/export/);
+  assert.match(appPage, /weekly_archives/);
+  assert.match(auditRoute, /buildClientDeliveryAuditCenterView/);
+  assert.match(auditRoute, /listUserClientDeliveryAuditEvents/);
+  assert.match(auditRoute, /listUserClientDeliveryWeeklyArchives/);
+  assert.match(exportRoute, /buildClientDeliveryAuditCenterCsv/);
+  assert.match(exportRoute, /Content-Disposition/);
+  assert.match(center, /project,event_type,actor,sentiment,note,report_href,event_at,archive_id,week_start,week_end,latest_report_id/);
+  assert.match(projects, /listUserClientDeliveryAuditEvents/);
+  assert.match(projects, /listUserClientDeliveryWeeklyArchives/);
+});
+
+test("client portal account access is enforced for share reports and feedback", () => {
+  const access = readFileSync("web/lib/report-share-access.mjs", "utf8");
+  const settings = readFileSync("web/lib/outreach-settings.mjs", "utf8");
+  const reportPage = readFileSync("web/app/r/[id]/page.tsx", "utf8");
+  const feedbackRoute = readFileSync("web/app/api/reports/[id]/feedback/route.ts", "utf8");
+
+  assert.match(access, /normalizeClientDeliveryAccessPolicy/);
+  assert.match(access, /verifyClientDeliveryCustomerAccountAccess/);
+  assert.match(settings, /client_delivery_access/);
+  assert.match(reportPage, /getUser/);
+  assert.match(reportPage, /verifyClientDeliveryShareAccess\(row, t,[\s\S]{0,220}viewer/);
+  assert.match(feedbackRoute, /verifyClientDeliveryShareAccess\(row \? \{ \.\.\.row, id \} : null, token,[\s\S]{0,220}accessPolicy/);
+});
+
+test("live signal provider cron and background role agent runs are wired", () => {
+  const config = readFileSync("web/vercel.json", "utf8");
+  const liveSignalRoute = readFileSync("web/app/api/cron/live-signals/route.ts", "utf8");
+  const liveSignalRunner = readFileSync("web/lib/live-signal-refresh.ts", "utf8");
+  const roleAgentRoute = readFileSync("web/app/api/projects/[id]/role-agent-runs/route.ts", "utf8");
+  const roleAgentRunner = readFileSync("web/lib/role-agent-runner.ts", "utf8");
+  const projectPage = readFileSync("web/app/app/projects/[id]/page.tsx", "utf8");
+
+  assert.match(config, /"path": "\/api\/cron\/live-signals"/);
+  assert.match(liveSignalRoute, /refreshDueLiveSignals/);
+  assert.match(liveSignalRoute, /CRON_SECRET/);
+  assert.match(liveSignalRunner, /buildRoleAgentWorkspaceView/);
+  assert.match(roleAgentRoute, /runRoleAgentProjectAction/);
+  assert.match(roleAgentRunner, /runRoleAgentRunCore/);
+  assert.match(projectPage, /\/api\/projects\/\$\{project\.id\}\/role-agent-runs/);
+});
+
+test("inbox-to-interview pipeline exposes two-sided message history", () => {
+  const messageHistory = readFileSync("web/lib/message-history.mjs", "utf8");
+  const inbox = readFileSync("web/lib/inbox.ts", "utf8");
+  const inboxAgent = readFileSync("web/lib/inbox-agent.mjs", "utf8");
+  const workspace = readFileSync("web/lib/role-agent-workspace.mjs", "utf8");
+  const projectPage = readFileSync("web/app/app/projects/[id]/page.tsx", "utf8");
+
+  assert.match(messageHistory, /buildTwoSidedMessageHistory/);
+  assert.match(inbox, /buildTwoSidedMessageHistory/);
+  assert.match(inboxAgent, /message_history/);
+  assert.match(workspace, /message_history/);
+  assert.match(projectPage, /Message history|消息历史/);
 });
 
 test("claims expose a unified supplement-material entry", () => {
@@ -664,7 +824,9 @@ test("Gmail integration routes and send route stay server-side and scope-limited
   assert.match(pureLib, /gmail\.send/);
   assert.match(pureLib, /gmail\.readonly/);
   assert.match(pureLib, /calendar\.freebusy/);
+  assert.match(pureLib, /calendar\.events/);
   assert.match(gmailLib, /can_read_calendar/);
+  assert.match(gmailLib, /can_create_calendar_event/);
   assert.doesNotMatch(pureLib, /gmail\.modify/);
   assert.match(tokenLib, /gmail_reconnect_required/);
   assert.doesNotMatch(tokenLib, /console\.log|console\.error/);
@@ -717,6 +879,54 @@ test("persistent scheduling draft state saves generated draft before interview-r
   assert.match(projectPage, /Saving this draft does not send email or create a calendar invite/);
   assert.match(projectPage, /保存草稿不会发送邮件，也不会创建日历邀请/);
   assert.doesNotMatch(saveFn, /\/send|\/api\/inbox\/actions\/send|calendar\/v3\/events|\/events/);
+});
+
+test("calendar slot hold and confirmed writeback stay in inbox action state", () => {
+  const inboxActions = readFileSync("web/lib/inbox-actions.mjs", "utf8");
+  const inboxAgent = readFileSync("web/lib/inbox-agent.mjs", "utf8");
+  const projectPage = readFileSync("web/app/app/projects/[id]/page.tsx", "utf8");
+  const route = readFileSync("web/lib/inbox-actions-route.mjs", "utf8");
+  const apiRoute = readFileSync("web/app/api/inbox/actions/route.ts", "utf8");
+  const gmailLib = readFileSync("web/lib/gmail.ts", "utf8");
+  const holdFn = projectPage.match(/async function holdCalendarSlot[\s\S]*?\n  }/)?.[0] ?? "";
+  const confirmFn = projectPage.match(/async function confirmInterviewEvent[\s\S]*?\n  }/)?.[0] ?? "";
+  const rescheduleFn = projectPage.match(/async function rescheduleInterviewEvent[\s\S]*?\n  }/)?.[0] ?? "";
+  const cancelFn = projectPage.match(/async function cancelInterviewEvent[\s\S]*?\n  }/)?.[0] ?? "";
+
+  assert.match(inboxActions, /hold_calendar_slot/);
+  assert.match(inboxActions, /confirm_interview_event/);
+  assert.match(inboxActions, /reschedule_interview_event/);
+  assert.match(inboxActions, /cancel_interview_event/);
+  assert.match(inboxActions, /slot_held/);
+  assert.match(inboxActions, /rescheduled/);
+  assert.match(inboxActions, /canceled/);
+  assert.match(inboxActions, /calendar_event_id/);
+  assert.match(inboxAgent, /calendarAvailabilityFromAction/);
+  assert.match(inboxAgent, /interviewEventFromAction/);
+  assert.match(projectPage, /Hold first slot/);
+  assert.match(projectPage, /暂留首个时间/);
+  assert.match(projectPage, /Confirm interview/);
+  assert.match(projectPage, /确认面试/);
+  assert.match(projectPage, /Reschedule event/);
+  assert.match(projectPage, /改期事件/);
+  assert.match(projectPage, /Cancel event/);
+  assert.match(projectPage, /取消事件/);
+  assert.match(route, /calendar_slot: body\.calendar_slot/);
+  assert.match(route, /calendar_event_id: calendarEventId/);
+  assert.match(route, /createCalendarEvent/);
+  assert.match(route, /updateCalendarEvent/);
+  assert.match(route, /cancelCalendarEvent/);
+  assert.match(apiRoute, /createCalendarInterviewEvent/);
+  assert.match(apiRoute, /updateCalendarInterviewEvent/);
+  assert.match(apiRoute, /cancelCalendarInterviewEvent/);
+  assert.match(gmailLib, /CALENDAR_EVENT_INSERT_URL/);
+  assert.match(gmailLib, /buildCalendarEventInsertRequest/);
+  assert.match(gmailLib, /buildCalendarEventPatchRequest/);
+  assert.match(gmailLib, /buildCalendarEventDeleteRequest/);
+  assert.match(confirmFn, /confirm_interview_event/);
+  assert.match(rescheduleFn, /reschedule_interview_event/);
+  assert.match(cancelFn, /cancel_interview_event/);
+  assert.doesNotMatch(`${holdFn}\n${confirmFn}\n${rescheduleFn}\n${cancelFn}`, /\/send|\/api\/inbox\/actions\/send/);
 });
 
 test("outreach schema migration adds Gmail connection and send lifecycle fields", () => {
@@ -999,6 +1209,218 @@ test("role workspace exposes sequence analytics without open tracking pixels", (
   assert.match(digest, /Sequence analytics/);
 });
 
+test("role workspace renders P0 role agent workspace actions before candidate modules", () => {
+  const projectPage = readFileSync("web/app/app/projects/[id]/page.tsx", "utf8");
+  const workspace = readFileSync("web/lib/role-agent-workspace.mjs", "utf8");
+  const projectRoute = readFileSync("web/app/api/projects/[id]/route.ts", "utf8");
+
+  assert.match(projectPage, /buildRoleAgentWorkspaceView/);
+  assert.match(projectPage, /RoleAgentWorkspaceView/);
+  assert.match(projectPage, /roleAgentWorkspace/);
+  assert.match(projectPage, /candidateGraph=\{detail\.candidateGraph\}/);
+  assert.match(projectPage, /leadPreview=\{detail\.leadPreview\}/);
+  assert.match(projectPage, /inboxQueue=\{detail\.inboxQueue\}/);
+  assert.match(projectPage, /roleAgentMetrics=\{detail\.project\.inbox_sync_summary\}/);
+  assert.match(projectRoute, /listClientDeliveryAuditEvents/);
+  assert.match(projectRoute, /clientDeliveryAuditEvents/);
+  assert.match(projectPage, /clientDeliveryAuditEvents=\{detail\.clientDeliveryAuditEvents/);
+  assert.match(projectPage, /clientDeliveryAuditEvents,/);
+  assert.match(workspace, /outreach_followup_summary/);
+  assert.match(workspace, /sequence_audit/);
+  assert.match(projectPage, /smartReport=\{latestSmartReportResult\}/);
+  assert.match(projectPage, /searchTasks=\{detail\.searchTasks/);
+  assert.match(projectPage, /delivery_summary/);
+  assert.match(projectPage, /Client delivery|客户交付/);
+  assert.match(projectPage, /why_now/);
+  assert.match(projectPage, /signal_refresh/);
+  assert.match(projectPage, /Why now|现在优先联系/);
+  assert.match(projectPage, /signal_sources/);
+  assert.match(projectPage, /signal_contract/);
+  assert.match(workspace, /expires_at/);
+  assert.match(workspace, /signalFreshness/);
+  assert.match(workspace, /buildSignalRefresh/);
+  assert.match(projectPage, /autopilot_path/);
+  assert.match(projectPage, /Autopilot path|自动推进路径/);
+  assert.match(projectPage, /autopilot_recovery/);
+  assert.match(projectPage, /Recovery history|恢复历史/);
+  assert.match(projectPage, /Retryable failed items|可重试失败项/);
+  assert.match(projectPage, /Latest execution|最近执行/);
+  assert.match(projectPage, /inbox_pipeline/);
+  assert.match(projectPage, /Inbox-to-interview|收件箱到约面/);
+  assert.match(workspace, /inboxPipelineSchedulingState/);
+  assert.match(projectPage, /Scheduling|待约面/);
+  assert.match(projectPage, /Confirmed|已确认/);
+  assert.match(projectPage, /needs_recovery/);
+  assert.match(workspace, /confirmed/);
+  assert.match(workspace, /calendar_event_id/);
+  assert.match(projectPage, /roleAgentInboxActionPayload/);
+  assert.match(projectPage, /\/api\/inbox\/actions/);
+  assert.match(projectPage, /weekly_progress/);
+  assert.match(projectPage, /This week|本周/);
+  assert.match(projectPage, /goals_configured/);
+  assert.match(projectPage, /Goals not set|未设置目标/);
+  assert.match(projectPage, /roleAgentStatusTone/);
+  assert.match(projectPage, /roleAgentStatusLabel/);
+  assert.match(projectPage, /roleAgentBlockedReasonLabel/);
+  assert.match(projectPage, /aria-disabled/);
+  assert.match(projectPage, /review_required/);
+  assert.match(projectPage, /next_actions/);
+  assert.match(projectPage, /roleAgentActionHref/);
+  assert.match(projectPage, /action\.cta/);
+  assert.match(projectPage, /id="lead-preview"/);
+  assert.match(projectPage, /id="gmail-outreach"/);
+  assert.match(projectPage, /id="inbox-agent"/);
+  assert.match(projectPage, /health\.blocked_actions/);
+  assert.match(projectPage, /stale_live_signals/);
+  assert.match(projectPage, /low_confidence_contact/);
+  assert.match(projectPage, /unapproved_draft/);
+  assert.match(projectPage, /no_preview_leads/);
+  assert.match(projectPage, /no_active_search_task/);
+  assert.match(projectPage, /needs_human_reply/);
+  assert.match(projectPage, /activity\.slice/);
+  assert.match(projectPage, /roleAgentActivityTimeLabel/);
+  assert.ok(projectPage.indexOf("<RoleAgentGuardrailsPanel") < projectPage.indexOf("<LeadPreviewPanel"));
+  assert.ok(projectPage.indexOf("<RoleAgentGuardrailsPanel") < projectPage.indexOf("<GmailOutreachPanel"));
+});
+
+test("role agent metrics record panel views and next action clicks", () => {
+  const projectPage = readFileSync("web/app/app/projects/[id]/page.tsx", "utf8");
+  const route = readFileSync("web/app/api/projects/[id]/role-agent-events/route.ts", "utf8");
+  const projects = readFileSync("web/lib/projects.ts", "utf8");
+  const metrics = readFileSync("web/lib/role-agent-metrics.mjs", "utf8");
+
+  assert.match(projectPage, /recordRoleAgentMetricEvent/);
+  assert.match(projectPage, /event_type: "panel_view"/);
+  assert.match(projectPage, /event_type: "next_action_click"/);
+  assert.match(projectPage, /event_type: "next_action_execution"/);
+  assert.match(projectPage, /const runId = recordRoleAgentActionStart/);
+  assert.match(projectPage, /run_id: runId/);
+  assert.match(projectPage, /action_status: "started"/);
+  assert.match(projectPage, /action_status: "succeeded"/);
+  assert.match(projectPage, /action_status: "failed"/);
+  assert.match(projectPage, /event_type: "settings_update"/);
+  assert.match(projectPage, /roleAgentSettingsActionType/);
+  assert.match(projectPage, /\/role-agent-events/);
+  assert.match(route, /recordProjectRoleAgentEvent/);
+  assert.match(route, /event_type/);
+  assert.match(route, /action_type/);
+  assert.match(route, /action_status/);
+  assert.match(route, /run_id/);
+  assert.match(route, /workflow_step/);
+  assert.match(route, /guardrail/);
+  assert.match(route, /detail/);
+  assert.match(route, /targets/);
+  assert.match(route, /result/);
+  assert.match(route, /failed_items/);
+  assert.match(route, /retryable/);
+  assert.match(projects, /buildRoleAgentMetricsSummary/);
+  assert.match(projects, /role_agent_metrics/);
+  assert.match(metrics, /next_action_clicks/);
+  assert.match(metrics, /next_action_runs/);
+  assert.match(metrics, /refresh_live_signals/);
+});
+
+test("role agent run sourcing action creates and runs a search task", () => {
+  const projectPage = readFileSync("web/app/app/projects/[id]/page.tsx", "utf8");
+
+  assert.match(projectPage, /runRoleAgentSourcingAction/);
+  assert.match(projectPage, /\/api\/search-tasks/);
+  assert.match(projectPage, /frequency: "manual"/);
+  assert.match(projectPage, /\/api\/search-tasks\/\$\{taskId\}\/run/);
+  assert.match(projectPage, /action_type: "run_sourcing"/);
+  assert.match(projectPage, /action_status: "succeeded"/);
+  assert.match(projectPage, /action_status: "failed"/);
+});
+
+test("role agent resolve contacts action runs bulk contact resolution", () => {
+  const projectPage = readFileSync("web/app/app/projects/[id]/page.tsx", "utf8");
+
+  assert.match(projectPage, /runRoleAgentContactResolutionAction/);
+  assert.match(projectPage, /\/api\/contact-resolution\/bulk/);
+  assert.match(projectPage, /action_type: "resolve_contacts"/);
+  assert.match(projectPage, /action_status: "started"/);
+  assert.match(projectPage, /action_status: "succeeded"/);
+  assert.match(projectPage, /action_status: "failed"/);
+  assert.match(projectPage, /summary\.resolved/);
+  assert.match(projectPage, /summary\.failed/);
+});
+
+test("role agent approve outreach action resolves and approves ready drafts without sending", () => {
+  const projectPage = readFileSync("web/app/app/projects/[id]/page.tsx", "utf8");
+  const actionFn = projectPage.match(/async function runRoleAgentOutreachApprovalAction[\s\S]*?\n  }/)?.[0] ?? "";
+
+  assert.match(projectPage, /runRoleAgentOutreachApprovalAction/);
+  assert.match(actionFn, /\/api\/contact-resolution\/bulk/);
+  assert.match(actionFn, /selectOutreachReadinessTargets/);
+  assert.match(actionFn, /await fetch\(`\/api\/outreach-threads\/\$\{id\}`/);
+  assert.match(actionFn, /status: "approved"/);
+  assert.match(actionFn, /approvedFirstEmailSequenceForRoleAgent/);
+  assert.match(actionFn, /action_type: "approve_or_send_outreach"/);
+  assert.match(actionFn, /action_status: "succeeded"/);
+  assert.match(actionFn, /action_status: "failed"/);
+  assert.doesNotMatch(actionFn, /\/api\/outreach-threads\/\$\{[^}]+\}\/send|\/api\/inbox\/actions\/send/);
+});
+
+test("role agent follow-up action saves Gmail drafts without sending", () => {
+  const projectPage = readFileSync("web/app/app/projects/[id]/page.tsx", "utf8");
+  const actionFn = projectPage.match(/async function runRoleAgentFollowUpAction[\s\S]*?\n  }/)?.[0] ?? "";
+
+  assert.match(projectPage, /runRoleAgentFollowUpAction/);
+  assert.match(actionFn, /status === "follow_up_due"/);
+  assert.match(actionFn, /queue_state === "due"/);
+  assert.match(actionFn, /await fetch\(`\/api\/outreach-threads\/\$\{item\.id\}\/draft`/);
+  assert.match(actionFn, /action_type: "follow_up"/);
+  assert.match(actionFn, /action_status: "succeeded"/);
+  assert.match(actionFn, /action_status: "failed"/);
+  assert.match(actionFn, /No emails were sent/);
+  assert.doesNotMatch(actionFn, /\/api\/outreach-threads\/\$\{[^}]+\}\/send|\/api\/inbox\/actions\/send/);
+});
+
+test("role agent review interested action applies the first inbox next step", () => {
+  const projectPage = readFileSync("web/app/app/projects/[id]/page.tsx", "utf8");
+  const actionFn = extractFunctionSource(projectPage, "runRoleAgentInterestedReviewAction");
+
+  assert.match(projectPage, /runRoleAgentInterestedReviewAction/);
+  assert.match(actionFn, /inbox_pipeline\.next_steps/);
+  assert.match(actionFn, /step\.can_apply/);
+  assert.match(actionFn, /applyRoleAgentInboxStep\(step, runId/);
+  assert.match(actionFn, /action_type: "review_interested_candidates"/);
+  assert.match(actionFn, /recordRoleAgentActionStart\(actionType, action\.cta\)/);
+  assert.match(actionFn, /action_status: "failed"/);
+  assert.match(projectPage, /action\.type === "review_interested_candidates"/);
+});
+
+test("role agent retry failed outreach action sends failed approved threads", () => {
+  const projectPage = readFileSync("web/app/app/projects/[id]/page.tsx", "utf8");
+  const actionFn = extractFunctionSource(projectPage, "runRoleAgentRetryFailedOutreachAction");
+
+  assert.match(projectPage, /runRoleAgentRetryFailedOutreachAction/);
+  assert.match(actionFn, /send_error/);
+  assert.match(actionFn, /status === "approved"/);
+  assert.match(actionFn, /\/api\/outreach-threads\/\$\{item\.id\}\/send/);
+  assert.match(actionFn, /recordRoleAgentActionStart\("retry_failed_outreach", action\.cta\)/);
+  assert.match(actionFn, /action_type: "retry_failed_outreach"/);
+  assert.match(actionFn, /action_status: "succeeded"/);
+  assert.match(actionFn, /action_status: "failed"/);
+  assert.match(actionFn, /failed_items: roleAgentFailedItems/);
+  assert.match(actionFn, /retryable: failed\.length > 0/);
+  assert.match(projectPage, /action\.type === "retry_failed_outreach"/);
+});
+
+test("role agent refresh live signals action records provider guardrail", () => {
+  const projectPage = readFileSync("web/app/app/projects/[id]/page.tsx", "utf8");
+  const actionFn = extractFunctionSource(projectPage, "runRoleAgentLiveSignalRefreshAction");
+
+  assert.match(projectPage, /runRoleAgentLiveSignalRefreshAction/);
+  assert.match(actionFn, /actionType = "refresh_live_signals"/);
+  assert.match(actionFn, /roleAgentWorkspace\.signal_refresh\.targets/);
+  assert.match(actionFn, /action_status: "blocked"/);
+  assert.match(actionFn, /provider_not_configured/);
+  assert.match(actionFn, /provider_ready: false/);
+  assert.match(actionFn, /retryable: true/);
+  assert.match(projectPage, /action\.type === "refresh_live_signals"/);
+});
+
 test("Profile Lead Layer productizes OpenJobs Mira as low-evidence leads", () => {
   const layer = readFileSync("web/lib/profile-lead-layer.mjs", "utf8");
   const sourceClassifier = readFileSync("web/lib/source-classifier.mjs", "utf8");
@@ -1019,4 +1441,39 @@ test("Profile Lead Layer productizes OpenJobs Mira as low-evidence leads", () =>
   assert.match(projectPage, /evidence verification|证据核验/);
   assert.match(openJobsProvider, /overall_evidence_quality: "low"/);
   assert.match(openJobsProvider, /OpenJobs AI profile has not been independently verified by public evidence/);
+});
+
+test("client portal workspace routes and APIs are wired to customer account access", () => {
+  const clientPage = readFileSync("web/app/client/page.tsx", "utf8");
+  const clientProjectPage = readFileSync("web/app/client/projects/[id]/page.tsx", "utf8");
+  const workspaceRoute = readFileSync("web/app/api/client-portal/workspace/route.ts", "utf8");
+  const projectRoute = readFileSync("web/app/api/client-portal/projects/[id]/route.ts", "utf8");
+  const feedbackRoute = readFileSync("web/app/api/client-portal/projects/[id]/feedback/route.ts", "utf8");
+  const portal = readFileSync("web/lib/client-portal-workspace.mjs", "utf8");
+  const portalServer = readFileSync("web/lib/client-portal.ts", "utf8");
+  const projects = readFileSync("web/lib/projects.ts", "utf8");
+  const access = readFileSync("web/lib/report-share-access.mjs", "utf8");
+  const reportPage = readFileSync("web/app/r/[id]/page.tsx", "utf8");
+
+  assert.match(clientPage, /\/api\/client-portal\/workspace/);
+  assert.match(clientPage, /暂无被授权项目|No authorized projects/);
+  assert.match(clientProjectPage, /\/api\/client-portal\/projects\/\$\{projectId\}/);
+  assert.match(clientProjectPage, /Interview-ready/);
+  assert.match(clientProjectPage, /Weekly archive/);
+  assert.match(clientProjectPage, /Feedback/);
+  assert.match(workspaceRoute, /getUser/);
+  assert.match(workspaceRoute, /buildClientPortalWorkspaceView/);
+  assert.match(workspaceRoute, /findClientPortalAuthorizedProjects/);
+  assert.match(portalServer, /listClientPortalCandidateProjects/);
+  assert.match(projectRoute, /verifyClientPortalProjectAccess/);
+  assert.match(projectRoute, /buildClientPortalProjectView/);
+  assert.match(feedbackRoute, /recordProjectRoleAgentEvent/);
+  assert.match(feedbackRoute, /client_delivery_feedback/);
+  assert.match(portal, /filterClientPortalAuthorizedProjects/);
+  assert.match(portal, /buildClientPortalWorkspaceView/);
+  assert.match(portal, /buildClientPortalProjectView/);
+  assert.match(portal, /verifyClientDeliveryCustomerAccountAccess/);
+  assert.match(projects, /listClientPortalCandidateProjects/);
+  assert.match(access, /verifyClientDeliveryCustomerAccountAccess/);
+  assert.match(reportPage, /verifyClientDeliveryShareAccess\(row, t, \{ viewer, accessPolicy \}\)/);
 });

@@ -2,9 +2,9 @@
 
 *Find signals. Not resumes.*
 
-SignalHire 是一个 evidence-first recruiting workspace。它把岗位 brief、人才画像或候选人资料
-转成可审计的公开证据搜索任务，输出候选人 shortlist、匹配理由、来源链接、证据风险、项目候选
-池、持续搜人任务和外联草稿。
+SignalHire 是一个 role-based AI recruiting workspace。它把岗位 brief、人才画像或候选人资料
+转成可执行的搜人、证据审阅、联系方式准备、外联、回复处理和候选人交付流程，输出 shortlist、
+匹配理由、来源链接、证据风险、联系方式置信度、外联序列、项目候选池、持续搜人任务和客户可见报告。
 
 **Live demo:** https://signal-hire-eight.vercel.app
 
@@ -14,24 +14,36 @@ SignalHire 是一个 evidence-first recruiting workspace。它把岗位 brief、
 
 ## 当前产品状态
 
-SignalHire 的主线已经从单次 AI 人才搜索，扩展为面向互联网岗位的证据优先搜人与交付工作台：
+SignalHire 的主线已经从单次 AI 人才搜索，扩展为面向互联网岗位的 role agent 招聘工作台：
 
 - **Role-aware sourcing**：从粘贴的 JD 或自然语言 brief 中识别岗位类型、雇主上下文、must-have、
   nice-to-have、排除项和来源策略。当前策略层覆盖软件工程、AI/ML/Data、产品、设计、增长、运营、
   销售/BD、客户成功、安全/DevOps、战略/运营、职能支持和高管/创始人等 12 类互联网岗位。
 - **Agent execution layer**：搜索结果不只显示候选人，还显示搜索策略、执行 trace、来源组合、候选
   提交事件、delivery clusters 和下一步建议。
+- **Fast lead preview**：搜索运行中即可展示 unverified leads 和 `open_evidence_leads`，用户可以先判断方向；
+  preview leads 明确不能直接外联，直到公开证据和联系方式来源被复核。
 - **Evidence-first shortlist**：候选人卡片保留匹配分、强/弱证据、claim verdict、来源链接、证据
   coverage 和待验证风险，避免把单一来源或自述包装成强推荐。
-- **Candidate profile cache**：成功搜索会把候选人快照、证据 URL、来源类型和标签写入
-  `candidate_profiles` / `candidate_evidence_sources`，用于去重、相似候选人和下一轮召回提示。
+- **CandidateGraph and source mix**：成功搜索会把候选人快照、证据 URL、来源类型和标签写入
+  `candidate_profiles` / `candidate_evidence_sources`，并在 Role Workspace 中展示多来源候选人图、
+  profile leads、LinkedIn URL seed、internal resume/manual upload、source mix、去重和 readiness。
 - **Open evidence precheck**：worker 在 MiroMind deep research 前可用 GitHub、Hugging Face、
   OpenAlex、Semantic Scholar、OpenReview、AnySearch 和可选 Maigret 做公开证据预检，并把候选线索
   写入 `open_evidence_leads`。
 - **Projects and Talent Monitor**：项目页维护候选人池、候选人状态、反馈信号、下一轮搜索约束，以及
   `search_tasks` 持续搜人任务；Vercel Cron 可触发 due tasks。
-- **Outreach threads**：外联草稿和跟进事项保存在 `outreach_threads`，关联项目和 shortlist item。
-  v1 保持手动复制发送，不自动发邮件。
+- **Profile lead and contact resolution**：可选 OpenJobs/Mira profile lead provider 和 Hunter contact provider
+  支持候选人扩展、联系方式解析、source/confidence/deliverability 标注和 contactability score。
+- **Gmail Outreach Sequence**：`outreach_threads` 支持 3-step evidence-based sequence、逐步编辑/审核、
+  批量解析联系方式、批准草稿、Gmail draft/send、follow-up draft、失败重试和 sequence analytics。
+- **Inbox Agent and scheduling**：Gmail 线程可同步并分类 interested、ask for details、later、not interested、
+  bounced、out of office、needs human reply；感兴趣候选人可以生成 scheduling packet 和 Calendar availability 草稿，暂留首个可约时间，跟踪候选人/manager 时间协商状态，创建、改期或取消 Google Calendar interview event，并把 confirmed/rescheduled/canceled interview 写回交付状态。
+- **Role Agent controls and why-now signals**：项目页可持久化 agent status、capacity goals、approval mode、client-visible digest / report field visibility，
+  并展示 next tasks、`run_sourcing` direct manual search-task execution、backend RoleAgentRun sourcing / live-signal refresh、`resolve_contacts` direct bulk contact resolution、`approve_or_send_outreach` direct ready-draft approval without sending、`retry_failed_outreach` direct failed-send retry、`follow_up` direct Gmail draft saving without sending、`review_interested_candidates` direct first inbox next-step application、`refresh_live_signals` stale/expired signal refresh queue with scheduled provider cron and provider guardrail fallback、next-action execution states、execution log with targets/results/failed items/retryability、带 run_id/workflow_step/status/guardrails 的 persisted role-agent run manifests、capacity pressure、activity log、blocked automation reasons、contact/outreach autopilot path 和带 target preview / guardrails 的 unified workflow run plan
+  和 persisted recovery history、latest execution summary、retryable failed item display、带 scheduling state、candidate/manager negotiation state、two-sided message history、activity timeline、slot-held/confirmed/rescheduled/canceled writeback、Google Calendar event lifecycle actions 和 handoff/calendar/recovery state 的 inbox-to-interview queue、Role Agent-to-Inbox action bridge，以及基于回复、跟进、contactability、fresh evidence、candidate/company/tech stack signals 的 `why_now` 候选人排序、contact timing window、从 CandidateGraph evidence/profile/company-open-role/tech-stack context 推断的 live signal ingestion、带 type/source/confidence/freshness/expires_at 的 live signal contract、过期信号降权和 stale/expired signal refresh queue。
+- **Delivery and operations**：Smart Report、token-gated / invited-customer-account shareable client delivery loop、project-level delivery snapshot injection、client delivery weekly progress、report-version frozen delivery snapshot manifest、shareable delivery version history、基于 persisted report versions 的 weekly delivery archive manifest、independent weekly delivery archive storage/readback、Client Delivery Audit Center with CSV export、Role Agent client delivery loop metrics/risks/next steps、confirmed interview metric、client-safe delivery filtering、client-visible report field controls、customer account access controls、shareable report view metrics、manager feedback capture、retained feedback audit history、metrics-derived and persisted client delivery audit trail 和 independent client delivery audit event storage、referral path、ATS-lite Greenhouse import/export、History facet counts
+  和 saved views 把搜索、外联、证据和客户交付组织成可复用的招聘记忆。
 
 内置缓存示例用于快速体验。非缓存 live research 需要 Insforge、MiroMind 和运行中的 worker，通常需要
 几分钟完成。
@@ -42,17 +54,20 @@ SignalHire 的主线已经从单次 AI 人才搜索，扩展为面向互联网�
 |------|------|
 | 输入 | JD、岗位 brief、人才画像、候选人资料或项目下一轮搜索约束 |
 | Intake | 清理 JD 噪音，分离雇主上下文与候选人要求，生成 role category、channel plan 和 query clusters |
-| 预检 | 可选公开来源预检，写入 `open_evidence_leads`，但不把预检线索当作已验证候选人 |
+| 预检 / preview | 可选公开来源预检，写入 `open_evidence_leads`，并在搜索运行中展示 unverified lead preview |
 | Deep research | worker 领取队列任务，调用 MiroMind 搜索、抓取、综合和交叉验证公开证据 |
-| 输出 | shortlist、talent map、search plan、execution trace、delivery clusters、evidence graph、share report |
-| 迭代 | 候选人加入项目池，反馈进入下一轮搜索约束，search tasks 可持续运行，外联草稿保留跟进状态 |
+| 输出 | shortlist、talent map、search plan、execution trace、delivery clusters、evidence graph、source mix、Smart Report |
+| 联系方式 | 候选人进入 ContactProfile，记录 email/phone/LinkedIn、来源、置信度、deliverability 和 contactability |
+| 外联 | 生成 evidence-based 3-step sequence，支持编辑、审核、批量准备、Gmail draft/send 和 follow-up draft |
+| 回复 / 约面 | Inbox Agent 分类回复，生成 reply draft、follow-up、stop、scheduling packet、Calendar availability 草稿、slot hold、Google Calendar event create/reschedule/cancel 和 interview lifecycle writeback |
+| 迭代 | 候选人加入项目池，反馈进入下一轮搜索约束，search tasks 可持续运行，Role Agent 维护目标和下一步 |
 
 Verify 能力仍作为候选人背景核验的辅助入口；主产品定位是证据可追溯的搜人、候选判断和项目迭代。
 
 ## How it works
 
 ```text
-Hiring brief / JD / candidate text
+Hiring brief / JD / candidate text / ATS role
   -> web/ Next.js app
   -> role-aware intake + cache/history lookup
   -> Insforge research_runs queue
@@ -61,11 +76,13 @@ Hiring brief / JD / candidate text
       -> MiroMind Deep Research API
       -> streaming progress + agent execution telemetry
   -> normalized talent payload
-  -> search workspace / project pool / shortlist / outreach / share report
+  -> search workspace / lead preview / CandidateGraph / project pool
+  -> contact resolution / outreach sequence / inbox agent / scheduling draft / slot hold / Google Calendar event lifecycle / interview writeback
+  -> Smart Report / ATS-lite export / history memory
 ```
 
 MiroMind 是底层 deep-research engine。SignalHire 负责队列、缓存、公开证据预检、结构化 guardrails、
-项目工作台、外联记录和交付 UI。
+项目工作台、联系方式解析、外联序列、收件箱动作、Role Agent 控制面板和交付 UI。
 
 ## 当前架构
 
@@ -73,9 +90,17 @@ MiroMind 是底层 deep-research engine。SignalHire 负责队列、缓存、公
 |------|------|
 | `web/` | Next.js App Router UI、API routes、auth/session sync、搜索工作台、项目、shortlist、history、public report |
 | `web/lib/talent-profile.mjs` | 搜索 payload normalizer、role-aware strategy、agent execution layer、evidence dossier、cache rows |
-| `web/lib/db.ts` | Insforge `research_runs`、history、feedback、retry/cancel、candidate cache 和 search queue access |
+| `web/lib/db.ts` | Insforge `research_runs`、history、feedback、retry/cancel、candidate cache、project、outreach 和 search queue access |
+| `web/lib/candidate-graph.mjs` | 多来源候选人合并、source mix、merge keys、readiness 和 contact coverage |
+| `web/lib/lead-preview.mjs` | 搜索运行中的 unverified lead preview、source summary 和 outreach block reason |
+| `web/lib/contact-*.mjs` | ContactProfile、Hunter/provider resolution、bulk resolution 和 send eligibility |
+| `web/lib/outreach-*.mjs` | 外联草稿、3-step sequence、Gmail draft/send、follow-up draft、readiness 和 activity digest |
+| `web/lib/inbox-*.mjs` | Gmail sync、reply classification、today queue、reply actions 和 scheduling packet |
+| `web/lib/role-agent-guardrails.mjs` | Role Agent status、capacity goals、approval mode、next tasks 和 blocked automation view |
+| `web/lib/smart-report.mjs` | 客户可见交付报告、source mix、risk、next actions 和 referral summary |
+| `web/lib/ats-lite.mjs` | Greenhouse-oriented ATS-lite import/export、dedupe keys 和 evidence-backed candidate payload |
 | `web/lib/search-tasks.*` | Talent Monitor / AI Sourcer tasks、due run 计算、候选人新增/证据更新分类 |
-| `web/lib/outreach-threads.*` | 外联草稿、状态、跟进时间和项目/候选人关联 |
+| `web/lib/outreach-threads.*` | 外联线程、状态、Gmail thread、sequence messages、跟进时间和项目/候选人关联 |
 | `worker/` | 长任务运行时，领取 queued/retrying jobs，执行公开证据预检和 MiroMind live research |
 | `migrations/` | `research_runs` 可靠性、candidate cache、open evidence leads、search tasks、outreach threads |
 | `docs/` | 架构、验证、研究记录、PRD 和迭代计划 |
@@ -93,7 +118,8 @@ MiroMind 是底层 deep-research engine。SignalHire 负责队列、缓存、公
 | `candidate_evidence_sources` | 归一化后的候选人证据 URL、claim、verdict、source family |
 | `open_evidence_leads` | worker 预检阶段发现的公开候选线索，身份解析前只作 lead |
 | `search_tasks` | 项目内持续搜人任务、frequency、next run 和 last run |
-| `outreach_threads` | 外联草稿、手动联系状态、notes 和 follow-up 时间 |
+| `projects.outreach_settings` | Role Agent status、capacity goals、approval mode、follow-up interval、client-visible digest 和 report field visibility |
+| `outreach_threads` | 外联草稿、Gmail thread、contact profile、sequence messages、approval/send state、notes 和 follow-up 时间 |
 
 ## Quick start
 
@@ -123,6 +149,15 @@ cp web/.env.example web/.env.local
 - `ANYSEARCH_API_KEY`
 - `OPEN_EVIDENCE_MAX_QUERIES`
 - `MAIGRET_ENABLED` / `MAIGRET_COMMAND` / `MAIGRET_*`
+
+可选 profile lead / contact / inbox / ATS 能力：
+
+- `MIRA_KEY`
+- `HUNTER_API_KEY`
+- `GOOGLE_CLIENT_ID`
+- `GOOGLE_CLIENT_SECRET`
+- `GOOGLE_REDIRECT_URI`
+- `GREENHOUSE_API_KEY`
 
 > `.env.local` 已 gitignore。不要提交真实密钥。
 
@@ -163,10 +198,12 @@ jobs，写入 streaming progress，失败时进入 bounded retry，并恢复 sta
 
 ### 5. 生产监控
 
-`web/vercel.json` 配置了两个 cron routes：
+`web/vercel.json` 配置了 cron routes：
 
 - `/api/cron/worker-health`：每日检查队列健康。
 - `/api/cron/search-tasks`：每日触发 due Talent Monitor tasks。
+- `/api/cron/inbox-sync`：同步 SignalHire 相关 Gmail threads，用于 Inbox Agent。
+- `/api/cron/outreach-followups`：处理 due follow-up draft 工作。
 
 生产环境需要设置 `CRON_SECRET`，cron routes 会校验 `Authorization: Bearer $CRON_SECRET`。
 
@@ -207,9 +244,9 @@ docs/
   research/
   superpowers/
 web/            Next.js app (App Router + Tailwind)
-  app/          Public landing, app shell, API routes, projects, search, reports
-  components/   Search workspace, result views, outreach modal, shared UI
-  lib/          Domain helpers, Insforge access, MiroMind client, task/outreach/cache logic
+  app/          Public landing, app shell, API routes, projects, search, reports, history, settings
+  components/   Search workspace, lead preview, result views, outreach modal, shared UI
+  lib/          Domain helpers, Insforge access, MiroMind client, candidate graph, contact, inbox, task/outreach/cache logic
   scripts/      Schema, migration, live-job, retry, worker-health checks
 worker/         Long-running Node worker for non-cached live research
 migrations/     Research queue, candidate cache, open evidence, search tasks, outreach tables
@@ -218,11 +255,11 @@ migrations/     Research queue, candidate cache, open evidence, search tasks, ou
 
 ## Guardrails
 
-- SignalHire 不抓取登录态、私密数据、邮箱/电话，也不绕过 CAPTCHA 或反爬。
-- LinkedIn profile crawling 默认禁止；未来如接入，只能走合规官方 API/provider。
-- `open_evidence_leads` 是发现线索，不是已验证证据。
-- 候选人身份合并不能只靠姓名，需要 GitHub、Scholar、个人站点、公司页或多来源强标识。
-- 外联 v1 保存草稿和跟进，不自动发送邮件。
+- `open_evidence_leads` 和 profile leads 是发现线索，不是已验证推荐。
+- 候选人身份合并不能只靠姓名，需要 LinkedIn URL、邮箱 hash、个人站点、公司页、GitHub、Scholar 或多来源强标识。
+- 联系方式必须带 source、confidence、deliverability 或 resolution metadata，不能把无来源联系方式包装成可发送。
+- 外联、跟进、收件箱和日程动作都必须保留可审阅状态、失败恢复和 activity/audit trail。
+- 自动化如果能明显提升用户体验，可以进入路线图；产品上必须让用户知道系统做了什么、为什么做、下一步是什么。
 
 ---
 
