@@ -65,6 +65,8 @@ export async function runInboxAction({
   const result = buildInboxActionPatch({
     action: body.action,
     notes: thread.notes,
+    thread_id: thread.id || id,
+    subject: thread.subject,
     reply_draft: body.reply_draft,
     follow_up_at: body.follow_up_at,
     scheduling_message: body.scheduling_message,

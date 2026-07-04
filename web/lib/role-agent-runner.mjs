@@ -3,7 +3,7 @@ import {
   buildLiveSignalRefreshEvent,
 } from "./live-signal-refresh.mjs";
 
-const SUPPORTED_ACTIONS = new Set(["run_sourcing", "refresh_live_signals"]);
+const SUPPORTED_ACTIONS = new Set(["run_sourcing", "refresh_live_signals", "prepare_outreach"]);
 
 function cleanString(value) {
   return typeof value === "string" ? value.trim() : "";
@@ -24,6 +24,18 @@ function safeTargets(targets = []) {
     id: cleanString(target?.candidate_id || target?.id),
     candidate_name: cleanString(target?.candidate_name || target?.name) || "Candidate",
   })).filter((target) => target.id || target.candidate_name);
+}
+
+function autopilotApprovalTargets(workspace = {}) {
+  const runPlanTargets = workspace?.autopilot_path?.run_plan?.targets;
+  const workflowSteps = workspace?.autopilot_path?.workflow?.steps;
+  const approvalStep = Array.isArray(workflowSteps)
+    ? workflowSteps.find((step) => cleanString(step?.type) === "approve_drafts")
+    : null;
+  const source = Array.isArray(runPlanTargets) && runPlanTargets.length > 0
+    ? runPlanTargets
+    : Array.isArray(approvalStep?.targets) ? approvalStep.targets : [];
+  return safeTargets(source).slice(0, 25);
 }
 
 export function buildRoleAgentRunRecord({
@@ -149,6 +161,56 @@ export async function runRoleAgentRunCore({
       failed_items: safeTargets(event.failed_items),
       run,
     };
+  }
+
+  if (run.action_type === "prepare_outreach") {
+    const targets = autopilotApprovalTargets(workspace);
+    const contactResult = typeof deps.resolveContacts === "function"
+      ? await deps.resolveContacts({ userId, projectId: run.project_id, targets })
+      : { status: "disabled", summary: { resolved: 0, skipped: 0, failed: 0 }, items: [], error: "contact_resolution_not_configured" };
+    const contactSummary = contactResult?.summary || {};
+    const sendableIds = new Set((Array.isArray(contactResult?.items) ? contactResult.items : [])
+      .filter((item) => item?.can_send !== false)
+      .map((item) => cleanString(item?.id || item?.candidate_id))
+      .filter(Boolean));
+    const approvalTargets = targets.filter((target) => !sendableIds.size || sendableIds.has(target.id));
+    const approved = [];
+    const failed = [];
+    for (const target of approvalTargets) {
+      try {
+        const updated = typeof deps.approveOutreachDraft === "function"
+          ? await deps.approveOutreachDraft({ userId, id: target.id, target, project })
+          : null;
+        if (updated?.id || cleanString(updated?.status) === "approved") approved.push(target);
+        else failed.push({ ...target, error: "approval_failed" });
+      } catch (error) {
+        failed.push({ ...target, error: error instanceof Error ? error.message : "approval_failed" });
+      }
+    }
+    const result = {
+      resolved: Number(contactSummary.resolved ?? 0) || 0,
+      skipped: Number(contactSummary.skipped ?? 0) || 0,
+      contact_failed: Number(contactSummary.failed ?? 0) || 0,
+      approved: approved.length,
+      failed: failed.length,
+      sent: 0,
+    };
+    const event = {
+      event_type: "next_action_execution",
+      action_type: "prepare_outreach",
+      action_status: approved.length > 0 || failed.length === 0 ? "succeeded" : "failed",
+      run_id: run.run_id,
+      workflow_step: "prepare_outreach",
+      guardrail: "No emails were sent; first-email send still requires manual confirmation.",
+      detail: `${approved.length} ready drafts approved, ${failed.length} failed. No emails were sent.`,
+      targets: approved,
+      result,
+      failed_items: failed,
+      retryable: failed.length > 0 || result.contact_failed > 0,
+      at: now.toISOString(),
+    };
+    await record(deps, run.project_id, run.user_id, event);
+    return { status: event.action_status, result, failed_items: failed, run };
   }
 
   return { status: "failed", error: "unsupported_role_agent_action", run };

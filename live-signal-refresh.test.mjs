@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import {
   buildLiveSignalRefreshEvent,
   buildLiveSignalRefreshSummary,
+  createHttpLiveSignalProvider,
   selectLiveSignalRefreshProjects,
 } from "./web/lib/live-signal-refresh.mjs";
 
@@ -54,4 +55,72 @@ test("summarizes scheduled live signal refresh without exposing provider interna
     errors: [{ project_id: "p2", error: "provider_not_configured" }],
   });
   assert.doesNotMatch(JSON.stringify(summary), /access_token|secret|debug/i);
+});
+
+test("refreshes live signals through an external HTTP provider", async () => {
+  const requests = [];
+  const provider = createHttpLiveSignalProvider({
+    url: "https://signals.example.com/refresh",
+    apiKey: "provider-secret",
+    fetchImpl: async (url, init) => {
+      requests.push({ url, init });
+      return {
+        ok: true,
+        json: async () => ({
+          refreshed: [
+            {
+              candidate_id: "c1",
+              candidate_name: "Ada Candidate",
+              signals: [
+                {
+                  type: "candidate_activity",
+                  source: "github",
+                  confidence: "high",
+                  freshness: "fresh",
+                  observed_at: "2026-07-04T12:00:00.000Z",
+                  expires_at: "2026-07-11T12:00:00.000Z",
+                  summary: "Published a new inference optimization project.",
+                  url: "https://github.com/ada/inference",
+                },
+              ],
+            },
+          ],
+          failed: [],
+        }),
+      };
+    },
+  });
+
+  const result = await provider.refresh({
+    userId: "user-1",
+    project: { id: "project-1", name: "AI Engineer" },
+    targets: [{ candidate_id: "c1", candidate_name: "Ada Candidate" }],
+  });
+
+  assert.equal(requests[0].url, "https://signals.example.com/refresh");
+  assert.equal(requests[0].init.headers.Authorization, "Bearer provider-secret");
+  assert.deepEqual(JSON.parse(requests[0].init.body).targets, [{ candidate_id: "c1", candidate_name: "Ada Candidate" }]);
+  assert.equal(result.refreshed[0].signal_count, 1);
+  assert.equal(result.refreshed[0].live_signals[0].type, "candidate_activity");
+  assert.equal(result.failed.length, 0);
+});
+
+test("redacts external live signal provider failures", async () => {
+  const provider = createHttpLiveSignalProvider({
+    url: "https://signals.example.com/refresh",
+    fetchImpl: async () => ({
+      ok: false,
+      status: 500,
+      text: async () => "provider failed api_key=secret-token debug trace",
+    }),
+  });
+
+  const result = await provider.refresh({
+    targets: [{ candidate_id: "c1", candidate_name: "Ada Candidate" }],
+  });
+
+  assert.equal(result.refreshed.length, 0);
+  assert.equal(result.failed[0].candidate_id, "c1");
+  assert.match(result.error, /api_key=redacted/);
+  assert.doesNotMatch(result.error, /secret-token|debug trace/);
 });

@@ -83,6 +83,20 @@ function savedDraftMessage(outreachThread) {
   };
 }
 
+function persistedActionMessages(outreachThread) {
+  const actionState = parseInboxActionState(cleanString(outreachThread.notes || outreachThread.action_notes));
+  const events = Array.isArray(actionState?.message_history_events) ? actionState.message_history_events : [];
+  return events.map((event) => ({
+    id: cleanString(event.id),
+    direction: ["inbound", "outbound", "system"].includes(event.direction) ? event.direction : "system",
+    status: cleanString(event.status),
+    subject: cleanString(event.subject),
+    body: excerpt(event.body),
+    at: validIso(event.at),
+    source: cleanString(event.source) || "inbox_action",
+  }));
+}
+
 export function buildTwoSidedMessageHistory({
   outreachThread = {},
   inboxThread = {},
@@ -101,7 +115,9 @@ export function buildTwoSidedMessageHistory({
     const inbound = fallbackInbound(inboxThread);
     if (inbound) messages.push(inbound);
   }
-  const draft = savedDraftMessage(outreachThread);
+  const actionMessages = persistedActionMessages(outreachThread);
+  messages.push(...actionMessages);
+  const draft = actionMessages.length ? null : savedDraftMessage(outreachThread);
   if (draft) messages.push(draft);
 
   const byKey = new Map();

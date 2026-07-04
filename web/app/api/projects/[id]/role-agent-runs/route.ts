@@ -4,7 +4,7 @@ import { getUser } from "@/lib/session";
 
 export const runtime = "nodejs";
 
-const ACTIONS = new Set<RoleAgentRunAction>(["run_sourcing", "refresh_live_signals"]);
+const ACTIONS = new Set<RoleAgentRunAction>(["run_sourcing", "refresh_live_signals", "prepare_outreach"]);
 
 export async function POST(req: Request, ctx: { params: Promise<{ id: string }> }) {
   let body: { action_type?: unknown; locale?: unknown } = {};

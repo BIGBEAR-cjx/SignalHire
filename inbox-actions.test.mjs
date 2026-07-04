@@ -69,7 +69,16 @@ test("save scheduling draft persists scheduling message without sending or marki
   assert.equal(result.patch.gmail_message_id, undefined);
   assert.equal(result.action_state.action_status, "draft_saved");
   assert.equal(result.action_state.scheduling_message, "Hi Ada, here are two available windows from my calendar.");
-  assert.deepEqual(parseInboxActionState(result.patch.notes), {
+  const state = parseInboxActionState(result.patch.notes);
+  assert.equal(state.message_history_events.length, 1);
+  assert.deepEqual({
+    action: state.action,
+    action_status: state.action_status,
+    action_applied_at: state.action_applied_at,
+    reply_draft: state.reply_draft,
+    follow_up_at: state.follow_up_at,
+    scheduling_message: state.scheduling_message,
+  }, {
     action: "save_scheduling_draft",
     action_status: "draft_saved",
     action_applied_at: "2026-06-26T10:00:00.000Z",
@@ -261,6 +270,104 @@ test("runInboxAction saves follow-up draft through the authorized outreach threa
   assert.equal(result.body.action_state.action_status, "draft_saved");
   assert.equal(calls.at(-1)[1].status, "follow_up_due");
   assert.equal(calls.at(-1)[1].body, "Follow-up draft");
+});
+
+test("runInboxAction appends a persistent message history event when saving scheduling work", async () => {
+  const calls = [];
+  const deps = {
+    user: { id: "user-1" },
+    getOutreachThread: async (input) => {
+      calls.push(["get", input]);
+      return {
+        id: input.id,
+        user_id: input.userId,
+        subject: "AI Engineer role",
+        notes: "Existing",
+      };
+    },
+    updateOutreachThread: async (input) => {
+      calls.push(["update", input]);
+      return { id: input.id, status: input.status, notes: input.notes };
+    },
+    now: new Date("2026-06-26T10:00:00.000Z"),
+  };
+
+  const result = await runInboxAction({
+    body: {
+      outreach_thread_id: "t1",
+      action: "save_scheduling_draft",
+      scheduling_message: "Hi Ada, here are two times.",
+    },
+    ...deps,
+  });
+
+  assert.equal(result.status, 200);
+  const state = parseInboxActionState(calls.at(-1)[1].notes);
+  assert.equal(state.message_history_events.length, 1);
+  assert.deepEqual(state.message_history_events[0], {
+    id: "inbox-action-t1-save_scheduling_draft-2026-06-26T10:00:00.000Z",
+    direction: "outbound",
+    status: "draft_saved",
+    subject: "AI Engineer role",
+    body: "Hi Ada, here are two times.",
+    at: "2026-06-26T10:00:00.000Z",
+    source: "inbox_action",
+  });
+});
+
+test("runInboxAction preserves previous persistent message history events", async () => {
+  const previousNotes = mergeInboxActionNotes("Existing", {
+    action: "reply",
+    action_status: "draft_saved",
+    action_applied_at: "2026-06-26T09:00:00.000Z",
+    reply_draft: "Previous draft",
+    message_history_events: [
+      {
+        id: "previous-event",
+        direction: "outbound",
+        status: "draft_saved",
+        subject: "AI Engineer role",
+        body: "Previous draft",
+        at: "2026-06-26T09:00:00.000Z",
+        source: "inbox_action",
+      },
+    ],
+  });
+  const calls = [];
+  const deps = {
+    user: { id: "user-1" },
+    getOutreachThread: async (input) => {
+      calls.push(["get", input]);
+      return {
+        id: input.id,
+        user_id: input.userId,
+        subject: "AI Engineer role",
+        notes: previousNotes,
+      };
+    },
+    updateOutreachThread: async (input) => {
+      calls.push(["update", input]);
+      return { id: input.id, status: input.status, notes: input.notes };
+    },
+    now: new Date("2026-06-26T10:00:00.000Z"),
+  };
+
+  const result = await runInboxAction({
+    body: {
+      outreach_thread_id: "t1",
+      action: "reply",
+      reply_draft: "Current draft",
+    },
+    ...deps,
+  });
+
+  assert.equal(result.status, 200);
+  const state = parseInboxActionState(calls.at(-1)[1].notes);
+  assert.deepEqual(state.message_history_events.map((event) => event.id), [
+    "previous-event",
+    "inbox-action-t1-reply-2026-06-26T10:00:00.000Z",
+  ]);
+  assert.equal(state.message_history_events[1].body, "Current draft");
 });
 
 test("runInboxAction checks auth, ownership lookup, invalid action, and update", async () => {

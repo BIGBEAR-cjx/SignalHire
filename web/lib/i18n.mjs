@@ -682,7 +682,7 @@ export const messages = {
     "job.status.queued.label": "已进入研究队列",
     "job.status.queued.detail": "等待 worker 认领任务。",
     "job.status.running.label": "正在全网搜索/抓取/核验",
-    "job.status.running.detail": "Worker 正在搜索网页、抓取页面并核对证据。",
+    "job.status.running.detail": "Worker 正在搜索网页、抓取页面并交叉核验证据。",
     "job.status.retrying.label": "正在重试",
     "job.status.retrying.fallback": "研究连接中断",
     "job.status.retrying.detail": "上次失败: {last}。正在准备第 {attempt}/{max} 次尝试。",

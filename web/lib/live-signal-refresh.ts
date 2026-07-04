@@ -4,7 +4,7 @@ import { listOutreachQueue } from "./outreach-threads";
 import { buildProjectInboxQueueView } from "./inbox";
 import { listSearchTasks } from "./search-tasks";
 import { buildRoleAgentWorkspaceView } from "./role-agent-workspace.mjs";
-import { buildLiveSignalRefreshSummary, selectLiveSignalRefreshProjects } from "./live-signal-refresh.mjs";
+import { buildLiveSignalRefreshSummary, createHttpLiveSignalProvider, selectLiveSignalRefreshProjects } from "./live-signal-refresh.mjs";
 import { runRoleAgentRunCore } from "./role-agent-runner.mjs";
 
 const BASE = process.env.INSFORGE_API_BASE_URL;
@@ -70,16 +70,23 @@ async function buildProjectWorkspace(row: { id: string; user_id: string; status:
   };
 }
 
-async function refreshLiveSignals(input: { targets?: unknown[] }) {
-  const targets = Array.isArray(input.targets) ? input.targets : [];
-  return {
-    refreshed: targets.map((target) => ({
-      ...(target && typeof target === "object" ? target as Record<string, unknown> : {}),
-      signal_count: 1,
-      provider: "candidate_activity_snapshot",
-    })),
-    failed: [],
-  };
+async function refreshLiveSignals(input: { userId?: string; project?: unknown; targets?: unknown[] }) {
+  const provider = createHttpLiveSignalProvider({
+    url: process.env.LIVE_SIGNAL_PROVIDER_URL,
+    apiKey: process.env.LIVE_SIGNAL_PROVIDER_API_KEY,
+  });
+  if (!provider) {
+    const targets = Array.isArray(input.targets) ? input.targets : [];
+    return {
+      refreshed: [],
+      failed: targets.map((target) => ({
+        ...(target && typeof target === "object" ? target as Record<string, unknown> : {}),
+        error: "provider_not_configured",
+      })),
+      error: "provider_not_configured",
+    };
+  }
+  return provider.refresh(input);
 }
 
 export async function refreshDueLiveSignals(limit = 10) {

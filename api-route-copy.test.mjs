@@ -516,8 +516,13 @@ test("live signal provider cron and background role agent runs are wired", () =>
   assert.match(liveSignalRoute, /refreshDueLiveSignals/);
   assert.match(liveSignalRoute, /CRON_SECRET/);
   assert.match(liveSignalRunner, /buildRoleAgentWorkspaceView/);
+  assert.match(liveSignalRunner, /LIVE_SIGNAL_PROVIDER_URL/);
+  assert.match(liveSignalRunner, /createHttpLiveSignalProvider/);
   assert.match(roleAgentRoute, /runRoleAgentProjectAction/);
+  assert.match(roleAgentRoute, /prepare_outreach/);
   assert.match(roleAgentRunner, /runRoleAgentRunCore/);
+  assert.match(roleAgentRunner, /runBulkContactResolution/);
+  assert.match(roleAgentRunner, /approveOutreachDraft/);
   assert.match(projectPage, /\/api\/projects\/\$\{project\.id\}\/role-agent-runs/);
 });
 
@@ -529,6 +534,8 @@ test("inbox-to-interview pipeline exposes two-sided message history", () => {
   const projectPage = readFileSync("web/app/app/projects/[id]/page.tsx", "utf8");
 
   assert.match(messageHistory, /buildTwoSidedMessageHistory/);
+  assert.match(messageHistory, /message_history_events/);
+  assert.match(messageHistory, /persistedActionMessages/);
   assert.match(inbox, /buildTwoSidedMessageHistory/);
   assert.match(inboxAgent, /message_history/);
   assert.match(workspace, /message_history/);
@@ -986,6 +993,7 @@ test("Gmail inbox agent persists only role-related threads and renders queues", 
   assert.match(inboxAgent, /today_rank/);
   assert.match(inboxActions, /buildInboxActionPatch/);
   assert.match(inboxActions, /save_follow_up_draft/);
+  assert.match(inboxActions, /message_history_events/);
   assert.match(inboxActions, /signalhire-inbox-action/);
   assert.match(inboxActionsRoute, /runInboxAction/);
   assert.match(inboxActionsRoute, /getOutreachThread/);

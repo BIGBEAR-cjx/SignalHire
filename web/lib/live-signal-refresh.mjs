@@ -35,7 +35,65 @@ function safeFailedItem(item = {}) {
 function providerSafeError(value) {
   const clean = cleanString(value);
   if (!clean) return "live_signal_refresh_failed";
-  return clean.replace(/(access_token|refresh_token|secret|api[_-]?key)=?[^,\s]*/gi, "$1=redacted").slice(0, 120);
+  return clean
+    .replace(/(access_token|refresh_token|secret|api[_-]?key)=?[^,\s]*/gi, "$1=redacted")
+    .replace(/\b(debug|internal|stack|trace)\b[\s\S]*/gi, "")
+    .slice(0, 120)
+    .trim() || "live_signal_refresh_failed";
+}
+
+function normalizeLiveSignal(signal = {}) {
+  const type = cleanString(signal.type || signal.signal_type);
+  const summary = cleanString(signal.summary || signal.reason || signal.detail);
+  if (!type && !summary) return null;
+  return {
+    type: type || "candidate_activity",
+    source: cleanString(signal.source || signal.provider) || "external_provider",
+    confidence: cleanString(signal.confidence) || "medium",
+    freshness: cleanString(signal.freshness) || "fresh",
+    observed_at: validIso(signal.observed_at || signal.at || signal.created_at),
+    expires_at: cleanString(signal.expires_at) ? validIso(signal.expires_at) : "",
+    summary,
+    url: cleanString(signal.url || signal.href),
+  };
+}
+
+function normalizeProviderRefreshedItem(item = {}) {
+  const signals = Array.isArray(item.live_signals) ? item.live_signals : item.signals;
+  const liveSignals = (Array.isArray(signals) ? signals : [])
+    .map(normalizeLiveSignal)
+    .filter(Boolean)
+    .slice(0, 20);
+  return {
+    candidate_id: cleanString(item.candidate_id || item.id),
+    candidate_name: cleanString(item.candidate_name || item.name) || "Candidate",
+    provider: cleanString(item.provider) || "external_live_signal_provider",
+    signal_count: nonNegativeInteger(item.signal_count || liveSignals.length),
+    live_signals: liveSignals,
+  };
+}
+
+function providerInput(input) {
+  if (Array.isArray(input)) return { targets: input };
+  return isRecord(input) ? input : {};
+}
+
+function providerPayload(input = {}) {
+  const source = providerInput(input);
+  return {
+    user_id: cleanString(source.userId || source.user_id),
+    project: isRecord(source.project) ? {
+      id: cleanString(source.project.id),
+      name: cleanString(source.project.name),
+      brief: cleanString(source.project.brief),
+    } : {},
+    targets: (Array.isArray(source.targets) ? source.targets : [])
+      .filter(isRecord)
+      .map((target) => ({
+        candidate_id: cleanString(target.candidate_id || target.id),
+        candidate_name: cleanString(target.candidate_name || target.name) || "Candidate",
+      })),
+  };
 }
 
 export function selectLiveSignalRefreshProjects(projects = [], { limit = 10 } = {}) {
@@ -130,4 +188,62 @@ export async function refreshLiveSignalsWithProvider({ targets = [], provider } 
     };
   }
   return provider.refresh(targets);
+}
+
+export function createHttpLiveSignalProvider({
+  url = "",
+  apiKey = "",
+  fetchImpl = globalThis.fetch,
+  timeoutMs = 12000,
+} = {}) {
+  const endpoint = cleanString(url);
+  if (!endpoint) return null;
+  return {
+    async refresh(input = {}) {
+      const payload = providerPayload(input);
+      const controller = typeof AbortController !== "undefined" ? new AbortController() : null;
+      const timeout = controller ? setTimeout(() => controller.abort(), Math.max(1000, Number(timeoutMs) || 12000)) : null;
+      try {
+        const headers = { "Content-Type": "application/json" };
+        if (cleanString(apiKey)) headers.Authorization = `Bearer ${cleanString(apiKey)}`;
+        const response = await fetchImpl(endpoint, {
+          method: "POST",
+          headers,
+          body: JSON.stringify(payload),
+          ...(controller ? { signal: controller.signal } : {}),
+        });
+        if (!response?.ok) {
+          const text = typeof response?.text === "function" ? await response.text() : "";
+          const error = providerSafeError(text || `provider_http_${response?.status || "failed"}`);
+          return {
+            refreshed: [],
+            failed: payload.targets.map((target) => ({ ...target, error })),
+            error,
+          };
+        }
+        const data = typeof response.json === "function" ? await response.json() : {};
+        const refreshed = (Array.isArray(data?.refreshed) ? data.refreshed : Array.isArray(data?.signals) ? data.signals : [])
+          .filter(isRecord)
+          .map(normalizeProviderRefreshedItem)
+          .filter((item) => item.candidate_id || item.candidate_name);
+        const failed = (Array.isArray(data?.failed) ? data.failed : [])
+          .filter(isRecord)
+          .map((item) => ({
+            candidate_id: cleanString(item.candidate_id || item.id),
+            candidate_name: cleanString(item.candidate_name || item.name) || "Candidate",
+            error: providerSafeError(item.error || item.reason),
+          }));
+        return { refreshed, failed };
+      } catch (error) {
+        const safeError = providerSafeError(error instanceof Error ? error.message : String(error));
+        return {
+          refreshed: [],
+          failed: payload.targets.map((target) => ({ ...target, error: safeError })),
+          error: safeError,
+        };
+      } finally {
+        if (timeout) clearTimeout(timeout);
+      }
+    },
+  };
 }

@@ -45,6 +45,10 @@ function hasInterviewEvent(event) {
   return Boolean(event?.status || event?.starts_at || event?.ends_at || event?.calendar_event_id);
 }
 
+function isRecord(value) {
+  return Boolean(value && typeof value === "object" && !Array.isArray(value));
+}
+
 function defaultFollowUpAt(now) {
   const date = new Date(now);
   date.setDate(date.getDate() + 7);
@@ -53,6 +57,34 @@ function defaultFollowUpAt(now) {
 
 function markerRegex() {
   return new RegExp(`\\n?<!--${ACTION_MARKER}:([^>]*)-->`, "g");
+}
+
+function normalizeMessageHistoryEvent(value = {}) {
+  if (!isRecord(value)) return null;
+  const direction = cleanString(value.direction);
+  const body = cleanString(value.body);
+  const at = validIso(value.at);
+  if (!["inbound", "outbound", "system"].includes(direction) || !body || !at) return null;
+  return {
+    id: cleanString(value.id) || `${direction}:${at}:${body}`,
+    direction,
+    status: cleanString(value.status),
+    subject: cleanString(value.subject),
+    body,
+    at,
+    source: cleanString(value.source) || "inbox_action",
+  };
+}
+
+function normalizeMessageHistoryEvents(value = []) {
+  const byKey = new Map();
+  for (const item of Array.isArray(value) ? value : []) {
+    const event = normalizeMessageHistoryEvent(item);
+    if (!event) continue;
+    const key = event.id || `${event.direction}:${event.at}:${event.body}`;
+    if (!byKey.has(key)) byKey.set(key, event);
+  }
+  return Array.from(byKey.values()).sort((a, b) => String(a.at).localeCompare(String(b.at)));
 }
 
 export function parseInboxActionState(notes = "") {
@@ -85,6 +117,9 @@ export function parseInboxActionState(notes = "") {
       ...(hasCalendarSlot(calendarSlot) ? { calendar_slot: calendarSlot } : {}),
       ...(cleanString(parsed.calendar_event_id) ? { calendar_event_id: cleanString(parsed.calendar_event_id) } : {}),
       ...(hasInterviewEvent(event) ? { interview_event: event } : {}),
+      ...(normalizeMessageHistoryEvents(parsed.message_history_events).length
+        ? { message_history_events: normalizeMessageHistoryEvents(parsed.message_history_events) }
+        : {}),
     };
   } catch {
     return null;
@@ -109,6 +144,8 @@ export function defaultActionStatus({ action = "", outreachStatus = "" } = {}) {
 export function buildInboxActionPatch({
   action = "",
   notes = "",
+  thread_id = "",
+  subject = "",
   reply_draft = "",
   follow_up_at = "",
   scheduling_message = "",
@@ -126,6 +163,7 @@ export function buildInboxActionPatch({
     : "";
   const slot = normalizeCalendarSlot(calendar_slot);
   const eventId = cleanString(calendar_event_id);
+  const previousState = parseInboxActionState(notes);
   const actionStatus = {
     schedule: "interview_ready",
     reply: "draft_saved",
@@ -152,6 +190,28 @@ export function buildInboxActionPatch({
       ? normalizeInterviewEvent({ status: actionStatus, calendar_event_id: eventId, calendar_slot: slot })
       : normalizeInterviewEvent({ status: cleanAction === "hold_calendar_slot" ? "held" : "", calendar_event_id: eventId, calendar_slot: slot }),
   };
+  const eventBody = cleanAction === "reply" || cleanAction === "save_follow_up_draft"
+    ? state.reply_draft
+    : state.scheduling_message;
+  const eventDirection = ["reply", "save_follow_up_draft", "schedule", "save_scheduling_draft"].includes(cleanAction)
+    ? "outbound"
+    : "system";
+  const event = eventBody
+    ? normalizeMessageHistoryEvent({
+      id: `inbox-action-${cleanString(thread_id) || "thread"}-${cleanAction}-${appliedAt}`,
+      direction: eventDirection,
+      status: actionStatus,
+      subject,
+      body: eventBody,
+      at: appliedAt,
+      source: "inbox_action",
+    })
+    : null;
+  const messageHistoryEvents = normalizeMessageHistoryEvents([
+    ...(previousState?.message_history_events || []),
+    ...(event ? [event] : []),
+  ]);
+  if (messageHistoryEvents.length) state.message_history_events = messageHistoryEvents;
   return {
     ok: true,
     action_state: state,
