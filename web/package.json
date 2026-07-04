@@ -11,7 +11,8 @@
     "verify:schema": "node --env-file-if-exists=.env.local scripts/check-research-runs-schema.mjs && node --env-file-if-exists=.env.local scripts/check-ai-talent-cache-schema.mjs",
     "verify:worker-health": "node --env-file-if-exists=.env.local scripts/check-worker-health.mjs",
     "verify:live": "node --env-file-if-exists=.env.local scripts/verify-live-research-job.mjs",
-    "verify:retry": "node --env-file-if-exists=.env.local scripts/verify-retry-api.mjs"
+    "verify:retry": "node --env-file-if-exists=.env.local scripts/verify-retry-api.mjs",
+    "verify:release": "node --env-file-if-exists=.env.local scripts/verify-release-readiness.mjs"
   },
   "dependencies": {
     "@insforge/sdk": "^1.2.10",
