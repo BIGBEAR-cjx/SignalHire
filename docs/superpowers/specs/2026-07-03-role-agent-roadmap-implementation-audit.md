@@ -2,6 +2,15 @@
 
 日期：2026-07-03
 
+更新：2026-07-04
+
+- P1 已从 guardrail-only provider 推进到外部 HTTP live signal provider hook：生产需要配置 `LIVE_SIGNAL_PROVIDER_URL` / `LIVE_SIGNAL_PROVIDER_API_KEY` 后才会真实刷新；未配置时继续写入可恢复 guardrail run manifest。
+- P2 已新增后台 `prepare_outreach` RoleAgentRun：会复用 bulk contact resolution，批准可触达草稿，并明确不自动发送首封邮件。
+- P3 已新增 persisted two-sided message history events：Inbox action 写回会保留历史消息事件，message history 会合并 Gmail / inbox thread / action notes。
+- P4 已新增完整客户门户 workspace：`/client` 展示授权项目列表，`/client/projects/[id]` 展示 Overview、Interview-ready、Weekly archive、Reports、Feedback，并复用 customer account access policy。
+- 2026-07-04 已完成发布：commit `f59684d`，production deployment `dpl_56z3vNKtF8tCWFvN8bRYvpPBaSU2` Ready，alias `https://signal-hire-eight.vercel.app`。
+- 剩余外部依赖：真实 live signal provider endpoint、可用客户/团队测试账号、能通过 Vercel Security Checkpoint 的登录态浏览器会话。
+
 ## 1. Summary
 
 本审计用于回答：Lev8-inspired Role Agent 路线图 P0-P4 目前哪些已经落地，哪些只是产品视图，后续任务还剩什么。
@@ -14,7 +23,7 @@
 - P3 `Inbox-to-Interview Pipeline` 已经有 interested queue、interview-ready queue、scheduling state、candidate/manager negotiation state、two-sided message history、activity timeline、handoff/calendar/recovery state、slot hold、Google Calendar event create/reschedule/cancel、interview lifecycle writeback、confirmed interview metric 和 Role Agent-to-Inbox action bridge；但候选人/manager 外部双边消息自动推进仍未完成。
 - P4 `Client Delivery Loop` 已经有 Role Agent client delivery loop metrics/risks/next steps，并接入 Smart Report / delivery summary、token-gated public share report、invited customer account access policy、client-safe filtering、client-visible report field controls、report-version frozen delivery snapshot manifest、shareable delivery version history、weekly delivery archive manifest、independent weekly delivery archive storage/readback、Client Delivery Audit Center v1、CSV export、share view metrics、manager feedback capture、retained feedback audit history、metrics-derived and persisted client delivery audit trail 和 independent client delivery audit event storage；但还不是完整客户门户工作台。
 
-结论：路线图已经从 PRD 进入 P0-P4 的第一层产品实现，但剩余工作主要是把 P1-P4 从“聚合视图 + 手动触发执行”推进到“真实后台信号、自动编排、外部协作交付”。
+结论：路线图已经从 PRD 进入 P0-P4 的第一层产品实现，并已补齐客户门户 workspace、P2 后台 `prepare_outreach`、P3 持久消息历史和 P1 HTTP provider hook。剩余工作主要依赖外部配置和真实账号验收：接入 live signal provider endpoint、跑登录态浏览器 QA、再根据真实使用数据决定是否升级为更完整的无人值守编排。
 
 ## 2. Audit Method
 

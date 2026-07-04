@@ -40,9 +40,9 @@ SignalHire 的主线已经从单次 AI 人才搜索，扩展为面向互联网�
 - **Inbox Agent and scheduling**：Gmail 线程可同步并分类 interested、ask for details、later、not interested、
   bounced、out of office、needs human reply；感兴趣候选人可以生成 scheduling packet 和 Calendar availability 草稿，暂留首个可约时间，跟踪候选人/manager 时间协商状态，创建、改期或取消 Google Calendar interview event，并把 confirmed/rescheduled/canceled interview 写回交付状态。
 - **Role Agent controls and why-now signals**：项目页可持久化 agent status、capacity goals、approval mode、client-visible digest / report field visibility，
-  并展示 next tasks、`run_sourcing` direct manual search-task execution、backend RoleAgentRun sourcing / live-signal refresh、`resolve_contacts` direct bulk contact resolution、`approve_or_send_outreach` direct ready-draft approval without sending、`retry_failed_outreach` direct failed-send retry、`follow_up` direct Gmail draft saving without sending、`review_interested_candidates` direct first inbox next-step application、`refresh_live_signals` stale/expired signal refresh queue with scheduled provider cron and provider guardrail fallback、next-action execution states、execution log with targets/results/failed items/retryability、带 run_id/workflow_step/status/guardrails 的 persisted role-agent run manifests、capacity pressure、activity log、blocked automation reasons、contact/outreach autopilot path 和带 target preview / guardrails 的 unified workflow run plan
-  和 persisted recovery history、latest execution summary、retryable failed item display、带 scheduling state、candidate/manager negotiation state、two-sided message history、activity timeline、slot-held/confirmed/rescheduled/canceled writeback、Google Calendar event lifecycle actions 和 handoff/calendar/recovery state 的 inbox-to-interview queue、Role Agent-to-Inbox action bridge，以及基于回复、跟进、contactability、fresh evidence、candidate/company/tech stack signals 的 `why_now` 候选人排序、contact timing window、从 CandidateGraph evidence/profile/company-open-role/tech-stack context 推断的 live signal ingestion、带 type/source/confidence/freshness/expires_at 的 live signal contract、过期信号降权和 stale/expired signal refresh queue。
-- **Delivery and operations**：Smart Report、token-gated / invited-customer-account shareable client delivery loop、project-level delivery snapshot injection、client delivery weekly progress、report-version frozen delivery snapshot manifest、shareable delivery version history、基于 persisted report versions 的 weekly delivery archive manifest、independent weekly delivery archive storage/readback、Client Delivery Audit Center with CSV export、Role Agent client delivery loop metrics/risks/next steps、confirmed interview metric、client-safe delivery filtering、client-visible report field controls、customer account access controls、shareable report view metrics、manager feedback capture、retained feedback audit history、metrics-derived and persisted client delivery audit trail 和 independent client delivery audit event storage、referral path、ATS-lite Greenhouse import/export、History facet counts
+  并展示 next tasks、`run_sourcing` direct manual search-task execution、backend RoleAgentRun sourcing / live-signal refresh / `prepare_outreach`、`resolve_contacts` direct bulk contact resolution、`approve_or_send_outreach` direct ready-draft approval without sending、`retry_failed_outreach` direct failed-send retry、`follow_up` direct Gmail draft saving without sending、`review_interested_candidates` direct first inbox next-step application、`refresh_live_signals` stale/expired signal refresh queue with scheduled provider cron、HTTP provider hook 和 provider guardrail fallback、next-action execution states、execution log with targets/results/failed items/retryability、带 run_id/workflow_step/status/guardrails 的 persisted role-agent run manifests、capacity pressure、activity log、blocked automation reasons、contact/outreach autopilot path 和带 target preview / guardrails 的 unified workflow run plan
+  和 persisted recovery history、latest execution summary、retryable failed item display、带 scheduling state、candidate/manager negotiation state、persisted two-sided message history、activity timeline、slot-held/confirmed/rescheduled/canceled writeback、Google Calendar event lifecycle actions 和 handoff/calendar/recovery state 的 inbox-to-interview queue、Role Agent-to-Inbox action bridge，以及基于回复、跟进、contactability、fresh evidence、candidate/company/tech stack signals 的 `why_now` 候选人排序、contact timing window、从 CandidateGraph evidence/profile/company-open-role/tech-stack context 推断的 live signal ingestion、带 type/source/confidence/freshness/expires_at 的 live signal contract、过期信号降权和 stale/expired signal refresh queue。
+- **Delivery and operations**：Smart Report、token-gated / invited-customer-account shareable client delivery loop、customer `/client` workspace、authorized project list、client project tabs、interview-ready queue、project-level delivery snapshot injection、client delivery weekly progress、report-version frozen delivery snapshot manifest、shareable delivery version history、基于 persisted report versions 的 weekly delivery archive manifest、independent weekly delivery archive storage/readback、Client Delivery Audit Center with CSV export、Role Agent client delivery loop metrics/risks/next steps、confirmed interview metric、client-safe delivery filtering、client-visible report field controls、customer account access controls、shareable report view metrics、manager/client feedback capture、retained feedback audit history、metrics-derived and persisted client delivery audit trail 和 independent client delivery audit event storage、referral path、ATS-lite Greenhouse import/export、History facet counts
   和 saved views 把搜索、外联、证据和客户交付组织成可复用的招聘记忆。
 
 内置缓存示例用于快速体验。非缓存 live research 需要 Insforge、MiroMind 和运行中的 worker，通常需要
@@ -159,6 +159,11 @@ cp web/.env.example web/.env.local
 - `GOOGLE_REDIRECT_URI`
 - `GREENHOUSE_API_KEY`
 
+可选 live signal provider：
+
+- `LIVE_SIGNAL_PROVIDER_URL`
+- `LIVE_SIGNAL_PROVIDER_API_KEY`
+
 > `.env.local` 已 gitignore。不要提交真实密钥。
 
 ### 2. 安装并运行 web app
@@ -204,20 +209,28 @@ jobs，写入 streaming progress，失败时进入 bounded retry，并恢复 sta
 - `/api/cron/search-tasks`：每日触发 due Talent Monitor tasks。
 - `/api/cron/inbox-sync`：同步 SignalHire 相关 Gmail threads，用于 Inbox Agent。
 - `/api/cron/outreach-followups`：处理 due follow-up draft 工作。
+- `/api/cron/live-signals`：刷新 stale / expired Role Agent live signals；未配置 provider 时记录可恢复 guardrail。
 
 生产环境需要设置 `CRON_SECRET`，cron routes 会校验 `Authorization: Bearer $CRON_SECRET`。
 
 ## 验证
 
-Last verified locally: 2026-06-20
+Last verified locally: 2026-07-04
 
 ```bash
 git diff --check
-node --test api-route-copy.test.mjs open-evidence-sources.test.mjs run-storage.test.mjs talent-profile.test.mjs landing-redesign.test.mjs outreach-threads.test.mjs search-tasks.test.mjs talent-intelligence.test.mjs worker-concurrency.test.mjs
+node --test
 npm --prefix web run build
 ```
 
-结果：空白检查、130 个 Node tests、Next.js production build 均通过。
+结果：空白检查、596 个 Node tests、Next.js production build 均通过。
+
+2026-07-04 发布后 smoke：
+
+- Vercel production deployment `dpl_56z3vNKtF8tCWFvN8bRYvpPBaSU2` Ready，并 alias 到 `https://signal-hire-eight.vercel.app`。
+- Vercel authenticated fetch：`/client` 返回 200，`/api/client-portal/workspace` 匿名返回 401。
+- 本地 production build 浏览器 QA：desktop/mobile `/client`、`/client/projects/[id]` 和 `/login?next=/client` 未登录状态可见登录入口，无 loading 卡死或明显文本重叠。
+- 普通 headless browser 访问生产 URL 会被 Vercel Security Checkpoint 拦截；真实登录态客户门户 QA 仍需要可用测试账号和可通过 Vercel 检查的浏览器会话。
 
 常用环境检查：
 
