@@ -1485,3 +1485,16 @@ test("client portal workspace routes and APIs are wired to customer account acce
   assert.match(access, /verifyClientDeliveryCustomerAccountAccess/);
   assert.match(reportPage, /verifyClientDeliveryShareAccess\(row, t, \{ viewer, accessPolicy \}\)/);
 });
+
+test("release readiness can run token-based client portal QA", () => {
+  const script = readFileSync("web/scripts/verify-release-readiness.mjs", "utf8");
+
+  assert.match(script, /SIGNALHIRE_QA_USER_ID/);
+  assert.match(script, /SIGNALHIRE_QA_SESSION_TOKEN/);
+  assert.match(script, /JWT_SECRET/);
+  assert.match(script, /signQaJwt/);
+  assert.match(script, /sh_token/);
+  assert.match(script, /route:\/api\/client-portal\/workspace authenticated/);
+  assert.match(script, /route:\/api\/client-portal\/projects\/\[id\] authenticated/);
+  assert.match(script, /useQaSession/);
+});
