@@ -84,7 +84,7 @@ export async function listProjects(userId: string): Promise<ProjectWithKpi[]> {
     runs_total: string; runs_active: string;
   }>(
     `SELECT
-        p.id, p.user_id, p.name, p.brief, p.status, p.color, p.inbox_sync_summary, p.outreach_settings, p.network_seeds, p.created_at, p.updated_at,
+        p.id, p.user_id, p.name, p.brief, p.status, p.color, p.inbox_sync_summary, p.outreach_settings, p.created_at, p.updated_at,
         COALESCE(s.candidates_total, 0)  AS candidates_total,
         COALESCE(s.candidates_active, 0) AS candidates_active,
         COALESCE(r.runs_total, 0)        AS runs_total,
@@ -118,7 +118,7 @@ export async function listProjects(userId: string): Promise<ProjectWithKpi[]> {
     color: r.color,
     inbox_sync_summary: r.inbox_sync_summary ?? {},
     outreach_settings: buildRoleOutreachSettings(r.outreach_settings),
-    network_seeds: normalizeProjectNetworkSeeds(r.network_seeds),
+    network_seeds: [],
     created_at: r.created_at,
     updated_at: r.updated_at,
     candidates_total: Number(r.candidates_total),
@@ -142,7 +142,7 @@ export async function getProject(userId: string, id: string): Promise<ProjectWit
     runs_total: string; runs_active: string;
   }>(
     `SELECT
-        p.id, p.user_id, p.name, p.brief, p.status, p.color, p.inbox_sync_summary, p.outreach_settings, p.network_seeds, p.created_at, p.updated_at,
+        p.id, p.user_id, p.name, p.brief, p.status, p.color, p.inbox_sync_summary, p.outreach_settings, p.created_at, p.updated_at,
         COALESCE(s.candidates_total, 0)  AS candidates_total,
         COALESCE(s.candidates_active, 0) AS candidates_active,
         COALESCE(r.runs_total, 0)        AS runs_total,
@@ -172,7 +172,7 @@ export async function getProject(userId: string, id: string): Promise<ProjectWit
     id: r.id, user_id: r.user_id, name: r.name, brief: r.brief, status: r.status, color: r.color,
     inbox_sync_summary: r.inbox_sync_summary ?? {},
     outreach_settings: buildRoleOutreachSettings(r.outreach_settings),
-    network_seeds: normalizeProjectNetworkSeeds(r.network_seeds),
+    network_seeds: [],
     created_at: r.created_at, updated_at: r.updated_at,
     candidates_total: Number(r.candidates_total),
     candidates_active: Number(r.candidates_active),
@@ -193,7 +193,7 @@ export async function listClientPortalCandidateProjects(limit = 200): Promise<Pr
     runs_total: string; runs_active: string;
   }>(
     `SELECT
-        p.id, p.user_id, p.name, p.brief, p.status, p.color, p.inbox_sync_summary, p.outreach_settings, p.network_seeds, p.created_at, p.updated_at,
+        p.id, p.user_id, p.name, p.brief, p.status, p.color, p.inbox_sync_summary, p.outreach_settings, p.created_at, p.updated_at,
         COALESCE(s.candidates_total, 0)  AS candidates_total,
         COALESCE(s.candidates_active, 0) AS candidates_active,
         COALESCE(r.runs_total, 0)        AS runs_total,
@@ -228,7 +228,7 @@ export async function listClientPortalCandidateProjects(limit = 200): Promise<Pr
     color: r.color,
     inbox_sync_summary: r.inbox_sync_summary ?? {},
     outreach_settings: buildRoleOutreachSettings(r.outreach_settings),
-    network_seeds: normalizeProjectNetworkSeeds(r.network_seeds),
+    network_seeds: [],
     created_at: r.created_at,
     updated_at: r.updated_at,
     candidates_total: Number(r.candidates_total),
