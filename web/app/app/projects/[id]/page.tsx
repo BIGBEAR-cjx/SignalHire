@@ -1057,6 +1057,7 @@ function RoleAgentGuardrailsPanel({
   const [roleAgentActionSuccess, setRoleAgentActionSuccess] = useState<Record<string, string>>({});
   const [clientInviteCopied, setClientInviteCopied] = useState(false);
   const [clientInviteEmail, setClientInviteEmail] = useState("");
+  const [clientInviteNotice, setClientInviteNotice] = useState("");
   const agentPaused = draftSettings.agent_status === "paused";
   const view = buildRoleAgentGuardrailsView({
     role: { id: project.id, status: project.status },
@@ -1657,30 +1658,40 @@ function RoleAgentGuardrailsPanel({
     setTimeout(() => setClientInviteCopied(false), 1800);
   }
 
-  function upsertClientInvite(emailValue = clientInviteEmail) {
+  async function upsertClientInvite(emailValue = clientInviteEmail) {
     const email = emailValue.trim().toLowerCase();
     if (!email) return;
-    const now = new Date().toISOString();
-    const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
-    const existing = draftSettings.client_delivery_access.invites.find((invite) => invite.email === email);
-    const invites = [
-      ...draftSettings.client_delivery_access.invites.filter((invite) => invite.email !== email),
-      {
-        email,
-        status: "active" as const,
-        invited_at: existing?.invited_at || now,
-        last_sent_at: now,
-        expires_at: existing?.expires_at || expiresAt,
-        revoked_at: "",
-      },
-    ];
-    updateClientDeliveryAccess({
-      mode: "token_or_customer_account",
-      allowed_emails: Array.from(new Set([...draftSettings.client_delivery_access.allowed_emails, email])),
-      invites,
-    });
-    setClientInviteEmail("");
-    copyClientInvitation([email]);
+    const previous = draftSettings;
+    setSettingsSaving(true);
+    setClientInviteNotice("");
+    try {
+      const response = await fetch(`/api/projects/${project.id}/client-invites`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, locale }),
+      });
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(String(body.error || "client_invite_failed"));
+      const saved = buildRoleOutreachSettings(body.settings);
+      setDraftSettings(saved);
+      setCapacityDraft(saved.capacity_goal);
+      setClientInviteEmail("");
+      const emailStatus = String(body.email_status?.status || "");
+      const emailError = String(body.email_status?.error || "");
+      setClientInviteNotice(emailStatus === "sent"
+        ? (isEn ? "Invite email sent." : "邀请邮件已发送。")
+        : emailError === "email_provider_not_configured"
+          ? (isEn ? "Invite saved. Email provider is not configured, so copy the invite manually." : "邀请已保存。邮件服务未配置，请手动复制邀请。")
+          : (isEn ? "Invite saved. Email was not sent." : "邀请已保存，邮件未发送。"));
+      recordRoleAgentMetricEvent({ event_type: "settings_update", action_type: "client_delivery_access" });
+      onChanged();
+      copyClientInvitation([email]);
+    } catch (error) {
+      setDraftSettings(previous);
+      setClientInviteNotice((error as Error).message || (isEn ? "Client invite failed." : "客户邀请失败。"));
+    } finally {
+      setSettingsSaving(false);
+    }
   }
 
   function revokeClientInvite(email: string) {
@@ -1892,6 +1903,9 @@ function RoleAgentGuardrailsPanel({
                     {isEn ? "Add invite" : "添加邀请"}
                   </button>
                 </div>
+                {clientInviteNotice && (
+                  <p className="mt-2 text-[11px] leading-5 text-[var(--sh-muted)]">{clientInviteNotice}</p>
+                )}
                 {draftSettings.client_delivery_access.invites.length > 0 && (
                   <div className="mt-3 divide-y divide-black/5 rounded-lg bg-white ring-1 ring-black/10">
                     {draftSettings.client_delivery_access.invites.map((invite) => (

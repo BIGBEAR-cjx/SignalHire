@@ -158,10 +158,13 @@ cp web/.env.example web/.env.local
 - `GOOGLE_CLIENT_SECRET`
 - `GOOGLE_REDIRECT_URI`
 - `GREENHOUSE_API_KEY`
+- `RESEND_API_KEY`
+- `CLIENT_PORTAL_INVITE_FROM`
 
 可选 live signal provider：
 
 - `LIVE_SIGNAL_PROVIDER_URL`
+- `LIVE_SIGNAL_PROVIDER_HEALTH_URL`
 - `LIVE_SIGNAL_PROVIDER_API_KEY`
 
 > `.env.local` 已 gitignore。不要提交真实密钥。
@@ -245,16 +248,18 @@ npm --prefix web run verify:release -- --base-url https://signal-hire-eight.verc
 `verify:live` 需要 web server、worker、Insforge 和 MiroMind 都可用；生产 live smoke test 还需要登录
 cookie/token 或测试账号。
 
-`verify:release` 会检查 runtime env、`/client`、匿名 `/api/client-portal/workspace`、live signal provider
-配置状态和可选浏览器 QA。需要浏览器检查时先安装或提供 Playwright：
+`verify:release` 会检查 runtime env、live signal provider health、`/client`、匿名
+`/api/client-portal/workspace`、客户门户 token QA 和可选浏览器 QA。需要浏览器检查时先安装或提供
+Playwright：
 
 ```bash
 npm --prefix web run verify:release -- --base-url http://127.0.0.1:3000 --browser
 ```
 
-线上 Vercel URL 可能对普通 headless browser 返回 Security Checkpoint；这种情况下用 Vercel authenticated
-fetch 做线上 smoke，用本地 production build 跑 `--browser` 视觉/布局 QA。登录态客户门户 QA 需要设置
-`SIGNALHIRE_QA_EMAIL` / `SIGNALHIRE_QA_PASSWORD` 并使用能通过 Vercel 检查的浏览器会话。
+线上 Vercel URL 可能对普通 headless browser 返回 Security Checkpoint；这种情况下设置
+`VERCEL_AUTOMATION_BYPASS_SECRET`，`verify:release` 会把 `x-vercel-protection-bypass` 同时用于 fetch
+和 Playwright。登录态客户门户 QA 需要设置 `SIGNALHIRE_QA_USER_ID` / `SIGNALHIRE_QA_EMAIL`，脚本会生成短期
+`sh_token`。
 
 ## 项目结构
 

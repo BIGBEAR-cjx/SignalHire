@@ -496,6 +496,8 @@ test("client portal account access is enforced for share reports and feedback", 
   const loginPage = readFileSync("web/app/login/page.tsx", "utf8");
   const registerPage = readFileSync("web/app/register/page.tsx", "utf8");
   const projectPage = readFileSync("web/app/app/projects/[id]/page.tsx", "utf8");
+  const inviteRoute = readFileSync("web/app/api/projects/[id]/client-invites/route.ts", "utf8");
+  const inviteLib = readFileSync("web/lib/client-portal-invites.mjs", "utf8");
   const reportPage = readFileSync("web/app/r/[id]/page.tsx", "utf8");
   const feedbackRoute = readFileSync("web/app/api/reports/[id]/feedback/route.ts", "utf8");
 
@@ -511,7 +513,15 @@ test("client portal account access is enforced for share reports and feedback", 
   assert.match(projectPage, /Prepare resend|准备重发/);
   assert.match(projectPage, /Revoke|撤销/);
   assert.match(projectPage, /upsertClientInvite/);
+  assert.match(projectPage, /\/api\/projects\/\$\{project\.id\}\/client-invites/);
+  assert.match(projectPage, /email_provider_not_configured/);
   assert.match(projectPage, /revokeClientInvite/);
+  assert.match(inviteRoute, /sendClientPortalInviteEmail/);
+  assert.match(inviteRoute, /upsertClientDeliveryInvite/);
+  assert.match(inviteRoute, /updateProjectOutreachSettings/);
+  assert.doesNotMatch(inviteRoute, /body\.base_url/);
+  assert.match(inviteLib, /https:\/\/api\.resend\.com\/emails/);
+  assert.doesNotMatch(inviteRoute, /RESEND_API_KEY[\s\S]{0,80}Response\.json/);
   assert.match(projectPage, /\/register\?next=\/client/);
   assert.match(projectPage, /clientPortalInvitationText/);
   assert.match(projectPage, /client_delivery_access/);
@@ -535,6 +545,9 @@ test("live signal provider cron and background role agent runs are wired", () =>
   assert.match(liveSignalRunner, /buildRoleAgentWorkspaceView/);
   assert.match(liveSignalRunner, /LIVE_SIGNAL_PROVIDER_URL/);
   assert.match(liveSignalRunner, /createHttpLiveSignalProvider/);
+  const releaseVerifier = readFileSync("web/scripts/verify-release-readiness.mjs", "utf8");
+  assert.match(releaseVerifier, /LIVE_SIGNAL_PROVIDER_HEALTH_URL/);
+  assert.match(releaseVerifier, /checkLiveSignalProviderHealth/);
   assert.match(roleAgentRoute, /runRoleAgentProjectAction/);
   assert.match(roleAgentRoute, /prepare_outreach/);
   assert.match(roleAgentRunner, /runRoleAgentRunCore/);
@@ -1515,8 +1528,12 @@ test("release readiness can run token-based client portal QA", () => {
   assert.match(script, /SIGNALHIRE_QA_USER_ID/);
   assert.match(script, /SIGNALHIRE_QA_SESSION_TOKEN/);
   assert.match(script, /JWT_SECRET/);
+  assert.match(script, /VERCEL_AUTOMATION_BYPASS_SECRET/);
+  assert.match(script, /x-vercel-protection-bypass/);
   assert.match(script, /signQaJwt/);
   assert.match(script, /sh_token/);
+  assert.match(script, /automationBypassHeaders/);
+  assert.match(script, /extraHTTPHeaders/);
   assert.match(script, /route:\/api\/client-portal\/workspace authenticated/);
   assert.match(script, /route:\/api\/client-portal\/projects\/\[id\] authenticated/);
   assert.match(script, /useQaSession/);

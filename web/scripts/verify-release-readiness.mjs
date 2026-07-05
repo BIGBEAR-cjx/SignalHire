@@ -25,8 +25,23 @@ function baseUrl() {
   return cleanString(argValue("--base-url", process.env.SIGNALHIRE_QA_BASE_URL || "http://127.0.0.1:3000")).replace(/\/+$/, "");
 }
 
+function automationBypassHeaders() {
+  const secret = cleanString(process.env.VERCEL_AUTOMATION_BYPASS_SECRET);
+  return secret ? { "x-vercel-protection-bypass": secret } : {};
+}
+
+function requestOptions(options = {}) {
+  return {
+    ...options,
+    headers: {
+      ...automationBypassHeaders(),
+      ...(options.headers || {}),
+    },
+  };
+}
+
 async function fetchText(url, options = {}) {
-  const response = await fetch(url, { redirect: "manual", ...options });
+  const response = await fetch(url, requestOptions({ redirect: "manual", ...options }));
   const text = await response.text();
   return { status: response.status, text };
 }
@@ -87,7 +102,7 @@ async function gotoWithRetry(page, url, options = {}) {
 }
 
 async function fetchJson(url, options = {}) {
-  const response = await fetch(url, { redirect: "manual", ...options });
+  const response = await fetch(url, requestOptions({ redirect: "manual", ...options }));
   const text = await response.text();
   let json = {};
   try {
@@ -203,6 +218,27 @@ function runtimeEnvChecks({ requireLiveProvider = false } = {}) {
   return rows;
 }
 
+async function checkLiveSignalProviderHealth({ requireLiveProvider = false } = {}) {
+  const healthUrl = cleanString(process.env.LIVE_SIGNAL_PROVIDER_HEALTH_URL);
+  if (!healthUrl) {
+    return [{
+      name: "live-signal-provider:health",
+      status: requireLiveProvider ? "fail" : "warn",
+      detail: requireLiveProvider
+        ? "LIVE_SIGNAL_PROVIDER_HEALTH_URL missing"
+        : "LIVE_SIGNAL_PROVIDER_HEALTH_URL missing; provider health check skipped",
+    }];
+  }
+  const apiKey = cleanString(process.env.LIVE_SIGNAL_PROVIDER_API_KEY);
+  const headers = apiKey ? { Authorization: `Bearer ${apiKey}` } : {};
+  const response = await fetchTextWithRetry(healthUrl, { headers }, new Set([0, 502, 503, 504]));
+  return [{
+    name: "live-signal-provider:health",
+    status: response.status >= 200 && response.status < 300 ? "pass" : requireLiveProvider ? "fail" : "warn",
+    detail: `status=${response.status}`,
+  }];
+}
+
 async function routeSmokeChecks(origin, qaSession = null) {
   const rows = [];
   const client = await fetchTextWithRetry(`${origin}/client`);
@@ -303,7 +339,11 @@ async function browserChecks(origin, qaSession = null) {
   const rows = [];
   try {
     for (const item of cases) {
-      const context = await browser.newContext({ viewport: item.viewport, isMobile: Boolean(item.isMobile) });
+      const context = await browser.newContext({
+        viewport: item.viewport,
+        isMobile: Boolean(item.isMobile),
+        extraHTTPHeaders: automationBypassHeaders(),
+      });
       if (qaSession && item.useQaSession) {
         await context.addCookies([{
           name: "sh_token",
@@ -379,6 +419,7 @@ async function main() {
   const qaSession = qaSessionResult?.cookie ? qaSessionResult : null;
   const rows = [
     ...runtimeEnvChecks({ requireLiveProvider }),
+    ...await checkLiveSignalProviderHealth({ requireLiveProvider }),
     ...await routeSmokeChecks(origin, qaSession),
   ];
   if (qaSession) {
