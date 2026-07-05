@@ -5,6 +5,7 @@ import {
   listClientPortalCandidateProjects,
   listProjectClientDeliveryWeeklyArchives,
   projectRuns,
+  recordProjectRoleAgentEvent,
   type ProjectWithKpi,
 } from "./projects";
 import { buildProjectInboxQueueView } from "./inbox";
@@ -89,4 +90,29 @@ export function clientPortalReportHref(report: { id?: string } | null, locale: "
   if (!id) return "";
   const params = new URLSearchParams({ lang: locale });
   return `/r/${encodeURIComponent(id)}?${params.toString()}`;
+}
+
+export async function recordClientPortalProjectView(project: ProjectWithKpi, viewer: Viewer) {
+  const userId = cleanString(project?.user_id);
+  const projectId = cleanString(project?.id);
+  if (!userId || !projectId) return false;
+  const href = `/client/projects/${encodeURIComponent(projectId)}`;
+  const actor = cleanString(viewer?.email) || "Client";
+  try {
+    await recordProjectRoleAgentEvent({
+      userId,
+      id: projectId,
+      event: {
+        event_type: "client_report_view",
+        action_type: "client_portal_project_view",
+        actor,
+        report_href: href,
+        detail: `Client portal project viewed by ${actor} (${href})`,
+        at: new Date().toISOString(),
+      },
+    });
+    return true;
+  } catch {
+    return false;
+  }
 }

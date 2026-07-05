@@ -6,6 +6,9 @@ export type RoleAgentMetricEvent = {
   workflow_step?: string;
   guardrail?: string;
   detail?: string;
+  actor?: string;
+  note?: string;
+  report_href?: string;
   targets?: Array<{ id?: string; candidate_name?: string; name?: string }>;
   result?: Record<string, string | number | boolean>;
   failed_items?: Array<{ id?: string; candidate_name?: string; name?: string; error?: string; reason?: string }>;

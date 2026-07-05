@@ -1474,6 +1474,7 @@ test("client portal workspace routes and APIs are wired to customer account acce
   assert.match(workspaceRoute, /findClientPortalAuthorizedProjects/);
   assert.match(portalServer, /listClientPortalCandidateProjects/);
   assert.match(projectRoute, /verifyClientPortalProjectAccess/);
+  assert.match(projectRoute, /recordClientPortalProjectView/);
   assert.match(projectRoute, /buildClientPortalProjectView/);
   assert.match(feedbackRoute, /recordProjectRoleAgentEvent/);
   assert.match(feedbackRoute, /client_delivery_feedback/);
@@ -1481,6 +1482,7 @@ test("client portal workspace routes and APIs are wired to customer account acce
   assert.match(portal, /buildClientPortalWorkspaceView/);
   assert.match(portal, /buildClientPortalProjectView/);
   assert.match(portal, /verifyClientDeliveryCustomerAccountAccess/);
+  assert.match(portalServer, /client_portal_project_view/);
   assert.match(projects, /listClientPortalCandidateProjects/);
   assert.match(access, /verifyClientDeliveryCustomerAccountAccess/);
   assert.match(reportPage, /verifyClientDeliveryShareAccess\(row, t, \{ viewer, accessPolicy \}\)/);

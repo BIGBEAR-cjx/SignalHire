@@ -3,6 +3,7 @@ import { verifyClientPortalProjectAccess } from "@/lib/client-portal-workspace.m
 import {
   findClientPortalAuthorizedProject,
   loadClientPortalProjectDetail,
+  recordClientPortalProjectView,
 } from "@/lib/client-portal";
 import { normalizeLocale, t } from "@/lib/i18n.mjs";
 import { getUser } from "@/lib/session";
@@ -21,6 +22,7 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
   const access = verifyClientPortalProjectAccess(project, user);
   if (!access.allowed) return Response.json({ error: t(locale, "api.error.jobUnavailable") }, { status: 403 });
 
+  await recordClientPortalProjectView(project, user);
   const detail = await loadClientPortalProjectDetail(project, locale);
   return Response.json(buildClientPortalProjectView({
     viewer: user,

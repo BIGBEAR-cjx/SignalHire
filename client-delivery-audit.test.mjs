@@ -28,6 +28,27 @@ test("builds a persistent audit event for client report views", () => {
   });
 });
 
+test("builds a persistent audit event for client portal project views", () => {
+  const audit = buildClientDeliveryAuditEvent({
+    userId: "user-1",
+    projectId: "project-1",
+    event: {
+      event_type: "client_report_view",
+      action_type: "client_portal_project_view",
+      actor: "hiring@client.ai",
+      report_href: "/client/projects/project-1",
+      detail: "Client portal project viewed by hiring@client.ai (/client/projects/project-1)",
+      at: "2026-07-05T08:00:00.000Z",
+    },
+  });
+
+  assert.equal(audit?.event_type, "report_view");
+  assert.equal(audit?.action_type, "client_portal_project_view");
+  assert.equal(audit?.report_href, "/client/projects/project-1");
+  assert.equal(audit?.actor, "hiring@client.ai");
+  assert.equal(audit?.event_at, "2026-07-05T08:00:00.000Z");
+});
+
 test("builds a persistent audit event for client delivery feedback", () => {
   const audit = buildClientDeliveryAuditEvent({
     userId: "user-1",

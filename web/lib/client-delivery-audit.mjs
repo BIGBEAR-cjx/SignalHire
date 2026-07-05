@@ -1,4 +1,4 @@
-const REPORT_ACTION_TYPES = new Set(["shareable_client_delivery_loop"]);
+const REPORT_ACTION_TYPES = new Set(["shareable_client_delivery_loop", "client_portal_project_view"]);
 const FEEDBACK_ACTION_TYPES = new Set(["client_delivery_feedback"]);
 
 function isRecord(value) {
@@ -17,7 +17,7 @@ function validIso(value) {
 
 function reportHrefFromDetail(detail) {
   const clean = cleanString(detail);
-  const match = clean.match(/(https?:\/\/\S+|\/r\/\S+)/);
+  const match = clean.match(/(https?:\/\/\S+|\/r\/\S+|\/client\/projects\/\S+)/);
   return match ? match[1].replace(/[).,]+$/, "") : "";
 }
 
@@ -40,6 +40,7 @@ export function buildClientDeliveryAuditEvent(input = {}) {
   const eventType = cleanString(event.event_type);
   const actionType = cleanString(event.action_type);
   const detail = cleanString(event.detail);
+  const reportHref = cleanString(event.report_href) || reportHrefFromDetail(detail);
   if (!userId || !projectId) return null;
 
   if (eventType === "client_report_view" && REPORT_ACTION_TYPES.has(actionType)) {
@@ -48,10 +49,10 @@ export function buildClientDeliveryAuditEvent(input = {}) {
       project_id: projectId,
       event_type: "report_view",
       action_type: actionType,
-      report_href: reportHrefFromDetail(detail) || detail,
-      actor: "Client",
+      report_href: reportHref || detail,
+      actor: cleanString(event.actor) || "Client",
       sentiment: "",
-      note: "",
+      note: cleanString(event.note),
       detail,
       event_at: validIso(event.at),
     };
