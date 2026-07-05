@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { FiArrowRight, FiLock, FiMail, FiShield, FiUser } from "react-icons/fi";
 import LanguageSwitcher from "@/components/LanguageSwitcher";
@@ -22,6 +22,13 @@ export default function RegisterPage() {
   const [stage, setStage] = useState<"form" | "verify">("form");
   const [err, setErr] = useState("");
   const [loading, setLoading] = useState(false);
+  const [next, setNext] = useState("/");
+
+  useEffect(() => {
+    setNext(new URLSearchParams(location.search).get("next") || "/");
+  }, []);
+
+  const clientPortalRegister = next.startsWith("/client");
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -56,10 +63,14 @@ export default function RegisterPage() {
           <div className="max-w-2xl">
             <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[var(--sh-faint)]">{t("auth.graph")}</p>
             <h1 className="mt-3 text-5xl font-semibold leading-[1.02] tracking-tight text-[var(--sh-ink)] md:text-6xl">
-              {t("auth.registerHero")}
+              {clientPortalRegister ? (locale === "en" ? "Create your client portal account." : "创建客户门户账号。") : t("auth.registerHero")}
             </h1>
             <p className="mt-5 max-w-xl text-lg leading-8 text-[var(--sh-muted)]">
-              {t("auth.registerDesc")}
+              {clientPortalRegister
+                ? (locale === "en"
+                  ? "Register with the email your recruiting team invited. After email-code verification, you will return to the client workspace."
+                  : "请使用招聘团队邀请的邮箱注册。完成邮箱验证码验证后，会回到客户工作台。")
+                : t("auth.registerDesc")}
             </p>
           </div>
         </section>
@@ -116,6 +127,7 @@ export default function RegisterPage() {
           <form onSubmit={submitOtp} className="space-y-4">
             <p className="rounded-3xl bg-white/70 px-4 py-3 text-sm leading-6 text-[var(--sh-muted)] ring-1 ring-black/10">
               {t("auth.codeSent", { email })}
+              {clientPortalRegister ? ` ${locale === "en" ? "Verification is required before the client portal can open." : "客户门户需要完成邮箱验证后才能打开。"}` : ""}
             </p>
             <label className="block">
               <span className="mb-2 block text-sm font-medium text-[var(--sh-muted)]">{t("auth.verifyCode")}</span>
@@ -136,7 +148,8 @@ export default function RegisterPage() {
         )}
 
           <p className="mt-6 text-center text-sm text-[var(--sh-muted)]">
-            {t("auth.hasAccount")} <Link href="/login" className="font-semibold text-[var(--sh-blue)] hover:underline">{t("common.login")}</Link>
+            {t("auth.hasAccount")}{" "}
+            <Link href={clientPortalRegister ? `/login?next=${encodeURIComponent(next)}` : "/login"} className="font-semibold text-[var(--sh-blue)] hover:underline">{t("common.login")}</Link>
           </p>
         </section>
       </div>

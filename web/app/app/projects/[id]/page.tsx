@@ -5,7 +5,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { FiAlertTriangle, FiArrowLeft, FiCheckCircle, FiClock, FiMail, FiPauseCircle, FiPlay, FiRefreshCw, FiSearch, FiSend, FiTrash2 } from "react-icons/fi";
+import { FiAlertTriangle, FiArrowLeft, FiCheckCircle, FiClock, FiCopy, FiExternalLink, FiMail, FiPauseCircle, FiPlay, FiRefreshCw, FiSearch, FiSend, FiTrash2 } from "react-icons/fi";
 import { CandidateComparisonView, CandidateProfileView, EvidencePriorityPanel } from "@/components/result";
 import LeadPreviewPanel from "@/components/LeadPreviewPanel";
 import { useI18n } from "@/components/LanguageProvider";
@@ -969,8 +969,35 @@ function roleAgentSettingsActionType(next: Partial<ReturnType<typeof buildRoleOu
   if (Object.hasOwn(next, "approval_mode")) return "approval_mode";
   if (Object.hasOwn(next, "agent_status")) return "agent_status";
   if (Object.hasOwn(next, "client_delivery_visibility")) return "client_delivery_visibility";
-  if (Object.hasOwn(next, "client_delivery_access")) return "client_delivery_visibility";
+  if (Object.hasOwn(next, "client_delivery_access")) return "client_delivery_access";
   return "settings";
+}
+
+function absoluteAppUrl(path: string) {
+  if (typeof window === "undefined") return path;
+  return `${window.location.origin}${path}`;
+}
+
+function clientPortalInvitationText({
+  projectName,
+  emails,
+  domains,
+  isEn,
+}: {
+  projectName: string;
+  emails: string[];
+  domains: string[];
+  isEn: boolean;
+}) {
+  const portalUrl = absoluteAppUrl("/client");
+  const registerUrl = absoluteAppUrl("/register?next=/client");
+  const invited = [
+    emails.length ? `${isEn ? "emails" : "邮箱"}: ${emails.join(", ")}` : "",
+    domains.length ? `${isEn ? "domains" : "域名"}: ${domains.join(", ")}` : "",
+  ].filter(Boolean).join(" · ");
+  return isEn
+    ? `You have been invited to review ${projectName} in SignalHire Client Portal.\n\nUse an authorized email to sign up and verify your email code:\n${registerUrl}\n\nAfter verification, open your client workspace:\n${portalUrl}${invited ? `\n\nAuthorized access: ${invited}` : ""}`
+    : `你已被邀请在 SignalHire 客户门户查看「${projectName}」。\n\n请使用已授权邮箱注册，并完成邮箱验证码验证：\n${registerUrl}\n\n验证后打开客户工作台：\n${portalUrl}${invited ? `\n\n已授权访问：${invited}` : ""}`;
 }
 
 function roleAgentInboxActionPayload(step: RoleAgentWorkspaceView["inbox_pipeline"]["next_steps"][number]) {
@@ -1028,6 +1055,7 @@ function RoleAgentGuardrailsPanel({
   const [roleAgentActionBusy, setRoleAgentActionBusy] = useState("");
   const [roleAgentActionErrors, setRoleAgentActionErrors] = useState<Record<string, string>>({});
   const [roleAgentActionSuccess, setRoleAgentActionSuccess] = useState<Record<string, string>>({});
+  const [clientInviteCopied, setClientInviteCopied] = useState(false);
   const agentPaused = draftSettings.agent_status === "paused";
   const view = buildRoleAgentGuardrailsView({
     role: { id: project.id, status: project.status },
@@ -1617,6 +1645,17 @@ function RoleAgentGuardrailsPanel({
     return value.split(",").map((item) => item.trim()).filter(Boolean);
   }
 
+  function copyClientInvitation() {
+    navigator.clipboard?.writeText(clientPortalInvitationText({
+      projectName: project.name,
+      emails: draftSettings.client_delivery_access.allowed_emails,
+      domains: draftSettings.client_delivery_access.allowed_domains,
+      isEn,
+    }));
+    setClientInviteCopied(true);
+    setTimeout(() => setClientInviteCopied(false), 1800);
+  }
+
   function updateCapacityDraft(key: keyof typeof capacityDraft, value: string) {
     const number = Math.max(0, Math.floor(Number(value) || 0));
     setCapacityDraft((prev) => ({ ...prev, [key]: number }));
@@ -1773,6 +1812,38 @@ function RoleAgentGuardrailsPanel({
               placeholder={isEn ? "example.com" : "example.com"}
               aria-label={isEn ? "Allowed customer domains" : "允许的客户域名"}
             />
+            {draftSettings.client_delivery_access.mode === "token_or_customer_account" && (
+              <div className="mt-3 rounded-lg bg-[var(--sh-canvas)] px-2.5 py-2 ring-1 ring-black/5">
+                <p className="text-[11px] font-semibold text-[var(--sh-ink)]">
+                  {isEn ? "Customer invite path" : "客户邀请路径"}
+                </p>
+                <p className="mt-1 text-[11px] leading-5 text-[var(--sh-muted)]">
+                  {isEn
+                    ? "Invite customers to sign up with an allowed email, verify the email code, then open the client workspace."
+                    : "邀请客户使用已授权邮箱注册，完成邮箱验证码后进入客户工作台。"}
+                </p>
+                <div className="mt-2 space-y-1 text-[11px] leading-5 text-[var(--sh-muted)]">
+                  <p className="break-all">{isEn ? "Workspace" : "工作台"}: /client</p>
+                  <p className="break-all">{isEn ? "Sign up" : "注册"}: /register?next=/client</p>
+                </div>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={copyClientInvitation}
+                    className="inline-flex min-h-8 items-center gap-1.5 rounded-full bg-white px-3 text-[11px] font-semibold text-[var(--sh-ink)] ring-1 ring-black/10 hover:bg-neutral-50"
+                  >
+                    {clientInviteCopied ? <FiCheckCircle className="h-3.5 w-3.5" aria-hidden="true" /> : <FiCopy className="h-3.5 w-3.5" aria-hidden="true" />}
+                    {clientInviteCopied ? (isEn ? "Copied" : "已复制") : (isEn ? "Copy invite" : "复制邀请")}
+                  </button>
+                  <a
+                    href="/client"
+                    className="inline-flex min-h-8 items-center gap-1.5 rounded-full bg-white px-3 text-[11px] font-semibold text-[var(--sh-blue)] ring-1 ring-black/10 hover:bg-blue-50"
+                  >
+                    {isEn ? "Open portal" : "打开门户"} <FiExternalLink className="h-3.5 w-3.5" aria-hidden="true" />
+                  </a>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </div>

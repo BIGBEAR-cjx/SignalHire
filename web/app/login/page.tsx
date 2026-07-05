@@ -15,6 +15,8 @@ export default function LoginPage() {
   const [err, setErr] = useState("");
   const [loading, setLoading] = useState(false);
   const [hydrated, setHydrated] = useState(false);
+  const next = hydrated && typeof window !== "undefined" ? new URLSearchParams(location.search).get("next") || "/" : "/";
+  const clientPortalLogin = next.startsWith("/client");
 
   useEffect(() => {
     setHydrated(true);
@@ -27,7 +29,6 @@ export default function LoginPage() {
     setLoading(true); setErr("");
     const r = await login(email.trim(), pw, locale);
     if (r.ok) {
-      const next = new URLSearchParams(location.search).get("next") || "/";
       location.href = next; // 整页跳转, 让页面和服务端请求读取新 cookie
     } else {
       setErr(r.error);
@@ -47,10 +48,14 @@ export default function LoginPage() {
           <div className="max-w-2xl">
             <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[var(--sh-faint)]">{t("auth.intel")}</p>
             <h1 className="mt-3 text-5xl font-semibold leading-[1.02] tracking-tight text-[var(--sh-ink)] md:text-6xl">
-              {t("auth.loginHero")}
+              {clientPortalLogin ? (locale === "en" ? "Log in to the client portal." : "登录客户门户。") : t("auth.loginHero")}
             </h1>
             <p className="mt-5 max-w-xl text-lg leading-8 text-[var(--sh-muted)]">
-              {t("auth.loginDesc")}
+              {clientPortalLogin
+                ? (locale === "en"
+                  ? "Use the email authorized by your recruiting team to review delivery progress, reports, interview-ready candidates, and feedback history."
+                  : "使用招聘团队授权的邮箱，查看交付进展、报告、可约面候选人和反馈历史。")
+                : t("auth.loginDesc")}
             </p>
           </div>
         </section>
@@ -92,7 +97,12 @@ export default function LoginPage() {
           </form>
 
           <p className="mt-6 text-center text-sm text-[var(--sh-muted)]">
-            {t("auth.noAccount")} <Link href="/register" className="font-semibold text-[var(--sh-blue)] hover:underline">{t("common.register")}</Link>
+            {clientPortalLogin
+              ? (locale === "en" ? "First time here?" : "第一次访问？")
+              : t("auth.noAccount")}{" "}
+            <Link href={clientPortalLogin ? `/register?next=${encodeURIComponent(next)}` : "/register"} className="font-semibold text-[var(--sh-blue)] hover:underline">
+              {clientPortalLogin ? (locale === "en" ? "Sign up and verify email" : "注册并验证邮箱") : t("common.register")}
+            </Link>
           </p>
         </section>
       </div>

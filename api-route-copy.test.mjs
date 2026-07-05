@@ -493,6 +493,9 @@ test("client delivery audit center exposes dashboard page API and export", () =>
 test("client portal account access is enforced for share reports and feedback", () => {
   const access = readFileSync("web/lib/report-share-access.mjs", "utf8");
   const settings = readFileSync("web/lib/outreach-settings.mjs", "utf8");
+  const loginPage = readFileSync("web/app/login/page.tsx", "utf8");
+  const registerPage = readFileSync("web/app/register/page.tsx", "utf8");
+  const projectPage = readFileSync("web/app/app/projects/[id]/page.tsx", "utf8");
   const reportPage = readFileSync("web/app/r/[id]/page.tsx", "utf8");
   const feedbackRoute = readFileSync("web/app/api/reports/[id]/feedback/route.ts", "utf8");
 
@@ -502,6 +505,15 @@ test("client portal account access is enforced for share reports and feedback", 
   assert.match(reportPage, /getUser/);
   assert.match(reportPage, /verifyClientDeliveryShareAccess\(row, t,[\s\S]{0,220}viewer/);
   assert.match(feedbackRoute, /verifyClientDeliveryShareAccess\(row \? \{ \.\.\.row, id \} : null, token,[\s\S]{0,220}accessPolicy/);
+  assert.match(projectPage, /Customer invite path|客户邀请路径/);
+  assert.match(projectPage, /Copy invite|复制邀请/);
+  assert.match(projectPage, /\/register\?next=\/client/);
+  assert.match(projectPage, /clientPortalInvitationText/);
+  assert.match(projectPage, /client_delivery_access/);
+  assert.match(loginPage, /clientPortalLogin/);
+  assert.match(loginPage, /Sign up and verify email|注册并验证邮箱/);
+  assert.match(registerPage, /clientPortalRegister/);
+  assert.match(registerPage, /Verification is required before the client portal can open|客户门户需要完成邮箱验证后才能打开/);
 });
 
 test("live signal provider cron and background role agent runs are wired", () => {

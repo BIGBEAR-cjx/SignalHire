@@ -8,7 +8,7 @@ const ACTION_TYPES = new Set([
   "review_interested_candidates",
   "refresh_live_signals",
 ]);
-const SETTINGS_ACTION_TYPES = new Set(["agent_status", "approval_mode", "capacity_goal", "client_delivery_visibility"]);
+const SETTINGS_ACTION_TYPES = new Set(["agent_status", "approval_mode", "capacity_goal", "client_delivery_visibility", "client_delivery_access"]);
 const REPORT_ACTION_TYPES = new Set(["shareable_client_delivery_loop"]);
 const MANAGER_FEEDBACK_ACTION_TYPES = new Set(["client_delivery_feedback"]);
 const ACTION_STATUSES = new Set(["started", "succeeded", "failed", "blocked"]);
