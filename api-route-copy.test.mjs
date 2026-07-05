@@ -1520,4 +1520,6 @@ test("release readiness can run token-based client portal QA", () => {
   assert.match(script, /route:\/api\/client-portal\/workspace authenticated/);
   assert.match(script, /route:\/api\/client-portal\/projects\/\[id\] authenticated/);
   assert.match(script, /useQaSession/);
+  assert.match(script, /hasLoginPrompt/);
+  assert.doesNotMatch(script, /hasLoginEntry = \/登录\|Sign in\|邮箱\|Email\//);
 });

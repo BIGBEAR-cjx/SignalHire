@@ -340,13 +340,13 @@ async function browserChecks(origin, qaSession = null) {
           };
         }).filter((rect) => rect.text && rect.width > 1 && rect.height > 1));
         const overlap = visibleOverlap(rects);
-        const hasLoginEntry = /登录|Sign in|邮箱|Email/i.test(bodyText);
+        const hasLoginPrompt = /登录客户门户|登录 SignalHire|Log in to the client portal|Sign in to SignalHire|Sign up and verify email|注册并验证邮箱/i.test(bodyText);
         const hasClientPortalContent = /客户交付工作台|Client delivery|客户项目|Interview-ready|Authorized projects|已授权项目/i.test(bodyText);
-        const hasLoadingOnly = /正在加载工作台/.test(bodyText) && !hasLoginEntry;
+        const hasLoadingOnly = /正在加载工作台/.test(bodyText) && !hasLoginPrompt;
         const checkpoint = isVercelSecurityCheckpoint(bodyText);
         const ok = item.useQaSession
-          ? response?.status() === 200 && hasClientPortalContent && !hasLoginEntry && !hasLoadingOnly && !overlap && !checkpoint
-          : response?.status() === 200 && hasLoginEntry && !hasLoadingOnly && !overlap && !checkpoint;
+          ? response?.status() === 200 && hasClientPortalContent && !hasLoginPrompt && !hasLoadingOnly && !overlap && !checkpoint
+          : response?.status() === 200 && hasLoginPrompt && !hasLoadingOnly && !overlap && !checkpoint;
         rows.push({
           name: item.name,
           status: ok ? "pass" : checkpoint ? "blocked" : "fail",
