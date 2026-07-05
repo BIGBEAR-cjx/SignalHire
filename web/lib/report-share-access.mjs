@@ -16,6 +16,52 @@ function uniqueCleanList(value) {
   ));
 }
 
+function validIso(value) {
+  const clean = cleanString(value);
+  if (!clean) return "";
+  const date = new Date(clean);
+  return Number.isFinite(date.getTime()) ? date.toISOString() : "";
+}
+
+function nowTime(options = {}) {
+  const date = options.now ? new Date(options.now) : new Date();
+  return Number.isFinite(date.getTime()) ? date.getTime() : Date.now();
+}
+
+function normalizeClientDeliveryInvite(value, options = {}) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const email = cleanLower(value.email);
+  if (!email) return null;
+  const expiresAt = validIso(value.expires_at || value.expiresAt);
+  const revokedAt = validIso(value.revoked_at || value.revokedAt);
+  const rawStatus = cleanLower(value.status);
+  const expired = expiresAt && new Date(expiresAt).getTime() <= nowTime(options);
+  const status = rawStatus === "revoked"
+    ? "revoked"
+    : expired
+      ? "expired"
+      : "active";
+  return {
+    email,
+    status,
+    invited_at: validIso(value.invited_at || value.invitedAt),
+    last_sent_at: validIso(value.last_sent_at || value.lastSentAt),
+    expires_at: expiresAt,
+    revoked_at: revokedAt,
+  };
+}
+
+function normalizeClientDeliveryInvites(value, options = {}) {
+  const seen = new Set();
+  return (Array.isArray(value) ? value : [])
+    .map((item) => normalizeClientDeliveryInvite(item, options))
+    .filter((item) => {
+      if (!item || seen.has(item.email)) return false;
+      seen.add(item.email);
+      return true;
+    });
+}
+
 function shareSecret(options = {}) {
   return cleanString(options.secret)
     || cleanString(process.env.SIGNALHIRE_REPORT_SHARE_SECRET)
@@ -74,15 +120,20 @@ export function buildClientDeliveryShareHref(row = {}, options = {}) {
   return `/r/${encodeURIComponent(id)}${query ? `?${query}` : ""}`;
 }
 
-export function normalizeClientDeliveryAccessPolicy(value = {}) {
+export function normalizeClientDeliveryAccessPolicy(value = {}, options = {}) {
   const source = value && typeof value === "object" && !Array.isArray(value) ? value : {};
   const mode = cleanString(source.mode) === "token_or_customer_account" ? "token_or_customer_account" : "token_only";
+  const invites = normalizeClientDeliveryInvites(source.invites, options);
   return {
     mode,
-    allowed_emails: uniqueCleanList(source.allowed_emails || source.allowedEmails),
+    allowed_emails: uniqueCleanList([
+      ...(Array.isArray(source.allowed_emails || source.allowedEmails) ? source.allowed_emails || source.allowedEmails : []),
+      ...invites.filter((invite) => invite.status === "active").map((invite) => invite.email),
+    ]),
     allowed_domains: uniqueCleanList(source.allowed_domains || source.allowedDomains)
       .map((domain) => domain.replace(/^@+/, ""))
       .filter(Boolean),
+    invites,
   };
 }
 

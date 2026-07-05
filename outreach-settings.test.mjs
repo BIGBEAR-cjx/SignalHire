@@ -17,6 +17,7 @@ test("builds role outreach settings with conservative defaults", () => {
       mode: "token_only",
       allowed_emails: [],
       allowed_domains: [],
+      invites: [],
     },
     agent_status: "active",
     approval_mode: "manual_all",
@@ -55,6 +56,7 @@ test("builds role outreach settings with conservative defaults", () => {
       mode: "token_only",
       allowed_emails: [],
       allowed_domains: [],
+      invites: [],
     },
     agent_status: "paused",
     approval_mode: "auto_follow_up_only",
@@ -87,6 +89,7 @@ test("normalizes unsafe approval modes into manual persisted settings", () => {
       mode: "token_only",
       allowed_emails: [],
       allowed_domains: [],
+      invites: [],
     },
     agent_status: "active",
     approval_mode: "manual_all",
@@ -116,6 +119,7 @@ test("normalizes unsafe approval modes into manual persisted settings", () => {
       mode: "token_only",
       allowed_emails: [],
       allowed_domains: [],
+      invites: [],
     },
     agent_status: "active",
     approval_mode: "manual_all",
@@ -167,6 +171,7 @@ test("normalizes client delivery customer account access controls", () => {
     mode: "token_or_customer_account",
     allowed_emails: ["client@example.com"],
     allowed_domains: ["example.org"],
+    invites: [],
   });
 });
 

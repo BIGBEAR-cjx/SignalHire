@@ -1056,6 +1056,7 @@ function RoleAgentGuardrailsPanel({
   const [roleAgentActionErrors, setRoleAgentActionErrors] = useState<Record<string, string>>({});
   const [roleAgentActionSuccess, setRoleAgentActionSuccess] = useState<Record<string, string>>({});
   const [clientInviteCopied, setClientInviteCopied] = useState(false);
+  const [clientInviteEmail, setClientInviteEmail] = useState("");
   const agentPaused = draftSettings.agent_status === "paused";
   const view = buildRoleAgentGuardrailsView({
     role: { id: project.id, status: project.status },
@@ -1645,15 +1646,55 @@ function RoleAgentGuardrailsPanel({
     return value.split(",").map((item) => item.trim()).filter(Boolean);
   }
 
-  function copyClientInvitation() {
+  function copyClientInvitation(emails = draftSettings.client_delivery_access.allowed_emails) {
     navigator.clipboard?.writeText(clientPortalInvitationText({
       projectName: project.name,
-      emails: draftSettings.client_delivery_access.allowed_emails,
+      emails,
       domains: draftSettings.client_delivery_access.allowed_domains,
       isEn,
     }));
     setClientInviteCopied(true);
     setTimeout(() => setClientInviteCopied(false), 1800);
+  }
+
+  function upsertClientInvite(emailValue = clientInviteEmail) {
+    const email = emailValue.trim().toLowerCase();
+    if (!email) return;
+    const now = new Date().toISOString();
+    const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
+    const existing = draftSettings.client_delivery_access.invites.find((invite) => invite.email === email);
+    const invites = [
+      ...draftSettings.client_delivery_access.invites.filter((invite) => invite.email !== email),
+      {
+        email,
+        status: "active" as const,
+        invited_at: existing?.invited_at || now,
+        last_sent_at: now,
+        expires_at: existing?.expires_at || expiresAt,
+        revoked_at: "",
+      },
+    ];
+    updateClientDeliveryAccess({
+      mode: "token_or_customer_account",
+      allowed_emails: Array.from(new Set([...draftSettings.client_delivery_access.allowed_emails, email])),
+      invites,
+    });
+    setClientInviteEmail("");
+    copyClientInvitation([email]);
+  }
+
+  function revokeClientInvite(email: string) {
+    const cleanEmail = email.trim().toLowerCase();
+    if (!cleanEmail) return;
+    const now = new Date().toISOString();
+    updateClientDeliveryAccess({
+      allowed_emails: draftSettings.client_delivery_access.allowed_emails.filter((item) => item !== cleanEmail),
+      invites: draftSettings.client_delivery_access.invites.map((invite) => (
+        invite.email === cleanEmail
+          ? { ...invite, status: "revoked" as const, revoked_at: now }
+          : invite
+      )),
+    });
   }
 
   function updateCapacityDraft(key: keyof typeof capacityDraft, value: string) {
@@ -1826,10 +1867,79 @@ function RoleAgentGuardrailsPanel({
                   <p className="break-all">{isEn ? "Workspace" : "工作台"}: /client</p>
                   <p className="break-all">{isEn ? "Sign up" : "注册"}: /register?next=/client</p>
                 </div>
+                <div className="mt-3 flex flex-col gap-2 sm:flex-row">
+                  <input
+                    value={clientInviteEmail}
+                    onChange={(event) => setClientInviteEmail(event.target.value)}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter") {
+                        event.preventDefault();
+                        upsertClientInvite();
+                      }
+                    }}
+                    disabled={settingsSaving}
+                    className="min-h-8 flex-1 rounded-lg border border-black/10 bg-white px-2 text-xs text-[var(--sh-ink)] outline-none focus:border-[var(--sh-blue)]"
+                    placeholder={isEn ? "Invite customer email" : "客户邀请邮箱"}
+                    aria-label={isEn ? "Invite customer email" : "客户邀请邮箱"}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => upsertClientInvite()}
+                    disabled={settingsSaving || !clientInviteEmail.trim()}
+                    className="inline-flex min-h-8 items-center justify-center gap-1.5 rounded-full bg-[var(--sh-blue)] px-3 text-[11px] font-semibold text-white hover:bg-blue-700 disabled:opacity-50"
+                  >
+                    <FiMail className="h-3.5 w-3.5" aria-hidden="true" />
+                    {isEn ? "Add invite" : "添加邀请"}
+                  </button>
+                </div>
+                {draftSettings.client_delivery_access.invites.length > 0 && (
+                  <div className="mt-3 divide-y divide-black/5 rounded-lg bg-white ring-1 ring-black/10">
+                    {draftSettings.client_delivery_access.invites.map((invite) => (
+                      <div key={invite.email} className="grid gap-2 px-2.5 py-2">
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <div>
+                            <p className="text-xs font-semibold text-[var(--sh-ink)]">{invite.email}</p>
+                            <p className="text-[11px] text-[var(--sh-muted)]">
+                              {invite.status === "revoked"
+                                ? (isEn ? "Revoked" : "已撤销")
+                                : invite.status === "expired"
+                                  ? (isEn ? "Expired" : "已过期")
+                                  : (isEn ? "Active" : "有效")}
+                              {invite.last_sent_at ? ` · ${isEn ? "sent" : "发送"} ${roleAgentActivityTimeLabel(invite.last_sent_at, locale)}` : ""}
+                              {invite.expires_at && invite.status === "active" ? ` · ${isEn ? "expires" : "过期"} ${roleAgentActivityTimeLabel(invite.expires_at, locale)}` : ""}
+                            </p>
+                          </div>
+                          <div className="flex flex-wrap gap-1.5">
+                            <button
+                              type="button"
+                              onClick={() => upsertClientInvite(invite.email)}
+                              disabled={settingsSaving}
+                              className="inline-flex min-h-7 items-center gap-1 rounded-full bg-white px-2.5 text-[11px] font-semibold text-[var(--sh-ink)] ring-1 ring-black/10 hover:bg-neutral-50 disabled:opacity-50"
+                            >
+                              <FiRefreshCw className="h-3 w-3" aria-hidden="true" />
+                              {isEn ? "Prepare resend" : "准备重发"}
+                            </button>
+                            {invite.status !== "revoked" && (
+                              <button
+                                type="button"
+                                onClick={() => revokeClientInvite(invite.email)}
+                                disabled={settingsSaving}
+                                className="inline-flex min-h-7 items-center gap-1 rounded-full bg-white px-2.5 text-[11px] font-semibold text-rose-700 ring-1 ring-rose-200 hover:bg-rose-50 disabled:opacity-50"
+                              >
+                                <FiTrash2 className="h-3 w-3" aria-hidden="true" />
+                                {isEn ? "Revoke" : "撤销"}
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
                 <div className="mt-2 flex flex-wrap gap-2">
                   <button
                     type="button"
-                    onClick={copyClientInvitation}
+                    onClick={() => copyClientInvitation()}
                     className="inline-flex min-h-8 items-center gap-1.5 rounded-full bg-white px-3 text-[11px] font-semibold text-[var(--sh-ink)] ring-1 ring-black/10 hover:bg-neutral-50"
                   >
                     {clientInviteCopied ? <FiCheckCircle className="h-3.5 w-3.5" aria-hidden="true" /> : <FiCopy className="h-3.5 w-3.5" aria-hidden="true" />}

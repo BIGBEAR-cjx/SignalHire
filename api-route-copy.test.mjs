@@ -507,6 +507,11 @@ test("client portal account access is enforced for share reports and feedback", 
   assert.match(feedbackRoute, /verifyClientDeliveryShareAccess\(row \? \{ \.\.\.row, id \} : null, token,[\s\S]{0,220}accessPolicy/);
   assert.match(projectPage, /Customer invite path|客户邀请路径/);
   assert.match(projectPage, /Copy invite|复制邀请/);
+  assert.match(projectPage, /Invite customer email|客户邀请邮箱/);
+  assert.match(projectPage, /Prepare resend|准备重发/);
+  assert.match(projectPage, /Revoke|撤销/);
+  assert.match(projectPage, /upsertClientInvite/);
+  assert.match(projectPage, /revokeClientInvite/);
   assert.match(projectPage, /\/register\?next=\/client/);
   assert.match(projectPage, /clientPortalInvitationText/);
   assert.match(projectPage, /client_delivery_access/);

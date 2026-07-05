@@ -12,6 +12,14 @@ export type RoleOutreachSettings = {
     mode: "token_only" | "token_or_customer_account";
     allowed_emails: string[];
     allowed_domains: string[];
+    invites: Array<{
+      email: string;
+      status: "active" | "revoked" | "expired";
+      invited_at: string;
+      last_sent_at: string;
+      expires_at: string;
+      revoked_at: string;
+    }>;
   };
   agent_status: "active" | "paused";
   approval_mode: "manual_all" | "auto_follow_up_only";

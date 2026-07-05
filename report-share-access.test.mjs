@@ -52,6 +52,7 @@ test("client delivery access policy allows invited customer accounts without wea
     mode: "token_or_customer_account",
     allowed_emails: ["client@example.com"],
     allowed_domains: ["example.org"],
+    invites: [],
   });
   assert.equal(verifyClientDeliveryShareAccess(projectRun, "", {
     secret: "test-secret",
@@ -73,4 +74,54 @@ test("client delivery access policy allows invited customer accounts without wea
     viewer: { id: "customer-1", email: "client@example.com" },
     accessPolicy: policy,
   }).reason, "valid_customer_account");
+});
+
+test("client delivery account invites grant access only while active", () => {
+  const policy = normalizeClientDeliveryAccessPolicy({
+    mode: "token_or_customer_account",
+    allowed_emails: ["owner@client.ai"],
+    invites: [
+      {
+        email: "Active@Client.ai",
+        status: "active",
+        invited_at: "2026-07-01T10:00:00.000Z",
+        last_sent_at: "2026-07-02T10:00:00.000Z",
+        expires_at: "2026-08-01T00:00:00.000Z",
+      },
+      {
+        email: "revoked@client.ai",
+        status: "revoked",
+        invited_at: "2026-07-01T10:00:00.000Z",
+        revoked_at: "2026-07-03T10:00:00.000Z",
+      },
+      {
+        email: "expired@client.ai",
+        status: "active",
+        invited_at: "2026-06-01T10:00:00.000Z",
+        expires_at: "2026-07-01T00:00:00.000Z",
+      },
+    ],
+  }, { now: "2026-07-05T00:00:00.000Z" });
+
+  assert.deepEqual(policy.allowed_emails, ["owner@client.ai", "active@client.ai"]);
+  assert.deepEqual(policy.invites.map((item) => ({ email: item.email, status: item.status })), [
+    { email: "active@client.ai", status: "active" },
+    { email: "revoked@client.ai", status: "revoked" },
+    { email: "expired@client.ai", status: "expired" },
+  ]);
+  assert.equal(verifyClientDeliveryShareAccess(projectRun, "", {
+    secret: "test-secret",
+    viewer: { id: "customer-4", email: "active@client.ai" },
+    accessPolicy: policy,
+  }).reason, "valid_customer_account");
+  assert.equal(verifyClientDeliveryShareAccess(projectRun, "", {
+    secret: "test-secret",
+    viewer: { id: "customer-5", email: "revoked@client.ai" },
+    accessPolicy: policy,
+  }).reason, "missing_share_token");
+  assert.equal(verifyClientDeliveryShareAccess(projectRun, "", {
+    secret: "test-secret",
+    viewer: { id: "customer-6", email: "expired@client.ai" },
+    accessPolicy: policy,
+  }).reason, "missing_share_token");
 });
