@@ -73,6 +73,19 @@ async function fetchJsonWithRetry(url, options = {}, retryStatuses = new Set([0,
   return latest;
 }
 
+async function gotoWithRetry(page, url, options = {}) {
+  let latestError = null;
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    try {
+      return await page.goto(url, options);
+    } catch (error) {
+      latestError = error;
+      await sleep(700 * (attempt + 1));
+    }
+  }
+  throw latestError;
+}
+
 async function fetchJson(url, options = {}) {
   const response = await fetch(url, { redirect: "manual", ...options });
   const text = await response.text();
@@ -192,7 +205,7 @@ function runtimeEnvChecks({ requireLiveProvider = false } = {}) {
 
 async function routeSmokeChecks(origin, qaSession = null) {
   const rows = [];
-  const client = await fetchText(`${origin}/client`);
+  const client = await fetchTextWithRetry(`${origin}/client`);
   const clientHasCopy = /客户交付工作台|Client delivery|客户工作台/i.test(client.text);
   rows.push({
     name: "route:/client",
@@ -200,7 +213,7 @@ async function routeSmokeChecks(origin, qaSession = null) {
     detail: `status=${client.status}${clientHasCopy ? ", client workspace copy present" : ""}`,
   });
 
-  const workspace = await fetchText(`${origin}/api/client-portal/workspace`);
+  const workspace = await fetchTextWithRetry(`${origin}/api/client-portal/workspace`);
   rows.push({
     name: "route:/api/client-portal/workspace anonymous",
     status: workspace.status === 401 ? "pass" : isVercelSecurityCheckpoint(workspace.text) ? "blocked" : "fail",
@@ -302,7 +315,7 @@ async function browserChecks(origin, qaSession = null) {
       }
       const page = await context.newPage();
       try {
-        const response = await page.goto(`${origin}${item.path}`, { waitUntil: "domcontentloaded", timeout: 12000 });
+        const response = await gotoWithRetry(page, `${origin}${item.path}`, { waitUntil: "domcontentloaded", timeout: 12000 });
         await page.waitForLoadState("networkidle", { timeout: 2000 }).catch(() => {});
         await page.waitForFunction((useQaSession) => {
           const text = document.body?.innerText || "";
