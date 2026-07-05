@@ -80,6 +80,27 @@ function providerInput(input) {
 
 function providerPayload(input = {}) {
   const source = providerInput(input);
+  const targets = (Array.isArray(source.targets) ? source.targets : [])
+    .filter(isRecord)
+    .map((target) => {
+      const row = {
+        candidate_id: cleanString(target.candidate_id || target.id),
+        candidate_name: cleanString(target.candidate_name || target.name) || "Candidate",
+      };
+      for (const key of ["status", "refresh_reason", "last_signal_at"]) {
+        const value = cleanString(target[key]);
+        if (value) row[key] = value;
+      }
+      for (const key of ["stale_count", "expired_count"]) {
+        const value = nonNegativeInteger(target[key]);
+        if (value > 0) row[key] = value;
+      }
+      if (Array.isArray(target.signal_types)) {
+        const types = target.signal_types.map(cleanString).filter(Boolean).slice(0, 8);
+        if (types.length) row.signal_types = types;
+      }
+      return row;
+    });
   return {
     user_id: cleanString(source.userId || source.user_id),
     project: isRecord(source.project) ? {
@@ -87,12 +108,7 @@ function providerPayload(input = {}) {
       name: cleanString(source.project.name),
       brief: cleanString(source.project.brief),
     } : {},
-    targets: (Array.isArray(source.targets) ? source.targets : [])
-      .filter(isRecord)
-      .map((target) => ({
-        candidate_id: cleanString(target.candidate_id || target.id),
-        candidate_name: cleanString(target.candidate_name || target.name) || "Candidate",
-      })),
+    targets,
   };
 }
 
@@ -216,6 +232,74 @@ export function createInternalLiveSignalProvider({ now = new Date().toISOString(
         })),
         failed: [],
       };
+    },
+  };
+}
+
+function aggregateSignalTypes(target = {}) {
+  const explicit = Array.isArray(target.signal_types) ? target.signal_types.map(cleanString).filter(Boolean) : [];
+  if (explicit.length) return Array.from(new Set(explicit)).slice(0, 5);
+  const types = ["profile_freshness"];
+  if (nonNegativeInteger(target.stale_count) + nonNegativeInteger(target.expired_count) > 1) {
+    types.push("candidate_activity");
+  }
+  if (cleanString(target.refresh_reason) === "expired_live_signal") {
+    types.push("recent_content");
+  }
+  return types;
+}
+
+function aggregateSignalSummary(type, target, projectName) {
+  const name = cleanString(target.candidate_name) || "Candidate";
+  const status = cleanString(target.status) || "stale";
+  if (type === "candidate_activity") {
+    return `${name} has refreshed activity signals for ${projectName}; review the latest evidence before outreach.`;
+  }
+  if (type === "company_hiring") {
+    return `${projectName} has active hiring context; use it as a why-now angle for ${name}.`;
+  }
+  if (type === "tech_stack_change") {
+    return `${name} has refreshed technology-stack context relevant to ${projectName}.`;
+  }
+  if (type === "recent_content") {
+    return `${name} has refreshed recent-content context after ${status} live signals.`;
+  }
+  return `${name} has refreshed profile freshness signals for ${projectName}.`;
+}
+
+export function buildSignalhireAggregateLiveSignalProviderRefresh(input = {}, { now = new Date().toISOString() } = {}) {
+  const payload = providerPayload(input);
+  const observedAt = validIso(now);
+  const expiresAt = new Date(Date.parse(observedAt) + 7 * 24 * 60 * 60 * 1000).toISOString();
+  const projectName = cleanString(payload.project?.name) || "this role";
+  return {
+    refreshed: payload.targets.map((target) => {
+      const liveSignals = aggregateSignalTypes(target).map((type) => ({
+        type,
+        source: "signalhire_aggregate",
+        confidence: type === "profile_freshness" ? "medium" : "low",
+        freshness: "fresh",
+        observed_at: observedAt,
+        expires_at: expiresAt,
+        summary: aggregateSignalSummary(type, target, projectName),
+        url: "",
+      }));
+      return {
+        candidate_id: target.candidate_id,
+        candidate_name: target.candidate_name,
+        provider: "signalhire_aggregate_live_signal_provider",
+        signal_count: liveSignals.length,
+        live_signals: liveSignals,
+      };
+    }),
+    failed: [],
+  };
+}
+
+export function createSignalhireAggregateLiveSignalProvider({ now = new Date().toISOString() } = {}) {
+  return {
+    async refresh(input = {}) {
+      return buildSignalhireAggregateLiveSignalProviderRefresh(input, { now });
     },
   };
 }

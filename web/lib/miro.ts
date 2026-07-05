@@ -29,6 +29,23 @@ type ResultLike = {
   claims?: ClaimLike[];
   [key: string]: unknown;
 };
+type SearchStrategyChannel = {
+  key?: string;
+  label?: string;
+  coverage_group?: string;
+  source_types?: string[];
+  query_variants?: string[];
+};
+type SearchStrategyDimension = { key?: string; label?: string; weight?: string | number };
+type SearchStrategyCluster = { key?: string; label?: string };
+type SearchStrategyLike = {
+  role_category?: string;
+  role_category_label?: string;
+  recall_mode?: string;
+  channels?: SearchStrategyChannel[];
+  score_dimensions?: SearchStrategyDimension[];
+  query_clusters?: SearchStrategyCluster[];
+};
 
 export async function streamResearch(userPrompt: string, onStep: OnStep = () => {}) {
   const BASE = process.env.MIROMIND_BASE_URL;
@@ -201,10 +218,10 @@ function outputLanguageRules(platformLanguage = DEFAULT_PLATFORM_LANGUAGE) {
 - Do not paste raw source passages as the answer. Summarize or translate source evidence into the platform language.`;
 }
 
-function openEvidenceSourcePromptBlock(query: string, strategy?: any) {
+function openEvidenceSourcePromptBlock(query: string, strategy?: SearchStrategyLike) {
   const encoded = encodeURIComponent(query.trim().replace(/\s+/g, " ").slice(0, 160));
   const strategyLines = Array.isArray(strategy?.channels)
-    ? strategy.channels.slice(0, 5).flatMap((channel: any) => Array.isArray(channel?.query_variants) ? channel.query_variants.slice(0, 2) : [])
+    ? strategy.channels.slice(0, 5).flatMap((channel) => Array.isArray(channel?.query_variants) ? channel.query_variants.slice(0, 2) : [])
       .map((item: string) => `- Role-aware public web query: ${item}`)
       .join("\n")
     : "";
@@ -219,17 +236,17 @@ ${strategyLines ? `${strategyLines}\n` : ""}- Aggressive public web recall may u
 }
 
 function agentSearchStrategyBlock(query: string) {
-  const strategy = buildAgentSearchStrategy(query, { locale: platformLocale(query) });
+  const strategy = buildAgentSearchStrategy(query, { locale: platformLocale(query) }) as SearchStrategyLike;
   const channels = Array.isArray(strategy.channels) ? strategy.channels : [];
-  const channelLines = channels.slice(0, 8).map((channel: any) => {
+  const channelLines = channels.slice(0, 8).map((channel) => {
     const queries = Array.isArray(channel.query_variants) ? channel.query_variants.slice(0, 2).join(" | ") : "";
     return `- ${channel.key}: ${channel.label} · coverage=${channel.coverage_group} · source_types=${(channel.source_types || []).join(", ")} · queries=${queries}`;
   }).join("\n");
   const scoreLines = Array.isArray(strategy.score_dimensions)
-    ? strategy.score_dimensions.map((item: any) => `- ${item.key}: ${item.label} (${item.weight})`).join("\n")
+    ? strategy.score_dimensions.map((item) => `- ${item.key}: ${item.label} (${item.weight})`).join("\n")
     : "";
   const clusterLines = Array.isArray(strategy.query_clusters)
-    ? strategy.query_clusters.map((item: any) => `- ${item.key}: ${item.label}`).join("\n")
+    ? strategy.query_clusters.map((item) => `- ${item.key}: ${item.label}`).join("\n")
     : "";
   return { strategy, block: `INTERNET ROLE STRATEGY:
 role_category: ${strategy.role_category || "software_engineering"}

@@ -180,7 +180,14 @@ function buildActivityLog(threads, limit) {
     })
     .sort((a, b) => b.order - a.order)
     .slice(0, limit)
-    .map(({ order, ...entry }) => entry);
+    .map((entry) => ({
+      id: entry.id,
+      candidate: entry.candidate,
+      status: entry.status,
+      label: entry.label,
+      detail: entry.detail,
+      occurred_at: entry.occurred_at,
+    }));
 }
 
 function normalizeApprovalMode(settings, locale = "en") {

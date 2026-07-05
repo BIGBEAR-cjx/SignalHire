@@ -79,7 +79,10 @@ export default function ClientDeliveryAuditPage() {
     }
   }, [isEn, params]);
 
-  useEffect(() => { void reload(); }, [reload]);
+  useEffect(() => {
+    const id = window.setTimeout(() => { void reload(); }, 0);
+    return () => window.clearTimeout(id);
+  }, [reload]);
 
   const projectOptions = useMemo(() => [
     { value: "all", label: isEn ? "All projects" : "全部项目" },

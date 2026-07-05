@@ -1,8 +1,10 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
+  buildSignalhireAggregateLiveSignalProviderRefresh,
   buildLiveSignalRefreshEvent,
   buildLiveSignalRefreshSummary,
+  createSignalhireAggregateLiveSignalProvider,
   createInternalLiveSignalProvider,
   createHttpLiveSignalProvider,
   selectLiveSignalRefreshProjects,
@@ -138,4 +140,41 @@ test("internal live signal provider refreshes targets without external configura
   assert.equal(result.refreshed[0].provider, "internal_live_signal_provider");
   assert.equal(result.refreshed[0].live_signals[0].type, "profile_freshness");
   assert.match(result.refreshed[0].live_signals[0].summary, /AI Engineer/);
+});
+
+test("first-party aggregate live signal provider matches HTTP refresh contract", async () => {
+  const result = buildSignalhireAggregateLiveSignalProviderRefresh({
+    project: { id: "project-1", name: "AI Engineer" },
+    targets: [{
+      candidate_id: "c1",
+      candidate_name: "Ada Candidate",
+      status: "expired",
+      stale_count: 1,
+      expired_count: 1,
+      refresh_reason: "expired_live_signal",
+    }],
+  }, { now: "2026-07-05T12:00:00.000Z" });
+
+  assert.equal(result.failed.length, 0);
+  assert.equal(result.refreshed[0].provider, "signalhire_aggregate_live_signal_provider");
+  assert.equal(result.refreshed[0].candidate_id, "c1");
+  assert.equal(result.refreshed[0].signal_count, 3);
+  assert.deepEqual(result.refreshed[0].live_signals.map((signal) => signal.type), [
+    "profile_freshness",
+    "candidate_activity",
+    "recent_content",
+  ]);
+  assert.equal(result.refreshed[0].live_signals[0].freshness, "fresh");
+  assert.doesNotMatch(JSON.stringify(result), /role_agent|execution_log|debug|internal/i);
+});
+
+test("first-party aggregate provider exposes refresh method", async () => {
+  const provider = createSignalhireAggregateLiveSignalProvider({ now: "2026-07-05T12:00:00.000Z" });
+  const result = await provider.refresh({
+    project: { name: "AI Engineer" },
+    targets: [{ candidate_id: "c1", candidate_name: "Ada Candidate" }],
+  });
+
+  assert.equal(result.failed.length, 0);
+  assert.equal(result.refreshed[0].provider, "signalhire_aggregate_live_signal_provider");
 });

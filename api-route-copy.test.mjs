@@ -325,8 +325,8 @@ test("one-prompt role creation activates default Role Agent settings", () => {
 test("role workspace exposes PRD candidate statuses and run candidate ingestion", () => {
   const shortlist = readFileSync("web/lib/shortlist.ts", "utf8");
   const projects = readFileSync("web/lib/projects.ts", "utf8");
+  const projectRoute = readFileSync("web/app/api/projects/[id]/route.ts", "utf8");
   const projectPage = readFileSync("web/app/app/projects/[id]/page.tsx", "utf8");
-  const route = readFileSync("web/app/api/shortlist/route.ts", "utf8");
 
   assert.match(shortlist, /"shortlisted"/);
   assert.match(shortlist, /"needs_evidence"/);
@@ -336,9 +336,9 @@ test("role workspace exposes PRD candidate statuses and run candidate ingestion"
   assert.match(shortlist, /makeProjectCandidateDedupKey/);
   assert.match(projects, /status IN \('shortlisted','interviewing','hired'\)/);
   assert.match(projects, /status IN \('outreach_drafted','contacted'\)/);
+  assert.match(projectRoute, /ingestProjectRunCandidates/);
   assert.match(projectPage, /candidateStatus\.needsEvidence/);
   assert.match(projectPage, /candidateDisplayStatus/);
-  assert.match(route, /ingestProjectRunCandidates/);
 });
 
 test("evidence-qualified workspace shows delivery summary and claim counts", () => {
@@ -535,7 +535,10 @@ test("live signal provider cron and background role agent runs are wired", () =>
   const config = readFileSync("web/vercel.json", "utf8");
   const liveSignalRoute = readFileSync("web/app/api/cron/live-signals/route.ts", "utf8");
   const liveSignalHealthRoute = readFileSync("web/app/api/live-signals/health/route.ts", "utf8");
+  const liveSignalProviderHealthRoute = readFileSync("web/app/api/live-signals/provider/health/route.ts", "utf8");
+  const liveSignalProviderRefreshRoute = readFileSync("web/app/api/live-signals/provider/refresh/route.ts", "utf8");
   const liveSignalRunner = readFileSync("web/lib/live-signal-refresh.ts", "utf8");
+  const liveSignalProvider = readFileSync("web/lib/live-signal-refresh.mjs", "utf8");
   const roleAgentRoute = readFileSync("web/app/api/projects/[id]/role-agent-runs/route.ts", "utf8");
   const roleAgentRunner = readFileSync("web/lib/role-agent-runner.ts", "utf8");
   const projectPage = readFileSync("web/app/app/projects/[id]/page.tsx", "utf8");
@@ -545,6 +548,10 @@ test("live signal provider cron and background role agent runs are wired", () =>
   assert.match(liveSignalRoute, /CRON_SECRET/);
   assert.match(liveSignalHealthRoute, /internal_live_signal_provider/);
   assert.match(liveSignalHealthRoute, /Response\.json/);
+  assert.match(liveSignalProviderHealthRoute, /signalhire_aggregate_live_signal_provider/);
+  assert.match(liveSignalProviderRefreshRoute, /LIVE_SIGNAL_PROVIDER_API_KEY/);
+  assert.match(liveSignalProviderRefreshRoute, /buildSignalhireAggregateLiveSignalProviderRefresh/);
+  assert.match(liveSignalProvider, /createSignalhireAggregateLiveSignalProvider/);
   assert.match(liveSignalRunner, /buildRoleAgentWorkspaceView/);
   assert.match(liveSignalRunner, /LIVE_SIGNAL_PROVIDER_URL/);
   assert.match(liveSignalRunner, /createInternalLiveSignalProvider/);
@@ -1515,6 +1522,7 @@ test("client portal workspace routes and APIs are wired to customer account acce
   assert.match(workspaceRoute, /findClientPortalAuthorizedProjects/);
   assert.match(portalServer, /listClientPortalCandidateProjects/);
   assert.match(projectRoute, /verifyClientPortalProjectAccess/);
+  assert.match(projectRoute, /recordClientPortalAccessDenied/);
   assert.match(projectRoute, /recordClientPortalProjectView/);
   assert.match(projectRoute, /buildClientPortalProjectView/);
   assert.match(feedbackRoute, /recordProjectRoleAgentEvent/);
@@ -1524,6 +1532,7 @@ test("client portal workspace routes and APIs are wired to customer account acce
   assert.match(portal, /buildClientPortalProjectView/);
   assert.match(portal, /verifyClientDeliveryCustomerAccountAccess/);
   assert.match(portalServer, /client_portal_project_view/);
+  assert.match(portalServer, /client_portal_access_denied/);
   assert.match(projects, /listClientPortalCandidateProjects/);
   assert.match(access, /verifyClientDeliveryCustomerAccountAccess/);
   assert.match(reportPage, /verifyClientDeliveryShareAccess\(row, t, \{ viewer, accessPolicy \}\)/);

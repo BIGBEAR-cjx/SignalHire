@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState, useSyncExternalStore } from "react";
 import Link from "next/link";
 import { FiArrowRight, FiLock, FiMail } from "react-icons/fi";
 import LanguageSwitcher from "@/components/LanguageSwitcher";
@@ -14,17 +14,15 @@ export default function LoginPage() {
   const [pw, setPw] = useState("");
   const [err, setErr] = useState("");
   const [loading, setLoading] = useState(false);
-  const [hydrated, setHydrated] = useState(false);
-  const next = hydrated && typeof window !== "undefined" ? new URLSearchParams(location.search).get("next") || "/" : "/";
+  const next = useSyncExternalStore(
+    () => () => {},
+    () => new URLSearchParams(location.search).get("next") || "/",
+    () => "/",
+  );
   const clientPortalLogin = next.startsWith("/client");
-
-  useEffect(() => {
-    setHydrated(true);
-  }, []);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
-    if (!hydrated) return;
     if (!email.trim() || !pw) return;
     setLoading(true); setErr("");
     const r = await login(email.trim(), pw, locale);
@@ -90,7 +88,7 @@ export default function LoginPage() {
               </span>
             </label>
             {err && <p className="rounded-2xl bg-red-50 px-4 py-3 text-sm text-red-700 ring-1 ring-red-100">{err}</p>}
-            <button type="submit" disabled={!hydrated || loading} className="sh-primary-action w-full disabled:pointer-events-none disabled:opacity-50">
+            <button type="submit" disabled={loading} className="sh-primary-action w-full disabled:pointer-events-none disabled:opacity-50">
               {loading ? t("auth.loggingIn") : t("common.login")}
               <FiArrowRight aria-hidden="true" />
             </button>

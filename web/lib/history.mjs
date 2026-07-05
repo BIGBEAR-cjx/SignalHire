@@ -7,7 +7,6 @@ export const HISTORY_EVIDENCE_FILTERS = ["all", "high_confidence", "needs_verifi
 export const HISTORY_SAVED_VIEWS_STORAGE_KEY = "signalhire.history.savedViews.v1";
 
 const ACTIVE_STATUSES = new Set(["queued", "running", "retrying"]);
-const FINAL_ERROR_STATUSES = new Set(["error", "canceled"]);
 const GAP_TYPE_LABELS = {
   research: { en: "Research", zh: "研究" },
   practice: { en: "Practice", zh: "实践" },

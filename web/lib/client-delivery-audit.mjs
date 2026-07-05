@@ -1,5 +1,11 @@
 const REPORT_ACTION_TYPES = new Set(["shareable_client_delivery_loop", "client_portal_project_view"]);
 const FEEDBACK_ACTION_TYPES = new Set(["client_delivery_feedback"]);
+const ACCESS_ACTION_TYPES = new Set([
+  "client_portal_invite_sent",
+  "client_portal_invite_resend",
+  "client_portal_invite_revoked",
+  "client_portal_access_denied",
+]);
 
 function isRecord(value) {
   return Boolean(value && typeof value === "object" && !Array.isArray(value));
@@ -69,6 +75,21 @@ export function buildClientDeliveryAuditEvent(input = {}) {
       actor: feedback.actor,
       sentiment: feedback.sentiment,
       note: feedback.note,
+      detail,
+      event_at: validIso(event.at),
+    };
+  }
+
+  if (eventType === "client_portal_access" && ACCESS_ACTION_TYPES.has(actionType)) {
+    return {
+      user_id: userId,
+      project_id: projectId,
+      event_type: "access",
+      action_type: actionType,
+      report_href: reportHref || "",
+      actor: cleanString(event.actor) || "Client",
+      sentiment: cleanString(event.sentiment),
+      note: cleanString(event.note) || detail,
       detail,
       event_at: validIso(event.at),
     };

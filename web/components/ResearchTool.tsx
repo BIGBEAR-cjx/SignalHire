@@ -1072,16 +1072,19 @@ export default function ResearchTool({
     const jobId = new URL(window.location.href).searchParams.get("run")?.trim();
     if (!jobId) return;
     ranAuto.current = true;
-    setLoading(true);
-    setError("");
-    setResult(null);
-    setStats(null);
-    setFeed([]);
-    setLive(null);
-    setRunId(null);
-    setCurrentJobId(jobId);
-    setJobStatus({ phase: "queued", label: t("research.status.requeued.label"), detail: t("research.status.requeued.detail"), canRetry: false });
-    beginPolling(jobId);
+    const id = window.setTimeout(() => {
+      setLoading(true);
+      setError("");
+      setResult(null);
+      setStats(null);
+      setFeed([]);
+      setLive(null);
+      setRunId(null);
+      setCurrentJobId(jobId);
+      setJobStatus({ phase: "queued", label: t("research.status.requeued.label"), detail: t("research.status.requeued.detail"), canRetry: false });
+      beginPolling(jobId);
+    }, 0);
+    return () => window.clearTimeout(id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

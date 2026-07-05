@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState, useSyncExternalStore } from "react";
 import Link from "next/link";
 import { FiArrowRight, FiLock, FiMail, FiShield, FiUser } from "react-icons/fi";
 import LanguageSwitcher from "@/components/LanguageSwitcher";
@@ -22,11 +22,11 @@ export default function RegisterPage() {
   const [stage, setStage] = useState<"form" | "verify">("form");
   const [err, setErr] = useState("");
   const [loading, setLoading] = useState(false);
-  const [next, setNext] = useState("/");
-
-  useEffect(() => {
-    setNext(new URLSearchParams(location.search).get("next") || "/");
-  }, []);
+  const next = useSyncExternalStore(
+    () => () => {},
+    () => new URLSearchParams(location.search).get("next") || "/",
+    () => "/",
+  );
 
   const clientPortalRegister = next.startsWith("/client");
 

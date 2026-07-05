@@ -259,7 +259,6 @@ function buildCounts({ settings, candidateGraph, leadPreview, outreachItems, seq
   const graphSummary = summaryOf(candidateGraph);
   const previewSummary = summaryOf(leadPreview);
   const sequenceSummary = summaryOf(sequenceAnalytics);
-  const inboxSummary = summaryOf(inboxQueue);
   const goals = buildRoleOutreachSettings(settings).capacity_goal;
   return {
     goals,
@@ -1214,7 +1213,11 @@ function buildWhyNow({ candidateGraph, outreachItems, inboxQueue, locale, now })
     }
   }
   return [...rows.values()]
-    .map(({ action_score: _actionScore, ...row }) => row)
+    .map((row) => {
+      const next = { ...row };
+      delete next.action_score;
+      return next;
+    })
     .filter((row) => row.why_now)
     .sort((a, b) => b.score - a.score || String(b.updated_at).localeCompare(String(a.updated_at)))
     .slice(0, 5);

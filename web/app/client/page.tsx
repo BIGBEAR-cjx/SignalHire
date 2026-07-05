@@ -88,7 +88,10 @@ export default function ClientWorkspacePage() {
     }
   }, [isEn, locale]);
 
-  useEffect(() => { void reload(); }, [reload]);
+  useEffect(() => {
+    const id = window.setTimeout(() => { void reload(); }, 0);
+    return () => window.clearTimeout(id);
+  }, [reload]);
 
   return (
     <div className="min-h-screen bg-[var(--sh-bg)] text-[var(--sh-ink)]">

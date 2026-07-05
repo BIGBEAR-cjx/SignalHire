@@ -2,7 +2,9 @@ import { buildClientPortalProjectView } from "@/lib/client-portal-workspace.mjs"
 import { verifyClientPortalProjectAccess } from "@/lib/client-portal-workspace.mjs";
 import {
   findClientPortalAuthorizedProject,
+  findClientPortalCandidateProject,
   loadClientPortalProjectDetail,
+  recordClientPortalAccessDenied,
   recordClientPortalProjectView,
 } from "@/lib/client-portal";
 import { normalizeLocale, t } from "@/lib/i18n.mjs";
@@ -18,9 +20,16 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
 
   const { id } = await ctx.params;
   const project = await findClientPortalAuthorizedProject(user, id);
-  if (!project) return Response.json({ error: t(locale, "api.error.jobUnavailable") }, { status: 404 });
+  if (!project) {
+    const candidate = await findClientPortalCandidateProject(id);
+    if (candidate) await recordClientPortalAccessDenied(candidate, user, "unauthorized_customer_account");
+    return Response.json({ error: t(locale, "api.error.jobUnavailable") }, { status: 404 });
+  }
   const access = verifyClientPortalProjectAccess(project, user);
-  if (!access.allowed) return Response.json({ error: t(locale, "api.error.jobUnavailable") }, { status: 403 });
+  if (!access.allowed) {
+    await recordClientPortalAccessDenied(project, user, access.reason);
+    return Response.json({ error: t(locale, "api.error.jobUnavailable") }, { status: 403 });
+  }
 
   await recordClientPortalProjectView(project, user);
   const detail = await loadClientPortalProjectDetail(project, locale);

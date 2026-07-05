@@ -96,7 +96,10 @@ export default function ClientProjectPage() {
     }
   }, [isEn, locale, projectId]);
 
-  useEffect(() => { void reload(); }, [reload]);
+  useEffect(() => {
+    const id = window.setTimeout(() => { void reload(); }, 0);
+    return () => window.clearTimeout(id);
+  }, [reload]);
 
   async function submitFeedback(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();

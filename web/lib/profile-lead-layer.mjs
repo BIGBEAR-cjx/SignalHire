@@ -2,21 +2,6 @@ function isRecord(value) {
   return Boolean(value && typeof value === "object" && !Array.isArray(value));
 }
 
-function sourceTypes(candidate) {
-  const source = isRecord(candidate) ? candidate : {};
-  if (Array.isArray(source.source_types)) return source.source_types.map(String);
-  if (Array.isArray(source.source_nodes)) {
-    return source.source_nodes
-      .map((node) => (isRecord(node) ? String(node.source_type ?? "") : ""))
-      .filter(Boolean);
-  }
-  return [];
-}
-
-function isProfileLeadCandidate(candidate) {
-  return sourceTypes(candidate).includes("people_api") || String(isRecord(candidate) ? candidate.provider ?? "" : "") === "openjobs_mira";
-}
-
 function isVerifiedCandidate(candidate) {
   const source = isRecord(candidate) ? candidate : {};
   const quality = String(source.evidence_quality || source.evidence_summary?.quality || source.evidence_audit?.overall_evidence_quality || "").toLowerCase();

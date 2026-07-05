@@ -4,7 +4,6 @@ import {
   buildNextRunAt,
   buildSearchTaskRunLabel,
   normalizeSearchTaskInput,
-  summarizeTaskRuns,
 } from "./search-tasks.mjs";
 
 const BASE = process.env.INSFORGE_API_BASE_URL;

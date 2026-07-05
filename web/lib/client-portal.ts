@@ -5,6 +5,7 @@ import {
   listClientPortalCandidateProjects,
   listProjectClientDeliveryWeeklyArchives,
   projectRuns,
+  recordProjectClientDeliveryAuditEvent,
   recordProjectRoleAgentEvent,
   type ProjectWithKpi,
 } from "./projects";
@@ -34,6 +35,13 @@ export async function findClientPortalAuthorizedProjects(viewer: Viewer) {
 export async function findClientPortalAuthorizedProject(viewer: Viewer, projectId: string) {
   const projects = await findClientPortalAuthorizedProjects(viewer);
   return projects.find((project) => project.id === projectId) ?? null;
+}
+
+export async function findClientPortalCandidateProject(projectId: string) {
+  const id = cleanString(projectId);
+  if (!id) return null;
+  const projects = await listClientPortalCandidateProjects(300);
+  return projects.find((project) => project.id === id) ?? null;
 }
 
 export async function loadClientPortalProjectDetail(project: ProjectWithKpi, locale: "zh" | "en" = "zh") {
@@ -112,6 +120,30 @@ export async function recordClientPortalProjectView(project: ProjectWithKpi, vie
       },
     });
     return true;
+  } catch {
+    return false;
+  }
+}
+
+export async function recordClientPortalAccessDenied(project: ProjectWithKpi, viewer: Viewer, reason = "unauthorized_customer_account") {
+  const userId = cleanString(project?.user_id);
+  const projectId = cleanString(project?.id);
+  if (!userId || !projectId) return false;
+  const actor = cleanString(viewer?.email) || "Client";
+  try {
+    return await recordProjectClientDeliveryAuditEvent({
+      userId,
+      projectId,
+      event: {
+        event_type: "client_portal_access",
+        action_type: "client_portal_access_denied",
+        actor,
+        sentiment: reason,
+        note: "Customer account access denied.",
+        detail: `Client portal access denied for ${actor}: ${reason}`,
+        at: new Date().toISOString(),
+      },
+    });
   } catch {
     return false;
   }

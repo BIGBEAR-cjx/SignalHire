@@ -694,10 +694,6 @@ function NetworkReferralPathsPanel({
         confidence: "可信度",
       };
 
-  useEffect(() => {
-    setSeedText(networkSeedsToCsv(networkSeeds));
-  }, [networkSeeds]);
-
   async function saveSeeds() {
     setSaving(true);
     setMessage("");
@@ -1110,6 +1106,7 @@ function RoleAgentGuardrailsPanel({
     id: item.candidate_id,
     candidate_name: item.candidate_name,
   });
+  const inboxStepRunCounterRef = useRef(0);
 
   const recordRoleAgentMetricEvent = useCallback((event: {
     event_type: "panel_view" | "next_action_click" | "settings_update" | "next_action_execution";
@@ -1713,8 +1710,9 @@ function RoleAgentGuardrailsPanel({
     setCapacityDraft((prev) => ({ ...prev, [key]: number }));
   }
 
-  async function applyRoleAgentInboxStep(step: RoleAgentWorkspaceView["inbox_pipeline"]["next_steps"][number], runId = `role-agent-review_interested_candidates-${Date.now()}`, recordStart = true) {
+  async function applyRoleAgentInboxStep(step: RoleAgentWorkspaceView["inbox_pipeline"]["next_steps"][number], runId = "", recordStart = true) {
     if (!step.can_apply) return false;
+    const effectiveRunId = runId || `role-agent-review_interested_candidates-${++inboxStepRunCounterRef.current}`;
     setInboxActionBusyId(step.id);
     setInboxActionErrors((prev) => ({ ...prev, [step.id]: "" }));
     setInboxActionSuccess((prev) => ({ ...prev, [step.id]: "" }));
@@ -1723,7 +1721,7 @@ function RoleAgentGuardrailsPanel({
         event_type: "next_action_execution",
         action_type: "review_interested_candidates",
         action_status: "started",
-        run_id: runId,
+        run_id: effectiveRunId,
         workflow_step: "review_interested_candidates",
         detail: step.cta,
       });
@@ -1742,7 +1740,7 @@ function RoleAgentGuardrailsPanel({
         event_type: "next_action_execution",
         action_type: "review_interested_candidates",
         action_status: "succeeded",
-        run_id: runId,
+        run_id: effectiveRunId,
         workflow_step: "review_interested_candidates",
         detail: roleAgentInboxActionSuccessLabel(step, locale),
         targets: [{ id: step.action_target_id || step.id, candidate_name: step.candidate_name }],
@@ -1757,7 +1755,7 @@ function RoleAgentGuardrailsPanel({
         event_type: "next_action_execution",
         action_type: "review_interested_candidates",
         action_status: "failed",
-        run_id: runId,
+        run_id: effectiveRunId,
         workflow_step: "review_interested_candidates",
         detail: message,
         targets: [{ id: step.action_target_id || step.id, candidate_name: step.candidate_name }],
@@ -5527,6 +5525,7 @@ export default function ProjectDetailPage() {
       />
 
       <NetworkReferralPathsPanel
+        key={networkSeedsToCsv(detail.project.network_seeds ?? [])}
         projectId={id}
         networkSeeds={detail.project.network_seeds ?? []}
         referralPaths={detail.referralPaths ?? []}

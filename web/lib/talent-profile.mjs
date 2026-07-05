@@ -781,21 +781,6 @@ export function buildInternetRoleSearchPlaybook(query, { locale = "zh" } = {}) {
   };
 }
 
-function editableSourceTerms(query, plan) {
-  const values = [
-    firstRoleLine(query),
-    ...cleanStringArray(plan.must_have, 5),
-    ...cleanStringArray(plan.nice_to_have, 3),
-  ];
-  const keywordTerms = keywordTermsFromText(values.join("\n"));
-  const compactTerms = values
-    .flatMap((value) => cleanString(value).split(/[，,、/|；;：:\s]+/))
-    .map((term) => term.trim())
-    .filter((term) => term.length >= 2 && term.length <= 28)
-    .filter((term) => !/^(岗位职责|任职要求|加分项|排除项|你将|负责|要求|经验|以上)$/.test(term));
-  return uniqueStrings([...keywordTerms, ...compactTerms], 10);
-}
-
 function inferredMustHave(query) {
   const clean = cleanString(query);
   const parsed = parseEditableBrief(clean);

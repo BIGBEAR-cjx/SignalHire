@@ -7,6 +7,7 @@ export type RoleAgentMetricEvent = {
   guardrail?: string;
   detail?: string;
   actor?: string;
+  sentiment?: string;
   note?: string;
   report_href?: string;
   targets?: Array<{ id?: string; candidate_name?: string; name?: string }>;

@@ -163,7 +163,7 @@ function currentStepFor(item) {
   return 1;
 }
 
-function firstStepState({ step, item, blocked }) {
+function firstStepState({ item, blocked }) {
   const status = cleanString(item?.status).toLowerCase();
   if (FIRST_EMAIL_SENT_STATUSES.has(status)) return "sent";
   if (blocked) return "blocked";
@@ -226,7 +226,7 @@ export function buildOutreachSequenceWorkspaceItem({ item = {}, settings = {} } 
       skipped: message.skipped === true,
       audit_events: normalizedAuditEvents(message.audit_events),
       state: step === 1
-        ? firstStepState({ step, item: source, blocked: hardBlocked })
+        ? firstStepState({ item: source, blocked: hardBlocked })
         : (message.skipped === true ? "skipped" : followUpStepState({ step, currentStep, stopped, blocked: hardBlocked })),
       auto_sendable: step === 1 || hardBlocked || message.skipped === true ? false : canAutoSendFollowUp({
         settings: normalizedSettings,

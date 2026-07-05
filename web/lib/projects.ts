@@ -472,6 +472,18 @@ async function recordClientDeliveryAuditEvent(input: {
   }
 }
 
+export async function recordProjectClientDeliveryAuditEvent(input: {
+  userId: string;
+  projectId: string;
+  event: RoleAgentMetricEvent;
+}): Promise<boolean> {
+  return recordClientDeliveryAuditEvent({
+    userId: input.userId,
+    projectId: input.projectId,
+    event: input.event,
+  });
+}
+
 export async function updateProjectOutreachSettings(input: {
   userId: string; id: string; settings: unknown;
 }): Promise<unknown | null> {
