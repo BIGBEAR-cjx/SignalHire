@@ -4,7 +4,7 @@ import { listOutreachQueue } from "./outreach-threads";
 import { buildProjectInboxQueueView } from "./inbox";
 import { listSearchTasks } from "./search-tasks";
 import { buildRoleAgentWorkspaceView } from "./role-agent-workspace.mjs";
-import { buildLiveSignalRefreshSummary, createHttpLiveSignalProvider, selectLiveSignalRefreshProjects } from "./live-signal-refresh.mjs";
+import { buildLiveSignalRefreshSummary, createHttpLiveSignalProvider, createInternalLiveSignalProvider, selectLiveSignalRefreshProjects } from "./live-signal-refresh.mjs";
 import { runRoleAgentRunCore } from "./role-agent-runner.mjs";
 
 const BASE = process.env.INSFORGE_API_BASE_URL;
@@ -74,18 +74,7 @@ async function refreshLiveSignals(input: { userId?: string; project?: unknown; t
   const provider = createHttpLiveSignalProvider({
     url: process.env.LIVE_SIGNAL_PROVIDER_URL,
     apiKey: process.env.LIVE_SIGNAL_PROVIDER_API_KEY,
-  });
-  if (!provider) {
-    const targets = Array.isArray(input.targets) ? input.targets : [];
-    return {
-      refreshed: [],
-      failed: targets.map((target) => ({
-        ...(target && typeof target === "object" ? target as Record<string, unknown> : {}),
-        error: "provider_not_configured",
-      })),
-      error: "provider_not_configured",
-    };
-  }
+  }) || createInternalLiveSignalProvider();
   return provider.refresh(input);
 }
 

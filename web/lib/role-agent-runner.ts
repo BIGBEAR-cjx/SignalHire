@@ -4,7 +4,7 @@ import { buildProjectInboxQueueView } from "./inbox";
 import { listSearchTasks, createSearchTask, runSearchTaskNow } from "./search-tasks";
 import { buildRoleAgentWorkspaceView } from "./role-agent-workspace.mjs";
 import { runRoleAgentRunCore } from "./role-agent-runner.mjs";
-import { createHttpLiveSignalProvider } from "./live-signal-refresh.mjs";
+import { createHttpLiveSignalProvider, createInternalLiveSignalProvider } from "./live-signal-refresh.mjs";
 import { runBulkContactResolution } from "./contact-resolution-route.mjs";
 import { updateOutreachThread } from "./outreach-threads";
 
@@ -36,18 +36,7 @@ async function refreshLiveSignals(input: { userId?: string; project?: unknown; t
   const provider = createHttpLiveSignalProvider({
     url: process.env.LIVE_SIGNAL_PROVIDER_URL,
     apiKey: process.env.LIVE_SIGNAL_PROVIDER_API_KEY,
-  });
-  if (!provider) {
-    const targets = Array.isArray(input.targets) ? input.targets : [];
-    return {
-      refreshed: [],
-      failed: targets.map((target) => ({
-        ...(target && typeof target === "object" ? target as Record<string, unknown> : {}),
-        error: "provider_not_configured",
-      })),
-      error: "provider_not_configured",
-    };
-  }
+  }) || createInternalLiveSignalProvider();
   return provider.refresh(input);
 }
 

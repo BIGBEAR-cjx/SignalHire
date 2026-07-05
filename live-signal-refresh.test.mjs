@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import {
   buildLiveSignalRefreshEvent,
   buildLiveSignalRefreshSummary,
+  createInternalLiveSignalProvider,
   createHttpLiveSignalProvider,
   selectLiveSignalRefreshProjects,
 } from "./web/lib/live-signal-refresh.mjs";
@@ -123,4 +124,18 @@ test("redacts external live signal provider failures", async () => {
   assert.equal(result.failed[0].candidate_id, "c1");
   assert.match(result.error, /api_key=redacted/);
   assert.doesNotMatch(result.error, /secret-token|debug trace/);
+});
+
+test("internal live signal provider refreshes targets without external configuration", async () => {
+  const provider = createInternalLiveSignalProvider();
+  const result = await provider.refresh({
+    project: { id: "project-1", name: "AI Engineer" },
+    targets: [{ candidate_id: "c1", candidate_name: "Ada Candidate" }],
+  });
+
+  assert.equal(result.failed.length, 0);
+  assert.equal(result.refreshed[0].candidate_id, "c1");
+  assert.equal(result.refreshed[0].provider, "internal_live_signal_provider");
+  assert.equal(result.refreshed[0].live_signals[0].type, "profile_freshness");
+  assert.match(result.refreshed[0].live_signals[0].summary, /AI Engineer/);
 });

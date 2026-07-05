@@ -161,7 +161,7 @@ cp web/.env.example web/.env.local
 - `RESEND_API_KEY`
 - `CLIENT_PORTAL_INVITE_FROM`
 
-可选 live signal provider：
+可选外部 live signal provider（不配置时使用内置 `internal_live_signal_provider` fallback）：
 
 - `LIVE_SIGNAL_PROVIDER_URL`
 - `LIVE_SIGNAL_PROVIDER_HEALTH_URL`
@@ -248,7 +248,7 @@ npm --prefix web run verify:release -- --base-url https://signal-hire-eight.verc
 `verify:live` 需要 web server、worker、Insforge 和 MiroMind 都可用；生产 live smoke test 还需要登录
 cookie/token 或测试账号。
 
-`verify:release` 会检查 runtime env、live signal provider health、`/client`、匿名
+`verify:release` 会检查 runtime env、live signal provider health（外部 URL 或内置 fallback）、`/client`、匿名
 `/api/client-portal/workspace`、客户门户 token QA 和可选浏览器 QA。需要浏览器检查时先安装或提供
 Playwright：
 

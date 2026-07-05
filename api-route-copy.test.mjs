@@ -534,6 +534,7 @@ test("client portal account access is enforced for share reports and feedback", 
 test("live signal provider cron and background role agent runs are wired", () => {
   const config = readFileSync("web/vercel.json", "utf8");
   const liveSignalRoute = readFileSync("web/app/api/cron/live-signals/route.ts", "utf8");
+  const liveSignalHealthRoute = readFileSync("web/app/api/live-signals/health/route.ts", "utf8");
   const liveSignalRunner = readFileSync("web/lib/live-signal-refresh.ts", "utf8");
   const roleAgentRoute = readFileSync("web/app/api/projects/[id]/role-agent-runs/route.ts", "utf8");
   const roleAgentRunner = readFileSync("web/lib/role-agent-runner.ts", "utf8");
@@ -542,15 +543,21 @@ test("live signal provider cron and background role agent runs are wired", () =>
   assert.match(config, /"path": "\/api\/cron\/live-signals"/);
   assert.match(liveSignalRoute, /refreshDueLiveSignals/);
   assert.match(liveSignalRoute, /CRON_SECRET/);
+  assert.match(liveSignalHealthRoute, /internal_live_signal_provider/);
+  assert.match(liveSignalHealthRoute, /Response\.json/);
   assert.match(liveSignalRunner, /buildRoleAgentWorkspaceView/);
   assert.match(liveSignalRunner, /LIVE_SIGNAL_PROVIDER_URL/);
+  assert.match(liveSignalRunner, /createInternalLiveSignalProvider/);
   assert.match(liveSignalRunner, /createHttpLiveSignalProvider/);
   const releaseVerifier = readFileSync("web/scripts/verify-release-readiness.mjs", "utf8");
   assert.match(releaseVerifier, /LIVE_SIGNAL_PROVIDER_HEALTH_URL/);
   assert.match(releaseVerifier, /checkLiveSignalProviderHealth/);
+  assert.match(releaseVerifier, /\/api\/live-signals\/health/);
+  assert.match(releaseVerifier, /internal provider health/);
   assert.match(roleAgentRoute, /runRoleAgentProjectAction/);
   assert.match(roleAgentRoute, /prepare_outreach/);
   assert.match(roleAgentRunner, /runRoleAgentRunCore/);
+  assert.match(roleAgentRunner, /createInternalLiveSignalProvider/);
   assert.match(roleAgentRunner, /runBulkContactResolution/);
   assert.match(roleAgentRunner, /approveOutreachDraft/);
   assert.match(projectPage, /\/api\/projects\/\$\{project\.id\}\/role-agent-runs/);

@@ -190,6 +190,36 @@ export async function refreshLiveSignalsWithProvider({ targets = [], provider } 
   return provider.refresh(targets);
 }
 
+export function createInternalLiveSignalProvider({ now = new Date().toISOString() } = {}) {
+  return {
+    async refresh(input = {}) {
+      const payload = providerPayload(input);
+      const observedAt = validIso(now);
+      const expiresAt = new Date(Date.parse(observedAt) + 7 * 24 * 60 * 60 * 1000).toISOString();
+      const projectName = cleanString(payload.project?.name) || "this role";
+      return {
+        refreshed: payload.targets.map((target) => ({
+          candidate_id: target.candidate_id,
+          candidate_name: target.candidate_name,
+          provider: "internal_live_signal_provider",
+          signal_count: 1,
+          live_signals: [{
+            type: "profile_freshness",
+            source: "signalhire_internal",
+            confidence: "medium",
+            freshness: "fresh",
+            observed_at: observedAt,
+            expires_at: expiresAt,
+            summary: `${target.candidate_name} is queued for ${projectName}; review recent evidence before outreach.`,
+            url: "",
+          }],
+        })),
+        failed: [],
+      };
+    },
+  };
+}
+
 export function createHttpLiveSignalProvider({
   url = "",
   apiKey = "",

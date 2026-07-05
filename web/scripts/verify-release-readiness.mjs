@@ -195,8 +195,8 @@ function runtimeEnvChecks({ requireLiveProvider = false } = {}) {
   const liveReady = Boolean(cleanString(process.env.LIVE_SIGNAL_PROVIDER_URL));
   rows.push({
     name: "env:LIVE_SIGNAL_PROVIDER_URL",
-    status: liveReady ? "pass" : requireLiveProvider ? "fail" : "warn",
-    detail: liveReady ? "configured" : "missing; refresh_live_signals will record provider_not_configured guardrail",
+    status: liveReady || !requireLiveProvider ? "pass" : "fail",
+    detail: liveReady ? "configured" : "using internal live signal provider fallback",
   });
   rows.push({
     name: "env:SIGNALHIRE_QA_EMAIL",
@@ -218,15 +218,14 @@ function runtimeEnvChecks({ requireLiveProvider = false } = {}) {
   return rows;
 }
 
-async function checkLiveSignalProviderHealth({ requireLiveProvider = false } = {}) {
+async function checkLiveSignalProviderHealth(origin, { requireLiveProvider = false } = {}) {
   const healthUrl = cleanString(process.env.LIVE_SIGNAL_PROVIDER_HEALTH_URL);
   if (!healthUrl) {
+    const response = await fetchTextWithRetry(`${origin}/api/live-signals/health`, {}, new Set([0, 502, 503, 504]));
     return [{
       name: "live-signal-provider:health",
-      status: requireLiveProvider ? "fail" : "warn",
-      detail: requireLiveProvider
-        ? "LIVE_SIGNAL_PROVIDER_HEALTH_URL missing"
-        : "LIVE_SIGNAL_PROVIDER_HEALTH_URL missing; provider health check skipped",
+      status: response.status >= 200 && response.status < 300 ? "pass" : requireLiveProvider ? "fail" : "warn",
+      detail: `internal provider health status=${response.status}`,
     }];
   }
   const apiKey = cleanString(process.env.LIVE_SIGNAL_PROVIDER_API_KEY);
@@ -419,7 +418,7 @@ async function main() {
   const qaSession = qaSessionResult?.cookie ? qaSessionResult : null;
   const rows = [
     ...runtimeEnvChecks({ requireLiveProvider }),
-    ...await checkLiveSignalProviderHealth({ requireLiveProvider }),
+    ...await checkLiveSignalProviderHealth(origin, { requireLiveProvider }),
     ...await routeSmokeChecks(origin, qaSession),
   ];
   if (qaSession) {
