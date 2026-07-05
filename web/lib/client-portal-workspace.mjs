@@ -58,7 +58,6 @@ function normalizeAccessGrant(access, viewer) {
 function normalizeProject(project, accessReason = "", accessGrant = null) {
   return {
     id: cleanString(project?.id),
-    user_id: cleanString(project?.user_id),
     name: safeText(project?.name, 120) || "Untitled project",
     brief: safeText(project?.brief, 500),
     status: cleanString(project?.status) || "open",

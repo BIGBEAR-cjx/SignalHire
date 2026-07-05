@@ -117,7 +117,10 @@ test("builds a client-safe workspace summary from authorized projects", () => {
   assert.deepEqual(workspace.projects.map((item) => item.id), ["project-1", "project-2"]);
   assert.equal(workspace.projects[0].access.viewer_email, "hiring@client.ai");
   assert.equal(JSON.stringify(workspace).includes("internal debug"), false);
+  assert.equal(JSON.stringify(workspace).includes("user_id"), false);
   assert.equal(JSON.stringify(workspace).includes("allowed_emails"), false);
+  assert.equal(JSON.stringify(workspace).includes("allowed_domains"), false);
+  assert.equal(JSON.stringify(workspace).includes("invites"), false);
 });
 
 test("builds a client-safe project workspace with tabs, reports, feedback, and message history", () => {
@@ -194,4 +197,8 @@ test("builds a client-safe project workspace with tabs, reports, feedback, and m
   assert.equal(view.feedback_history.length, 1);
   assert.equal(JSON.stringify(view).includes("execution_log"), false);
   assert.equal(JSON.stringify(view).includes("role_agent"), false);
+  assert.equal(JSON.stringify(view).includes("user_id"), false);
+  assert.equal(JSON.stringify(view).includes("allowed_emails"), false);
+  assert.equal(JSON.stringify(view).includes("allowed_domains"), false);
+  assert.equal(JSON.stringify(view).includes("invites"), false);
 });

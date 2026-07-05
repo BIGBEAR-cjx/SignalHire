@@ -28,7 +28,6 @@ export type ClientPortalWorkspaceView = {
   interview_ready_queue: unknown[];
   projects: Array<{
     id: string;
-    user_id: string;
     name: string;
     brief: string;
     status: string;
@@ -53,7 +52,6 @@ export type ClientPortalProjectView = {
   tabs: string[];
   project: {
     id: string;
-    user_id: string;
     name: string;
     brief: string;
     status: string;
