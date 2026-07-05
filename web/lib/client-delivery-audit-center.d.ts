@@ -18,6 +18,8 @@ export type ClientDeliveryAuditCenterView = {
     project_id: string;
     project_name: string;
     event_type: "report_view" | "feedback" | string;
+    action_type: string;
+    display_type: "report_view" | "feedback" | "portal_project_view" | string;
     actor: string;
     sentiment: string;
     note: string;

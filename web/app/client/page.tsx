@@ -35,6 +35,14 @@ function metricLine(metrics: ClientPortalWorkspaceView["projects"][number]["metr
     : `${metrics.candidates} 候选人 · ${metrics.contacted} 已联系 · ${metrics.replied} 已回复 · ${metrics.interview_ready} 可约面`;
 }
 
+function accessLine(access: ClientPortalWorkspaceView["projects"][number]["access"], isEn: boolean) {
+  if (!access?.viewer_email) return "";
+  if (access.method === "domain" && access.matched) {
+    return isEn ? `Signed in as ${access.viewer_email} · domain access: ${access.matched}` : `当前账号 ${access.viewer_email} · 域名授权：${access.matched}`;
+  }
+  return isEn ? `Signed in as ${access.viewer_email} · email access` : `当前账号 ${access.viewer_email} · 邮箱授权`;
+}
+
 function ClientHeader({ isEn }: { isEn: boolean }) {
   return (
     <header className="border-b border-black/10 bg-white/80">
@@ -97,6 +105,11 @@ export default function ClientWorkspacePage() {
                 ? "Review authorized roles, weekly progress, interview-ready candidates, report versions, risks, and feedback history."
                 : "查看已授权项目、周交付进展、可约面候选人、报告版本、风险和反馈历史。"}
             </p>
+            {view.viewer.email && !loading && !needsLogin && (
+              <p className="mt-2 text-xs font-medium text-[var(--sh-faint)]">
+                {isEn ? `Signed in as ${view.viewer.email}` : `当前客户账号：${view.viewer.email}`}
+              </p>
+            )}
           </div>
         </div>
 
@@ -132,6 +145,7 @@ export default function ClientWorkspacePage() {
                       <p className="text-base font-semibold text-[var(--sh-ink)]">{project.name}</p>
                       {project.brief && <p className="mt-1 max-w-3xl text-sm leading-6 text-[var(--sh-muted)]">{project.brief}</p>}
                       <p className="mt-3 text-sm font-medium text-[var(--sh-muted)]">{metricLine(project.metrics, locale)}</p>
+                      {accessLine(project.access, isEn) && <p className="mt-2 text-xs font-medium text-[var(--sh-faint)]">{accessLine(project.access, isEn)}</p>}
                       {project.risks[0] && <p className="mt-3 rounded-xl bg-amber-50 px-3 py-2 text-sm text-amber-800">{project.risks[0]}</p>}
                       {project.next_actions[0] && <p className="mt-2 text-sm text-[var(--sh-muted)]">{project.next_actions[0]}</p>}
                     </div>

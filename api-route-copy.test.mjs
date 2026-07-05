@@ -1454,6 +1454,7 @@ test("Profile Lead Layer productizes OpenJobs Mira as low-evidence leads", () =>
 test("client portal workspace routes and APIs are wired to customer account access", () => {
   const clientPage = readFileSync("web/app/client/page.tsx", "utf8");
   const clientProjectPage = readFileSync("web/app/client/projects/[id]/page.tsx", "utf8");
+  const appClientDeliveryPage = readFileSync("web/app/app/client-delivery/page.tsx", "utf8");
   const workspaceRoute = readFileSync("web/app/api/client-portal/workspace/route.ts", "utf8");
   const projectRoute = readFileSync("web/app/api/client-portal/projects/[id]/route.ts", "utf8");
   const feedbackRoute = readFileSync("web/app/api/client-portal/projects/[id]/feedback/route.ts", "utf8");
@@ -1469,6 +1470,9 @@ test("client portal workspace routes and APIs are wired to customer account acce
   assert.match(clientProjectPage, /Interview-ready/);
   assert.match(clientProjectPage, /Weekly archive/);
   assert.match(clientProjectPage, /Feedback/);
+  assert.match(clientProjectPage, /accessText/);
+  assert.match(clientPage, /accessLine/);
+  assert.match(appClientDeliveryPage, /Portal project viewed|门户项目查看/);
   assert.match(workspaceRoute, /getUser/);
   assert.match(workspaceRoute, /buildClientPortalWorkspaceView/);
   assert.match(workspaceRoute, /findClientPortalAuthorizedProjects/);

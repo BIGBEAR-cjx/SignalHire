@@ -36,7 +36,26 @@ function normalizeAccessPolicy(project) {
   return buildRoleOutreachSettings(project?.outreach_settings || project?.outreachSettings || {}).client_delivery_access;
 }
 
-function normalizeProject(project, accessReason = "") {
+function normalizeAccessGrant(access, viewer) {
+  const policy = isRecord(access?.policy) ? access.policy : {};
+  const viewerEmail = cleanString(viewer?.email).toLowerCase();
+  const domain = viewerEmail.includes("@") ? viewerEmail.split("@").pop() : "";
+  const emails = Array.isArray(policy.allowed_emails) ? policy.allowed_emails.map((item) => cleanString(item).toLowerCase()) : [];
+  const domains = Array.isArray(policy.allowed_domains) ? policy.allowed_domains.map((item) => cleanString(item).toLowerCase()) : [];
+  const method = viewerEmail && emails.includes(viewerEmail)
+    ? "email"
+    : domain && domains.includes(domain)
+      ? "domain"
+      : cleanString(access?.reason) || "customer_account";
+  return {
+    viewer_email: viewerEmail,
+    reason: cleanString(access?.reason),
+    method,
+    matched: method === "domain" ? domain : method === "email" ? viewerEmail : "",
+  };
+}
+
+function normalizeProject(project, accessReason = "", accessGrant = null) {
   return {
     id: cleanString(project?.id),
     user_id: cleanString(project?.user_id),
@@ -46,6 +65,7 @@ function normalizeProject(project, accessReason = "") {
     updated_at: validIso(project?.updated_at || project?.created_at),
     candidates_total: nonNegativeInteger(project?.candidates_total),
     access_reason: accessReason,
+    access: accessGrant,
   };
 }
 
@@ -221,7 +241,7 @@ export function filterClientPortalAuthorizedProjects(projects = [], viewer = {})
     .filter(isRecord)
     .map((project) => {
       const access = clientPortalAccess(project, viewer);
-      return access.allowed ? normalizeProject(project, access.reason) : null;
+      return access.allowed ? normalizeProject(project, access.reason, normalizeAccessGrant(access, viewer)) : null;
     })
     .filter(Boolean);
 }
@@ -291,7 +311,8 @@ export function buildClientPortalProjectView({
   locale = "zh",
 } = {}) {
   const access = clientPortalAccess(project, viewer);
-  const normalizedProject = normalizeProject(project, access.reason);
+  const accessGrant = normalizeAccessGrant(access, viewer);
+  const normalizedProject = normalizeProject(project, access.reason, accessGrant);
   const archives = normalizeWeeklyArchives(weeklyArchives);
   const normalizedReports = normalizeReports(reports);
   const interviewReadyQueue = normalizeCandidateQueue(candidateQueue);
@@ -307,6 +328,7 @@ export function buildClientPortalProjectView({
     locale: locale === "en" ? "en" : "zh",
     authorized: access.allowed,
     access_reason: access.reason,
+    access: accessGrant,
     tabs: TABS,
     project: normalizedProject,
     summary: {

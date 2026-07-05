@@ -40,6 +40,17 @@ function queryString(locale: string, project: string, range: AuditRange, type: A
   return new URLSearchParams({ locale, project, range, type }).toString();
 }
 
+function eventLabel(event: ClientDeliveryAuditCenterView["events"][number], isEn: boolean) {
+  if (event.display_type === "feedback") return isEn ? "Client feedback" : "客户反馈";
+  if (event.display_type === "portal_project_view") return isEn ? "Portal project viewed" : "门户项目查看";
+  return isEn ? "Report viewed" : "报告查看";
+}
+
+function eventLinkLabel(event: ClientDeliveryAuditCenterView["events"][number], isEn: boolean) {
+  if (event.display_type === "portal_project_view") return isEn ? "Open portal" : "打开门户";
+  return isEn ? "View report" : "查看报告";
+}
+
 export default function ClientDeliveryAuditPage() {
   const { locale } = useI18n();
   const isEn = locale === "en";
@@ -157,13 +168,13 @@ export default function ClientDeliveryAuditPage() {
                       <div className="flex flex-wrap items-start justify-between gap-3">
                         <div>
                           <p className="text-sm font-semibold text-[var(--sh-ink)]">
-                            {event.event_type === "feedback" ? (isEn ? "Client feedback" : "客户反馈") : (isEn ? "Report viewed" : "报告查看")}
+                            {eventLabel(event, isEn)}
                           </p>
                           <p className="mt-1 text-xs text-[var(--sh-muted)]">{event.project_name} · {dateLabel(event.event_at, locale)}</p>
                         </div>
                         {event.report_href && (
                           <a href={event.report_href} className="inline-flex items-center gap-1 text-xs font-semibold text-[var(--sh-blue)]">
-                            {isEn ? "View report" : "查看报告"} <FiExternalLink className="h-3 w-3" aria-hidden="true" />
+                            {eventLinkLabel(event, isEn)} <FiExternalLink className="h-3 w-3" aria-hidden="true" />
                           </a>
                         )}
                       </div>

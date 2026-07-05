@@ -89,12 +89,18 @@ function normalizeProjects(projects) {
 function normalizeEvent(event, projectsById) {
   const projectId = cleanString(event.project_id);
   const eventType = cleanString(event.event_type);
+  const actionType = cleanString(event.action_type);
   const eventAt = validIso(event.event_at || event.at || event.created_at);
   if (!projectId || !["report_view", "feedback"].includes(eventType) || !eventAt) return null;
+  const displayType = eventType === "report_view" && actionType === "client_portal_project_view"
+    ? "portal_project_view"
+    : eventType;
   return {
     project_id: projectId,
     project_name: projectsById.get(projectId) || "Untitled project",
     event_type: eventType,
+    action_type: actionType,
+    display_type: displayType,
     actor: safeText(event.actor) || (eventType === "report_view" ? "Client" : ""),
     sentiment: safeText(event.sentiment),
     note: safeText(event.note),

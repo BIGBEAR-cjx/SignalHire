@@ -7,6 +7,13 @@ export type ClientPortalMetricSummary = {
   confirmed: number;
 };
 
+export type ClientPortalAccessGrant = {
+  viewer_email: string;
+  reason: string;
+  method: string;
+  matched: string;
+};
+
 export type ClientPortalWorkspaceView = {
   locale: "zh" | "en";
   viewer: { email: string };
@@ -28,6 +35,7 @@ export type ClientPortalWorkspaceView = {
     updated_at: string;
     candidates_total: number;
     access_reason: string;
+    access: ClientPortalAccessGrant | null;
     metrics: ClientPortalMetricSummary;
     latest_activity: string;
     risks: string[];
@@ -41,6 +49,7 @@ export type ClientPortalProjectView = {
   locale: "zh" | "en";
   authorized: boolean;
   access_reason: string;
+  access: ClientPortalAccessGrant;
   tabs: string[];
   project: {
     id: string;
@@ -51,6 +60,7 @@ export type ClientPortalProjectView = {
     updated_at: string;
     candidates_total: number;
     access_reason: string;
+    access: ClientPortalAccessGrant | null;
   };
   summary: ClientPortalMetricSummary & { latest_activity: string };
   overview: {

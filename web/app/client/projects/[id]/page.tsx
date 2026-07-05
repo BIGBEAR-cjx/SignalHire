@@ -47,6 +47,19 @@ function metricText(metrics: Record<string, unknown>, locale: string) {
     : `${values.new_candidates} 新增 · ${values.contacted} 已联系 · ${values.replied} 已回复 · ${values.interview_ready} 可约面 · ${values.confirmed} 已确认`;
 }
 
+function accessText(view: ClientPortalProjectView, isEn: boolean) {
+  const access = view.access;
+  if (!access?.viewer_email) return "";
+  if (access.method === "domain" && access.matched) {
+    return isEn
+      ? `You are signed in as ${access.viewer_email}. Access is granted through ${access.matched}.`
+      : `你当前使用 ${access.viewer_email} 登录，通过 ${access.matched} 域名授权访问。`;
+  }
+  return isEn
+    ? `You are signed in as ${access.viewer_email}. Access is granted to this email.`
+    : `你当前使用 ${access.viewer_email} 登录，该邮箱已被授权访问。`;
+}
+
 export default function ClientProjectPage() {
   const { id } = useParams<{ id: string }>();
   const projectId = Array.isArray(id) ? id[0] : id;
@@ -138,6 +151,11 @@ export default function ClientProjectPage() {
                 <h1 className="mt-2 text-2xl font-semibold tracking-normal text-[var(--sh-ink)] md:text-3xl">{view.project.name}</h1>
                 {view.project.brief && <p className="mt-2 max-w-3xl text-sm leading-6 text-[var(--sh-muted)]">{view.project.brief}</p>}
               </div>
+              {accessText(view, isEn) && (
+                <div className="rounded-2xl border border-black/10 bg-white/80 px-4 py-3 text-sm font-medium text-[var(--sh-muted)]">
+                  {accessText(view, isEn)}
+                </div>
+              )}
               <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
                 <MetricCard label={isEn ? "Candidates" : "候选人"} value={view.summary.candidates} Icon={FiUsers} tone="blue" />
                 <MetricCard label={isEn ? "Contacted" : "已联系"} value={view.summary.contacted} />

@@ -63,6 +63,9 @@ test("filters customer portal projects by account access and excludes token-only
 
   assert.deepEqual(authorized.map((item) => item.id), ["email-match", "domain-match"]);
   assert.equal(authorized[0].access_reason, "valid_customer_account");
+  assert.equal(authorized[0].access.method, "email");
+  assert.equal(authorized[1].access.method, "domain");
+  assert.equal(authorized[1].access.matched, "client.ai");
 });
 
 test("builds a client-safe workspace summary from authorized projects", () => {
@@ -112,7 +115,9 @@ test("builds a client-safe workspace summary from authorized projects", () => {
   assert.equal(workspace.summary.this_week_replies, 2);
   assert.equal(workspace.summary.latest_activity, "2026-07-03T12:00:00.000Z");
   assert.deepEqual(workspace.projects.map((item) => item.id), ["project-1", "project-2"]);
+  assert.equal(workspace.projects[0].access.viewer_email, "hiring@client.ai");
   assert.equal(JSON.stringify(workspace).includes("internal debug"), false);
+  assert.equal(JSON.stringify(workspace).includes("allowed_emails"), false);
 });
 
 test("builds a client-safe project workspace with tabs, reports, feedback, and message history", () => {
@@ -181,6 +186,8 @@ test("builds a client-safe project workspace with tabs, reports, feedback, and m
   assert.equal(view.authorized, true);
   assert.equal(view.project.id, "project-1");
   assert.equal(view.summary.interview_ready, 1);
+  assert.equal(view.access.method, "email");
+  assert.equal(view.access.viewer_email, "hiring@client.ai");
   assert.equal(view.interview_ready_queue[0].message_history.summary.total, 3);
   assert.equal(view.reports[0].href, "/r/report-1");
   assert.deepEqual(view.tabs, ["overview", "interview-ready", "weekly-archive", "reports", "feedback"]);

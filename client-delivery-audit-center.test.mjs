@@ -32,6 +32,15 @@ const events = [
     event_at: "2026-07-03T11:00:00.000Z",
   },
   {
+    project_id: "project-1",
+    event_type: "report_view",
+    action_type: "client_portal_project_view",
+    report_href: "/client/projects/project-1",
+    actor: "hiring@client.ai",
+    detail: "Client portal project viewed by hiring@client.ai (/client/projects/project-1)",
+    event_at: "2026-07-03T12:00:00.000Z",
+  },
+  {
     project_id: "project-2",
     event_type: "report_view",
     action_type: "shareable_client_delivery_loop",
@@ -70,12 +79,13 @@ test("builds client delivery audit center dashboard view", () => {
   });
 
   assert.deepEqual(view.summary, {
-    report_views: 1,
+    report_views: 2,
     feedback: 1,
     weekly_archives: 1,
-    latest_activity: "2026-07-03T11:00:00.000Z",
+    latest_activity: "2026-07-03T12:00:00.000Z",
   });
-  assert.deepEqual(view.events.map((event) => event.event_type), ["feedback", "report_view"]);
+  assert.deepEqual(view.events.map((event) => event.display_type), ["portal_project_view", "feedback", "report_view"]);
+  assert.equal(view.events[0].action_type, "client_portal_project_view");
   assert.equal(view.events[0].project_name, "AI Infra Lead");
   assert.equal(view.weekly_archives[0].metrics.confirmed, 1);
   assert.doesNotMatch(JSON.stringify(view), /debug|execution_log|role_agent/i);
@@ -112,6 +122,7 @@ test("exports audit center rows with a stable csv header", () => {
 
   assert.equal(csv.split("\n")[0], "project,event_type,actor,sentiment,note,report_href,event_at,archive_id,week_start,week_end,latest_report_id");
   assert.match(csv, /AI Infra Lead,feedback,Hiring Manager,ready_to_interview,Move Ada forward\.,\/r\/run-1\?t=token,2026-07-03T11:00:00.000Z,,,,/);
+  assert.match(csv, /AI Infra Lead,report_view,hiring@client\.ai,,,.?\/client\/projects\/project-1,2026-07-03T12:00:00.000Z,,,,/);
   assert.match(csv, /AI Infra Lead,weekly_archive,,,,,,cda_week_1,2026-06-29,2026-07-05,run-1/);
   assert.doesNotMatch(csv, /debug|execution_log|role_agent/i);
 });
