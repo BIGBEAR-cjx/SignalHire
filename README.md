@@ -2,9 +2,14 @@
 
 *Find signals. Not resumes.*
 
-SignalHire 是一个 role-based AI recruiting workspace。它把岗位 brief、人才画像或候选人资料
-转成可执行的搜人、证据审阅、联系方式准备、外联、回复处理和候选人交付流程，输出 shortlist、
-匹配理由、来源链接、证据风险、联系方式置信度、外联序列、项目候选池、持续搜人任务和客户可见报告。
+SignalHire 是一个证据优先的 AI 招聘工作台。它把岗位 brief、JD 或候选人资料转成可审阅的搜人、
+候选判断、联系方式准备、外联、回复处理和客户交付流程。
+
+它不是简历库，也不是只返回一串名字的搜索工具。SignalHire 的目标是帮助招聘团队回答三个问题：
+
+1. 谁值得进入 shortlist？
+2. 为什么这个人匹配，证据来自哪里，风险是什么？
+3. 下一步应该搜索、验证、联系、跟进、约面，还是交付给客户/manager？
 
 **Live demo:** https://signal-hire-eight.vercel.app
 
@@ -12,57 +17,52 @@ SignalHire 是一个 role-based AI recruiting workspace。它把岗位 brief、�
 
 ---
 
-## 当前产品状态
+## Product Overview
 
-SignalHire 的主线已经从单次 AI 人才搜索，扩展为面向互联网岗位的 role agent 招聘工作台：
+SignalHire has evolved from a one-shot AI talent search into a role-based recruiting workspace:
 
-- **Role-aware sourcing**：从粘贴的 JD 或自然语言 brief 中识别岗位类型、雇主上下文、must-have、
-  nice-to-have、排除项和来源策略。当前策略层覆盖软件工程、AI/ML/Data、产品、设计、增长、运营、
-  销售/BD、客户成功、安全/DevOps、战略/运营、职能支持和高管/创始人等 12 类互联网岗位。
-- **Agent execution layer**：搜索结果不只显示候选人，还显示搜索策略、执行 trace、来源组合、候选
-  提交事件、delivery clusters 和下一步建议。
-- **Fast lead preview**：搜索运行中即可展示 unverified leads 和 `open_evidence_leads`，用户可以先判断方向；
-  preview leads 明确不能直接外联，直到公开证据和联系方式来源被复核。
-- **Evidence-first shortlist**：候选人卡片保留匹配分、强/弱证据、claim verdict、来源链接、证据
-  coverage 和待验证风险，避免把单一来源或自述包装成强推荐。
-- **CandidateGraph and source mix**：成功搜索会把候选人快照、证据 URL、来源类型和标签写入
-  `candidate_profiles` / `candidate_evidence_sources`，并在 Role Workspace 中展示多来源候选人图、
-  profile leads、LinkedIn URL seed、internal resume/manual upload、source mix、去重和 readiness。
-- **Open evidence precheck**：worker 在 MiroMind deep research 前可用 GitHub、Hugging Face、
-  OpenAlex、Semantic Scholar、OpenReview、AnySearch 和可选 Maigret 做公开证据预检，并把候选线索
-  写入 `open_evidence_leads`。
-- **Projects and Talent Monitor**：项目页维护候选人池、候选人状态、反馈信号、下一轮搜索约束，以及
-  `search_tasks` 持续搜人任务；Vercel Cron 可触发 due tasks。
-- **Profile lead and contact resolution**：可选 OpenJobs/Mira profile lead provider 和 Hunter contact provider
-  支持候选人扩展、联系方式解析、source/confidence/deliverability 标注和 contactability score。
-- **Gmail Outreach Sequence**：`outreach_threads` 支持 3-step evidence-based sequence、逐步编辑/审核、
-  批量解析联系方式、批准草稿、Gmail draft/send、follow-up draft、失败重试和 sequence analytics。
-- **Inbox Agent and scheduling**：Gmail 线程可同步并分类 interested、ask for details、later、not interested、
-  bounced、out of office、needs human reply；感兴趣候选人可以生成 scheduling packet 和 Calendar availability 草稿，暂留首个可约时间，跟踪候选人/manager 时间协商状态，创建、改期或取消 Google Calendar interview event，并把 confirmed/rescheduled/canceled interview 写回交付状态。
-- **Role Agent controls and why-now signals**：项目页可持久化 agent status、capacity goals、approval mode、client-visible digest / report field visibility，
-  并展示 next tasks、`run_sourcing` direct manual search-task execution、backend RoleAgentRun sourcing / live-signal refresh / `prepare_outreach`、`resolve_contacts` direct bulk contact resolution、`approve_or_send_outreach` direct ready-draft approval without sending、`retry_failed_outreach` direct failed-send retry、`follow_up` direct Gmail draft saving without sending、`review_interested_candidates` direct first inbox next-step application、`refresh_live_signals` stale/expired signal refresh queue with scheduled provider cron、HTTP provider hook 和 provider guardrail fallback、next-action execution states、execution log with targets/results/failed items/retryability、带 run_id/workflow_step/status/guardrails 的 persisted role-agent run manifests、capacity pressure、activity log、blocked automation reasons、contact/outreach autopilot path 和带 target preview / guardrails 的 unified workflow run plan
-  和 persisted recovery history、latest execution summary、retryable failed item display、带 scheduling state、candidate/manager negotiation state、persisted two-sided message history、activity timeline、slot-held/confirmed/rescheduled/canceled writeback、Google Calendar event lifecycle actions 和 handoff/calendar/recovery state 的 inbox-to-interview queue、Role Agent-to-Inbox action bridge，以及基于回复、跟进、contactability、fresh evidence、candidate/company/tech stack signals 的 `why_now` 候选人排序、contact timing window、从 CandidateGraph evidence/profile/company-open-role/tech-stack context 推断的 live signal ingestion、带 type/source/confidence/freshness/expires_at 的 live signal contract、过期信号降权和 stale/expired signal refresh queue。
-- **Delivery and operations**：Smart Report、token-gated / invited-customer-account shareable client delivery loop、customer `/client` workspace、authorized project list、client project tabs、interview-ready queue、project-level delivery snapshot injection、client delivery weekly progress、report-version frozen delivery snapshot manifest、shareable delivery version history、基于 persisted report versions 的 weekly delivery archive manifest、independent weekly delivery archive storage/readback、Client Delivery Audit Center with CSV export、Role Agent client delivery loop metrics/risks/next steps、confirmed interview metric、client-safe delivery filtering、client-visible report field controls、customer account access controls、shareable report view metrics、manager/client feedback capture、retained feedback audit history、metrics-derived and persisted client delivery audit trail 和 independent client delivery audit event storage、referral path、ATS-lite Greenhouse import/export、History facet counts
-  和 saved views 把搜索、外联、证据和客户交付组织成可复用的招聘记忆。
+- **Role-aware sourcing**: Turn a JD or natural-language brief into role category, must-have criteria, exclusions, source strategy, and query clusters.
+- **Evidence-first shortlist**: Review candidates with match reasons, public source links, evidence strength, claim verdicts, coverage, and unresolved risks.
+- **Lead preview while research runs**: See unverified leads early, but keep outreach blocked until evidence and contact provenance are reviewed.
+- **CandidateGraph and source mix**: Merge public evidence, profile leads, LinkedIn URL seeds, internal resume/manual upload paths, contact profiles, and source readiness into one candidate view.
+- **Contact and outreach workspace**: Resolve contact profiles when providers are configured, prepare 3-step evidence-based outreach sequences, review drafts, save Gmail drafts, send approved messages, retry failures, and track follow-ups.
+- **Inbox-to-interview flow**: Classify replies, surface interested candidates, prepare scheduling packets, hold slots, and write interview lifecycle state back into delivery reporting when Gmail/Calendar access is connected.
+- **Role Agent controls**: Track role goals, health, blocked reasons, next actions, activity history, why-now signals, contact timing, execution logs, and recovery state from one project workspace.
+- **Client delivery loop**: Share Smart Reports, client-safe delivery summaries, weekly progress, interview-ready candidates, report history, feedback, and audit trails through token-gated or customer-account access.
 
-内置缓存示例用于快速体验。非缓存 live research 需要 Insforge、MiroMind 和运行中的 worker，通常需要
-几分钟完成。
+Built-in cached examples are available for quick evaluation. Non-cached live research requires Insforge, MiroMind, and a running worker, and usually takes several minutes.
 
-## 核心工作流
+## Who It Is For
 
-| 阶段 | 内容 |
+SignalHire is designed for:
+
+- Company HR and talent teams that need evidence-backed sourcing for AI, technical, product, growth, and operating roles.
+- Founders and hiring managers who want to inspect why a candidate is worth interviewing, not just receive a list of names.
+- Recruiters and boutique agencies that need to deliver credible shortlists, outreach progress, and client-ready reports.
+- Recruiting operators who want a controlled role agent rather than a black-box outbound automation tool.
+
+## Core Workflow
+
+| Stage | What SignalHire does |
 |------|------|
-| 输入 | JD、岗位 brief、人才画像、候选人资料或项目下一轮搜索约束 |
-| Intake | 清理 JD 噪音，分离雇主上下文与候选人要求，生成 role category、channel plan 和 query clusters |
-| 预检 / preview | 可选公开来源预检，写入 `open_evidence_leads`，并在搜索运行中展示 unverified lead preview |
-| Deep research | worker 领取队列任务，调用 MiroMind 搜索、抓取、综合和交叉验证公开证据 |
-| 输出 | shortlist、talent map、search plan、execution trace、delivery clusters、evidence graph、source mix、Smart Report |
-| 联系方式 | 候选人进入 ContactProfile，记录 email/phone/LinkedIn、来源、置信度、deliverability 和 contactability |
-| 外联 | 生成 evidence-based 3-step sequence，支持编辑、审核、批量准备、Gmail draft/send 和 follow-up draft |
-| 回复 / 约面 | Inbox Agent 分类回复，生成 reply draft、follow-up、stop、scheduling packet、Calendar availability 草稿、slot hold、Google Calendar event create/reschedule/cancel 和 interview lifecycle writeback |
-| 迭代 | 候选人加入项目池，反馈进入下一轮搜索约束，search tasks 可持续运行，Role Agent 维护目标和下一步 |
+| Input | Accepts a JD, role brief, candidate text, ATS role, or project search constraint |
+| Intake | Separates employer context from candidate requirements and builds role-aware search strategy |
+| Preview | Runs optional open-evidence prechecks and shows unverified leads while research is still running |
+| Research | Uses the worker and MiroMind deep research to search, fetch, summarize, and cross-check public evidence |
+| Review | Produces shortlist, talent map, execution trace, source mix, evidence graph, and Smart Report |
+| Contact | Builds ContactProfile records with source, confidence, deliverability, and contactability metadata when providers are configured |
+| Outreach | Drafts evidence-based sequences and supports review, approval, Gmail draft/send, follow-up draft, and retry workflows |
+| Inbox | Classifies replies and turns interested candidates into scheduling, interview-ready, or human-review actions |
+| Delivery | Packages role progress, candidate evidence, outreach state, risks, and client feedback into reusable recruiting memory |
 
-Verify 能力仍作为候选人背景核验的辅助入口；主产品定位是证据可追溯的搜人、候选判断和项目迭代。
+## Current Boundaries
+
+- SignalHire is **not** a resume database, traditional ATS, or mass cold-email platform.
+- Preview leads and profile leads are discovery signals, not verified recommendations.
+- Contact enrichment, Gmail, Calendar, Greenhouse, and external live-signal features require provider configuration.
+- `approve_or_send_outreach` currently approves ready drafts without blindly auto-sending first-touch emails.
+- Full unattended recruiting autopilot is still a roadmap direction; current automation keeps visible state, guardrails, audit history, and manual recovery paths.
+- Verify remains an auxiliary candidate background-check entry point. The main product is evidence-traceable sourcing, candidate judgment, and recruiting execution.
 
 ## How it works
 
