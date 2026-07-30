@@ -1,5 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import {
   buildCandidateLiveSignalUpsertRows,
   isCandidateLiveSignalActive,
@@ -61,4 +62,13 @@ test("skips malformed batch rows without merging matching evidence across projec
   assert.equal(normalizeCandidateLiveSignal(null), null);
   assert.equal(isCandidateLiveSignalActive(null), false);
   assert.equal(rows.length, 2);
+});
+
+test("deployment migration replaces the legacy evidence key with a scoped unique constraint", () => {
+  const migration = readFileSync("migrations/20260730010000_scope_candidate_live_signal_key.sql", "utf8");
+
+  assert.match(migration, /drop constraint if exists candidate_live_signals_evidence_key_unique/i);
+  assert.match(migration, /drop index if exists public\.candidate_live_signals_evidence_key_unique/i);
+  assert.match(migration, /unique \(user_id, project_id, provider, candidate_merge_key, source_url, content_hash\)/i);
+  assert.match(migration, /to_regclass\('public\.candidate_live_signals'\)/i);
 });
