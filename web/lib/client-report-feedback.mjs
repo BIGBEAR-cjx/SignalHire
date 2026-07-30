@@ -51,7 +51,7 @@ export function normalizeClientFeedback(input = {}, context = {}) {
 
 export function normalizeClientReportFeedbackForShareAccess(input = {}, context = {}) {
   const source = isRecord(input?.feedback) ? input.feedback : input;
-  if (cleanString(context?.shareAccess?.reason, 80) === "valid_customer_account") {
+  if (["valid_customer_account", "owner_account"].includes(cleanString(context?.shareAccess?.reason, 80))) {
     return normalizeClientFeedback(source, {
       actorEmail: context?.user?.email,
       reportId: context?.reportId,

@@ -28,6 +28,21 @@ test("direct report feedback derives an account actor from the session", () => {
   });
 });
 
+test("direct report feedback ignores a forged reviewer for the report owner", () => {
+  const normalized = normalizeClientReportFeedbackForShareAccess({ feedback }, {
+    shareAccess: { allowed: true, reason: "owner_account" },
+    user: { id: "owner-1", email: "owner@signalhire.ai" },
+    reportId: "report-1",
+  });
+
+  assert.deepEqual(normalized, {
+    sentiment: "ready_to_interview",
+    note: "Strong evidence",
+    actor: "owner@signalhire.ai",
+    report_id: "report-1",
+  });
+});
+
 test("direct report feedback rejects an unauthorized customer account", () => {
   const shareAccess = verifyClientDeliveryShareAccess({
     id: "report-1",
