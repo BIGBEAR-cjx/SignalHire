@@ -50,13 +50,17 @@ export function normalizeClientFeedback(input = {}, context = {}) {
 }
 
 export function buildClientReportFeedbackEvent({ feedback, reportHref = "", now = new Date() } = {}) {
-  const normalized = isRecord(feedback) && cleanString(feedback.actor, 120)
-    ? {
-      sentiment: cleanString(feedback.sentiment, 80),
-      reviewer: cleanString(feedback.actor, 120),
-      note: cleanString(feedback.note, 500),
-    }
-    : normalizeClientReportFeedback(feedback);
+  const source = isRecord(feedback) ? feedback : {};
+  const hasActor = Object.hasOwn(source, "actor");
+  const actor = cleanString(source.actor, 120);
+  if (hasActor && !actor) return null;
+  const normalized = hasActor
+    ? normalizeClientReportFeedback({
+      sentiment: source.sentiment,
+      reviewer: actor,
+      note: source.note,
+    })
+    : normalizeClientReportFeedback(source);
   if (!normalized) return null;
   const href = cleanString(reportHref, 240);
   const detail = [

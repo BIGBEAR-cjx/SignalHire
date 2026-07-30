@@ -40,6 +40,13 @@ test("normalizes feedback with the server-owned actor and report version", () =>
     ).actor,
     "real@client.ai",
   );
+  assert.equal(
+    normalizeClientFeedback(
+      { sentiment: "ready_to_interview", note: "Strong evidence" },
+      { actorEmail: "   ", reportId: "r1" },
+    ),
+    null,
+  );
   assert.equal(normalizeClientFeedback({}, { actorEmail: "", reportId: "r1" }), null);
   assert.equal(normalizeClientFeedback({}, { actorEmail: "real@client.ai", reportId: "" }), null);
 });

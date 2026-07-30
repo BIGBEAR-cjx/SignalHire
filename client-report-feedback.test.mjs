@@ -40,3 +40,15 @@ test("builds a role agent manager feedback event", () => {
   assert.match(event.detail, /Move Ada/);
   assert.equal(event.at, "2026-07-03T13:00:00.000Z");
 });
+
+test("rejects invalid authenticated client feedback before building an event", () => {
+  assert.equal(buildClientReportFeedbackEvent({
+    feedback: { actor: "real@client.ai", sentiment: "unknown", note: "Looks good" },
+  }), null);
+  assert.equal(buildClientReportFeedbackEvent({
+    feedback: { actor: "real@client.ai", sentiment: "ready_to_interview", note: "" },
+  }), null);
+  assert.equal(buildClientReportFeedbackEvent({
+    feedback: { actor: "", sentiment: "ready_to_interview", note: "Looks good" },
+  }), null);
+});
