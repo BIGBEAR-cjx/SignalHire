@@ -31,8 +31,20 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
     return Response.json({ error: t(locale, "api.error.jobUnavailable") }, { status: 403 });
   }
 
-  await recordClientPortalProjectView(project, user);
-  const detail = await loadClientPortalProjectDetail(project, locale);
+  const currentProject = await findClientPortalAuthorizedProject(user, id);
+  if (!currentProject) {
+    const candidate = await findClientPortalCandidateProject(id);
+    if (candidate) await recordClientPortalAccessDenied(candidate, user, "unauthorized_customer_account");
+    return Response.json({ error: t(locale, "api.error.jobUnavailable") }, { status: 403 });
+  }
+  const currentAccess = verifyClientPortalProjectAccess(currentProject, user);
+  if (!currentAccess.allowed) {
+    await recordClientPortalAccessDenied(currentProject, user, currentAccess.reason);
+    return Response.json({ error: t(locale, "api.error.jobUnavailable") }, { status: 403 });
+  }
+
+  await recordClientPortalProjectView(currentProject, user);
+  const detail = await loadClientPortalProjectDetail(currentProject, locale);
   return Response.json(buildClientPortalProjectView({
     viewer: user,
     project: detail.project,

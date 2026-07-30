@@ -94,10 +94,15 @@ function errorResponse(locale, key, status, dependencies) {
   return Response.json({ error: dependencies.t(locale, key) }, { status });
 }
 
+function isSameProject(project, projectId) {
+  return cleanString(project?.id, 160) === cleanString(projectId, 160);
+}
+
 export async function handleClientPortalFeedbackPost({ req, projectId, dependencies = {} } = {}) {
   const {
     getUser,
     findAuthorizedProject,
+    recheckAuthorizedProject = findAuthorizedProject,
     findProjectReport,
     clientPortalReportHref,
     recordProjectRoleAgentEvent,
@@ -106,7 +111,7 @@ export async function handleClientPortalFeedbackPost({ req, projectId, dependenc
     expectedAction = "client_delivery_feedback",
     now = () => new Date(),
   } = dependencies;
-  if (typeof getUser !== "function" || typeof findAuthorizedProject !== "function" || typeof findProjectReport !== "function"
+  if (typeof getUser !== "function" || typeof findAuthorizedProject !== "function" || typeof recheckAuthorizedProject !== "function" || typeof findProjectReport !== "function"
     || typeof clientPortalReportHref !== "function" || typeof recordProjectRoleAgentEvent !== "function"
     || typeof normalizeLocale !== "function" || typeof t !== "function") {
     throw new Error("client_portal_feedback_dependencies_missing");
@@ -122,8 +127,11 @@ export async function handleClientPortalFeedbackPost({ req, projectId, dependenc
   if (!user) return errorResponse(locale, "api.error.unauthorized", 401, { t });
 
   const id = cleanString(projectId, 160);
-  const project = id ? await findAuthorizedProject(user, id) : null;
+  let project = id ? await findAuthorizedProject(user, id) : null;
   if (!project) return errorResponse(locale, "api.error.jobUnavailable", 404, { t });
+
+  project = await recheckAuthorizedProject(user, id);
+  if (!isSameProject(project, id)) return errorResponse(locale, "api.error.jobUnavailable", 403, { t });
 
   const reportId = cleanString(body.report_id, 160);
   if (!reportId) return errorResponse(locale, "api.error.invalidFeedback", 400, { t });
@@ -149,6 +157,9 @@ export async function handleClientPortalFeedbackPost({ req, projectId, dependenc
   if (!event || event.action_type !== expectedAction) {
     return errorResponse(locale, "api.error.invalidFeedback", 400, { t });
   }
+
+  project = await recheckAuthorizedProject(user, id);
+  if (!isSameProject(project, id)) return errorResponse(locale, "api.error.jobUnavailable", 403, { t });
 
   const metrics = await recordProjectRoleAgentEvent({
     userId: project.user_id,

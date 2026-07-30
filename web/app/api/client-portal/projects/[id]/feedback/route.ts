@@ -22,6 +22,7 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
     dependencies: {
       getUser,
       findAuthorizedProject: findClientPortalAuthorizedProject,
+      recheckAuthorizedProject: findClientPortalAuthorizedProject,
       findProjectReport: findClientPortalProjectReport,
       clientPortalReportHref,
       recordProjectRoleAgentEvent,

@@ -11,6 +11,7 @@ function dependencies(overrides = {}) {
   return {
     getUser: async () => ({ id: "client-user", email: "real@client.ai" }),
     findAuthorizedProject: async () => ({ id: "project-1", user_id: "owner-1" }),
+    recheckAuthorizedProject: async () => ({ id: "project-1", user_id: "owner-1" }),
     findProjectReport: async () => ({ id: "report-1", kind: "search" }),
     clientPortalReportHref: () => "/r/report-1?lang=en",
     recordProjectRoleAgentEvent: async () => ({ manager_feedback_count: 1 }),
@@ -100,6 +101,41 @@ test("requires a logged-in customer account", async () => {
     getUser: async () => null,
   });
   assert.equal(response.status, 401);
+});
+
+test("rejects feedback when customer-account access is revoked after the initial lookup", async () => {
+  const response = await post({
+    report_id: "report-1",
+    sentiment: "ready_to_interview",
+    note: "Strong evidence",
+  }, {
+    recheckAuthorizedProject: async () => null,
+  });
+
+  assert.equal(response.status, 403);
+});
+
+test("rechecks customer-account access immediately before persisting feedback", async () => {
+  let checks = 0;
+  let persisted = false;
+  const response = await post({
+    report_id: "report-1",
+    sentiment: "ready_to_interview",
+    note: "Strong evidence",
+  }, {
+    recheckAuthorizedProject: async () => {
+      checks += 1;
+      return checks === 1 ? { id: "project-1", user_id: "owner-1" } : null;
+    },
+    recordProjectRoleAgentEvent: async () => {
+      persisted = true;
+      return { manager_feedback_count: 1 };
+    },
+  });
+
+  assert.equal(response.status, 403);
+  assert.equal(checks, 2);
+  assert.equal(persisted, false);
 });
 
 test("client project feedback sends a root report-version payload without a reviewer", () => {

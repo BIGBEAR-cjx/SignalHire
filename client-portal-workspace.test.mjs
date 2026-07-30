@@ -203,3 +203,57 @@ test("builds a client-safe project workspace with tabs, reports, feedback, and m
   assert.equal(JSON.stringify(view).includes("allowed_domains"), false);
   assert.equal(JSON.stringify(view).includes("invites"), false);
 });
+
+test("removes a project from the client response after customer access is revoked", () => {
+  const revoked = project({
+    outreach_settings: {
+      client_delivery_access: {
+        mode: "token_or_customer_account",
+        allowed_emails: ["other@client.ai"],
+        allowed_domains: [],
+      },
+    },
+  });
+
+  const workspace = buildClientPortalWorkspaceView({ viewer, projects: [revoked] });
+  const detail = buildClientPortalProjectView({ viewer, project: revoked });
+
+  assert.equal(workspace.projects.length, 0);
+  assert.equal(detail.authorized, false);
+});
+
+test("does not serialize access policy or internal execution data into client payloads", () => {
+  const payload = buildClientPortalProjectView({
+    viewer,
+    project: project({
+      user_id: "owner-secret",
+      outreach_settings: {
+        client_delivery_access: {
+          mode: "token_or_customer_account",
+          allowed_emails: ["hiring@client.ai"],
+          allowed_domains: ["client.ai"],
+          invites: [{ email: "hidden@client.ai" }],
+        },
+      },
+    }),
+    reports: [{
+      id: "report-1",
+      label: "Client report",
+      summary: "Safe summary",
+      result: { execution_log: "must never leave the server", role_agent: { debug: true } },
+    }],
+    auditEvents: [{
+      event_type: "feedback",
+      actor: "Hiring manager",
+      note: "Safe note",
+      execution_log: "must never leave the server",
+      role_agent: "must never leave the server",
+      debug: "must never leave the server",
+    }],
+  });
+  const serialized = JSON.stringify(payload);
+
+  for (const forbidden of ["user_id", "allowed_emails", "allowed_domains", "invites", "execution_log", "role_agent", "debug"]) {
+    assert.equal(serialized.includes(forbidden), false, `${forbidden} must not be in client payload`);
+  }
+});
