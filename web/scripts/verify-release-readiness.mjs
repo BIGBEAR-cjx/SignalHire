@@ -1,5 +1,6 @@
 import { createRequire } from "node:module";
 import { createHmac } from "node:crypto";
+import { runCustomerBrowserScenarios } from "./qa-browser-scenarios.mjs";
 
 const require = createRequire(import.meta.url);
 
@@ -15,6 +16,11 @@ function argValue(name, fallback = "") {
 
 function hasFlag(name) {
   return process.argv.includes(name);
+}
+
+function printUsage() {
+  console.log("Usage: node web/scripts/verify-release-readiness.mjs [--base-url URL] [--browser] [--browser-if-available] [--require-live-provider]");
+  console.log("--browser requires configured owner, customer, and project QA fixtures; missing evidence exits non-zero.");
 }
 
 function sleep(ms) {
@@ -177,6 +183,15 @@ async function resolveQaSession() {
   };
 }
 
+function browserQaFixture(qaSession = null) {
+  return {
+    owner: cleanString(process.env.SIGNALHIRE_QA_OWNER_SESSION_TOKEN),
+    customer: cleanString(process.env.SIGNALHIRE_QA_CUSTOMER_SESSION_TOKEN) || qaSession?.cookie || "",
+    projectId: cleanString(process.env.SIGNALHIRE_QA_PROJECT_ID) || qaSession?.projectId || "",
+    reportId: cleanString(process.env.SIGNALHIRE_QA_REPORT_ID),
+  };
+}
+
 function runtimeEnvChecks({ requireLiveProvider = false } = {}) {
   const rows = [];
   const required = [
@@ -319,12 +334,18 @@ function visibleOverlap(rects) {
 
 async function browserChecks(origin, qaSession = null) {
   const playwright = loadPlaywright();
+  const fixture = browserQaFixture(qaSession);
   if (!playwright?.chromium) {
     return [{
       name: "browser:playwright",
       status: "blocked",
       detail: "Install playwright or set PLAYWRIGHT_MODULE_PATH to run browser QA.",
-    }];
+    }, ...await runCustomerBrowserScenarios({
+      playwright,
+      fixture,
+      origin,
+      headers: automationBypassHeaders(),
+    })];
   }
   const projectPath = qaSession?.projectId ? `/client/projects/${encodeURIComponent(qaSession.projectId)}` : "/client/projects/qa-missing-project";
   const cases = [
@@ -400,17 +421,27 @@ async function browserChecks(origin, qaSession = null) {
   } finally {
     await browser.close();
   }
+  rows.push(...await runCustomerBrowserScenarios({
+    playwright,
+    fixture,
+    origin,
+    headers: automationBypassHeaders(),
+  }));
   return rows;
 }
 
 function printRows(rows) {
   for (const row of rows) {
     const prefix = row.status === "pass" ? "PASS" : row.status === "warn" ? "WARN" : row.status === "blocked" ? "BLOCKED" : "FAIL";
-    console.log(`${prefix} ${row.name} - ${row.detail}`);
+    console.log(`${prefix} ${row.name} - ${row.detail || row.error || ""}`);
   }
 }
 
 async function main() {
+  if (hasFlag("--help") || hasFlag("-h")) {
+    printUsage();
+    return;
+  }
   const origin = baseUrl();
   const requireLiveProvider = hasFlag("--require-live-provider") || process.env.SIGNALHIRE_QA_REQUIRE_LIVE_PROVIDER === "1";
   const strictBrowser = hasFlag("--browser");

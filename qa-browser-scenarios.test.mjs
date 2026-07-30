@@ -4,7 +4,60 @@ import test from "node:test";
 import {
   buildQaFixture,
   classifyBrowserPrerequisites,
+  containsSensitiveValue,
+  customerScenarioNames,
+  projectBrowserScenarioResult,
+  runCustomerBrowserScenarios,
 } from "./web/scripts/qa-browser-scenarios.mjs";
+
+test("customer browser QA covers the required portal and negative scenarios", () => {
+  assert.deepEqual(customerScenarioNames(), [
+    "login_redirect",
+    "workspace",
+    "project_tabs",
+    "feedback",
+    "revoked_access",
+  ]);
+});
+
+test("browser QA result helpers recognize and redact sensitive values", () => {
+  assert.equal(containsSensitiveValue("Bearer secret", ["secret"]), true);
+
+  const result = projectBrowserScenarioResult({
+    name: "workspace",
+    role: "customer",
+    viewport: "desktop",
+    status: "fail",
+    screenshotPath: "/tmp/qa.png",
+    error: "Request failed with Bearer secret",
+    ignored: "must not leak",
+  }, ["secret"]);
+
+  assert.deepEqual(Object.keys(result).sort(), [
+    "error",
+    "name",
+    "role",
+    "screenshotPath",
+    "status",
+    "viewport",
+  ]);
+  assert.equal(result.error, "Request failed with Bearer [REDACTED]");
+  assert.equal("ignored" in result, false);
+});
+
+test("customer scenarios remain blocked when browser evidence is unavailable", async () => {
+  const results = await runCustomerBrowserScenarios({ playwright: null, fixture: {} });
+
+  assert.equal(results.length, 5);
+  assert.deepEqual(results.map((result) => result.status), ["blocked", "blocked", "blocked", "blocked", "blocked"]);
+  assert.deepEqual(results.map((result) => result.error), [
+    "missing_playwright_or_qa_fixture",
+    "missing_playwright_or_qa_fixture",
+    "missing_playwright_or_qa_fixture",
+    "missing_playwright_or_qa_fixture",
+    "missing_playwright_or_qa_fixture",
+  ]);
+});
 
 test("buildQaFixture returns the safe empty fixture", () => {
   assert.deepEqual(buildQaFixture({}), {
