@@ -39,6 +39,19 @@ test("browser QA is blocked without Playwright or a complete fixture", () => {
   );
 });
 
+test("browser QA is blocked when any required fixture value is missing", () => {
+  for (const fixture of [
+    { customer: "customer-session-configured", projectId: "project-123" },
+    { owner: "owner-session-configured", projectId: "project-123" },
+    { owner: "owner-session-configured", customer: "customer-session-configured" },
+  ]) {
+    assert.equal(
+      classifyBrowserPrerequisites({ playwright: true, fixture }).status,
+      "blocked",
+    );
+  }
+});
+
 test("browser QA is ready with Playwright and owner, customer, and project fixtures", () => {
   const completeFixture = buildQaFixture({
     owner: "owner-session-configured",
@@ -49,6 +62,20 @@ test("browser QA is ready with Playwright and owner, customer, and project fixtu
 
   assert.equal(
     classifyBrowserPrerequisites({ playwright: true, fixture: completeFixture }).status,
+    "ready",
+  );
+});
+
+test("browser QA does not require a report fixture", () => {
+  assert.equal(
+    classifyBrowserPrerequisites({
+      playwright: true,
+      fixture: {
+        owner: "owner-session-configured",
+        customer: "customer-session-configured",
+        projectId: "project-123",
+      },
+    }).status,
     "ready",
   );
 });
