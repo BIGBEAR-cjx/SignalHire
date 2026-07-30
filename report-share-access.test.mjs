@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import {
   buildClientDeliveryShareHref,
   buildClientDeliveryShareToken,
+  canSubmitAccountFeedback,
   normalizeClientDeliveryAccessPolicy,
   requiresClientDeliveryShareToken,
   verifyClientDeliveryShareAccess,
@@ -124,4 +125,9 @@ test("client delivery account invites grant access only while active", () => {
     viewer: { id: "customer-6", email: "expired@client.ai" },
     accessPolicy: policy,
   }).reason, "missing_share_token");
+});
+
+test("account-authorized report viewers can submit feedback without a share token", () => {
+  assert.equal(canSubmitAccountFeedback({ authorized: true, token: "" }), true);
+  assert.equal(canSubmitAccountFeedback({ authorized: false, token: "" }), false);
 });

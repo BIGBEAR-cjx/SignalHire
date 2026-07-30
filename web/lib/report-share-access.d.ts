@@ -19,3 +19,4 @@ export function verifyClientDeliveryShareAccess(row?: unknown, token?: string | 
   viewer?: unknown;
   accessPolicy?: unknown;
 }): ClientDeliveryShareAccess;
+export function canSubmitAccountFeedback(input?: { authorized?: boolean; token?: string }): boolean;

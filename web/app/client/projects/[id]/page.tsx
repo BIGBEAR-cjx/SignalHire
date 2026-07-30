@@ -72,6 +72,7 @@ export default function ClientProjectPage() {
   const [error, setError] = useState("");
   const [sentiment, setSentiment] = useState("ready_to_interview");
   const [note, setNote] = useState("");
+  const [selectedReportId, setSelectedReportId] = useState("");
   const [saving, setSaving] = useState(false);
 
   const reload = useCallback(async () => {
@@ -86,7 +87,9 @@ export default function ClientProjectPage() {
       }
       const json = await response.json();
       if (!response.ok) throw new Error(json.error || (isEn ? "Unable to load project." : "无法加载项目。"));
-      setView(json as ClientPortalProjectView);
+      const nextView = json as ClientPortalProjectView;
+      setView(nextView);
+      setSelectedReportId((current) => nextView.reports.some((report) => report.id === current) ? current : (nextView.reports[0]?.id ?? ""));
       setNeedsLogin(false);
       setError("");
     } catch (err) {
@@ -103,13 +106,13 @@ export default function ClientProjectPage() {
 
   async function submitFeedback(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!projectId || !note.trim()) return;
+    if (!projectId || !selectedReportId || !note.trim()) return;
     setSaving(true);
     try {
       const response = await fetch(`/api/client-portal/projects/${projectId}/feedback`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ locale, feedback: { sentiment, note, reviewer: isEn ? "Hiring manager" : "招聘负责人" } }),
+        body: JSON.stringify({ report_id: selectedReportId, sentiment, note, locale }),
       });
       const json = await response.json();
       if (!response.ok) throw new Error(json.error || (isEn ? "Unable to save feedback." : "无法保存反馈。"));
@@ -279,24 +282,34 @@ export default function ClientProjectPage() {
               <div className="grid gap-5 lg:grid-cols-[0.9fr_1.1fr]">
                 <Surface className="p-5">
                   <h2 className="text-base font-semibold text-[var(--sh-ink)]">{isEn ? "Send feedback" : "提交反馈"}</h2>
-                  <form className="mt-4 space-y-3" onSubmit={submitFeedback}>
-                    <select value={sentiment} onChange={(event) => setSentiment(event.target.value)} className="min-h-11 w-full rounded-2xl border border-black/10 bg-white px-3 text-sm font-medium outline-none focus:border-[var(--sh-blue)]">
-                      <option value="ready_to_interview">{isEn ? "Ready to interview" : "可以约面"}</option>
-                      <option value="needs_more_candidates">{isEn ? "Need more candidates" : "需要更多候选人"}</option>
-                      <option value="needs_stronger_evidence">{isEn ? "Need stronger evidence" : "需要更强证据"}</option>
-                      <option value="not_a_fit">{isEn ? "Not a fit" : "不匹配"}</option>
-                    </select>
-                    <textarea
-                      value={note}
-                      onChange={(event) => setNote(event.target.value)}
-                      rows={5}
-                      className="w-full rounded-2xl border border-black/10 bg-white px-3 py-3 text-sm leading-6 outline-none focus:border-[var(--sh-blue)]"
-                      placeholder={isEn ? "Add context for the recruiting team." : "给招聘团队补充上下文。"}
-                    />
-                    <button type="submit" disabled={saving || !note.trim()} className="sh-primary-action w-full justify-center disabled:opacity-50">
-                      <FiSend className="h-4 w-4" aria-hidden="true" /> {saving ? (isEn ? "Saving" : "保存中") : (isEn ? "Send feedback" : "提交反馈")}
-                    </button>
-                  </form>
+                  {view.reports.length === 0 ? (
+                    <EmptyState title={isEn ? "No report version to review" : "暂无可反馈的报告版本"} description={isEn ? "Feedback becomes available after a report is generated." : "生成项目报告后即可提交反馈。"} />
+                  ) : (
+                    <form className="mt-4 space-y-3" onSubmit={submitFeedback}>
+                      <label className="block text-sm font-medium text-[var(--sh-ink)]">
+                        {isEn ? "Report version" : "报告版本"}
+                        <select value={selectedReportId} onChange={(event) => setSelectedReportId(event.target.value)} className="mt-2 min-h-11 w-full rounded-2xl border border-black/10 bg-white px-3 text-sm font-medium outline-none focus:border-[var(--sh-blue)]">
+                          {view.reports.map((report) => <option key={report.id} value={report.id}>{report.label}</option>)}
+                        </select>
+                      </label>
+                      <select value={sentiment} onChange={(event) => setSentiment(event.target.value)} className="min-h-11 w-full rounded-2xl border border-black/10 bg-white px-3 text-sm font-medium outline-none focus:border-[var(--sh-blue)]">
+                        <option value="ready_to_interview">{isEn ? "Ready to interview" : "可以约面"}</option>
+                        <option value="needs_more_candidates">{isEn ? "Need more candidates" : "需要更多候选人"}</option>
+                        <option value="needs_stronger_evidence">{isEn ? "Need stronger evidence" : "需要更强证据"}</option>
+                        <option value="not_a_fit">{isEn ? "Not a fit" : "不匹配"}</option>
+                      </select>
+                      <textarea
+                        value={note}
+                        onChange={(event) => setNote(event.target.value)}
+                        rows={5}
+                        className="w-full rounded-2xl border border-black/10 bg-white px-3 py-3 text-sm leading-6 outline-none focus:border-[var(--sh-blue)]"
+                        placeholder={isEn ? "Add context for the recruiting team." : "给招聘团队补充上下文。"}
+                      />
+                      <button type="submit" disabled={saving || !selectedReportId || !note.trim()} className="sh-primary-action w-full justify-center disabled:opacity-50">
+                        <FiSend className="h-4 w-4" aria-hidden="true" /> {saving ? (isEn ? "Saving" : "保存中") : (isEn ? "Send feedback" : "提交反馈")}
+                      </button>
+                    </form>
+                  )}
                 </Surface>
                 <Surface className="p-5">
                   <h2 className="text-base font-semibold text-[var(--sh-ink)]">{isEn ? "Feedback history" : "反馈历史"}</h2>

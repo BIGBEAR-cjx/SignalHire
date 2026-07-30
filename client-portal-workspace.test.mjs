@@ -192,6 +192,7 @@ test("builds a client-safe project workspace with tabs, reports, feedback, and m
   assert.equal(view.access.method, "email");
   assert.equal(view.access.viewer_email, "hiring@client.ai");
   assert.equal(view.interview_ready_queue[0].message_history.summary.total, 3);
+  assert.equal(view.reports[0].id, "report-1");
   assert.equal(view.reports[0].href, "/r/report-1");
   assert.deepEqual(view.tabs, ["overview", "interview-ready", "weekly-archive", "reports", "feedback"]);
   assert.equal(view.feedback_history.length, 1);

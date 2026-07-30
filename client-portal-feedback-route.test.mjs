@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import test from "node:test";
 
 import {
@@ -99,4 +100,11 @@ test("requires a logged-in customer account", async () => {
     getUser: async () => null,
   });
   assert.equal(response.status, 401);
+});
+
+test("client project feedback sends a root report-version payload without a reviewer", () => {
+  const source = readFileSync("web/app/client/projects/[id]/page.tsx", "utf8");
+
+  assert.match(source, /body: JSON\.stringify\(\{ report_id: selectedReportId, sentiment, note, locale \}\)/);
+  assert.doesNotMatch(source, /feedback:\s*\{[^}]*reviewer/);
 });

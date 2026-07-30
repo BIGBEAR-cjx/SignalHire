@@ -11,7 +11,7 @@ import { buildRoleOutreachSettings } from "@/lib/outreach-settings.mjs";
 import { buildRoleAgentWorkspaceView } from "@/lib/role-agent-workspace.mjs";
 import { attachClientDeliveryLoopSnapshot, buildClientDeliverySnapshot, buildClientDeliveryVersionHistory, buildClientDeliveryWeeklyArchive } from "@/lib/smart-report.mjs";
 import { buildClientDeliveryWeeklyArchiveFromRows } from "@/lib/client-delivery-weekly-archive.mjs";
-import { buildClientDeliveryShareHref, verifyClientDeliveryShareAccess } from "@/lib/report-share-access.mjs";
+import { buildClientDeliveryShareHref, canSubmitAccountFeedback, verifyClientDeliveryShareAccess } from "@/lib/report-share-access.mjs";
 import { ClientReportFeedbackForm } from "@/components/ClientReportFeedbackForm";
 import { getUser } from "@/lib/session";
 import {
@@ -513,7 +513,13 @@ export default async function ReportPage({
   const legacyCandidates = visibleRow?.kind === "search" && !talentResult
     ? normalizeLegacyCandidates(shareResult, locale)
     : [];
-  const canCollectFeedback = Boolean(visibleRow?.kind === "search" && visibleRow.user_id && visibleRow.project_id && t && visibility.feedback_form);
+  const canCollectFeedback = Boolean(
+    visibleRow?.kind === "search"
+    && visibleRow.user_id
+    && visibleRow.project_id
+    && visibility.feedback_form
+    && (t || canSubmitAccountFeedback({ authorized: shareAccess.reason === "valid_customer_account" })),
+  );
   const cta = visibleRow?.kind === "verify"
     ? {
         title: rc(locale, "verifyCtaTitle"),

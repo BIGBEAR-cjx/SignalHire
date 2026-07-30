@@ -108,6 +108,10 @@ export function verifyClientDeliveryShareAccess(row, token, options = {}) {
   return { allowed: false, reason: "invalid_share_token" };
 }
 
+export function canSubmitAccountFeedback({ authorized = false } = {}) {
+  return Boolean(authorized);
+}
+
 export function buildClientDeliveryShareHref(row = {}, options = {}) {
   const id = cleanString(row.id);
   if (!id) return "";
