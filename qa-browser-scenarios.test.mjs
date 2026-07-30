@@ -8,6 +8,7 @@ import {
   customerScenarioNames,
   projectBrowserScenarioResult,
   runCustomerBrowserScenarios,
+  runCustomerFeedbackMutation,
   ownerScenarioNames,
   summarizeBrowserChecks,
 } from "./web/scripts/qa-browser-scenarios.mjs";
@@ -195,4 +196,63 @@ test("revoked access remains an anonymous negative check", async () => {
   const revoked = results.find((result) => result.name === "revoked_access");
 
   assert.equal(revoked?.role, "anonymous_access_negative");
+});
+
+function fakeFeedbackPage() {
+  let feedbackTabClicks = 0;
+  let submitClicks = 0;
+  let filledNote = "";
+  const feedbackTab = {
+    first: () => feedbackTab,
+    waitFor: async () => {},
+    click: async () => { feedbackTabClicks += 1; },
+  };
+  const submit = {
+    first: () => submit,
+    waitFor: async () => {},
+    click: async () => { submitClicks += 1; },
+  };
+  const textarea = {
+    first: () => textarea,
+    waitFor: async () => {},
+    fill: async (value) => { filledNote = value; },
+  };
+  return {
+    getByRole: (_role, options) => options.name.source.includes("send feedback") ? submit : feedbackTab,
+    locator: () => textarea,
+    waitForFunction: async () => {},
+    state: () => ({ feedbackTabClicks, submitClicks, filledNote }),
+  };
+}
+
+test("customer feedback mutation is blocked by default without clicking submit", async () => {
+  const page = fakeFeedbackPage();
+  const result = await runCustomerFeedbackMutation({
+    page,
+    allowMutations: false,
+    feedbackFixture: "disposable QA feedback",
+  });
+
+  assert.deepEqual(result, { status: "blocked", reason: "mutations_not_enabled" });
+  assert.deepEqual(page.state(), { feedbackTabClicks: 0, submitClicks: 0, filledNote: "" });
+});
+
+test("customer feedback mutation requires an explicit disposable feedback fixture", async () => {
+  const page = fakeFeedbackPage();
+  const result = await runCustomerFeedbackMutation({ page, allowMutations: true });
+
+  assert.deepEqual(result, { status: "blocked", reason: "missing_feedback_fixture" });
+  assert.deepEqual(page.state(), { feedbackTabClicks: 0, submitClicks: 0, filledNote: "" });
+});
+
+test("customer feedback mutation runs only with explicit permission and fixture", async () => {
+  const page = fakeFeedbackPage();
+  const result = await runCustomerFeedbackMutation({
+    page,
+    allowMutations: true,
+    feedbackFixture: "disposable QA feedback",
+  });
+
+  assert.deepEqual(result, { status: "pass", reason: "" });
+  assert.deepEqual(page.state(), { feedbackTabClicks: 1, submitClicks: 1, filledNote: "disposable QA feedback" });
 });

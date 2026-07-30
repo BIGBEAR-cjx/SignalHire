@@ -367,11 +367,27 @@ function requireVisible(locator, label) {
   });
 }
 
+export async function runCustomerFeedbackMutation({ page, allowMutations = false, feedbackFixture = "" } = {}) {
+  if (!mutationAllowed(allowMutations)) return { status: "blocked", reason: "mutations_not_enabled" };
+  const noteText = cleanIdentifier(feedbackFixture);
+  if (!noteText) return { status: "blocked", reason: "missing_feedback_fixture" };
+
+  const feedbackTab = page.getByRole("button", { name: /feedback|反馈/i }).first();
+  await requireVisible(feedbackTab, "feedback_tab");
+  await feedbackTab.click();
+  const note = page.locator("textarea").first();
+  await requireVisible(note, "feedback_note");
+  await note.fill(noteText);
+  await page.getByRole("button", { name: /send feedback|提交反馈/i }).click();
+  await page.waitForFunction(() => document.querySelector("textarea")?.value === "", { timeout: 5000 });
+  return { status: "pass", reason: "" };
+}
+
 /**
  * Runs the customer-facing browser checks only. Owner-only invitation, revoke,
  * and Role Agent actions intentionally remain in the next task.
  */
-export async function runCustomerBrowserScenarios({ playwright, fixture, origin, headers = {} } = {}) {
+export async function runCustomerBrowserScenarios({ playwright, fixture, origin, headers = {}, allowMutations = false } = {}) {
   const prerequisite = classifyBrowserPrerequisites({ playwright: Boolean(playwright?.chromium), fixture });
   const normalizedFixture = buildQaFixture(fixture);
   const sensitiveValues = [
@@ -447,8 +463,11 @@ export async function runCustomerBrowserScenarios({ playwright, fixture, origin,
       }
     }));
 
-    if (!normalizedFixture.reportId) {
-      results.push(scenarioResult("feedback", "blocked", "missing_report_fixture", sensitiveValues));
+    const feedbackFixture = cleanIdentifier(fixture?.feedbackNote);
+    if (!mutationAllowed(allowMutations)) {
+      results.push(scenarioResult("feedback", "blocked", "mutations_not_enabled", sensitiveValues));
+    } else if (!normalizedFixture.reportId || !feedbackFixture) {
+      results.push(scenarioResult("feedback", "blocked", "missing_feedback_fixture", sensitiveValues));
     } else {
       results.push(await runScenario(browser, "feedback", options, async () => {
         const { context, page } = await openPage(browser, {
@@ -459,14 +478,8 @@ export async function runCustomerBrowserScenarios({ playwright, fixture, origin,
         try {
           const status = await visit(page, `${options.origin}${projectPath}`);
           if (status !== 200) throw new Error(`unexpected_feedback_project_status=${status}`);
-          const feedbackTab = page.getByRole("button", { name: /feedback|反馈/i }).first();
-          await requireVisible(feedbackTab, "feedback_tab");
-          await feedbackTab.click();
-          const note = page.locator("textarea").first();
-          await requireVisible(note, "feedback_note");
-          await note.fill("QA browser verification feedback");
-          await page.getByRole("button", { name: /send feedback|提交反馈/i }).click();
-          await page.waitForFunction(() => document.querySelector("textarea")?.value === "", { timeout: 5000 });
+          const result = await runCustomerFeedbackMutation({ page, allowMutations, feedbackFixture });
+          if (result.status !== "pass") throw new Error(result.reason);
         } finally {
           await context.close();
         }

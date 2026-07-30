@@ -197,6 +197,7 @@ function browserQaFixture(qaSession = null) {
     customer: cleanString(process.env.SIGNALHIRE_QA_CUSTOMER_SESSION_TOKEN) || qaSession?.cookie || "",
     projectId: cleanString(process.env.SIGNALHIRE_QA_PROJECT_ID) || qaSession?.projectId || "",
     reportId: cleanString(process.env.SIGNALHIRE_QA_REPORT_ID),
+    feedbackNote: cleanString(process.env.SIGNALHIRE_QA_FEEDBACK_NOTE),
     disposableCustomerEmail: cleanString(process.env.SIGNALHIRE_QA_DISPOSABLE_CUSTOMER_EMAIL),
     roleAgentSuccessCta: cleanString(process.env.SIGNALHIRE_QA_ROLE_AGENT_SUCCESS_CTA),
     roleAgentErrorCta: cleanString(process.env.SIGNALHIRE_QA_ROLE_AGENT_ERROR_CTA),
@@ -427,6 +428,7 @@ async function browserChecks(origin, qaSession = null) {
       fixture,
       origin,
       headers: automationBypassHeaders(),
+      allowMutations: process.env.SIGNALHIRE_QA_ALLOW_MUTATIONS,
     }), ...await runOwnerBrowserScenarios({
       playwright,
       fixture,
@@ -463,6 +465,7 @@ async function browserChecks(origin, qaSession = null) {
     fixture,
     origin,
     headers: automationBypassHeaders(),
+    allowMutations: process.env.SIGNALHIRE_QA_ALLOW_MUTATIONS,
   }));
   rows.push(...await runOwnerBrowserScenarios({
     playwright,
