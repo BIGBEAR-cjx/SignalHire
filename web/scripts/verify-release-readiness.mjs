@@ -6,6 +6,8 @@ import {
   browserSessionSensitiveValues,
   redactBrowserQaText,
   runCustomerBrowserScenarios,
+  runOwnerBrowserScenarios,
+  summarizeBrowserChecks,
 } from "./qa-browser-scenarios.mjs";
 
 const require = createRequire(import.meta.url);
@@ -195,6 +197,10 @@ function browserQaFixture(qaSession = null) {
     customer: cleanString(process.env.SIGNALHIRE_QA_CUSTOMER_SESSION_TOKEN) || qaSession?.cookie || "",
     projectId: cleanString(process.env.SIGNALHIRE_QA_PROJECT_ID) || qaSession?.projectId || "",
     reportId: cleanString(process.env.SIGNALHIRE_QA_REPORT_ID),
+    disposableCustomerEmail: cleanString(process.env.SIGNALHIRE_QA_DISPOSABLE_CUSTOMER_EMAIL),
+    roleAgentSuccessCta: cleanString(process.env.SIGNALHIRE_QA_ROLE_AGENT_SUCCESS_CTA),
+    roleAgentErrorCta: cleanString(process.env.SIGNALHIRE_QA_ROLE_AGENT_ERROR_CTA),
+    roleAgentErrorPath: cleanString(process.env.SIGNALHIRE_QA_ROLE_AGENT_ERROR_PATH),
   };
 }
 
@@ -421,6 +427,12 @@ async function browserChecks(origin, qaSession = null) {
       fixture,
       origin,
       headers: automationBypassHeaders(),
+    }), ...await runOwnerBrowserScenarios({
+      playwright,
+      fixture,
+      origin,
+      headers: automationBypassHeaders(),
+      allowMutations: process.env.SIGNALHIRE_QA_ALLOW_MUTATIONS,
     })];
   }
   const projectPath = qaSession?.projectId ? `/client/projects/${encodeURIComponent(qaSession.projectId)}` : "/client/projects/qa-missing-project";
@@ -452,12 +464,19 @@ async function browserChecks(origin, qaSession = null) {
     origin,
     headers: automationBypassHeaders(),
   }));
+  rows.push(...await runOwnerBrowserScenarios({
+    playwright,
+    fixture,
+    origin,
+    headers: automationBypassHeaders(),
+    allowMutations: process.env.SIGNALHIRE_QA_ALLOW_MUTATIONS,
+  }));
   return rows;
 }
 
 function printRows(rows) {
   for (const row of rows) {
-    const prefix = row.status === "pass" ? "PASS" : row.status === "warn" ? "WARN" : row.status === "blocked" ? "BLOCKED" : "FAIL";
+    const prefix = row.status === "pass" ? "PASS" : row.status === "warn" ? "WARN" : row.status === "blocked" ? "BLOCKED" : row.status === "not-run" ? "NOT-RUN" : "FAIL";
     const label = row.role ? `${row.name} (${row.role})` : row.name;
     console.log(`${prefix} ${label} - ${row.detail || row.error || ""}`);
   }
@@ -484,7 +503,22 @@ async function main() {
     rows.push({ name: "qa:token-session", status: "fail", detail: qaSessionResult.error });
   }
   if (strictBrowser || hasFlag("--browser-if-available")) {
-    rows.push(...await browserChecks(origin, qaSession));
+    const browserRows = await browserChecks(origin, qaSession);
+    rows.push(...browserRows);
+    if (strictBrowser) {
+      const browserSummary = summarizeBrowserChecks(browserRows);
+      rows.push({
+        name: "browser:evidence",
+        status: browserSummary.releaseReady ? "pass" : "fail",
+        detail: `${browserSummary.passed}/${browserSummary.total} passed, ${browserSummary.failed} failed, ${browserSummary.blocked} blocked`,
+      });
+    }
+  } else {
+    rows.push({
+      name: "browser:evidence",
+      status: "not-run",
+      detail: "Run with --browser for required release evidence or --browser-if-available for optional checks.",
+    });
   }
   printRows(rows);
   const failures = rows.filter((row) => row.status === "fail" || (strictBrowser && row.status === "blocked"));

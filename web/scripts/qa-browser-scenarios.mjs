@@ -46,10 +46,35 @@ const CUSTOMER_SCENARIOS = [
   "revoked_access",
 ];
 
+const OWNER_SCENARIOS = [
+  "client_access_settings",
+  "invite",
+  "revoke",
+  "role_agent_success",
+  "role_agent_error",
+  "role_agent_disabled",
+];
+
 const CUSTOMER_VIEWPORT = { width: 1440, height: 900 };
 
 export function customerScenarioNames() {
   return [...CUSTOMER_SCENARIOS];
+}
+
+export function ownerScenarioNames() {
+  return [...OWNER_SCENARIOS];
+}
+
+export function summarizeBrowserChecks(results = []) {
+  const checks = Array.isArray(results) ? results : [];
+  const summary = { total: checks.length, passed: 0, failed: 0, blocked: 0, releaseReady: false };
+  for (const result of checks) {
+    if (result?.status === "pass" || result?.status === "passed") summary.passed += 1;
+    else if (result?.status === "blocked") summary.blocked += 1;
+    else summary.failed += 1;
+  }
+  summary.releaseReady = summary.total > 0 && summary.passed === summary.total;
+  return summary;
 }
 
 export function containsSensitiveValue(value, sensitiveValues = []) {
@@ -151,6 +176,188 @@ async function runScenario(browser, name, options, execute) {
     return scenarioResult(name, "pass", "", options.sensitiveValues);
   } catch (error) {
     return scenarioResult(name, "fail", error instanceof Error ? error.message : String(error), options.sensitiveValues);
+  }
+}
+
+function safeTextPattern(value) {
+  const text = cleanIdentifier(value);
+  return text ? new RegExp(text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i") : null;
+}
+
+function ownerScenarioResult(name, status, error = "", sensitiveValues = []) {
+  return projectBrowserScenarioResult({
+    name,
+    role: "owner",
+    viewport: "desktop",
+    status,
+    screenshotPath: null,
+    error,
+  }, sensitiveValues);
+}
+
+function ownerScenarioPrerequisite({ playwright, fixture }) {
+  return classifyBrowserPrerequisites({ playwright: Boolean(playwright?.chromium), fixture });
+}
+
+function mutationAllowed(value) {
+  return value === true || cleanIdentifier(value).toLowerCase() === "true" || cleanIdentifier(value) === "1";
+}
+
+async function openOwnerProject(browser, options) {
+  const { context, page } = await openPage(browser, {
+    ...options,
+    viewport: CUSTOMER_VIEWPORT,
+    customerSession: options.fixture.owner,
+  });
+  const status = await visit(page, `${options.origin}/app/projects/${encodeURIComponent(options.fixture.projectId)}`);
+  if (status !== 200) {
+    await context.close();
+    throw new Error(`unexpected_owner_project_status=${status}`);
+  }
+  await requireVisible(page.getByRole("heading", { name: /role agent guardrails/i }).first(), "role_agent_guardrails");
+  return { context, page };
+}
+
+async function ensureCustomerAccountAccess(page) {
+  const access = page.getByLabel(/customer account access|客户账号权限/i).first();
+  await requireVisible(access, "customer_account_access");
+  await access.selectOption("token_or_customer_account");
+  await page.waitForTimeout(150);
+}
+
+async function addDisposableInvite(page, email) {
+  const emailInput = page.getByLabel(/invite customer email|客户邀请邮箱/i).first();
+  await requireVisible(emailInput, "invite_customer_email");
+  await emailInput.fill(email);
+  await page.getByRole("button", { name: /add invite|添加邀请/i }).click();
+  await requireVisible(page.getByText(email, { exact: true }).first(), "disposable_invite");
+}
+
+function ownerBlockedResults(reason, sensitiveValues) {
+  return ownerScenarioNames().map((name) => ownerScenarioResult(name, "blocked", reason, sensitiveValues));
+}
+
+/**
+ * Owner checks only create or revoke an explicitly named disposable invite
+ * when SIGNALHIRE_QA_ALLOW_MUTATIONS=true. Role Agent error/busy checks use
+ * Playwright route interception and never send a request to the live server.
+ */
+export async function runOwnerBrowserScenarios({ playwright, fixture = {}, origin, headers = {}, allowMutations = false } = {}) {
+  const prerequisite = ownerScenarioPrerequisite({ playwright, fixture });
+  const sensitiveValues = [
+    ...browserSessionSensitiveValues(fixture.owner),
+    ...browserSessionSensitiveValues(fixture.customer),
+    ...Object.values(headers),
+  ].filter((value) => typeof value === "string");
+  if (prerequisite.status !== "ready") return ownerBlockedResults(prerequisite.reason, sensitiveValues);
+
+  const options = {
+    fixture,
+    origin: cleanIdentifier(origin).replace(/\/+$/, ""),
+    headers,
+    sensitiveValues,
+  };
+  const browser = await playwright.chromium.launch({ headless: true });
+  const results = [];
+  const disposableEmail = cleanIdentifier(fixture.disposableCustomerEmail).toLowerCase();
+  const successCta = safeTextPattern(fixture.roleAgentSuccessCta);
+  const errorCta = safeTextPattern(fixture.roleAgentErrorCta);
+  const errorPath = cleanIdentifier(fixture.roleAgentErrorPath);
+  try {
+    results.push(await runScenario(browser, "client_access_settings", options, async () => {
+      const { context, page } = await openOwnerProject(browser, options);
+      try {
+        await requireVisible(page.getByLabel(/customer account access|客户账号权限/i).first(), "customer_account_access");
+        await requireVisible(page.getByLabel(/allowed customer emails|允许的客户邮箱/i).first(), "allowed_customer_emails");
+      } finally {
+        await context.close();
+      }
+    }).then((result) => ownerScenarioResult(result.name, result.status, result.error, sensitiveValues)));
+
+    for (const name of ["invite", "revoke"]) {
+      if (!mutationAllowed(allowMutations)) {
+        results.push(ownerScenarioResult(name, "blocked", "mutations_not_enabled", sensitiveValues));
+      } else if (!disposableEmail) {
+        results.push(ownerScenarioResult(name, "blocked", "missing_disposable_customer_fixture", sensitiveValues));
+      } else {
+        results.push(await runScenario(browser, name, options, async () => {
+          const { context, page } = await openOwnerProject(browser, options);
+          try {
+            await ensureCustomerAccountAccess(page);
+            await addDisposableInvite(page, disposableEmail);
+            if (name === "revoke") {
+              const inviteRow = page.getByText(disposableEmail, { exact: true }).first().locator("..").locator("..");
+              await inviteRow.getByRole("button", { name: /revoke|撤销/i }).click();
+              await requireVisible(inviteRow.getByText(/revoked|已撤销/i).first(), "revoked_disposable_invite");
+            }
+          } finally {
+            await context.close();
+          }
+        }).then((result) => ownerScenarioResult(result.name, result.status, result.error, sensitiveValues)));
+      }
+    }
+
+    if (!mutationAllowed(allowMutations)) {
+      results.push(ownerScenarioResult("role_agent_success", "blocked", "mutations_not_enabled", sensitiveValues));
+    } else if (!successCta) {
+      results.push(ownerScenarioResult("role_agent_success", "blocked", "missing_role_agent_success_fixture", sensitiveValues));
+    } else {
+      results.push(await runScenario(browser, "role_agent_success", options, async () => {
+        const { context, page } = await openOwnerProject(browser, options);
+        try {
+          const action = page.getByRole("button", { name: successCta }).first();
+          await requireVisible(action, "role_agent_success_action");
+          await action.click();
+          await requireVisible(page.locator("p.text-emerald-700").first(), "role_agent_success_copy");
+        } finally {
+          await context.close();
+        }
+      }).then((result) => ownerScenarioResult(result.name, result.status, result.error, sensitiveValues)));
+    }
+
+    if (!errorCta || !errorPath) {
+      results.push(ownerScenarioResult("role_agent_error", "blocked", "missing_role_agent_error_fixture", sensitiveValues));
+      results.push(ownerScenarioResult("role_agent_disabled", "blocked", "missing_role_agent_error_fixture", sensitiveValues));
+    } else {
+      results.push(await runScenario(browser, "role_agent_error", options, async () => {
+        const { context, page } = await openOwnerProject(browser, options);
+        try {
+          await page.route(`**${errorPath}`, async (route) => {
+            await route.fulfill({ status: 500, contentType: "application/json", body: JSON.stringify({ error: "qa_safe_server_error" }) });
+          });
+          const action = page.getByRole("button", { name: errorCta }).first();
+          await requireVisible(action, "role_agent_error_action");
+          await action.click();
+          await requireVisible(page.getByText("qa_safe_server_error", { exact: true }).first(), "safe_role_agent_error_copy");
+        } finally {
+          await context.close();
+        }
+      }).then((result) => ownerScenarioResult(result.name, result.status, result.error, sensitiveValues)));
+
+      results.push(await runScenario(browser, "role_agent_disabled", options, async () => {
+        const { context, page } = await openOwnerProject(browser, options);
+        try {
+          let fulfill;
+          const delayedResponse = new Promise((resolve) => { fulfill = resolve; });
+          await page.route(`**${errorPath}`, async (route) => {
+            await delayedResponse;
+            await route.fulfill({ status: 500, contentType: "application/json", body: JSON.stringify({ error: "qa_safe_server_error" }) });
+          });
+          const action = page.getByRole("button", { name: errorCta }).first();
+          await requireVisible(action, "role_agent_busy_action");
+          await action.click();
+          await action.waitFor({ state: "visible", timeout: 1000 });
+          if (!await action.isDisabled()) throw new Error("expected_role_agent_action_disabled_while_busy");
+          fulfill();
+          await requireVisible(page.getByText("qa_safe_server_error", { exact: true }).first(), "busy_role_agent_error_copy");
+        } finally {
+          await context.close();
+        }
+      }).then((result) => ownerScenarioResult(result.name, result.status, result.error, sensitiveValues)));
+    }
+    return results;
+  } finally {
+    await browser.close();
   }
 }
 

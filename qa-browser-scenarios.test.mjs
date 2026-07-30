@@ -8,6 +8,8 @@ import {
   customerScenarioNames,
   projectBrowserScenarioResult,
   runCustomerBrowserScenarios,
+  ownerScenarioNames,
+  summarizeBrowserChecks,
 } from "./web/scripts/qa-browser-scenarios.mjs";
 
 test("customer browser QA covers the required portal and negative scenarios", () => {
@@ -170,4 +172,27 @@ test("browser QA does not require a report fixture", () => {
     }).status,
     "ready",
   );
+});
+
+test("owner browser QA covers client access and Role Agent release evidence", () => {
+  assert.deepEqual(ownerScenarioNames(), [
+    "client_access_settings",
+    "invite",
+    "revoke",
+    "role_agent_success",
+    "role_agent_error",
+    "role_agent_disabled",
+  ]);
+});
+
+test("browser release evidence is fail-closed", () => {
+  assert.equal(summarizeBrowserChecks([{ status: "blocked" }]).releaseReady, false);
+  assert.equal(summarizeBrowserChecks([{ status: "passed" }]).releaseReady, true);
+});
+
+test("revoked access remains an anonymous negative check", async () => {
+  const results = await runCustomerBrowserScenarios({ playwright: null, fixture: {} });
+  const revoked = results.find((result) => result.name === "revoked_access");
+
+  assert.equal(revoked?.role, "anonymous_access_negative");
 });
