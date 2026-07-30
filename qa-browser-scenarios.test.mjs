@@ -57,6 +57,10 @@ test("customer scenarios remain blocked when browser evidence is unavailable", a
     "missing_playwright_or_qa_fixture",
     "missing_playwright_or_qa_fixture",
   ]);
+  assert.equal(
+    results.find((result) => result.name === "revoked_access").role,
+    "anonymous_access_negative",
+  );
 });
 
 test("cookie setup failures redact original, stripped, and decoded QA sessions", async () => {

@@ -1,6 +1,12 @@
 import { createRequire } from "node:module";
 import { createHmac } from "node:crypto";
-import { runCustomerBrowserScenarios } from "./qa-browser-scenarios.mjs";
+import { fileURLToPath } from "node:url";
+import { resolve } from "node:path";
+import {
+  browserSessionSensitiveValues,
+  redactBrowserQaText,
+  runCustomerBrowserScenarios,
+} from "./qa-browser-scenarios.mjs";
 
 const require = createRequire(import.meta.url);
 
@@ -332,6 +338,76 @@ function visibleOverlap(rects) {
   return null;
 }
 
+export async function runReleaseBrowserCase({ browser, item, qaSession = null, origin, headers = {} }) {
+  const sensitiveValues = [
+    ...browserSessionSensitiveValues(qaSession?.cookie),
+    ...Object.values(headers),
+  ].filter((value) => typeof value === "string");
+  let context = null;
+  try {
+    context = await browser.newContext({
+      viewport: item.viewport,
+      isMobile: Boolean(item.isMobile),
+      extraHTTPHeaders: headers,
+    });
+    if (qaSession && item.useQaSession) {
+      await context.addCookies([{
+        name: "sh_token",
+        value: decodeURIComponent(qaSession.cookie.replace(/^sh_token=/, "")),
+        url: origin,
+        httpOnly: true,
+        sameSite: "Lax",
+      }]);
+    }
+    const page = await context.newPage();
+    const response = await gotoWithRetry(page, `${origin}${item.path}`, { waitUntil: "domcontentloaded", timeout: 12000 });
+    await page.waitForLoadState("networkidle", { timeout: 2000 }).catch(() => {});
+    await page.waitForFunction((useQaSession) => {
+      const text = document.body?.innerText || "";
+      if (useQaSession) {
+        return /客户交付工作台|Client delivery|客户项目|Autonomous Recruiter QA Role|Interview-ready|Authorized projects|已授权项目/i.test(text)
+          && !/正在加载工作台/.test(text);
+      }
+      return /登录|Sign in|邮箱|Email/i.test(text);
+    }, Boolean(item.useQaSession), { timeout: 5000 }).catch(() => {});
+    const bodyText = (await page.locator("body").innerText({ timeout: 5000 })).replace(/\s+/g, " ");
+    const rects = await page.locator("h1, h2, h3, p, a, button, input, label").evaluateAll((nodes) => nodes.map((node) => {
+      const r = node.getBoundingClientRect();
+      return {
+        tag: node.tagName,
+        text: (node.textContent || node.getAttribute("placeholder") || "").trim().slice(0, 80),
+        left: r.left,
+        top: r.top,
+        right: r.right,
+        bottom: r.bottom,
+        width: r.width,
+        height: r.height,
+      };
+    }).filter((rect) => rect.text && rect.width > 1 && rect.height > 1));
+    const overlap = visibleOverlap(rects);
+    const hasLoginPrompt = /登录客户门户|登录 SignalHire|Log in to the client portal|Sign in to SignalHire|Sign up and verify email|注册并验证邮箱/i.test(bodyText);
+    const hasClientPortalContent = /客户交付工作台|Client delivery|客户项目|Interview-ready|Authorized projects|已授权项目/i.test(bodyText);
+    const hasLoadingOnly = /正在加载工作台/.test(bodyText) && !hasLoginPrompt;
+    const checkpoint = isVercelSecurityCheckpoint(bodyText);
+    const ok = item.useQaSession
+      ? response?.status() === 200 && hasClientPortalContent && !hasLoginPrompt && !hasLoadingOnly && !overlap && !checkpoint
+      : response?.status() === 200 && hasLoginPrompt && !hasLoadingOnly && !overlap && !checkpoint;
+    return {
+      name: item.name,
+      status: ok ? "pass" : checkpoint ? "blocked" : "fail",
+      detail: `status=${response?.status() || "n/a"}${overlap ? `, overlap=${overlap.a}/${overlap.b}` : ""}${checkpoint ? ", Vercel Security Checkpoint" : ""}`,
+    };
+  } catch (error) {
+    return {
+      name: item.name,
+      status: "fail",
+      detail: redactBrowserQaText(error instanceof Error ? error.message : String(error), sensitiveValues),
+    };
+  } finally {
+    await context?.close().catch(() => {});
+  }
+}
+
 async function browserChecks(origin, qaSession = null) {
   const playwright = loadPlaywright();
   const fixture = browserQaFixture(qaSession);
@@ -359,64 +435,13 @@ async function browserChecks(origin, qaSession = null) {
   const rows = [];
   try {
     for (const item of cases) {
-      const context = await browser.newContext({
-        viewport: item.viewport,
-        isMobile: Boolean(item.isMobile),
-        extraHTTPHeaders: automationBypassHeaders(),
-      });
-      if (qaSession && item.useQaSession) {
-        await context.addCookies([{
-          name: "sh_token",
-          value: decodeURIComponent(qaSession.cookie.replace(/^sh_token=/, "")),
-          url: origin,
-          httpOnly: true,
-          sameSite: "Lax",
-        }]);
-      }
-      const page = await context.newPage();
-      try {
-        const response = await gotoWithRetry(page, `${origin}${item.path}`, { waitUntil: "domcontentloaded", timeout: 12000 });
-        await page.waitForLoadState("networkidle", { timeout: 2000 }).catch(() => {});
-        await page.waitForFunction((useQaSession) => {
-          const text = document.body?.innerText || "";
-          if (useQaSession) {
-            return /客户交付工作台|Client delivery|客户项目|Autonomous Recruiter QA Role|Interview-ready|Authorized projects|已授权项目/i.test(text)
-              && !/正在加载工作台/.test(text);
-          }
-          return /登录|Sign in|邮箱|Email/i.test(text);
-        }, Boolean(item.useQaSession), { timeout: 5000 }).catch(() => {});
-        const bodyText = (await page.locator("body").innerText({ timeout: 5000 })).replace(/\s+/g, " ");
-        const rects = await page.locator("h1, h2, h3, p, a, button, input, label").evaluateAll((nodes) => nodes.map((node) => {
-          const r = node.getBoundingClientRect();
-          return {
-            tag: node.tagName,
-            text: (node.textContent || node.getAttribute("placeholder") || "").trim().slice(0, 80),
-            left: r.left,
-            top: r.top,
-            right: r.right,
-            bottom: r.bottom,
-            width: r.width,
-            height: r.height,
-          };
-        }).filter((rect) => rect.text && rect.width > 1 && rect.height > 1));
-        const overlap = visibleOverlap(rects);
-        const hasLoginPrompt = /登录客户门户|登录 SignalHire|Log in to the client portal|Sign in to SignalHire|Sign up and verify email|注册并验证邮箱/i.test(bodyText);
-        const hasClientPortalContent = /客户交付工作台|Client delivery|客户项目|Interview-ready|Authorized projects|已授权项目/i.test(bodyText);
-        const hasLoadingOnly = /正在加载工作台/.test(bodyText) && !hasLoginPrompt;
-        const checkpoint = isVercelSecurityCheckpoint(bodyText);
-        const ok = item.useQaSession
-          ? response?.status() === 200 && hasClientPortalContent && !hasLoginPrompt && !hasLoadingOnly && !overlap && !checkpoint
-          : response?.status() === 200 && hasLoginPrompt && !hasLoadingOnly && !overlap && !checkpoint;
-        rows.push({
-          name: item.name,
-          status: ok ? "pass" : checkpoint ? "blocked" : "fail",
-          detail: `status=${response?.status() || "n/a"}${overlap ? `, overlap=${overlap.a}/${overlap.b}` : ""}${checkpoint ? ", Vercel Security Checkpoint" : ""}`,
-        });
-      } catch (error) {
-        rows.push({ name: item.name, status: "fail", detail: error instanceof Error ? error.message : String(error) });
-      } finally {
-        await context.close();
-      }
+      rows.push(await runReleaseBrowserCase({
+        browser,
+        item,
+        qaSession,
+        origin,
+        headers: automationBypassHeaders(),
+      }));
     }
   } finally {
     await browser.close();
@@ -433,7 +458,8 @@ async function browserChecks(origin, qaSession = null) {
 function printRows(rows) {
   for (const row of rows) {
     const prefix = row.status === "pass" ? "PASS" : row.status === "warn" ? "WARN" : row.status === "blocked" ? "BLOCKED" : "FAIL";
-    console.log(`${prefix} ${row.name} - ${row.detail || row.error || ""}`);
+    const label = row.role ? `${row.name} (${row.role})` : row.name;
+    console.log(`${prefix} ${label} - ${row.detail || row.error || ""}`);
   }
 }
 
@@ -465,7 +491,9 @@ async function main() {
   if (failures.length > 0) process.exit(1);
 }
 
-main().catch((error) => {
-  console.error(error instanceof Error ? error.message : error);
-  process.exit(1);
-});
+if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  main().catch((error) => {
+    console.error(error instanceof Error ? error.message : error);
+    process.exit(1);
+  });
+}

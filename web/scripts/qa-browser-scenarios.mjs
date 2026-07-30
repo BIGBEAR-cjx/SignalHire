@@ -60,7 +60,7 @@ export function containsSensitiveValue(value, sensitiveValues = []) {
   });
 }
 
-function redactSensitiveValues(value, sensitiveValues = []) {
+export function redactBrowserQaText(value, sensitiveValues = []) {
   let redacted = typeof value === "string" ? value : "";
   const values = sensitiveValues
     .map(cleanIdentifier)
@@ -80,18 +80,20 @@ export function projectBrowserScenarioResult(result = {}, sensitiveValues = []) 
   const row = result && typeof result === "object" && !Array.isArray(result) ? result : {};
   const status = ["pass", "fail", "blocked"].includes(row.status) ? row.status : "fail";
   return {
-    name: redactSensitiveValues(cleanIdentifier(row.name), sensitiveValues),
-    role: redactSensitiveValues(cleanIdentifier(row.role), sensitiveValues),
-    viewport: redactSensitiveValues(cleanIdentifier(row.viewport), sensitiveValues),
+    name: redactBrowserQaText(cleanIdentifier(row.name), sensitiveValues),
+    role: redactBrowserQaText(cleanIdentifier(row.role), sensitiveValues),
+    viewport: redactBrowserQaText(cleanIdentifier(row.viewport), sensitiveValues),
     status,
-    screenshotPath: row.screenshotPath ? redactSensitiveValues(cleanIdentifier(row.screenshotPath), sensitiveValues) : null,
-    error: redactSensitiveValues(cleanIdentifier(row.error), sensitiveValues),
+    screenshotPath: row.screenshotPath ? redactBrowserQaText(cleanIdentifier(row.screenshotPath), sensitiveValues) : null,
+    error: redactBrowserQaText(cleanIdentifier(row.error), sensitiveValues),
   };
 }
 
 function scenarioDefinition(name) {
   if (name === "login_redirect") return { role: "anonymous", viewport: "desktop" };
-  if (name === "revoked_access") return { role: "anonymous", viewport: "desktop" };
+  // This legacy scenario name runs only the safe no-session negative check.
+  // Owner-driven revocation is intentionally covered by the later owner flow.
+  if (name === "revoked_access") return { role: "anonymous_access_negative", viewport: "desktop" };
   return { role: "customer", viewport: "desktop" };
 }
 
@@ -117,7 +119,7 @@ function customerSessionCookie(session, origin) {
   };
 }
 
-function sessionSensitiveValues(session) {
+export function browserSessionSensitiveValues(session) {
   const original = cleanIdentifier(session);
   if (!original) return [];
   const stripped = original.replace(/^sh_token=/, "");
@@ -166,8 +168,8 @@ export async function runCustomerBrowserScenarios({ playwright, fixture, origin,
   const prerequisite = classifyBrowserPrerequisites({ playwright: Boolean(playwright?.chromium), fixture });
   const normalizedFixture = buildQaFixture(fixture);
   const sensitiveValues = [
-    ...sessionSensitiveValues(fixture?.owner),
-    ...sessionSensitiveValues(fixture?.customer),
+    ...browserSessionSensitiveValues(fixture?.owner),
+    ...browserSessionSensitiveValues(fixture?.customer),
     ...Object.values(headers),
   ].filter((value) => typeof value === "string");
   if (prerequisite.status !== "ready") {
