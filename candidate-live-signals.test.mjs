@@ -1,6 +1,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
+  buildCandidateLiveSignalUpsertRows,
+  isCandidateLiveSignalActive,
   liveSignalKey,
   normalizeCandidateLiveSignal,
 } from "./web/lib/candidate-live-signals.mjs";
@@ -33,4 +35,30 @@ test("rejects signals missing required evidence or identity fields", () => {
   assert.equal(normalizeCandidateLiveSignal({ ...validSignal, observed_at: "" }), null);
   assert.equal(normalizeCandidateLiveSignal({ ...validSignal, summary: "" }), null);
   assert.equal(normalizeCandidateLiveSignal({ ...validSignal, expires_at: "" }), null);
+});
+
+test("canonicalizes HTTPS evidence URLs and rejects URLs with credentials", () => {
+  const normalized = normalizeCandidateLiveSignal({
+    ...validSignal,
+    source_url: "https://github.com/ada/repo?utm_source=newsletter&tab=readme#overview",
+  });
+
+  assert.equal(normalized.source_url, "https://github.com/ada/repo?tab=readme");
+  assert.equal(normalizeCandidateLiveSignal({
+    ...validSignal,
+    source_url: "https://token@github.com/ada/repo",
+  }), null);
+});
+
+test("skips malformed batch rows without merging matching evidence across projects", () => {
+  const rows = buildCandidateLiveSignalUpsertRows([
+    null,
+    "not-a-signal",
+    validSignal,
+    { ...validSignal, project_id: "project-2" },
+  ]);
+
+  assert.equal(normalizeCandidateLiveSignal(null), null);
+  assert.equal(isCandidateLiveSignalActive(null), false);
+  assert.equal(rows.length, 2);
 });

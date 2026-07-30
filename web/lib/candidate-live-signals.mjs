@@ -1,4 +1,9 @@
 const CONFIDENCE_LEVELS = new Set(["high", "medium", "low"]);
+const TRACKING_QUERY_PARAM = /^(utm_.+|fbclid|gclid|dclid|msclkid|mc_[ce]id)$/i;
+
+function isRecord(value) {
+  return Boolean(value && typeof value === "object" && !Array.isArray(value));
+}
 
 function cleanString(value) {
   return typeof value === "string" ? value.trim() : "";
@@ -16,7 +21,12 @@ function validHttpsUrl(value) {
   if (!clean) return "";
   try {
     const url = new URL(clean);
-    return url.protocol === "https:" && url.hostname ? clean : "";
+    if (url.protocol !== "https:" || !url.hostname || url.username || url.password) return "";
+    url.hash = "";
+    for (const key of [...url.searchParams.keys()]) {
+      if (TRACKING_QUERY_PARAM.test(key)) url.searchParams.delete(key);
+    }
+    return url.toString();
   } catch {
     return "";
   }
@@ -28,6 +38,7 @@ function confidenceOf(value) {
 }
 
 export function normalizeCandidateLiveSignal(value = {}) {
+  if (!isRecord(value)) return null;
   const userId = cleanString(value.user_id || value.userId);
   const projectId = cleanString(value.project_id || value.projectId);
   const candidateMergeKey = cleanString(value.candidate_merge_key || value.candidateMergeKey);
@@ -74,12 +85,13 @@ export function buildCandidateLiveSignalUpsertRows(signals = []) {
   for (const value of Array.isArray(signals) ? signals : []) {
     const signal = normalizeCandidateLiveSignal(value);
     if (!signal) continue;
-    rowsByKey.set(liveSignalKey(signal), signal);
+    rowsByKey.set([signal.user_id, signal.project_id, liveSignalKey(signal)].join(":"), signal);
   }
   return [...rowsByKey.values()];
 }
 
 export function isCandidateLiveSignalActive(value = {}, now = new Date()) {
+  if (!isRecord(value)) return false;
   const expiresAt = validIso(value.expires_at || value.expiresAt);
   return Boolean(expiresAt && Date.parse(expiresAt) > new Date(now).getTime());
 }

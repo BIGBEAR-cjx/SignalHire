@@ -27,6 +27,7 @@ export interface CandidateLiveSignal {
 }
 
 function mapSignal(value: Record<string, unknown>): CandidateLiveSignal | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
   const normalized = normalizeCandidateLiveSignal(value);
   if (!normalized) return null;
   return {
@@ -45,7 +46,7 @@ export async function upsertCandidateLiveSignals(signals: unknown[]): Promise<Ca
   try {
     const { data, error } = await client.database
       .from(TABLE)
-      .upsert(rows, { onConflict: "provider,candidate_merge_key,source_url,content_hash" })
+      .upsert(rows, { onConflict: "user_id,project_id,provider,candidate_merge_key,source_url,content_hash" })
       .select("*");
     if (error || !data) return [];
     return data
@@ -61,7 +62,7 @@ export async function listActiveCandidateLiveSignals(input: {
   projectId: string;
   now?: string;
 }): Promise<CandidateLiveSignal[]> {
-  if (!client || !input.userId || !input.projectId) return [];
+  if (!client || !input || !input.userId || !input.projectId) return [];
   try {
     const { data, error } = await client.database
       .from(TABLE)

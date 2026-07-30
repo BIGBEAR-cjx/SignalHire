@@ -18,7 +18,7 @@ create table if not exists public.candidate_live_signals (
   constraint candidate_live_signals_expires_after_observed_check
     check (expires_at > observed_at),
   constraint candidate_live_signals_evidence_key_unique
-    unique (provider, candidate_merge_key, source_url, content_hash)
+    unique (user_id, project_id, provider, candidate_merge_key, source_url, content_hash)
 );
 
 create index if not exists candidate_live_signals_project_expires_idx
