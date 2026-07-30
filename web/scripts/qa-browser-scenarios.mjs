@@ -117,6 +117,17 @@ function customerSessionCookie(session, origin) {
   };
 }
 
+function sessionSensitiveValues(session) {
+  const original = cleanIdentifier(session);
+  if (!original) return [];
+  const stripped = original.replace(/^sh_token=/, "");
+  let decoded = stripped;
+  try {
+    decoded = decodeURIComponent(stripped);
+  } catch {}
+  return [...new Set([original, stripped, decoded].filter(Boolean))];
+}
+
 async function openPage(browser, { origin, headers, viewport, customerSession }) {
   const context = await browser.newContext({
     viewport,
@@ -155,8 +166,8 @@ export async function runCustomerBrowserScenarios({ playwright, fixture, origin,
   const prerequisite = classifyBrowserPrerequisites({ playwright: Boolean(playwright?.chromium), fixture });
   const normalizedFixture = buildQaFixture(fixture);
   const sensitiveValues = [
-    fixture?.owner,
-    fixture?.customer,
+    ...sessionSensitiveValues(fixture?.owner),
+    ...sessionSensitiveValues(fixture?.customer),
     ...Object.values(headers),
   ].filter((value) => typeof value === "string");
   if (prerequisite.status !== "ready") {

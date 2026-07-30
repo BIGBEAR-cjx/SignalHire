@@ -59,6 +59,41 @@ test("customer scenarios remain blocked when browser evidence is unavailable", a
   ]);
 });
 
+test("cookie setup failures redact original, stripped, and decoded QA sessions", async () => {
+  const rawSession = "sh_token=token%2Fdecoded";
+  const strippedSession = "token%2Fdecoded";
+  const decodedSession = "token/decoded";
+  const playwright = {
+    chromium: {
+      launch: async () => ({
+        newContext: async () => ({
+          addCookies: async () => { throw new Error(`cookie setup failed for ${decodedSession}`); },
+          newPage: async () => { throw new Error("page unavailable"); },
+          close: async () => {},
+        }),
+        close: async () => {},
+      }),
+    },
+  };
+
+  const results = await runCustomerBrowserScenarios({
+    playwright,
+    fixture: {
+      owner: "owner-session",
+      customer: rawSession,
+      projectId: "project-123",
+      reportId: "report-456",
+    },
+    origin: "http://127.0.0.1:3000",
+  });
+  const serialized = JSON.stringify(results);
+
+  assert.equal(serialized.includes(rawSession), false);
+  assert.equal(serialized.includes(strippedSession), false);
+  assert.equal(serialized.includes(decodedSession), false);
+  assert.match(results.find((result) => result.name === "workspace").error, /\[REDACTED\]/);
+});
+
 test("buildQaFixture returns the safe empty fixture", () => {
   assert.deepEqual(buildQaFixture({}), {
     owner: null,
