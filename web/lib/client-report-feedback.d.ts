@@ -6,6 +6,16 @@ export type ClientReportFeedback = {
 
 export function normalizeClientReportFeedback(input?: unknown): ClientReportFeedback | null;
 
+export function normalizeClientFeedback(input?: unknown, context?: {
+  actorEmail?: unknown;
+  reportId?: unknown;
+}): {
+  sentiment: ClientReportFeedback["sentiment"];
+  note: string;
+  actor: string;
+  report_id: string;
+} | null;
+
 export function buildClientReportFeedbackEvent(input?: {
   feedback?: unknown;
   reportHref?: string;
@@ -17,3 +27,9 @@ export function buildClientReportFeedbackEvent(input?: {
   detail: string;
   at: string;
 } | null;
+
+export function handleClientPortalFeedbackPost(input?: {
+  req?: Request;
+  projectId?: string;
+  dependencies?: Record<string, unknown>;
+}): Promise<Response>;
