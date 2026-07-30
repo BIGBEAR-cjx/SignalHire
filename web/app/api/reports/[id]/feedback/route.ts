@@ -1,6 +1,6 @@
 import { getRunById } from "@/lib/db";
 import { getProject, recordProjectRoleAgentEvent } from "@/lib/projects";
-import { buildClientReportFeedbackEvent, normalizeClientReportFeedback } from "@/lib/client-report-feedback.mjs";
+import { buildClientReportFeedbackEvent, normalizeClientReportFeedbackForShareAccess } from "@/lib/client-report-feedback.mjs";
 import { buildClientDeliveryShareHref, verifyClientDeliveryShareAccess } from "@/lib/report-share-access.mjs";
 import { buildRoleOutreachSettings } from "@/lib/outreach-settings.mjs";
 import { normalizeLocale, t } from "@/lib/i18n.mjs";
@@ -41,7 +41,11 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
     return Response.json({ error: t(locale, "api.error.invalidFeedback") }, { status: 400 });
   }
 
-  const feedback = normalizeClientReportFeedback(body.feedback ?? body);
+  const feedback = normalizeClientReportFeedbackForShareAccess(body, {
+    shareAccess,
+    user: viewer,
+    reportId: id,
+  });
   if (!feedback) return Response.json({ error: t(locale, "api.error.invalidFeedback") }, { status: 400 });
 
   const event = buildClientReportFeedbackEvent({

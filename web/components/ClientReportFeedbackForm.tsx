@@ -16,8 +16,6 @@ const OPTIONS: Array<{ value: Sentiment; zh: string; en: string }> = [
 const COPY = {
   zh: {
     title: "招聘经理反馈",
-    reviewer: "反馈人",
-    reviewerPlaceholder: "例如：Hiring Manager",
     note: "反馈",
     notePlaceholder: "告诉团队下一步该推进谁、补什么证据，或为什么暂缓。",
     submit: "保存反馈",
@@ -27,8 +25,6 @@ const COPY = {
   },
   en: {
     title: "Hiring manager feedback",
-    reviewer: "Reviewer",
-    reviewerPlaceholder: "e.g. Hiring Manager",
     note: "Feedback",
     notePlaceholder: "Tell the team who to move next, what evidence is missing, or why this is not a fit.",
     submit: "Save feedback",
@@ -49,7 +45,6 @@ export function ClientReportFeedbackForm({
 }) {
   const copy = COPY[locale];
   const [sentiment, setSentiment] = useState<Sentiment>("ready_to_interview");
-  const [reviewer, setReviewer] = useState("");
   const [note, setNote] = useState("");
   const [status, setStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
 
@@ -63,7 +58,7 @@ export function ClientReportFeedbackForm({
       body: JSON.stringify({
         token,
         locale,
-        feedback: { sentiment, reviewer, note },
+        feedback: { sentiment, note },
       }),
     });
     setStatus(response.ok ? "saved" : "error");
@@ -90,16 +85,7 @@ export function ClientReportFeedbackForm({
           ))}
         </select>
       </div>
-      <div className="mt-3 grid gap-3 sm:grid-cols-[160px_1fr]">
-        <label className="text-xs font-medium text-gray-500">
-          {copy.reviewer}
-          <input
-            value={reviewer}
-            onChange={(event) => setReviewer(event.target.value)}
-            placeholder={copy.reviewerPlaceholder}
-            className="mt-1 h-10 w-full rounded-lg border border-gray-200 px-3 text-sm text-gray-800 outline-none focus:border-gray-950"
-          />
-        </label>
+      <div className="mt-3">
         <label className="text-xs font-medium text-gray-500">
           {copy.note}
           <textarea

@@ -49,6 +49,17 @@ export function normalizeClientFeedback(input = {}, context = {}) {
   };
 }
 
+export function normalizeClientReportFeedbackForShareAccess(input = {}, context = {}) {
+  const source = isRecord(input?.feedback) ? input.feedback : input;
+  if (cleanString(context?.shareAccess?.reason, 80) === "valid_customer_account") {
+    return normalizeClientFeedback(source, {
+      actorEmail: context?.user?.email,
+      reportId: context?.reportId,
+    });
+  }
+  return normalizeClientReportFeedback(source);
+}
+
 export function buildClientReportFeedbackEvent({ feedback, reportHref = "", now = new Date() } = {}) {
   const source = isRecord(feedback) ? feedback : {};
   const hasActor = Object.hasOwn(source, "actor");

@@ -16,6 +16,17 @@ export function normalizeClientFeedback(input?: unknown, context?: {
   report_id: string;
 } | null;
 
+export function normalizeClientReportFeedbackForShareAccess(input?: unknown, context?: {
+  shareAccess?: { reason?: unknown };
+  user?: { email?: unknown } | null;
+  reportId?: unknown;
+}): ClientReportFeedback | {
+  sentiment: ClientReportFeedback["sentiment"];
+  note: string;
+  actor: string;
+  report_id: string;
+} | null;
+
 export function buildClientReportFeedbackEvent(input?: {
   feedback?: unknown;
   reportHref?: string;
