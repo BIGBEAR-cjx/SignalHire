@@ -1,6 +1,6 @@
 import { buildClientPortalWorkspaceView } from "@/lib/client-portal-workspace.mjs";
+import { loadClientPortalWorkspaceDetails } from "@/lib/client-portal-route-guards.mjs";
 import {
-  findClientPortalAuthorizedProject,
   findClientPortalAuthorizedProjects,
   loadClientPortalProjectDetail,
 } from "@/lib/client-portal";
@@ -15,21 +15,17 @@ export async function GET(req: Request) {
   const locale = normalizeLocale(url.searchParams.get("locale") || url.searchParams.get("lang"));
   if (!user) return Response.json({ error: t(locale, "api.error.unauthorized") }, { status: 401 });
 
-  const projects = await findClientPortalAuthorizedProjects(user);
-  const entries = await Promise.all(
-    projects.slice(0, 30).map(async (project) => {
-      const currentProject = await findClientPortalAuthorizedProject(user, project.id);
-      if (!currentProject) return null;
-      const detail = await loadClientPortalProjectDetail(currentProject, locale);
-      return [currentProject.id, detail] as const;
-    }),
-  );
-  const refreshedEntries = entries.filter((entry): entry is NonNullable<typeof entry> => entry !== null);
-  const refreshedProjects = refreshedEntries.map((entry) => entry[1].project);
-  const projectDetails = Object.fromEntries(refreshedEntries);
+  const { projects, projectDetails } = await loadClientPortalWorkspaceDetails({
+    viewer: user,
+    locale,
+    dependencies: {
+      findAuthorizedProjects: findClientPortalAuthorizedProjects,
+      loadProjectDetail: loadClientPortalProjectDetail,
+    },
+  });
   return Response.json(buildClientPortalWorkspaceView({
     viewer: user,
-    projects: refreshedProjects,
+    projects,
     projectDetails,
     locale,
   }));
