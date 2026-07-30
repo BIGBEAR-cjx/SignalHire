@@ -43,7 +43,7 @@ const CUSTOMER_SCENARIOS = [
   "workspace",
   "project_tabs",
   "feedback",
-  "revoked_access",
+  "anonymous_access_denied",
 ];
 
 const OWNER_SCENARIOS = [
@@ -116,9 +116,7 @@ export function projectBrowserScenarioResult(result = {}, sensitiveValues = []) 
 
 function scenarioDefinition(name) {
   if (name === "login_redirect") return { role: "anonymous", viewport: "desktop" };
-  // This legacy scenario name runs only the safe no-session negative check.
-  // Owner-driven revocation is intentionally covered by the later owner flow.
-  if (name === "revoked_access") return { role: "anonymous_access_negative", viewport: "desktop" };
+  if (name === "anonymous_access_denied") return { role: "anonymous_access_negative", viewport: "desktop" };
   return { role: "customer", viewport: "desktop" };
 }
 
@@ -203,6 +201,30 @@ function mutationAllowed(value) {
   return value === true || cleanIdentifier(value).toLowerCase() === "true" || cleanIdentifier(value) === "1";
 }
 
+function roleAgentRunsPath(projectId) {
+  const id = cleanIdentifier(projectId);
+  if (!id) throw new Error("missing_role_agent_project_fixture");
+  return `/api/projects/${encodeURIComponent(id)}/role-agent-runs`;
+}
+
+export async function installStrictRoleAgentErrorRoute(page, { projectId, release } = {}) {
+  const expectedPath = roleAgentRunsPath(projectId);
+  await page.route("**/*", async (route) => {
+    const request = route.request();
+    const method = cleanIdentifier(request.method()).toUpperCase();
+    if (method === "GET" || method === "HEAD") return route.continue();
+    let pathname = "";
+    try {
+      pathname = new URL(request.url()).pathname;
+    } catch {}
+    if (method === "POST" && pathname === expectedPath) {
+      if (typeof release === "function") await release();
+      return route.fulfill({ status: 500, contentType: "application/json", body: JSON.stringify({ error: "qa_safe_server_error" }) });
+    }
+    return route.abort("blockedbyclient");
+  });
+}
+
 async function openOwnerProject(browser, options) {
   const { context, page } = await openPage(browser, {
     ...options,
@@ -233,6 +255,29 @@ async function addDisposableInvite(page, email) {
   await requireVisible(page.getByText(email, { exact: true }).first(), "disposable_invite");
 }
 
+async function verifyRevokedCustomerAccess(browser, options, session) {
+  const { context, page } = await openPage(browser, {
+    ...options,
+    viewport: CUSTOMER_VIEWPORT,
+    customerSession: session,
+  });
+  try {
+    await visit(page, `${options.origin}/login?next=/client`);
+    let status = 0;
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      status = await page.evaluate(async (path) => {
+        const response = await fetch(path);
+        return response.status;
+      }, `/api/client-portal/projects/${encodeURIComponent(options.fixture.projectId)}`);
+      if (status === 401) return;
+      await page.waitForTimeout(300);
+    }
+    if (status !== 401) throw new Error(`expected_revoked_customer_unauthorized_status=401 actual=${status}`);
+  } finally {
+    await context.close();
+  }
+}
+
 function ownerBlockedResults(reason, sensitiveValues) {
   return ownerScenarioNames().map((name) => ownerScenarioResult(name, "blocked", reason, sensitiveValues));
 }
@@ -247,6 +292,7 @@ export async function runOwnerBrowserScenarios({ playwright, fixture = {}, origi
   const sensitiveValues = [
     ...browserSessionSensitiveValues(fixture.owner),
     ...browserSessionSensitiveValues(fixture.customer),
+    ...browserSessionSensitiveValues(fixture.disposableCustomerSession),
     ...Object.values(headers),
   ].filter((value) => typeof value === "string");
   if (prerequisite.status !== "ready") return ownerBlockedResults(prerequisite.reason, sensitiveValues);
@@ -260,9 +306,9 @@ export async function runOwnerBrowserScenarios({ playwright, fixture = {}, origi
   const browser = await playwright.chromium.launch({ headless: true });
   const results = [];
   const disposableEmail = cleanIdentifier(fixture.disposableCustomerEmail).toLowerCase();
+  const disposableCustomerSession = cleanIdentifier(fixture.disposableCustomerSession);
   const successCta = safeTextPattern(fixture.roleAgentSuccessCta);
   const errorCta = safeTextPattern(fixture.roleAgentErrorCta);
-  const errorPath = cleanIdentifier(fixture.roleAgentErrorPath);
   try {
     results.push(await runScenario(browser, "client_access_settings", options, async () => {
       const { context, page } = await openOwnerProject(browser, options);
@@ -279,6 +325,8 @@ export async function runOwnerBrowserScenarios({ playwright, fixture = {}, origi
         results.push(ownerScenarioResult(name, "blocked", "mutations_not_enabled", sensitiveValues));
       } else if (!disposableEmail) {
         results.push(ownerScenarioResult(name, "blocked", "missing_disposable_customer_fixture", sensitiveValues));
+      } else if (name === "revoke" && !disposableCustomerSession) {
+        results.push(ownerScenarioResult(name, "blocked", "missing_disposable_customer_session_fixture", sensitiveValues));
       } else {
         results.push(await runScenario(browser, name, options, async () => {
           const { context, page } = await openOwnerProject(browser, options);
@@ -289,6 +337,7 @@ export async function runOwnerBrowserScenarios({ playwright, fixture = {}, origi
               const inviteRow = page.getByText(disposableEmail, { exact: true }).first().locator("..").locator("..");
               await inviteRow.getByRole("button", { name: /revoke|撤销/i }).click();
               await requireVisible(inviteRow.getByText(/revoked|已撤销/i).first(), "revoked_disposable_invite");
+              await verifyRevokedCustomerAccess(browser, options, disposableCustomerSession);
             }
           } finally {
             await context.close();
@@ -315,16 +364,14 @@ export async function runOwnerBrowserScenarios({ playwright, fixture = {}, origi
       }).then((result) => ownerScenarioResult(result.name, result.status, result.error, sensitiveValues)));
     }
 
-    if (!errorCta || !errorPath) {
+    if (!errorCta) {
       results.push(ownerScenarioResult("role_agent_error", "blocked", "missing_role_agent_error_fixture", sensitiveValues));
       results.push(ownerScenarioResult("role_agent_disabled", "blocked", "missing_role_agent_error_fixture", sensitiveValues));
     } else {
       results.push(await runScenario(browser, "role_agent_error", options, async () => {
         const { context, page } = await openOwnerProject(browser, options);
         try {
-          await page.route(`**${errorPath}`, async (route) => {
-            await route.fulfill({ status: 500, contentType: "application/json", body: JSON.stringify({ error: "qa_safe_server_error" }) });
-          });
+          await installStrictRoleAgentErrorRoute(page, { projectId: fixture.projectId });
           const action = page.getByRole("button", { name: errorCta }).first();
           await requireVisible(action, "role_agent_error_action");
           await action.click();
@@ -337,18 +384,15 @@ export async function runOwnerBrowserScenarios({ playwright, fixture = {}, origi
       results.push(await runScenario(browser, "role_agent_disabled", options, async () => {
         const { context, page } = await openOwnerProject(browser, options);
         try {
-          let fulfill;
-          const delayedResponse = new Promise((resolve) => { fulfill = resolve; });
-          await page.route(`**${errorPath}`, async (route) => {
-            await delayedResponse;
-            await route.fulfill({ status: 500, contentType: "application/json", body: JSON.stringify({ error: "qa_safe_server_error" }) });
-          });
+          let release;
+          const delayedResponse = new Promise((resolve) => { release = resolve; });
+          await installStrictRoleAgentErrorRoute(page, { projectId: fixture.projectId, release: () => delayedResponse });
           const action = page.getByRole("button", { name: errorCta }).first();
           await requireVisible(action, "role_agent_busy_action");
           await action.click();
           await action.waitFor({ state: "visible", timeout: 1000 });
           if (!await action.isDisabled()) throw new Error("expected_role_agent_action_disabled_while_busy");
-          fulfill();
+          release();
           await requireVisible(page.getByText("qa_safe_server_error", { exact: true }).first(), "busy_role_agent_error_copy");
         } finally {
           await context.close();
@@ -383,10 +427,7 @@ export async function runCustomerFeedbackMutation({ page, allowMutations = false
   return { status: "pass", reason: "" };
 }
 
-/**
- * Runs the customer-facing browser checks only. Owner-only invitation, revoke,
- * and Role Agent actions intentionally remain in the next task.
- */
+/** Runs customer-facing browser checks. */
 export async function runCustomerBrowserScenarios({ playwright, fixture, origin, headers = {}, allowMutations = false } = {}) {
   const prerequisite = classifyBrowserPrerequisites({ playwright: Boolean(playwright?.chromium), fixture });
   const normalizedFixture = buildQaFixture(fixture);
@@ -486,7 +527,7 @@ export async function runCustomerBrowserScenarios({ playwright, fixture, origin,
       }));
     }
 
-    results.push(await runScenario(browser, "revoked_access", options, async () => {
+    results.push(await runScenario(browser, "anonymous_access_denied", options, async () => {
       const { context, page } = await openPage(browser, { ...options, viewport: CUSTOMER_VIEWPORT });
       try {
         await visit(page, `${options.origin}/login?next=/client`);

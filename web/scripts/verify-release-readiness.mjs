@@ -199,9 +199,9 @@ function browserQaFixture(qaSession = null) {
     reportId: cleanString(process.env.SIGNALHIRE_QA_REPORT_ID),
     feedbackNote: cleanString(process.env.SIGNALHIRE_QA_FEEDBACK_NOTE),
     disposableCustomerEmail: cleanString(process.env.SIGNALHIRE_QA_DISPOSABLE_CUSTOMER_EMAIL),
+    disposableCustomerSession: cleanString(process.env.SIGNALHIRE_QA_DISPOSABLE_CUSTOMER_SESSION_TOKEN),
     roleAgentSuccessCta: cleanString(process.env.SIGNALHIRE_QA_ROLE_AGENT_SUCCESS_CTA),
     roleAgentErrorCta: cleanString(process.env.SIGNALHIRE_QA_ROLE_AGENT_ERROR_CTA),
-    roleAgentErrorPath: cleanString(process.env.SIGNALHIRE_QA_ROLE_AGENT_ERROR_PATH),
   };
 }
 

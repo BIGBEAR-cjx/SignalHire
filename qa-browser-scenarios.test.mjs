@@ -9,6 +9,8 @@ import {
   projectBrowserScenarioResult,
   runCustomerBrowserScenarios,
   runCustomerFeedbackMutation,
+  runOwnerBrowserScenarios,
+  installStrictRoleAgentErrorRoute,
   ownerScenarioNames,
   summarizeBrowserChecks,
 } from "./web/scripts/qa-browser-scenarios.mjs";
@@ -19,7 +21,7 @@ test("customer browser QA covers the required portal and negative scenarios", ()
     "workspace",
     "project_tabs",
     "feedback",
-    "revoked_access",
+    "anonymous_access_denied",
   ]);
 });
 
@@ -61,7 +63,7 @@ test("customer scenarios remain blocked when browser evidence is unavailable", a
     "missing_playwright_or_qa_fixture",
   ]);
   assert.equal(
-    results.find((result) => result.name === "revoked_access").role,
+    results.find((result) => result.name === "anonymous_access_denied").role,
     "anonymous_access_negative",
   );
 });
@@ -191,11 +193,11 @@ test("browser release evidence is fail-closed", () => {
   assert.equal(summarizeBrowserChecks([{ status: "passed" }]).releaseReady, true);
 });
 
-test("revoked access remains an anonymous negative check", async () => {
+test("anonymous access denial remains separate from revoked-customer verification", async () => {
   const results = await runCustomerBrowserScenarios({ playwright: null, fixture: {} });
-  const revoked = results.find((result) => result.name === "revoked_access");
+  const anonymous = results.find((result) => result.name === "anonymous_access_denied");
 
-  assert.equal(revoked?.role, "anonymous_access_negative");
+  assert.equal(anonymous?.role, "anonymous_access_negative");
 });
 
 function fakeFeedbackPage() {
@@ -255,4 +257,117 @@ test("customer feedback mutation runs only with explicit permission and fixture"
 
   assert.deepEqual(result, { status: "pass", reason: "" });
   assert.deepEqual(page.state(), { feedbackTabClicks: 1, submitClicks: 1, filledNote: "disposable QA feedback" });
+});
+
+test("owner mutation scenarios are blocked by default without opening action controls", async () => {
+  let actionClicks = 0;
+  const visible = { first: () => visible, waitFor: async () => {} };
+  const action = { ...visible, click: async () => { actionClicks += 1; } };
+  const page = {
+    goto: async () => ({ status: () => 200 }),
+    waitForLoadState: async () => {},
+    getByRole: (_role, options) => options.name?.source.includes("disposable") ? action : visible,
+    getByLabel: () => visible,
+  };
+  const playwright = {
+    chromium: {
+      launch: async () => ({
+        newContext: async () => ({ addCookies: async () => {}, newPage: async () => page, close: async () => {} }),
+        close: async () => {},
+      }),
+    },
+  };
+
+  const results = await runOwnerBrowserScenarios({
+    playwright,
+    fixture: {
+      owner: "owner-session",
+      customer: "customer-session",
+      projectId: "project-123",
+      disposableCustomerEmail: "qa-customer@example.com",
+      roleAgentSuccessCta: "Run disposable action",
+    },
+    origin: "http://127.0.0.1:3000",
+    allowMutations: false,
+  });
+
+  assert.equal(actionClicks, 0);
+  assert.equal(results.find((result) => result.name === "invite")?.status, "blocked");
+  assert.equal(results.find((result) => result.name === "revoke")?.status, "blocked");
+  assert.equal(results.find((result) => result.name === "role_agent_success")?.status, "blocked");
+});
+
+test("owner scenario errors redact the owner session", async () => {
+  const rawSession = "sh_token=owner%2Fsecret";
+  const decodedSession = "owner/secret";
+  const playwright = {
+    chromium: {
+      launch: async () => ({
+        newContext: async () => ({
+          addCookies: async () => { throw new Error(`owner cookie failed: ${decodedSession}`); },
+          newPage: async () => { throw new Error("unreachable"); },
+          close: async () => {},
+        }),
+        close: async () => {},
+      }),
+    },
+  };
+
+  const results = await runOwnerBrowserScenarios({
+    playwright,
+    fixture: { owner: rawSession, customer: "customer-session", projectId: "project-123" },
+    origin: "http://127.0.0.1:3000",
+  });
+  const serialized = JSON.stringify(results);
+
+  assert.equal(serialized.includes(rawSession), false);
+  assert.equal(serialized.includes(decodedSession), false);
+  assert.match(results.find((result) => result.name === "client_access_settings")?.error ?? "", /\[REDACTED\]/);
+});
+
+test("strict Role Agent intercept only fulfills the current project POST and aborts unknown writes", async () => {
+  let handler;
+  const page = { route: async (_pattern, next) => { handler = next; } };
+  await installStrictRoleAgentErrorRoute(page, { projectId: "project-123" });
+
+  const unknown = { aborted: 0, continued: 0, fulfilled: 0 };
+  await handler({
+    request: () => ({ method: () => "POST", url: () => "https://qa.example/api/other" }),
+    abort: async () => { unknown.aborted += 1; },
+    continue: async () => { unknown.continued += 1; },
+    fulfill: async () => { unknown.fulfilled += 1; },
+  });
+  assert.deepEqual(unknown, { aborted: 1, continued: 0, fulfilled: 0 });
+
+  const exact = { aborted: 0, continued: 0, fulfilled: 0, status: 0 };
+  await handler({
+    request: () => ({ method: () => "POST", url: () => "https://qa.example/api/projects/project-123/role-agent-runs" }),
+    abort: async () => { exact.aborted += 1; },
+    continue: async () => { exact.continued += 1; },
+    fulfill: async ({ status }) => { exact.fulfilled += 1; exact.status = status; },
+  });
+  assert.deepEqual(exact, { aborted: 0, continued: 0, fulfilled: 1, status: 500 });
+});
+
+test("strict Role Agent intercept holds the error response until the busy check releases it", async () => {
+  let handler;
+  let release;
+  const held = new Promise((resolve) => { release = resolve; });
+  await installStrictRoleAgentErrorRoute(
+    { route: async (_pattern, next) => { handler = next; } },
+    { projectId: "project-123", release: () => held },
+  );
+  let fulfilled = 0;
+  const pending = handler({
+    request: () => ({ method: () => "POST", url: () => "https://qa.example/api/projects/project-123/role-agent-runs" }),
+    abort: async () => {},
+    continue: async () => {},
+    fulfill: async () => { fulfilled += 1; },
+  });
+
+  await Promise.resolve();
+  assert.equal(fulfilled, 0);
+  release();
+  await pending;
+  assert.equal(fulfilled, 1);
 });
