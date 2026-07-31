@@ -101,6 +101,10 @@ test("keeps draft fixtures out of passing evaluation until human review is appro
     scoreCase(baseCase, { candidates: [], ...metrics }, { fixture: { review_status: "draft_pending_human_review" } }),
     { status: "inconclusive", reason: "case_review_pending" },
   );
+  assert.deepEqual(
+    scoreCase({ ...baseCase, review_status: "draft_pending_human_review" }, { candidates: [], ...metrics }),
+    { status: "inconclusive", reason: "case_review_pending" },
+  );
 });
 
 test("ships exactly thirty human-review-pending cases with ten cases at every difficulty", () => {

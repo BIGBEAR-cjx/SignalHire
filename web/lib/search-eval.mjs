@@ -74,10 +74,8 @@ function rate(numerator, denominator) {
 }
 
 export function scoreCase(caseDefinition, result, { fixture } = {}) {
-  if (fixture) {
-    const eligibility = evaluationEligibility({ caseDefinition, fixture });
-    if (eligibility.status !== "eligible") return eligibility;
-  }
+  const eligibility = evaluationEligibility({ caseDefinition, fixture });
+  if (eligibility.status !== "eligible") return eligibility;
   if (!Array.isArray(result?.candidates)) return { status: "inconclusive", reason: "missing_candidates" };
   if (!requiredRunMetrics(result).every(finiteNonNegative)) return { status: "inconclusive", reason: "missing_run_metrics" };
 
