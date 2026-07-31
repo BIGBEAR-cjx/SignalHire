@@ -13,6 +13,7 @@ import { buildOpenEvidenceLeadRowsForRun, runOpenEvidenceSourcePrecheck } from "
 import { fillWorkerPool, normalizeWorkerConcurrency, waitForWorkerPool } from "./pool.mjs";
 import { startRunHeartbeat } from "./run-heartbeat.mjs";
 import { buildCandidateEvidenceSourceRowsForRun, buildCandidateProfileRowsForRun } from "./talent-profile.mjs";
+import { prepareMonitorResult } from "./talent-monitor-settlement.mjs";
 import {
   buildRunFailureUpdate,
   buildRunStartUpdate,
@@ -28,11 +29,15 @@ createServer((_req, res) => { res.writeHead(200, { "content-type": "text/plain" 
 
 const BASE = process.env.INSFORGE_API_BASE_URL;
 const KEY = process.env.INSFORGE_API_KEY;
+const MONITOR_SERVICE_ROLE_KEY = process.env.INSFORGE_CREDITS_SERVICE_ROLE_KEY;
 if (!BASE || !KEY) {
   console.error("缺少 INSFORGE_API_BASE_URL / INSFORGE_API_KEY");
   process.exit(1);
 }
 const db = createClient({ baseUrl: BASE, anonKey: KEY, isServerMode: true }).database;
+const monitorDb = MONITOR_SERVICE_ROLE_KEY
+  ? createClient({ baseUrl: BASE, anonKey: MONITOR_SERVICE_ROLE_KEY, isServerMode: true }).database
+  : null;
 const TABLE = "research_runs";
 const CANDIDATE_PROFILE_TABLE = "candidate_profiles";
 const CANDIDATE_EVIDENCE_SOURCE_TABLE = "candidate_evidence_sources";
@@ -63,6 +68,51 @@ async function recoverStaleRunning() {
   }
 }
 
+function monitorSettlementService() {
+  if (!monitorDb) throw new Error("Talent Monitor settlement service is not configured");
+  return monitorDb;
+}
+
+async function monitorRpc(name, args) {
+  const { data, error } = await monitorSettlementService().rpc(name, args);
+  if (error) throw new Error(`Talent Monitor ${name} RPC rejected the request`);
+  return data;
+}
+
+async function monitorRunForResearchRun(researchRunId) {
+  const { data, error } = await monitorSettlementService()
+    .from("search_task_runs")
+    .select("id,config_snapshot,status")
+    .eq("research_run_id", researchRunId)
+    .limit(1);
+  if (error) throw new Error("Talent Monitor run lookup failed");
+  return data?.[0] ?? null;
+}
+
+async function markMonitorRunRunning(researchRunId) {
+  await monitorRpc("mark_monitor_run_running", { p_research_run_id: researchRunId });
+}
+
+async function settleMonitorRun(researchRunId) {
+  await monitorRpc("settle_monitor_run", { p_research_run_id: researchRunId });
+}
+
+async function releaseMonitorRun(researchRunId, reason) {
+  await monitorRpc("release_monitor_run", {
+    p_research_run_id: researchRunId,
+    p_stop_reason: reason === "canceled" ? "cancelled" : "failed",
+  });
+}
+
+async function reconcileMonitorRunOutcomes() {
+  if (!monitorDb) return;
+  try {
+    await monitorRpc("reconcile_monitor_run_outcomes", { p_limit: 20 });
+  } catch (error) {
+    console.error(`[${new Date().toISOString()}] Talent Monitor terminal reconciliation failed: ${error?.message || error}`);
+  }
+}
+
 // 认领一个排队/待重试任务: 取最老任务, 原子置 running。返回任务行或 null。
 async function claimByStatus(status) {
   const { data } = await db.from(TABLE)
@@ -75,12 +125,19 @@ async function claimByStatus(status) {
   const nextAttempt = Number(job.attempt_count ?? 0) + 1;
   const max = maxAttempts(job);
   if (nextAttempt > max) {
-    await db.from(TABLE).update({
+    const { data: failed } = await db.from(TABLE).update({
       status: "error",
       error: "已达到最大重试次数",
       last_error: "已达到最大重试次数",
       updated_at: new Date().toISOString(),
     }).eq("id", job.id).eq("status", status).select("id");
+    if (failed?.length > 0 && job.kind === "search" && job.search_task_id) {
+      try {
+        await releaseMonitorRun(job.id, "error");
+      } catch (error) {
+        console.error(`[${new Date().toISOString()}] Talent Monitor release pending for ${job.id}: ${error?.message || error}`);
+      }
+    }
     return null;
   }
   // 原子认领: 仅当仍是目标状态时置 running
@@ -94,6 +151,7 @@ async function claimByStatus(status) {
 
 async function claimNext() {
   await recoverStaleRunning();
+  await reconcileMonitorRunOutcomes();
   return (await claimByStatus("queued")) ?? (await claimByStatus("retrying"));
 }
 
@@ -539,7 +597,12 @@ async function runOpenEvidencePrecheck(queryText, searchStrategy = null) {
 async function runJob(job) {
   console.log(`[${new Date().toISOString()}] 认领任务 ${job.id} (${job.kind})`);
   const stopHeartbeat = startRunHeartbeat({ db, table: TABLE, jobId: job.id });
+  let monitorRun = null;
   try {
+  if (job.kind === "search" && job.search_task_id) {
+    monitorRun = await monitorRunForResearchRun(job.id);
+    if (monitorRun) await markMonitorRunRunning(job.id);
+  }
   const queryText = typeof job.progress?.original_query === "string" ? job.progress.original_query : job.query_text;
   const platformLanguage = typeof job.progress?.platform_language === "string" ? job.progress.platform_language : undefined;
   const candidateHints = Array.isArray(job.progress?.candidate_profile_hints) ? job.progress.candidate_profile_hints : [];
@@ -598,7 +661,14 @@ async function runJob(job) {
     let data = normalizeResult(parseJson(out.content));
     if (!data) throw new Error("模型输出不是干净 JSON");
     const finishedAt = new Date().toISOString();
-    if (job.kind === "search" && job.search_task_id) {
+    if (job.kind === "search" && monitorRun) {
+      data = prepareMonitorResult({
+        result: data,
+        knownProfiles: await knownCandidateProfiles(job.user_id),
+        configSnapshot: monitorRun.config_snapshot,
+        monitorRunId: monitorRun.id,
+      });
+    } else if (job.kind === "search" && job.search_task_id) {
       await attachTaskDiscovery({ userId: job.user_id, result: data });
     }
     if (job.kind === "search") {
@@ -659,6 +729,15 @@ async function runJob(job) {
         observedAt: finishedAt,
         result: data,
       });
+      if (monitorRun) {
+        try {
+          await settleMonitorRun(job.id);
+        } catch (error) {
+          // The done result is durable. Reconciliation retries this DB-owned,
+          // idempotent settlement without ever charging twice.
+          console.error(`[${new Date().toISOString()}] Talent Monitor settlement pending for ${job.id}: ${error?.message || error}`);
+        }
+      }
     }
     console.log(`[${new Date().toISOString()}] 完成 ${job.id}: 搜索 ${out.searches} 抓取 ${out.fetches}`);
   } catch (e) {
@@ -675,6 +754,15 @@ async function runJob(job) {
         if (upd && upd.length > 0) break;
       } catch {}
       await sleep(1500);
+    }
+    if (monitorRun && (failureRow.status === "error" || failureRow.status === "canceled")) {
+      try {
+        await releaseMonitorRun(job.id, failureRow.status);
+      } catch (releaseError) {
+        // A periodic service-role reconciliation releases an already-terminal
+        // run if this immediate call encounters a transient transport error.
+        console.error(`[${new Date().toISOString()}] Talent Monitor release pending for ${job.id}: ${releaseError?.message || releaseError}`);
+      }
     }
     console.error(`[${new Date().toISOString()}] 任务 ${job.id} ${failureRow.status === "retrying" ? "等待重试" : "失败"}:`, failureRow.last_error);
   }
