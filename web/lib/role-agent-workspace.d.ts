@@ -142,7 +142,7 @@ export type RoleAgentWorkspaceView = {
     updated_at: string;
   }>;
   signal_refresh: {
-    status: "idle" | "due" | string;
+    status: "idle" | "due" | "blocked" | string;
     provider_status: "not_configured" | "ready" | string;
     due_count: number;
     stale_count: number;

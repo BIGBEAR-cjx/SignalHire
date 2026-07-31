@@ -239,6 +239,7 @@ function candidateDisplayStatus(status: ShortlistStatus): CandidateDisplayStatus
 
 type CandidateGraphView = {
   provider_status: Array<{ provider: "pdl"; enabled: boolean; reason: string }>;
+  live_signal_provider_status: "ready" | "not_configured";
   summary: {
     candidate_count: number;
     ready_for_outreach_count: number;
@@ -957,6 +958,7 @@ function roleAgentBlockedReasonLabel(reason: string, locale: "zh" | "en") {
     agent_paused: { en: "Agent is paused. Resume it before running this action.", zh: "Agent 已暂停。恢复后才能执行这个动作。" },
     active_search_running: { en: "A search is already running for this role.", zh: "这个岗位已有搜索正在运行。" },
     stale_live_signals: { en: "Some live signals are stale or expired.", zh: "部分实时信号已变旧或过期。" },
+    provider_not_configured: { en: "Connect a live signal provider before refreshing these signals.", zh: "请先接入实时信号 provider，再刷新这些信号。" },
   };
   return labels[reason]?.[locale] ?? reason;
 }

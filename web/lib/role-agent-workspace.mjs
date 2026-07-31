@@ -338,7 +338,10 @@ function buildNextActions({ status, goals, counts, health, candidateGraph, leadP
   if (outreachReady > 0) actions.push(makeAction("approve_or_send_outreach", outreachReady, locale, pausedBlock));
   if (failedSends > 0) actions.push(makeAction("retry_failed_outreach", failedSends, locale, pausedBlock));
   if (dueFollowUps > 0) actions.push(makeAction("follow_up", dueFollowUps, locale, pausedBlock));
-  if (asNumber(signalRefresh?.due_count) > 0) actions.push(makeAction("refresh_live_signals", signalRefresh.due_count, locale, pausedBlock));
+  if (asNumber(signalRefresh?.due_count) > 0) {
+    const blockedReason = pausedBlock || (cleanString(signalRefresh?.status) === "blocked" ? "provider_not_configured" : "");
+    actions.push(makeAction("refresh_live_signals", signalRefresh.due_count, locale, blockedReason));
+  }
   if (previewCount > 0) actions.push(makeAction("review_preview_leads", previewCount, locale, pausedBlock));
   if (candidateShortfall) {
     const blockedReason = pausedBlock || (activeSearch ? "active_search_running" : "");
@@ -991,14 +994,20 @@ function buildSignalRefresh({ candidateGraph, roleAgentMetrics, now, locale }) {
   const staleCount = targets.reduce((total, target) => total + asNumber(target.stale_count), 0);
   const expiredCount = targets.reduce((total, target) => total + asNumber(target.expired_count), 0);
   const dueCount = targets.length;
+  const providerStatus = cleanString(candidateGraph?.live_signal_provider_status).toLowerCase() === "ready"
+    ? "ready"
+    : "not_configured";
+  const blocked = dueCount > 0 && providerStatus !== "ready";
   return {
-    status: dueCount > 0 ? "due" : "idle",
-    provider_status: "not_configured",
+    status: dueCount > 0 ? (blocked ? "blocked" : "due") : "idle",
+    provider_status: providerStatus,
     due_count: dueCount,
     stale_count: staleCount,
     expired_count: expiredCount,
-    summary: dueCount > 0
-      ? (zh ? `${dueCount} 个候选人的实时信号需要刷新。` : `${dueCount} candidates have live signals due for refresh.`)
+    summary: blocked
+      ? (zh ? `${dueCount} 个候选人的实时信号需要刷新，但尚未配置 provider。` : `${dueCount} candidates have live signals due for refresh, but no provider is configured.`)
+      : dueCount > 0
+        ? (zh ? `${dueCount} 个候选人的实时信号需要刷新。` : `${dueCount} candidates have live signals due for refresh.`)
       : (zh ? "实时信号暂无刷新任务。" : "No live signal refresh is due."),
     targets,
     last_run: signalRefreshLastRun(roleAgentMetrics),

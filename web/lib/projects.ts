@@ -698,6 +698,7 @@ export async function buildProjectLeadPreviewView(userId: string, projectId: str
 
 export interface ProjectCandidateGraphView {
   provider_status: Array<{ provider: "pdl"; enabled: boolean; reason: string }>;
+  live_signal_provider_status: "ready" | "not_configured";
   summary: {
     candidate_count: number;
     ready_for_outreach_count: number;
@@ -737,6 +738,10 @@ function providerCandidateRowsFromCandidates(candidates: unknown[]) {
   ));
 }
 
+function liveSignalProviderStatus(): "ready" | "not_configured" {
+  return process.env.LIVE_SIGNAL_PROVIDER_URL?.trim() ? "ready" : "not_configured";
+}
+
 export async function buildProjectCandidateGraphView(userId: string, projectId: string): Promise<ProjectCandidateGraphView> {
   const items = await listItems(userId, projectId);
   const candidates = items.map((item) => item.candidate);
@@ -753,6 +758,7 @@ export async function buildProjectCandidateGraphView(userId: string, projectId: 
   const providerStatus = buildPeopleProviderConfig().providers as ProjectCandidateGraphView["provider_status"];
   const candidateGraph: ProjectCandidateGraphView = {
     provider_status: providerStatus,
+    live_signal_provider_status: liveSignalProviderStatus(),
     summary: graph.summary,
     source_mix: graph.source_mix,
     candidates: candidatesWithLiveSignals.map((candidate) => {

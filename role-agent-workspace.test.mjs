@@ -951,6 +951,7 @@ test("builds a live signal refresh queue for stale or expired candidates", () =>
     role: { id: "role-live-refresh", status: "active" },
     settings: {},
     candidateGraph: {
+      live_signal_provider_status: "ready",
       candidates: [
         {
           candidate_id: "stale-signal",
@@ -1000,6 +1001,34 @@ test("builds a live signal refresh queue for stale or expired candidates", () =>
   const action = view.next_actions.find((item) => item.type === "refresh_live_signals");
   assert.equal(action?.affected_count, 2);
   assert.match(action?.reason ?? "", /signals/i);
+});
+
+test("blocks a due live signal refresh when no real provider is configured", () => {
+  const view = buildRoleAgentWorkspaceView({
+    role: { id: "role-live-refresh-blocked", status: "active" },
+    settings: {},
+    candidateGraph: {
+      candidates: [
+        {
+          candidate_id: "stale-signal",
+          canonical_name: "Stale Signal Candidate",
+          activity_signals: [
+            { type: "candidate_activity", source: "github", label: "Old project update", confidence: "medium", at: "2026-05-20T08:30:00.000Z" },
+          ],
+        },
+      ],
+    },
+    outreachQueue: { items: [] },
+    inboxQueue: { items: [] },
+    now: "2026-07-03T12:00:00.000Z",
+    locale: "en",
+  });
+
+  assert.equal(view.signal_refresh.provider_status, "not_configured");
+  assert.equal(view.signal_refresh.status, "blocked");
+  assert.equal(view.signal_refresh.due_count, 1);
+  assert.match(view.signal_refresh.summary, /provider/i);
+  assert.equal(view.next_actions.find((item) => item.type === "refresh_live_signals")?.blocked_reason, "provider_not_configured");
 });
 
 test("builds a contact and outreach autopilot path with recovery states", () => {
