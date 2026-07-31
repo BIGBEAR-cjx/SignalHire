@@ -102,3 +102,9 @@ test("legacy schedule migration does not target preconfigured v2 monitor timezon
   assert.match(migration, /where frequency in \('daily', 'weekly'\)\s+and timezone = 'UTC'\s+and schedule_time = '09:00'/i);
   assert.doesNotMatch(migration, /timezone = 'Asia\/Shanghai'/i);
 });
+
+test("monitor migration scopes constraint-name checks to search_tasks", () => {
+  const migration = readFileSync("migrations/20260730000000_talent_monitor_v2.sql", "utf8");
+
+  assert.match(migration, /conrelid = 'public\.search_tasks'::regclass/i);
+});

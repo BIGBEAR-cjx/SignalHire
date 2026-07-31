@@ -35,19 +35,19 @@ where monthly_credit_reserved < 0;
 
 do $$
 begin
-  if not exists (select 1 from pg_constraint where conname = 'search_tasks_frequency_check') then
+  if not exists (select 1 from pg_constraint where conname = 'search_tasks_frequency_check' and conrelid = 'public.search_tasks'::regclass) then
     alter table public.search_tasks
       add constraint search_tasks_frequency_check check (frequency in ('manual', 'daily', 'weekly'));
   end if;
-  if not exists (select 1 from pg_constraint where conname = 'search_tasks_status_check') then
+  if not exists (select 1 from pg_constraint where conname = 'search_tasks_status_check' and conrelid = 'public.search_tasks'::regclass) then
     alter table public.search_tasks
       add constraint search_tasks_status_check check (status in ('active', 'paused'));
   end if;
-  if not exists (select 1 from pg_constraint where conname = 'search_tasks_batch_size_check') then
+  if not exists (select 1 from pg_constraint where conname = 'search_tasks_batch_size_check' and conrelid = 'public.search_tasks'::regclass) then
     alter table public.search_tasks
       add constraint search_tasks_batch_size_check check (candidate_batch_size in (5, 10, 20));
   end if;
-  if not exists (select 1 from pg_constraint where conname = 'search_tasks_monthly_credits_check') then
+  if not exists (select 1 from pg_constraint where conname = 'search_tasks_monthly_credits_check' and conrelid = 'public.search_tasks'::regclass) then
     alter table public.search_tasks
       add constraint search_tasks_monthly_credits_check check (
         monthly_credit_limit >= 0
