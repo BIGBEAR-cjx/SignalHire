@@ -1,5 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import {
   buildNextRunAt,
   nextRunAfterPatch,
@@ -83,4 +84,13 @@ test("takes an immutable snapshot of monitor configuration", () => {
     monthly_credit_limit: 60,
     notification_enabled: true,
   });
+});
+
+test("forward migration preserves legacy scheduled monitor cadence", () => {
+  const migration = readFileSync("migrations/20260730020000_preserve_legacy_talent_monitor_schedule.sql", "utf8");
+
+  assert.match(migration, /update public\.search_tasks[\s\S]*set schedule_time = to_char\(/i);
+  assert.match(migration, /coalesce\(next_run_at, last_run_at, created_at\) at time zone 'UTC'/i);
+  assert.match(migration, /where frequency in \('daily', 'weekly'\)/i);
+  assert.doesNotMatch(migration, /set\s+next_run_at\s*=/i);
 });
