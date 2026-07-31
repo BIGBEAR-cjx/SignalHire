@@ -20,6 +20,13 @@ function validIso(value) {
   return Number.isFinite(date.getTime()) ? date.toISOString() : new Date().toISOString();
 }
 
+function strictIso(value) {
+  const clean = cleanString(value);
+  if (!clean) return "";
+  const date = new Date(clean);
+  return Number.isFinite(date.getTime()) ? date.toISOString() : "";
+}
+
 function safeTarget(item = {}) {
   return {
     id: cleanString(item.candidate_id || item.id),
@@ -39,7 +46,10 @@ function providerSafeError(value) {
   const clean = cleanString(value);
   if (!clean) return "live_signal_refresh_failed";
   return clean
-    .replace(/(access_token|refresh_token|secret|api[_-]?key)=?[^,\s]*/gi, "$1=redacted")
+    .replace(/([a-z][a-z0-9+.-]*:\/\/)[^\s/@]+@/gi, "$1redacted@")
+    .replace(/\bauthorization\s*[:=]\s*(bearer|basic)\s+[^,\s]*/gi, "Authorization: $1 redacted")
+    .replace(/\b(bearer|basic)\s+[^,\s]+/gi, "$1 redacted")
+    .replace(/(access_token|refresh_token|secret|api[_-]?key)\s*=?\s*[^,\s]*/gi, "$1=redacted")
     .replace(/\b(debug|internal|stack|trace)\b[\s\S]*/gi, "")
     .slice(0, 120)
     .trim() || "live_signal_refresh_failed";
@@ -54,8 +64,8 @@ function normalizeLiveSignal(signal = {}) {
     source: cleanString(signal.source || signal.provider) || "external_provider",
     confidence: cleanString(signal.confidence) || "medium",
     freshness: cleanString(signal.freshness) || "fresh",
-    observed_at: validIso(signal.observed_at || signal.at || signal.created_at),
-    expires_at: cleanString(signal.expires_at) ? validIso(signal.expires_at) : "",
+    observed_at: strictIso(signal.observed_at || signal.at || signal.created_at),
+    expires_at: strictIso(signal.expires_at),
     summary,
     url: cleanString(signal.url || signal.href),
   };

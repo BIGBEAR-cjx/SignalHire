@@ -7,6 +7,7 @@ import {
   createSignalhireAggregateLiveSignalProvider,
   createInternalLiveSignalProvider,
   createHttpLiveSignalProvider,
+  buildLiveSignalPersistenceRows,
   selectLiveSignalRefreshProjects,
 } from "./web/lib/live-signal-refresh.mjs";
 
@@ -130,7 +131,7 @@ test("redacts external live signal provider failures", async () => {
     fetchImpl: async () => ({
       ok: false,
       status: 500,
-      text: async () => "provider failed api_key=secret-token debug trace",
+      text: async () => "api_key=secret-token Authorization: Bearer bearer-secret Authorization: Basic basic-secret https://a:p@x.io/ debug trace",
     }),
   });
 
@@ -141,7 +142,43 @@ test("redacts external live signal provider failures", async () => {
   assert.equal(result.refreshed.length, 0);
   assert.equal(result.failed[0].candidate_id, "c1");
   assert.match(result.error, /api_key=redacted/);
-  assert.doesNotMatch(result.error, /secret-token|debug trace/);
+  assert.doesNotMatch(result.error, /secret-token|bearer-secret|basic-secret|a:p|debug trace/);
+  assert.match(result.error, /Authorization: Bearer redacted/i);
+  assert.match(result.error, /Authorization: Basic redacted/i);
+});
+
+test("keeps missing or malformed provider observed_at empty so persistence rejects it", async () => {
+  const provider = createHttpLiveSignalProvider({
+    url: "https://signals.example.com/refresh",
+    fetchImpl: async () => ({
+      ok: true,
+      json: async () => ({
+        refreshed: [{
+          candidate_id: "c1",
+          provider: "github",
+          signals: [{
+            summary: "Published a new inference optimization project.",
+            url: "https://github.com/ada/inference",
+            observed_at: "not-a-date",
+            expires_at: "2026-07-11T12:00:00.000Z",
+          }],
+        }],
+      }),
+    }),
+  });
+
+  const result = await provider.refresh({ targets: [{ candidate_id: "c1", candidate_name: "Ada Candidate" }] });
+  const persistence = buildLiveSignalPersistenceRows({
+    userId: "user-1",
+    projectId: "project-1",
+    candidateGraph: { candidates: [{ candidate_id: "c1", merge_keys: ["github:ada"] }] },
+    refreshed: result.refreshed,
+  });
+
+  assert.equal(result.refreshed[0].live_signals[0].observed_at, "");
+  assert.deepEqual(persistence.rows, []);
+  assert.equal(persistence.skipped, 1);
+  assert.equal(persistence.failed[0].error, "invalid_live_signal");
 });
 
 test("internal live signal provider refreshes targets without external configuration", async () => {
