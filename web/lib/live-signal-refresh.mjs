@@ -497,3 +497,13 @@ export function createHttpLiveSignalProvider({
     },
   };
 }
+
+// Extensionless cron imports select this pure provider module first. Delegate
+// the database-backed refresh only when the server route invokes it.
+function liveSignalRefreshService() {
+  return import("./live-signal-refresh.ts");
+}
+
+export async function refreshDueLiveSignals(...args) {
+  return (await liveSignalRefreshService()).refreshDueLiveSignals(...args);
+}

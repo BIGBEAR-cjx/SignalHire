@@ -258,3 +258,13 @@ export async function runRoleAgentRunCore({
 
   return { status: "failed", error: "unsupported_role_agent_action", run };
 }
+
+// The action orchestrator lives in the typed server module. Keeping this
+// bridge lazy preserves the pure core for all existing consumers.
+function roleAgentRunnerService() {
+  return import("./role-agent-runner.ts");
+}
+
+export async function runRoleAgentProjectAction(...args) {
+  return (await roleAgentRunnerService()).runRoleAgentProjectAction(...args);
+}
