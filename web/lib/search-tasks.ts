@@ -6,7 +6,7 @@ import {
   normalizeSearchTaskInput,
 } from "./search-tasks.mjs";
 import { startMonitorRun as startMonitorRunCore } from "./talent-monitor-run.mjs";
-import { buildMonitorView } from "./talent-monitor-view.mjs";
+import { buildMonitorView, sanitizeMonitorErrorSummary } from "./talent-monitor-view.mjs";
 
 export { buildMonitorView };
 
@@ -75,6 +75,7 @@ export type MonitorRun = {
   credits_consumed: number;
   credits_released: number;
   stop_reason: string | null;
+  error_summary: string | null;
   config_snapshot: Record<string, unknown>;
 };
 
@@ -172,6 +173,7 @@ function mapMonitorRun(row: Record<string, unknown>): MonitorRun {
     credits_consumed: nonNegativeInteger(row.credits_consumed),
     credits_released: nonNegativeInteger(row.credits_released),
     stop_reason: typeof row.stop_reason === "string" && row.stop_reason ? row.stop_reason : null,
+    error_summary: sanitizeMonitorErrorSummary(row.error_summary),
     config_snapshot: snapshot,
   };
 }
@@ -184,7 +186,7 @@ async function listMonitorRuns(userId: string, taskIds: string[]): Promise<Map<s
        SELECT r.id, r.search_task_id, r.research_run_id, r.status, r.started_at, r.finished_at,
          r.requested_count, r.returned_count, r.new_candidates, r.updated_candidates,
          r.seen_candidates, r.skipped_candidates, r.credits_reserved, r.credits_consumed,
-         r.credits_released, r.stop_reason, r.config_snapshot,
+         r.credits_released, r.stop_reason, r.error_summary, r.config_snapshot,
          row_number() OVER (PARTITION BY r.search_task_id ORDER BY r.updated_at DESC) AS history_rank
        FROM public.search_task_runs r
        WHERE r.user_id = $1 AND r.search_task_id = ANY($2::uuid[])

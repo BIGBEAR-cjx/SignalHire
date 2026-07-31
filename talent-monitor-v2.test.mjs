@@ -118,6 +118,7 @@ test("builds a user-safe monitor view with immutable run configuration", () => {
       credits_reserved: 10,
       credits_consumed: 7,
       credits_released: 3,
+      error_summary: "Provider rejected Bearer super-secret-token at https://provider.example/v1?token=secret",
       outreach_sent: 99,
       candidate_snapshot: { email: "private@example.com" },
       report: { secret: "private" },
@@ -133,6 +134,10 @@ test("builds a user-safe monitor view with immutable run configuration", () => {
   assert.equal(view.runs[0].outreach_sent, undefined);
   assert.equal(view.runs[0].candidate_snapshot, undefined);
   assert.equal(view.runs[0].report, undefined);
+  assert.equal(view.runs[0].error_summary, "Provider rejected Bearer [redacted] at [URL redacted]");
+  assert.ok(view.runs[0].error_summary.length <= 240);
+  assert.equal(view.runs[0].error_summary.includes("super-secret-token"), false);
+  assert.equal(view.runs[0].error_summary.includes("provider.example"), false);
   assert.deepEqual(view.credits, { limit: 30, used: 10, reserved: 5, available: 15 });
 });
 

@@ -16,6 +16,16 @@ function safeDate(value) {
   return date && Number.isFinite(Date.parse(date)) ? date : null;
 }
 
+export function sanitizeMonitorErrorSummary(value) {
+  const raw = text(value).replace(/\s+/g, " ").trim();
+  if (!raw) return null;
+  return raw
+    .replace(/\b(?:https?|wss?):\/\/[^\s<>"']+/gi, "[URL redacted]")
+    .replace(/\b(Bearer|Basic)\s+[^\s,;]+/gi, "$1 [redacted]")
+    .replace(/\b(api[_ -]?key|access[_ -]?token|token|secret|password)\s*([=:])\s*[^\s,;]+/gi, "$1$2[redacted]")
+    .slice(0, 240);
+}
+
 function safeSnapshot(value) {
   const row = value && typeof value === "object" && !Array.isArray(value) ? value : {};
   return {
@@ -48,6 +58,7 @@ function safeRun(row) {
     credits_consumed: nonNegative(value.credits_consumed),
     credits_released: nonNegative(value.credits_released),
     stop_reason: text(value.stop_reason) || null,
+    error_summary: sanitizeMonitorErrorSummary(value.error_summary),
     config_snapshot: safeSnapshot(value.config_snapshot),
   };
 }

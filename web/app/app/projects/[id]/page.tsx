@@ -444,6 +444,7 @@ type SearchTaskView = {
     credits_consumed: number;
     credits_released: number;
     stop_reason: string | null;
+    error_summary: string | null;
     config_snapshot: {
       candidate_batch_size: number;
       timezone: string;
@@ -3481,6 +3482,7 @@ function TalentMonitorPanel({
                     <div className="flex flex-wrap items-center justify-between gap-2"><span className="font-semibold text-[var(--sh-ink)]">{run.status}</span><span>{run.returned_count}/{run.requested_count} · +{run.new_candidates} · {run.credits_consumed} Credits</span></div>
                     <p className="mt-1 text-[var(--sh-muted)]">{run.config_snapshot.candidate_batch_size} candidates · {run.config_snapshot.timezone} · {run.config_snapshot.schedule_time}</p>
                     {run.stop_reason && <p className="mt-1 text-amber-800">{run.stop_reason}</p>}
+                    {["failed", "cancelled", "blocked"].includes(run.status) && run.error_summary && <p className="mt-1 text-red-700">{run.error_summary}</p>}
                     {run.research_run_id && <Link href={`/app/projects/${projectId}#research-round-${run.research_run_id}`} className="mt-1 inline-block text-[var(--sh-blue)] hover:underline">{c.researchRun}</Link>}
                   </div>
                 ))}

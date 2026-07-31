@@ -60,3 +60,8 @@ test("monitor panel avoids hour controls and announces mutation failures", () =>
   assert.match(monitorPanel, /aria-live="polite"/);
   assert.match(monitorPanel, /setActionError\(/);
 });
+
+test("monitor panel only renders the safe error summary for terminal runs", () => {
+  assert.match(monitorPanel, /\["failed", "cancelled", "blocked"\]\.includes\(run\.status\)/);
+  assert.match(monitorPanel, /run\.error_summary/);
+});
