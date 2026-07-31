@@ -109,6 +109,10 @@ export function scoreCase(caseDefinition, result, { fixture } = {}) {
 
   const judgments = Array.isArray(caseDefinition?.judgments) ? caseDefinition.judgments : [];
   const knownRelevant = new Set((caseDefinition?.known_relevant || []).map(stableCandidateIdentity).filter(Boolean));
+  const approvedHardRelevant = new Set(judgments
+    .filter((item) => item.relevance === "relevant" && item.hard_conditions_met === true)
+    .map(stableCandidateIdentity)
+    .filter((identity) => knownRelevant.has(identity)));
   const relevantIdentities = new Set([
     ...knownRelevant,
     ...judgments.filter((item) => item.relevance === "relevant").map(stableCandidateIdentity).filter(Boolean),
@@ -124,7 +128,7 @@ export function scoreCase(caseDefinition, result, { fixture } = {}) {
     const judgment = judgmentFor(candidate, judgments);
     if (!identity) identityErrors += 1;
     if (knownRelevant.has(identity)) matchedKnown.add(identity);
-    if (judgment?.relevance === "relevant" && judgment.hard_conditions_met === true) hardMatches += 1;
+    if (approvedHardRelevant.has(identity)) hardMatches += 1;
     if (judgment?.identity_correct === false) identityErrors += 1;
     if (!judgment && candidate?.name && candidate?.current_company) {
       const sameNameKnown = (caseDefinition?.known_relevant || []).some((known) =>
@@ -134,10 +138,6 @@ export function scoreCase(caseDefinition, result, { fixture } = {}) {
     }
   }
 
-  const hardConditionTotal = (caseDefinition?.known_relevant || []).filter((known) => {
-    const judgment = judgments.find((item) => stableCandidateIdentity(item) === stableCandidateIdentity(known));
-    return !judgment || judgment.hard_conditions_met === true;
-  }).length;
   const relevantAt = (candidates) => candidates.filter((candidate) => relevantIdentities.has(stableCandidateIdentity(candidate))).length;
 
   return {
@@ -145,7 +145,7 @@ export function scoreCase(caseDefinition, result, { fixture } = {}) {
     precision_at_5: rate(relevantAt(topFive), topFive.length),
     precision_at_10: rate(relevantAt(topTen), topTen.length),
     known_relevant_recall_at_10: rate(matchedKnown.size, knownRelevant.size),
-    hard_constraint_recall: rate(hardMatches, hardConditionTotal),
+    hard_constraint_recall: rate(hardMatches, approvedHardRelevant.size),
     identity_errors: identityErrors,
     valid_evidence_rate: rate(topTen.filter(hasVerifiableEvidence).length, topTen.length),
   };

@@ -156,6 +156,22 @@ test("keeps identity-less returned candidates in the denominator and flags them"
   assert.equal(score.identity_errors, 4);
 });
 
+test("does not let an unrelated relevant judgment inflate hard-constraint recall", () => {
+  const caseWithUnrelatedJudgment = {
+    ...baseCase,
+    judgments: [
+      ...baseCase.judgments,
+      { name: "Unrelated Relevant", company: "Elsewhere", relevance: "relevant", hard_conditions_met: true, identity_correct: true, evidence_verifiable: true, reviewer: "human-reviewer", review_status: "approved_human_review", reviewed_at: "2026-07-30T00:00:00.000Z", version: "v1" },
+    ],
+  };
+  const score = scoreCase(caseWithUnrelatedJudgment, {
+    candidates: [{ name: "Unrelated Relevant", current_company: "Elsewhere", evidence: [{ url: "https://example.com/unrelated" }] }],
+    ...metrics,
+  });
+  assert.equal(score.hard_constraint_recall, 0);
+  assert.ok(score.hard_constraint_recall <= 1);
+});
+
 test("ships exactly thirty human-review-pending cases with ten cases at every difficulty", () => {
   assert.equal(fixture.schema_version, "search-eval-v1-draft");
   assert.equal(fixture.review_status, "draft_pending_human_review");
