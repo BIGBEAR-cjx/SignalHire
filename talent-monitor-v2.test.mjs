@@ -92,5 +92,13 @@ test("forward migration preserves legacy scheduled monitor cadence", () => {
   assert.match(migration, /update public\.search_tasks[\s\S]*set schedule_time = to_char\(/i);
   assert.match(migration, /coalesce\(next_run_at, last_run_at, created_at\) at time zone 'UTC'/i);
   assert.match(migration, /where frequency in \('daily', 'weekly'\)/i);
+  assert.match(migration, /and timezone = 'UTC'\s*and schedule_time = '09:00'/i);
   assert.doesNotMatch(migration, /set\s+next_run_at\s*=/i);
+});
+
+test("legacy schedule migration does not target preconfigured v2 monitor timezones", () => {
+  const migration = readFileSync("migrations/20260730020000_preserve_legacy_talent_monitor_schedule.sql", "utf8");
+
+  assert.match(migration, /where frequency in \('daily', 'weekly'\)\s+and timezone = 'UTC'\s+and schedule_time = '09:00'/i);
+  assert.doesNotMatch(migration, /timezone = 'Asia\/Shanghai'/i);
 });

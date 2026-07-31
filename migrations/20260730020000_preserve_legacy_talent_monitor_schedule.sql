@@ -5,4 +5,6 @@ set schedule_time = to_char(
   coalesce(next_run_at, last_run_at, created_at) at time zone 'UTC',
   'HH24:MI'
 )::time
-where frequency in ('daily', 'weekly');
+where frequency in ('daily', 'weekly')
+  and timezone = 'UTC'
+  and schedule_time = '09:00';
