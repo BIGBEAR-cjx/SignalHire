@@ -1,3 +1,6 @@
+import { createHash } from "node:crypto";
+import { normalizeCandidateLiveSignal } from "./candidate-live-signals.mjs";
+
 function cleanString(value) {
   return typeof value === "string" ? value.trim() : "";
 }
@@ -28,7 +31,7 @@ function safeFailedItem(item = {}) {
   return {
     id: cleanString(item.candidate_id || item.id),
     candidate_name: cleanString(item.candidate_name || item.name) || "Candidate",
-    error: cleanString(item.error || item.reason) || "live_signal_refresh_failed",
+    error: providerSafeError(item.error || item.reason),
   };
 }
 
@@ -70,6 +73,127 @@ function normalizeProviderRefreshedItem(item = {}) {
     provider: cleanString(item.provider) || "external_live_signal_provider",
     signal_count: nonNegativeInteger(item.signal_count || liveSignals.length),
     live_signals: liveSignals,
+  };
+}
+
+function candidateGraphMergeKeyIndex(candidateGraph = {}) {
+  const index = new Map();
+  const candidates = Array.isArray(candidateGraph?.candidates) ? candidateGraph.candidates : [];
+  for (const candidate of candidates.filter(isRecord)) {
+    const mergeKeys = (Array.isArray(candidate.merge_keys) ? candidate.merge_keys : [])
+      .map(cleanString)
+      .filter(Boolean);
+    const candidateMergeKey = mergeKeys[0];
+    if (!candidateMergeKey) continue;
+    const record = {
+      candidate_id: cleanString(candidate.candidate_id || candidate.id),
+      candidate_merge_key: candidateMergeKey,
+    };
+    for (const key of [record.candidate_id, ...mergeKeys]) {
+      if (key) index.set(key.toLowerCase(), record);
+    }
+  }
+  return index;
+}
+
+function contentHashForLiveSignal(signal = {}) {
+  return createHash("sha256")
+    .update(JSON.stringify({
+      provider: cleanString(signal.provider),
+      type: cleanString(signal.type),
+      source_url: cleanString(signal.source_url),
+      summary: cleanString(signal.summary),
+    }))
+    .digest("hex");
+}
+
+function refreshFailure(item = {}, error = "live_signal_refresh_failed") {
+  return {
+    candidate_id: cleanString(item.candidate_id || item.id),
+    candidate_name: cleanString(item.candidate_name || item.name) || "Candidate",
+    error: providerSafeError(error),
+  };
+}
+
+// Provider IDs are only locators. Persisted records always use a merge key already
+// present in the project CandidateGraph, so a provider cannot create a new identity.
+export function buildLiveSignalPersistenceRows({
+  userId = "",
+  projectId = "",
+  candidateGraph = {},
+  refreshed = [],
+} = {}) {
+  const mergeKeyIndex = candidateGraphMergeKeyIndex(candidateGraph);
+  const rows = [];
+  const failed = [];
+  let skipped = 0;
+
+  for (const sourceItem of Array.isArray(refreshed) ? refreshed.filter(isRecord) : []) {
+    const item = normalizeProviderRefreshedItem(sourceItem);
+    const candidate = mergeKeyIndex.get(cleanString(item.candidate_id).toLowerCase());
+    if (!candidate) {
+      failed.push(refreshFailure(item, "candidate_not_found"));
+      continue;
+    }
+
+    let validSignals = 0;
+    let invalidSignals = 0;
+    for (const signal of item.live_signals) {
+      const provisional = normalizeCandidateLiveSignal({
+        user_id: userId,
+        project_id: projectId,
+        candidate_merge_key: candidate.candidate_merge_key,
+        provider: item.provider,
+        type: signal.type,
+        source_url: signal.url,
+        summary: signal.summary,
+        confidence: signal.confidence,
+        observed_at: signal.observed_at,
+        expires_at: signal.expires_at,
+        content_hash: "pending",
+      });
+      if (!provisional) {
+        invalidSignals += 1;
+        skipped += 1;
+        continue;
+      }
+      const normalized = normalizeCandidateLiveSignal({
+        ...provisional,
+        content_hash: contentHashForLiveSignal(provisional),
+      });
+      if (!normalized) {
+        invalidSignals += 1;
+        skipped += 1;
+        continue;
+      }
+      rows.push(normalized);
+      validSignals += 1;
+    }
+    if (invalidSignals > 0 || validSignals === 0) {
+      failed.push(refreshFailure(item, "invalid_live_signal"));
+    }
+  }
+
+  return { rows, failed, skipped };
+}
+
+export function buildPersistedLiveSignalRefreshResult(signals = []) {
+  const rows = [];
+  for (const value of Array.isArray(signals) ? signals : []) {
+    if (!isRecord(value)) continue;
+    const normalized = normalizeCandidateLiveSignal(value);
+    const id = cleanString(value.id);
+    if (!normalized || !id) continue;
+    rows.push({ id, ...normalized });
+  }
+  const uniqueRows = new Map();
+  for (const row of rows) uniqueRows.set(row.id, row);
+  const persisted = [...uniqueRows.values()];
+  return {
+    refreshed: new Set(persisted.map((row) => row.candidate_merge_key)).size,
+    persisted_signal_count: persisted.length,
+    signal_ids: persisted.map((row) => row.id),
+    signal_hashes: persisted.map((row) => row.content_hash),
   };
 }
 
@@ -123,23 +247,23 @@ export function selectLiveSignalRefreshProjects(projects = [], { limit = 10 } = 
 export function buildLiveSignalRefreshEvent({
   runId = "",
   targets = [],
-  refreshed = [],
+  persistedSignals = [],
   failed = [],
   at = new Date().toISOString(),
 } = {}) {
-  const refreshedCount = Array.isArray(refreshed) ? refreshed.length : 0;
+  const persisted = buildPersistedLiveSignalRefreshResult(persistedSignals);
   const failedItems = (Array.isArray(failed) ? failed : []).filter(isRecord).map(safeFailedItem);
   return {
     event_type: "next_action_execution",
     action_type: "refresh_live_signals",
-    action_status: refreshedCount > 0 || failedItems.length === 0 ? "succeeded" : "failed",
+    action_status: persisted.refreshed > 0 || failedItems.length === 0 ? "succeeded" : "failed",
     run_id: cleanString(runId),
     workflow_step: "refresh_live_signals",
-    detail: `${refreshedCount} live signals refreshed, ${failedItems.length} failed.`,
+    detail: `${persisted.refreshed} live signals refreshed, ${failedItems.length} failed.`,
     targets: (Array.isArray(targets) ? targets : []).filter(isRecord).map(safeTarget),
     result: {
       provider_ready: true,
-      refreshed: refreshedCount,
+      ...persisted,
       failed: failedItems.length,
     },
     failed_items: failedItems,
@@ -214,6 +338,7 @@ export function createInternalLiveSignalProvider({ now = new Date().toISOString(
       const expiresAt = new Date(Date.parse(observedAt) + 7 * 24 * 60 * 60 * 1000).toISOString();
       const projectName = cleanString(payload.project?.name) || "this role";
       return {
+        synthetic: true,
         refreshed: payload.targets.map((target) => ({
           candidate_id: target.candidate_id,
           candidate_name: target.candidate_name,
@@ -273,6 +398,7 @@ export function buildSignalhireAggregateLiveSignalProviderRefresh(input = {}, { 
   const expiresAt = new Date(Date.parse(observedAt) + 7 * 24 * 60 * 60 * 1000).toISOString();
   const projectName = cleanString(payload.project?.name) || "this role";
   return {
+    synthetic: true,
     refreshed: payload.targets.map((target) => {
       const liveSignals = aggregateSignalTypes(target).map((type) => ({
         type,

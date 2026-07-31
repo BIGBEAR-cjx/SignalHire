@@ -1,6 +1,8 @@
 import {
+  buildLiveSignalPersistenceRows,
   buildLiveSignalRefreshBlockedEvent,
   buildLiveSignalRefreshEvent,
+  buildPersistedLiveSignalRefreshResult,
 } from "./live-signal-refresh.mjs";
 
 const SUPPORTED_ACTIONS = new Set(["run_sourcing", "refresh_live_signals", "prepare_outreach"]);
@@ -84,6 +86,7 @@ export async function runRoleAgentRunCore({
   project = {},
   actionType = "",
   workspace = {},
+  candidateGraph = {},
   now = new Date(),
   deps = {},
 } = {}) {
@@ -145,20 +148,60 @@ export async function runRoleAgentRunCore({
     const providerResult = typeof deps.refreshLiveSignals === "function"
       ? await deps.refreshLiveSignals({ userId, project, targets })
       : { refreshed: [], failed: targets.map((target) => ({ ...target, error: "provider_not_configured" })), error: "provider_not_configured" };
-    const event = providerResult.error === "provider_not_configured"
-      ? buildLiveSignalRefreshBlockedEvent({ runId: run.run_id, targets, error: providerResult.error, at: now.toISOString() })
-      : buildLiveSignalRefreshEvent({
+    const blocked = providerResult.error === "provider_not_configured" || providerResult.synthetic === true;
+    if (blocked) {
+      const event = buildLiveSignalRefreshBlockedEvent({
         runId: run.run_id,
         targets,
-        refreshed: providerResult.refreshed,
-        failed: providerResult.failed,
+        error: providerResult.synthetic === true ? "provider_not_configured" : providerResult.error,
         at: now.toISOString(),
       });
+      await record(deps, run.project_id, run.user_id, event);
+      return {
+        status: event.action_status,
+        result: event.result,
+        failed_items: event.failed_items,
+        run,
+      };
+    }
+
+    const persistenceInput = buildLiveSignalPersistenceRows({
+      userId,
+      projectId: run.project_id,
+      candidateGraph,
+      refreshed: providerResult.refreshed,
+    });
+    const persistedSignals = typeof deps.upsertCandidateLiveSignals === "function"
+      ? await deps.upsertCandidateLiveSignals(persistenceInput.rows)
+      : [];
+    const persisted = buildPersistedLiveSignalRefreshResult(persistedSignals);
+    const persistedHashes = new Set(persisted.signal_hashes);
+    const persistenceFailedByMergeKey = new Map();
+    for (const row of persistenceInput.rows) {
+      if (!persistedHashes.has(row.content_hash)) {
+        persistenceFailedByMergeKey.set(row.candidate_merge_key, {
+          candidate_id: row.candidate_merge_key,
+          candidate_name: "Candidate",
+          error: "live_signal_persistence_failed",
+        });
+      }
+    }
+    const event = buildLiveSignalRefreshEvent({
+      runId: run.run_id,
+      targets,
+      persistedSignals,
+      failed: [
+        ...(Array.isArray(providerResult.failed) ? providerResult.failed : []),
+        ...persistenceInput.failed,
+        ...persistenceFailedByMergeKey.values(),
+      ],
+      at: now.toISOString(),
+    });
     await record(deps, run.project_id, run.user_id, event);
     return {
       status: event.action_status,
       result: event.result,
-      failed_items: safeTargets(event.failed_items),
+      failed_items: event.failed_items,
       run,
     };
   }

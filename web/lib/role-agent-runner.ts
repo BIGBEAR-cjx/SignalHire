@@ -4,7 +4,8 @@ import { buildProjectInboxQueueView } from "./inbox";
 import { listSearchTasks, createSearchTask, runSearchTaskNow } from "./search-tasks";
 import { buildRoleAgentWorkspaceView } from "./role-agent-workspace.mjs";
 import { runRoleAgentRunCore } from "./role-agent-runner.mjs";
-import { createHttpLiveSignalProvider, createInternalLiveSignalProvider } from "./live-signal-refresh.mjs";
+import { createHttpLiveSignalProvider } from "./live-signal-refresh.mjs";
+import { upsertCandidateLiveSignals } from "./candidate-live-signals";
 import { runBulkContactResolution } from "./contact-resolution-route.mjs";
 import { updateOutreachThread } from "./outreach-threads";
 
@@ -29,14 +30,25 @@ export async function buildRoleAgentRunWorkspace(input: { userId: string; projec
     roleAgentMetrics: project.inbox_sync_summary,
     locale: "en",
   });
-  return { project, workspace };
+  return { project, workspace, candidateGraph };
 }
 
 async function refreshLiveSignals(input: { userId?: string; project?: unknown; targets?: unknown[] }) {
   const provider = createHttpLiveSignalProvider({
     url: process.env.LIVE_SIGNAL_PROVIDER_URL,
     apiKey: process.env.LIVE_SIGNAL_PROVIDER_API_KEY,
-  }) || createInternalLiveSignalProvider();
+  });
+  if (!provider) {
+    const targets = Array.isArray(input.targets) ? input.targets : [];
+    return {
+      refreshed: [],
+      failed: targets.map((target) => ({
+        ...(target && typeof target === "object" && !Array.isArray(target) ? target : {}),
+        error: "provider_not_configured",
+      })),
+      error: "provider_not_configured",
+    };
+  }
   return provider.refresh(input);
 }
 
@@ -74,10 +86,12 @@ export async function runRoleAgentProjectAction(input: {
     project: built.project,
     actionType: input.actionType,
     workspace: built.workspace,
+    candidateGraph: built.candidateGraph,
     deps: {
       createSearchTask,
       runSearchTaskNow,
       refreshLiveSignals,
+      upsertCandidateLiveSignals,
       resolveContacts,
       approveOutreachDraft,
       recordProjectRoleAgentEvent,

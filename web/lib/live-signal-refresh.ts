@@ -4,8 +4,9 @@ import { listOutreachQueue } from "./outreach-threads";
 import { buildProjectInboxQueueView } from "./inbox";
 import { listSearchTasks } from "./search-tasks";
 import { buildRoleAgentWorkspaceView } from "./role-agent-workspace.mjs";
-import { buildLiveSignalRefreshSummary, createHttpLiveSignalProvider, createInternalLiveSignalProvider, selectLiveSignalRefreshProjects } from "./live-signal-refresh.mjs";
+import { buildLiveSignalRefreshSummary, createHttpLiveSignalProvider, selectLiveSignalRefreshProjects } from "./live-signal-refresh.mjs";
 import { runRoleAgentRunCore } from "./role-agent-runner.mjs";
+import { upsertCandidateLiveSignals } from "./candidate-live-signals";
 
 const BASE = process.env.INSFORGE_API_BASE_URL;
 const KEY = process.env.INSFORGE_API_KEY;
@@ -57,6 +58,7 @@ async function buildProjectWorkspace(row: { id: string; user_id: string; status:
   if (!project) return null;
   return {
     ...project,
+    candidate_graph: candidateGraph,
     role_agent_workspace: buildRoleAgentWorkspaceView({
       role: { id: project.id, status: project.status },
       settings: project.outreach_settings,
@@ -74,7 +76,18 @@ async function refreshLiveSignals(input: { userId?: string; project?: unknown; t
   const provider = createHttpLiveSignalProvider({
     url: process.env.LIVE_SIGNAL_PROVIDER_URL,
     apiKey: process.env.LIVE_SIGNAL_PROVIDER_API_KEY,
-  }) || createInternalLiveSignalProvider();
+  });
+  if (!provider) {
+    const targets = Array.isArray(input.targets) ? input.targets : [];
+    return {
+      refreshed: [],
+      failed: targets.map((target) => ({
+        ...(target && typeof target === "object" && !Array.isArray(target) ? target : {}),
+        error: "provider_not_configured",
+      })),
+      error: "provider_not_configured",
+    };
+  }
   return provider.refresh(input);
 }
 
@@ -89,8 +102,10 @@ export async function refreshDueLiveSignals(limit = 10) {
       project,
       actionType: "refresh_live_signals",
       workspace: project.role_agent_workspace,
+      candidateGraph: project.candidate_graph,
       deps: {
         refreshLiveSignals,
+        upsertCandidateLiveSignals,
         recordProjectRoleAgentEvent,
       },
     }) as { status?: string; result?: { refreshed?: number; failed?: number }; error?: string };

@@ -29,7 +29,20 @@ test("builds live signal refresh metric event from provider results", () => {
       { candidate_id: "c1", candidate_name: "Ada Candidate" },
       { candidate_id: "c2", candidate_name: "Grace Candidate" },
     ],
-    refreshed: [{ candidate_id: "c1", signal_count: 2 }],
+    persistedSignals: [{
+      id: "signal-1",
+      user_id: "user-1",
+      project_id: "project-1",
+      candidate_merge_key: "github:ada",
+      provider: "github",
+      type: "candidate_activity",
+      source_url: "https://github.com/ada/inference",
+      summary: "Published a new inference optimization project.",
+      confidence: "high",
+      observed_at: "2026-07-04T10:00:00.000Z",
+      expires_at: "2026-07-11T10:00:00.000Z",
+      content_hash: "hash-1",
+    }],
     failed: [{ candidate_id: "c2", error: "provider_timeout" }],
     at: "2026-07-04T10:00:00.000Z",
   });
@@ -38,6 +51,9 @@ test("builds live signal refresh metric event from provider results", () => {
   assert.equal(event.action_type, "refresh_live_signals");
   assert.equal(event.action_status, "succeeded");
   assert.equal(event.result.refreshed, 1);
+  assert.equal(event.result.persisted_signal_count, 1);
+  assert.deepEqual(event.result.signal_ids, ["signal-1"]);
+  assert.deepEqual(event.result.signal_hashes, ["hash-1"]);
   assert.equal(event.result.failed, 1);
   assert.equal(event.failed_items[0].error, "provider_timeout");
   assert.equal(event.retryable, true);
