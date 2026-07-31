@@ -1,5 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 
 const { createOpsCreditsHandler, createOpsFailedReservationsHandler, createOpsLedgerHandler, projectOpsAccount, terminalMonitorFailureReason } = await import("./web/lib/ops-credits-handlers.mjs");
 const { authorizeOpsUser } = await import("./web/lib/ops-auth.ts");
@@ -349,4 +350,14 @@ test("failed reservation handler fails closed if its reservation/task join canno
   const response = await handler(new Request("http://ops.example/api/ops/credits/failed-reservations"));
   assert.equal(response.status, 500);
   assert.deepEqual(await response.json(), { error: "failed_reservations_lookup_failed" });
+});
+
+test("recent terminal monitor runs are selected before released reservations, so newer done releases cannot crowd out an older failure", () => {
+  const route = readFileSync("web/app/api/ops/credits/failed-reservations/route.ts", "utf8");
+  const terminalRuns = route.indexOf('.from("search_task_runs")');
+  const terminalFilter = route.indexOf('.in("status", ["failed", "cancelled"])');
+  const terminalLimit = route.indexOf(".limit(50)");
+  const reservations = route.indexOf('.from("credit_reservations")');
+  assert.ok(terminalRuns >= 0 && terminalFilter > terminalRuns && terminalLimit > terminalFilter);
+  assert.ok(reservations > terminalLimit);
 });

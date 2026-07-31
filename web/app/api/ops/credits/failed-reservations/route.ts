@@ -45,16 +45,31 @@ function asTimestamp(value: unknown) {
 
 async function configuredListFailedReservations(): Promise<FailedReservation[]> {
   if (!client) throw new Error("Credits service-role lookup is not configured");
+  const { data: taskRows, error: taskError } = await client.database
+    .from("search_task_runs")
+    .select("credit_reservation_id,search_task_id,status")
+    .in("status", ["failed", "cancelled"])
+    .order("updated_at", { ascending: false })
+    .limit(50);
+  if (taskError || !Array.isArray(taskRows)) throw new Error("Failed monitor-run lookup failed");
+
+  const terminalRuns = taskRows.map((row) => {
+    const reservationId = asUuid(row?.credit_reservation_id);
+    const taskId = asUuid(row?.search_task_id);
+    const failureReason = terminalMonitorFailureReason(row?.status) as FailedReservation["failureReason"] | null;
+    if (!reservationId || !taskId || !failureReason) throw new Error("Malformed terminal monitor-run reservation link");
+    return { reservationId, taskId, failureReason };
+  });
+  if (terminalRuns.length === 0) return [];
+
   const { data: reservationRows, error: reservationError } = await client.database
     .from("credit_reservations")
     .select("id,user_id,run_id,reserved_amount,status,updated_at")
-    .eq("status", "released")
-    .order("updated_at", { ascending: false })
-    .limit(50);
-  if (reservationError) throw new Error("Failed reservation lookup failed");
+    .in("id", terminalRuns.map((run) => run.reservationId))
+    .eq("status", "released");
+  if (reservationError || !Array.isArray(reservationRows)) throw new Error("Failed reservation lookup failed");
 
-  const rows = Array.isArray(reservationRows) ? reservationRows : [];
-  const reservations = rows.map((row) => {
+  const reservations = reservationRows.map((row) => {
     const id = asUuid(row?.id);
     const userId = asUuid(row?.user_id);
     const runId = asUuid(row?.run_id);
@@ -65,44 +80,29 @@ async function configuredListFailedReservations(): Promise<FailedReservation[]> 
   });
   if (reservations.length === 0) return [];
 
-  const [labelResult, taskResult] = await Promise.all([
-    client.database
-      .from("ops_credit_identity_labels")
-      .select("user_id,email")
-      .in("user_id", reservations.map((reservation) => reservation.userId)),
-    client.database
-      .from("search_task_runs")
-      .select("credit_reservation_id,search_task_id,status")
-      .in("credit_reservation_id", reservations.map((reservation) => reservation.id)),
-  ]);
+  const { data: labelRows, error: labelError } = await client.database
+    .from("ops_credit_identity_labels")
+    .select("user_id,email")
+    .in("user_id", reservations.map((reservation) => reservation.userId));
+  if (labelError || !Array.isArray(labelRows)) throw new Error("Failed reservation identity lookup failed");
 
-  if (labelResult.error || taskResult.error || !Array.isArray(labelResult.data) || !Array.isArray(taskResult.data)) {
-    throw new Error("Failed reservation enrichment lookup failed");
-  }
   const emails = new Map<string, string>();
-  for (const row of labelResult.data) {
+  for (const row of labelRows) {
     const userId = asUuid(row?.user_id);
     const email = asEmail(row?.email);
     if (!userId || !email) throw new Error("Malformed operator-recorded identity label");
     emails.set(userId, email);
   }
-  const tasks = new Map<string, { taskId: string; failureReason: FailedReservation["failureReason"] }>();
-  for (const row of taskResult.data) {
-    const reservationId = asUuid(row?.credit_reservation_id);
-    const taskId = asUuid(row?.search_task_id);
-    const failureReason = terminalMonitorFailureReason(row?.status) as FailedReservation["failureReason"] | null;
-    if (!reservationId || !taskId) throw new Error("Malformed monitor-run reservation link");
-    if (failureReason) tasks.set(reservationId, { taskId, failureReason });
-  }
-  return reservations.flatMap((reservation) => {
-    const task = tasks.get(reservation.id);
-    if (!task) return [];
+  const reservationsById = new Map(reservations.map((reservation) => [reservation.id, reservation]));
+  return terminalRuns.flatMap((run) => {
+    const reservation = reservationsById.get(run.reservationId);
+    if (!reservation) return [];
     return [{
       ...reservation,
       email: emails.get(reservation.userId) ?? null,
-      taskId: task.taskId,
-      status: "released",
-      failureReason: task.failureReason,
+      taskId: run.taskId,
+      status: "released" as const,
+      failureReason: run.failureReason,
     }];
   });
 }
