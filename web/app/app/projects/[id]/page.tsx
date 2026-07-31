@@ -2917,6 +2917,7 @@ function monitorCopy(locale: "zh" | "en") {
     researchRun: "Open research round",
     pauseReason: "Pause reason",
     notifications: "Notify when a run completes",
+    actionFailed: "The monitor could not be updated. Please try again.",
   } : {
     title: "Talent Monitor",
     desc: "让这个项目拥有持续运行的 AI Sourcer。每轮都会生成新的研究记录，并标记新增或证据更新的候选人。",
@@ -2950,6 +2951,7 @@ function monitorCopy(locale: "zh" | "en") {
     researchRun: "打开研究轮次",
     pauseReason: "暂停原因",
     notifications: "运行完成后通知我",
+    actionFailed: "监控操作未完成，请重试。",
   };
 }
 
@@ -3228,24 +3230,33 @@ function TalentMonitorPanel({
   const [editBrief, setEditBrief] = useState("");
   const [editFrequency, setEditFrequency] = useState<"manual" | "daily" | "weekly">("weekly");
   const [editBatchSize, setEditBatchSize] = useState<5 | 10 | 20>(10);
-  const [editTime, setEditTime] = useState("09:00");
   const [editCreditLimit, setEditCreditLimit] = useState(20);
   const [editNotifications, setEditNotifications] = useState(false);
+  const [actionError, setActionError] = useState("");
+
+  async function ensureMonitorResponse(response: Response) {
+    if (response.ok) return;
+    const payload = await response.json().catch(() => null) as { error?: unknown } | null;
+    throw new Error(typeof payload?.error === "string" && payload.error ? payload.error : c.actionFailed);
+  }
 
   async function createTask() {
     if (!brief.trim() || creating) return;
     setCreating(true);
+    setActionError("");
     try {
       const r = await fetch("/api/search-tasks", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ project_id: projectId, name, brief, frequency, locale }),
       });
-      if (!r.ok) throw new Error();
+      await ensureMonitorResponse(r);
       setName("");
       setBrief(projectBrief);
       setOpen(false);
       onChanged();
+    } catch (error) {
+      setActionError(error instanceof Error && error.message ? error.message : c.actionFailed);
     } finally {
       setCreating(false);
     }
@@ -3253,13 +3264,17 @@ function TalentMonitorPanel({
 
   async function runTask(id: string) {
     setBusyId(id);
+    setActionError("");
     try {
-      await fetch(`/api/search-tasks/${id}/run`, {
+      const r = await fetch(`/api/search-tasks/${id}/run`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ locale }),
       });
+      await ensureMonitorResponse(r);
       onChanged();
+    } catch (error) {
+      setActionError(error instanceof Error && error.message ? error.message : c.actionFailed);
     } finally {
       setBusyId(null);
     }
@@ -3267,13 +3282,17 @@ function TalentMonitorPanel({
 
   async function toggleTask(task: SearchTaskView) {
     setBusyId(task.id);
+    setActionError("");
     try {
-      await fetch(`/api/search-tasks/${task.id}`, {
+      const r = await fetch(`/api/search-tasks/${task.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ status: task.status === "active" ? "paused" : "active", locale }),
       });
+      await ensureMonitorResponse(r);
       onChanged();
+    } catch (error) {
+      setActionError(error instanceof Error && error.message ? error.message : c.actionFailed);
     } finally {
       setBusyId(null);
     }
@@ -3285,14 +3304,15 @@ function TalentMonitorPanel({
     setEditBrief(task.brief);
     setEditFrequency(task.frequency);
     setEditBatchSize(task.candidate_batch_size);
-    setEditTime(task.schedule_time);
     setEditCreditLimit(task.credits.limit);
     setEditNotifications(task.notification_enabled);
+    setActionError("");
   }
 
   async function saveDetails() {
     if (!selected || !editName.trim() || !editBrief.trim()) return;
     setBusyId(selected.id);
+    setActionError("");
     try {
       const r = await fetch(`/api/search-tasks/${selected.id}`, {
         method: "PATCH",
@@ -3302,15 +3322,16 @@ function TalentMonitorPanel({
           brief: editBrief,
           frequency: editFrequency,
           candidate_batch_size: editBatchSize,
-          schedule_time: editTime,
           monthly_credit_limit: editCreditLimit,
           notification_enabled: editNotifications,
           locale,
         }),
       });
-      if (!r.ok) throw new Error();
+      await ensureMonitorResponse(r);
       setSelected(null);
       onChanged();
+    } catch (error) {
+      setActionError(error instanceof Error && error.message ? error.message : c.actionFailed);
     } finally {
       setBusyId(null);
     }
@@ -3360,6 +3381,8 @@ function TalentMonitorPanel({
           </PrimaryAction>
         </div>
       )}
+
+      {actionError && <p role="status" aria-live="polite" className="rounded-xl bg-red-50 px-3 py-2 text-sm text-red-700 ring-1 ring-red-100">{actionError}</p>}
 
       {tasks.length === 0 ? (
         <p className="rounded-2xl border border-dashed border-black/10 bg-white/60 p-4 text-sm text-[var(--sh-muted)]">{c.empty}</p>
@@ -3442,7 +3465,6 @@ function TalentMonitorPanel({
             <label className="grid gap-1 text-xs text-[var(--sh-muted)]">{c.frequency}<select value={editFrequency} onChange={(event) => setEditFrequency(event.target.value as "manual" | "daily" | "weekly")} className="min-h-10 rounded-xl border border-black/10 bg-white px-3 text-sm text-[var(--sh-ink)]"><option value="manual">{c.manual}</option><option value="daily">{c.daily}</option><option value="weekly">{c.weekly}</option></select></label>
             <label className="grid gap-1 text-xs text-[var(--sh-muted)] md:col-span-2">{c.brief}<textarea value={editBrief} onChange={(event) => setEditBrief(event.target.value)} rows={3} className="rounded-xl border border-black/10 bg-white px-3 py-2 text-sm text-[var(--sh-ink)]" /></label>
             <label className="grid gap-1 text-xs text-[var(--sh-muted)]">{c.batch}<select value={editBatchSize} onChange={(event) => setEditBatchSize(Number(event.target.value) as 5 | 10 | 20)} className="min-h-10 rounded-xl border border-black/10 bg-white px-3 text-sm text-[var(--sh-ink)]"><option value={5}>5</option><option value={10}>10</option><option value={20}>20</option></select></label>
-            <label className="grid gap-1 text-xs text-[var(--sh-muted)]">{c.schedule}<input type="time" value={editTime} onChange={(event) => setEditTime(event.target.value)} className="min-h-10 rounded-xl border border-black/10 bg-white px-3 text-sm text-[var(--sh-ink)]" /></label>
             <label className="grid gap-1 text-xs text-[var(--sh-muted)]">{c.creditLimit}<input type="number" min={0} step={1} value={editCreditLimit} onChange={(event) => setEditCreditLimit(Math.max(0, Number(event.target.value) || 0))} className="min-h-10 rounded-xl border border-black/10 bg-white px-3 text-sm text-[var(--sh-ink)]" /></label>
             <label className="flex items-center gap-2 text-sm text-[var(--sh-ink)]"><input type="checkbox" checked={editNotifications} onChange={(event) => setEditNotifications(event.target.checked)} />{c.notifications}</label>
           </div>
@@ -3459,7 +3481,7 @@ function TalentMonitorPanel({
                     <div className="flex flex-wrap items-center justify-between gap-2"><span className="font-semibold text-[var(--sh-ink)]">{run.status}</span><span>{run.returned_count}/{run.requested_count} · +{run.new_candidates} · {run.credits_consumed} Credits</span></div>
                     <p className="mt-1 text-[var(--sh-muted)]">{run.config_snapshot.candidate_batch_size} candidates · {run.config_snapshot.timezone} · {run.config_snapshot.schedule_time}</p>
                     {run.stop_reason && <p className="mt-1 text-amber-800">{run.stop_reason}</p>}
-                    {run.research_run_id && <Link href="/app/history" className="mt-1 inline-block text-[var(--sh-blue)] hover:underline">{c.researchRun}</Link>}
+                    {run.research_run_id && <Link href={`/app/projects/${projectId}#research-round-${run.research_run_id}`} className="mt-1 inline-block text-[var(--sh-blue)] hover:underline">{c.researchRun}</Link>}
                   </div>
                 ))}
               </div>
@@ -6161,7 +6183,7 @@ function ProjectResearchRoundsPanel({
               : "";
 	            const reportHref = round.clientDeliveryReportHref || `/r/${round.id}`;
             return (
-              <li key={round.id} className="rounded-3xl border border-black/10 bg-white/84 p-4">
+              <li id={`research-round-${round.id}`} key={round.id} className="rounded-3xl border border-black/10 bg-white/84 p-4">
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2">

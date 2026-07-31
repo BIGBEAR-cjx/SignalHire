@@ -50,6 +50,13 @@ test("monitor panel presents a detail drawer, credits, and run history without o
   assert.match(monitorPanel, /role="dialog"/);
   assert.match(monitorPanel, /task\.credits\.available/);
   assert.match(monitorPanel, /selected\.runs\.map/);
-  assert.match(monitorPanel, /\/app\/history/);
+  assert.match(monitorPanel, /\/app\/projects\/\$\{projectId\}#research-round-\$\{run\.research_run_id\}/);
   assert.doesNotMatch(monitorPanel, /outreach CTA/);
+});
+
+test("monitor panel avoids hour controls and announces mutation failures", () => {
+  assert.doesNotMatch(monitorPanel, /type="time"/);
+  assert.doesNotMatch(monitorPanel, /setEditTime/);
+  assert.match(monitorPanel, /aria-live="polite"/);
+  assert.match(monitorPanel, /setActionError\(/);
 });
