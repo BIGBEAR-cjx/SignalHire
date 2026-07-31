@@ -115,3 +115,14 @@ test("reports inconclusive instead of passing missing labels or incomplete run e
     await rm(output, { recursive: true, force: true });
   }
 });
+
+test("keeps evaluation internal and documents the approved review boundary", async () => {
+  const [productionSearchRoute, readme] = await Promise.all([
+    readFile(new URL("../app/api/search/route.ts", import.meta.url), "utf8"),
+    readFile(new URL("../../README.md", import.meta.url), "utf8"),
+  ]);
+
+  assert.doesNotMatch(productionSearchRoute, /(?:from\s+["'][^"']*(?:search-eval|run-search-eval)[^"']*["']|import\(\s*["'][^"']*(?:search-eval|run-search-eval))/);
+  assert.match(readme, /known-relevant recall/i);
+  assert.match(readme, /does not route or enqueue production search/i);
+});

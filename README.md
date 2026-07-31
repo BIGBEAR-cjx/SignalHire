@@ -261,6 +261,34 @@ npm --prefix web run verify:release -- --base-url http://127.0.0.1:3000 --browse
 和 Playwright。登录态客户门户 QA 需要设置 `SIGNALHIRE_QA_USER_ID` / `SIGNALHIRE_QA_EMAIL`，脚本会生成短期
 `sh_token`。
 
+## Internal Search Eval v1
+
+Search Eval 是仅供内部回归评估的离线工具。基准 fixture 位于
+`docs/evals/search-eval-v1-cases.json`；它当前是 `draft_pending_human_review`，不能作为通过依据。每个 case
+都必须由人工完成候选人身份、相关性、硬条件和证据判断，并把 fixture 与 run export 一起纳入评审后，才可作为
+approved baseline。
+
+对已经完成并导出的 research runs 运行评估（不会重跑 research）：
+
+```bash
+node web/scripts/run-search-eval.mjs \
+  --cases docs/evals/search-eval-v1-cases.json \
+  --runs /absolute/path/completed-runs.json \
+  --baseline /absolute/path/approved-baseline.json \
+  --out /tmp/signalhire-search-eval
+```
+
+命令会输出 `search-eval.json` 和 `search-eval.md`。相对于人工批准的 baseline，以下阈值会使比较失败：
+`precision_at_10`、`hard_constraint_recall` 或 `valid_evidence_rate` 下降超过 5 个百分点，或
+`p95_duration_ms` 上升超过 25%。缺少完成 run、route metadata、人工批准标签或有效的 baseline metrics 时，
+结果为 `inconclusive`（退出码 2），不能被视为通过。
+
+`known-relevant recall@10` 只衡量该 case 中已人工确认的已知候选人是否被找回；它不是人才市场覆盖率、候选人
+质量或招聘成效结论。每次报告都需要人工审阅 case、证据和指标解释后，才可决定是否接受策略变更。
+
+该脚本只读取导出的已完成 runs 并生成报告：it does not route or enqueue production search。生产
+`/api/search` 不导入 evaluator 或 runner，用户请求继续保持原有的缓存/队列/worker 路径。
+
 ## 项目结构
 
 ```text
