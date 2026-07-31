@@ -10,6 +10,28 @@ import {
   validateIdempotencyKey,
 } from "./web/lib/credits.mjs";
 
+const { createCreditsService } = await import("./web/lib/credits.ts");
+
+const UUIDS = {
+  user: "11111111-1111-4111-8111-111111111111",
+  actor: "22222222-2222-4222-8222-222222222222",
+  run: "33333333-3333-4333-8333-333333333333",
+  reservation: "44444444-4444-4444-8444-444444444444",
+  ledger: "55555555-5555-4555-8555-555555555555",
+};
+
+function rpcResult({ available = 0, reserved = 0, status = "reserved", duplicate = false } = {}) {
+  return {
+    account_user_id: UUIDS.user,
+    available_credits: available,
+    reserved_credits: reserved,
+    reservation_id: UUIDS.reservation,
+    ledger_entry_id: UUIDS.ledger,
+    status,
+    duplicate,
+  };
+}
+
 test("reserving Credits moves balance atomically without going negative", () => {
   assert.deepEqual(
     applyCreditTransition({ available: 10, reserved: 0 }, { type: "reserve", amount: 6 }),
@@ -129,4 +151,113 @@ test("settlement snapshot follow-up preserves per-entry balances and exact dupli
   assert.match(migration, /v_existing_entry_amount <> p_amount/i);
   assert.match(migration, /v_settle_available, v_settle_reserved, v_settle_key/i);
   assert.match(migration, /v_account\.available_credits, v_account\.reserved_credits, v_release_key/i);
+});
+
+test("server-only Credits service uses injected RPCs and preserves grant idempotency", async () => {
+  const calls = [];
+  const service = createCreditsService({
+    rpc: async (name, args) => {
+      calls.push({ name, args });
+      return calls.length === 1
+        ? rpcResult({ available: 10, status: "granted" })
+        : rpcResult({ available: 10, status: "granted", duplicate: true });
+    },
+    readBalance: async () => ({ available_credits: 10, reserved_credits: 0 }),
+  });
+
+  const input = {
+    userId: UUIDS.user,
+    amount: 10,
+    idempotencyKey: "ops-grant-1",
+    actorUserId: UUIDS.actor,
+    note: "launch allowance",
+  };
+  assert.deepEqual(await service.grant(input), {
+    userId: UUIDS.user,
+    available: 10,
+    reserved: 0,
+    reservationId: UUIDS.reservation,
+    ledgerEntryId: UUIDS.ledger,
+    status: "granted",
+    duplicate: false,
+  });
+  assert.equal((await service.grant(input)).duplicate, true);
+  assert.deepEqual(calls[0], {
+    name: "grant_credits",
+    args: {
+      p_user_id: UUIDS.user,
+      p_amount: 10,
+      p_idempotency_key: "ops-grant-1",
+      p_actor_user_id: UUIDS.actor,
+      p_note: "launch allowance",
+    },
+  });
+  assert.deepEqual(await service.readBalance({ userId: UUIDS.user }), {
+    userId: UUIDS.user,
+    available: 10,
+    reserved: 0,
+  });
+});
+
+test("server-only Credits service releases a run exactly through its deterministic key", async () => {
+  const calls = [];
+  const service = createCreditsService({
+    rpc: async (name, args) => {
+      calls.push({ name, args });
+      return rpcResult({ available: 10, reserved: 0, status: "released" });
+    },
+    readBalance: async () => null,
+  });
+
+  assert.deepEqual(await service.release({ runId: UUIDS.run }), {
+    userId: UUIDS.user,
+    available: 10,
+    reserved: 0,
+    reservationId: UUIDS.reservation,
+    ledgerEntryId: UUIDS.ledger,
+    status: "released",
+    duplicate: false,
+  });
+  assert.deepEqual(calls, [{
+    name: "release_credits",
+    args: {
+      p_run_id: UUIDS.run,
+      p_idempotency_key: `research-run:${UUIDS.run}:release`,
+    },
+  }]);
+});
+
+test("server-only Credits service rejects invalid UUIDs, amounts, and idempotency keys before RPC", async () => {
+  let calls = 0;
+  const service = createCreditsService({
+    rpc: async () => {
+      calls += 1;
+      return rpcResult();
+    },
+    readBalance: async () => null,
+  });
+
+  await assert.rejects(
+    service.grant({ userId: "not-a-uuid", amount: 1, idempotencyKey: "grant-1" }),
+    /user id must be a UUID/i,
+  );
+  await assert.rejects(
+    service.reserve({ userId: UUIDS.user, runId: UUIDS.run, amount: 0, idempotencyKey: "reserve-1" }),
+    /positive integer/i,
+  );
+  await assert.rejects(
+    service.settle({ runId: UUIDS.run, amount: 1, idempotencyKey: "" }),
+    /idempotency key/i,
+  );
+  assert.equal(calls, 0);
+});
+
+test("Credits service stays server-only and does not bypass its service-role RPC gate", () => {
+  const source = readFileSync("web/lib/credits.ts", "utf8");
+
+  assert.match(source, /typeof window !== "undefined"/);
+  assert.match(source, /INSFORGE_CREDITS_SERVICE_ROLE_KEY/);
+  assert.match(source, /isServerMode:\s*true/);
+  assert.doesNotMatch(source, /NEXT_PUBLIC_/);
+  assert.doesNotMatch(source, /\.from\(\s*["']credit_accounts["']\s*\)\s*\.update\(/);
 });
