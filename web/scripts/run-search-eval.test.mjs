@@ -80,6 +80,19 @@ test("fails the comparison when a quality or p95 regression exceeds the gate", (
   assert.deepEqual(comparison.failures.map((failure) => failure.metric), ["precision_at_10", "p95_duration_ms"]);
 });
 
+test("fails closed when baseline or current comparison metrics are invalid", () => {
+  const valid = { summary: { status: "scored", precision_at_10: 0.8, hard_constraint_recall: 0.8, valid_evidence_rate: 0.8, p95_duration_ms: 1000 } };
+
+  assert.deepEqual(
+    compareToBaseline(valid, { summary: { ...valid.summary, p95_duration_ms: -1 } }),
+    { status: "inconclusive", failed: false, failures: [], reason: "invalid_comparison_metrics" },
+  );
+  assert.deepEqual(
+    compareToBaseline({ summary: { ...valid.summary, valid_evidence_rate: 1.1 } }, valid),
+    { status: "inconclusive", failed: false, failures: [], reason: "invalid_comparison_metrics" },
+  );
+});
+
 test("reports inconclusive instead of passing missing labels or incomplete run exports", async () => {
   const report = buildEvalReport([{ caseDefinition: approvedCase, run: { ...completedRun, route_reason: "" } }], {
     fixture: { review_status: "approved_human_review" },

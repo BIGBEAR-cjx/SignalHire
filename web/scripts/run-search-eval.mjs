@@ -177,8 +177,16 @@ export function compareToBaseline(current, baseline) {
   }
 
   const required = [...Object.keys(QUALITY_GATES), "p95_duration_ms"];
-  if (required.some((metric) => comparisonValue(current, metric) === null || comparisonValue(baseline, metric) === null || comparisonValue(baseline, metric) === 0 && metric === "p95_duration_ms")) {
+  if (required.some((metric) => comparisonValue(current, metric) === null || comparisonValue(baseline, metric) === null)) {
     return { status: "inconclusive", failed: false, failures: [], reason: "missing_baseline_metrics" };
+  }
+
+  if (Object.keys(QUALITY_GATES).some((metric) => {
+    const currentValue = comparisonValue(current, metric);
+    const baselineValue = comparisonValue(baseline, metric);
+    return currentValue < 0 || currentValue > 1 || baselineValue < 0 || baselineValue > 1;
+  }) || comparisonValue(current, "p95_duration_ms") < 0 || comparisonValue(baseline, "p95_duration_ms") <= 0) {
+    return { status: "inconclusive", failed: false, failures: [], reason: "invalid_comparison_metrics" };
   }
 
   const failures = [];
