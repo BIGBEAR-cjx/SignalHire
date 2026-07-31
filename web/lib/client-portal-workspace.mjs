@@ -89,6 +89,20 @@ function latestDate(values) {
   return values.map(validIso).filter(Boolean).sort((a, b) => String(b).localeCompare(String(a)))[0] || "";
 }
 
+function workspacePagination(value, pageCount) {
+  const source = isRecord(value) ? value : {};
+  const offset = nonNegativeInteger(source.offset);
+  const total = Math.max(pageCount, nonNegativeInteger(source.total));
+  const hasMore = source.has_more === true && offset + pageCount < total;
+  const nextOffset = nonNegativeInteger(source.next_offset);
+  return {
+    offset,
+    total,
+    has_more: hasMore,
+    next_offset: hasMore && nextOffset > offset && nextOffset < total ? nextOffset : null,
+  };
+}
+
 function normalizeWeeklyArchive(row) {
   if (!isRecord(row)) return null;
   const archiveId = cleanString(row.archive_id);
@@ -253,6 +267,7 @@ export function buildClientPortalWorkspaceView({
   viewer = {},
   projects = [],
   projectDetails = {},
+  pagination = {},
   now = new Date().toISOString(),
   locale = "zh",
 } = {}) {
@@ -279,16 +294,18 @@ export function buildClientPortalWorkspaceView({
     };
   }).sort((a, b) => String(b.latest_activity).localeCompare(String(a.latest_activity)));
   const latestActivity = latestDate(cards.map((item) => item.latest_activity).concat(now ? [] : []));
+  const page = workspacePagination(pagination, cards.length);
   return {
     locale: locale === "en" ? "en" : "zh",
     viewer: { email: cleanString(viewer?.email) },
     summary: {
-      authorized_projects: cards.length,
+      authorized_projects: page.total,
       interview_ready: cards.reduce((sum, item) => sum + nonNegativeInteger(item.metrics.interview_ready), 0),
       this_week_replies: cards.reduce((sum, item) => sum + nonNegativeInteger(item.latest_weekly_archive?.metrics?.replied), 0),
       latest_activity: latestActivity,
     },
     latest_activity: latestActivity,
+    pagination: page,
     recent_weekly_archives: cards.map((item) => item.latest_weekly_archive).filter(Boolean).slice(0, 8),
     interview_ready_queue: cards.flatMap((item) => item.interview_ready_queue.map((candidate) => ({
       ...candidate,

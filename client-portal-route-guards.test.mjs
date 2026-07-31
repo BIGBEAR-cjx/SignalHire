@@ -3,6 +3,7 @@ import test from "node:test";
 
 import {
   loadClientPortalWorkspaceDetails,
+  normalizeClientPortalWorkspaceOffset,
   resolveClientPortalProjectDetail,
 } from "./web/lib/client-portal-route-guards.mjs";
 
@@ -58,6 +59,25 @@ test("paginates authorized projects without silently dropping the thirty-first p
   assert.equal(secondPage.pagination.has_more, false);
   assert.equal(secondPage.pagination.next_offset, null);
   assert.deepEqual(Object.keys(secondPage.projectDetails), ["project-31"]);
+});
+
+test("bounds malformed workspace offsets before selecting a page", async () => {
+  assert.equal(normalizeClientPortalWorkspaceOffset("not-a-number"), 0);
+  assert.equal(normalizeClientPortalWorkspaceOffset("-30"), 0);
+  assert.equal(normalizeClientPortalWorkspaceOffset("999999999"), 10_000);
+
+  const projects = Array.from({ length: 31 }, (_, index) => project(`project-${index + 1}`));
+  const result = await loadClientPortalWorkspaceDetails({
+    viewer,
+    offset: normalizeClientPortalWorkspaceOffset("30"),
+    dependencies: {
+      findAuthorizedProjects: async () => projects,
+      loadProjectDetail: async (currentProject) => ({ project: currentProject }),
+    },
+  });
+
+  assert.deepEqual(result.projects.map((item) => item.id), ["project-31"]);
+  assert.equal(result.pagination.has_more, false);
 });
 
 test("returns revoked without loading detail when access changes after the initial lookup", async () => {

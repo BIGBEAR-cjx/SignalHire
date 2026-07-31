@@ -11,6 +11,7 @@ import {
 } from "./web/lib/credits.mjs";
 
 const { createCreditsService } = await import("./web/lib/credits.ts");
+const creditsRuntime = await import("./web/lib/credits.mjs");
 
 const UUIDS = {
   user: "11111111-1111-4111-8111-111111111111",
@@ -92,6 +93,14 @@ test("validates positive whole Credits and opaque idempotency keys", () => {
   assert.throws(() => validateCreditAmount(1.5), /positive integer/i);
   assert.equal(validateIdempotencyKey(" ops-grant-1 "), "ops-grant-1");
   assert.throws(() => validateIdempotencyKey(""), /idempotency key/i);
+});
+
+test("runtime Credits module lazily delegates readBalance to the typed server service", async () => {
+  assert.equal(typeof creditsRuntime.readBalance, "function");
+  await assert.rejects(
+    creditsRuntime.readBalance({ userId: "not-a-uuid" }),
+    /User id must be a UUID/,
+  );
 });
 
 test("derives one stable reservation idempotency key per research run", () => {

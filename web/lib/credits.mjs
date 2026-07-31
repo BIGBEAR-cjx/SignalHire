@@ -90,6 +90,10 @@ export async function grant(input) {
   return (await creditsService()).grant(input);
 }
 
+export async function readBalance(input) {
+  return (await creditsService()).readBalance(input);
+}
+
 export async function recordOpsIdentityLabel(input) {
   return (await creditsService()).recordOpsIdentityLabel(input);
 }

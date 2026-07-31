@@ -5,6 +5,7 @@ import { readFileSync } from "node:fs";
 const projectPage = readFileSync("web/app/app/projects/[id]/page.tsx", "utf8");
 const projectRoute = readFileSync("web/app/api/projects/[id]/route.ts", "utf8");
 const clientWorkspacePage = readFileSync("web/app/client/page.tsx", "utf8");
+const clientWorkspaceRoute = readFileSync("web/app/api/client-portal/workspace/route.ts", "utf8");
 
 function talentMonitorPanelSource() {
   const start = projectPage.indexOf("function TalentMonitorPanel(");
@@ -17,6 +18,8 @@ test("monitor settings expose a valid timezone selector while retaining the fixe
   assert.match(source, /value=\{editTimezone\}/);
   assert.match(source, /timezone: editTimezone/);
   assert.match(projectPage, /Scheduled runs use 09:00|所选时区的 09:00/);
+  assert.doesNotMatch(source, /(?<![A-Za-z0-9_$])setEditTime(?![A-Za-z0-9_$])/);
+  assert.match(source, /setEditTimezone/);
   assert.doesNotMatch(source, /type=["']time["']/);
   assert.doesNotMatch(source, /schedule_time: edit/);
 });
@@ -34,4 +37,6 @@ test("client workspace has an explicit load-more continuation and an accurate au
   assert.match(clientWorkspacePage, /Show more projects|显示更多项目/);
   assert.match(clientWorkspacePage, /Showing \$\{view\.projects\.length\} of \$\{view\.pagination\.total\}/);
   assert.match(clientWorkspacePage, /offset=\$\{offset\}/);
+  assert.match(clientWorkspaceRoute, /normalizeClientPortalWorkspaceOffset\(url\.searchParams\.get\("offset"\)\)/);
+  assert.match(clientWorkspaceRoute, /pagination,/);
 });

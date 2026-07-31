@@ -1,4 +1,5 @@
 const CLIENT_PORTAL_PAGE_SIZE = 30;
+const CLIENT_PORTAL_MAX_OFFSET = 10_000;
 
 function cleanId(value) {
   return typeof value === "string" ? value.trim().slice(0, 160) : "";
@@ -15,9 +16,9 @@ function requireDependency(dependencies, name) {
   return dependencies[name];
 }
 
-function pageOffset(value) {
+export function normalizeClientPortalWorkspaceOffset(value) {
   const parsed = Number(value);
-  return Number.isInteger(parsed) && parsed > 0 ? parsed : 0;
+  return Number.isInteger(parsed) && parsed > 0 ? Math.min(parsed, CLIENT_PORTAL_MAX_OFFSET) : 0;
 }
 
 /** @param {{ viewer?: unknown, locale?: string, offset?: number, dependencies?: Record<string, unknown> }} input */
@@ -26,7 +27,7 @@ export async function loadClientPortalWorkspaceDetails({ viewer, locale = "zh", 
   const loadProjectDetail = requireDependency(dependencies, "loadProjectDetail");
   const foundProjects = await findAuthorizedProjects(viewer);
   const authorizedProjects = Array.isArray(foundProjects) ? foundProjects : [];
-  const safeOffset = pageOffset(offset);
+  const safeOffset = normalizeClientPortalWorkspaceOffset(offset);
   const projects = authorizedProjects.slice(safeOffset, safeOffset + CLIENT_PORTAL_PAGE_SIZE);
   const entries = await Promise.all(
     projects.map(async (project) => {

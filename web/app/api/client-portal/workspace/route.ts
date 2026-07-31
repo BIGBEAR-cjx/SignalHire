@@ -1,5 +1,5 @@
 import { buildClientPortalWorkspaceView } from "@/lib/client-portal-workspace.mjs";
-import { loadClientPortalWorkspaceDetails } from "@/lib/client-portal-route-guards.mjs";
+import { loadClientPortalWorkspaceDetails, normalizeClientPortalWorkspaceOffset } from "@/lib/client-portal-route-guards.mjs";
 import {
   findClientPortalAuthorizedProjects,
   loadClientPortalProjectDetail,
@@ -13,11 +13,13 @@ export async function GET(req: Request) {
   const user = await getUser();
   const url = new URL(req.url);
   const locale = normalizeLocale(url.searchParams.get("locale") || url.searchParams.get("lang"));
+  const offset = normalizeClientPortalWorkspaceOffset(url.searchParams.get("offset"));
   if (!user) return Response.json({ error: t(locale, "api.error.unauthorized") }, { status: 401 });
 
   const { projects, projectDetails, pagination } = await loadClientPortalWorkspaceDetails({
     viewer: user,
     locale,
+    offset,
     dependencies: {
       findAuthorizedProjects: findClientPortalAuthorizedProjects,
       loadProjectDetail: loadClientPortalProjectDetail,
@@ -27,6 +29,7 @@ export async function GET(req: Request) {
     viewer: user,
     projects,
     projectDetails,
+    pagination,
     locale,
   }));
 }
