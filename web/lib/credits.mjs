@@ -28,6 +28,14 @@ export function reservationKey({ runId } = {}) {
   return `research-run:${normalizedRunId}`;
 }
 
+export function operationIdempotencyKey({ runId, operation } = {}) {
+  const normalizedRunId = requiredString(runId, "Run id");
+  if (operation !== "settle" && operation !== "release") {
+    throw new Error("Credit operation must be settle or release");
+  }
+  return `research-run:${normalizedRunId}:${operation}`;
+}
+
 export function applyCreditTransition(balance = {}, transition = {}) {
   const available = balance.available;
   const reserved = balance.reserved;

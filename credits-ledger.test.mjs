@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import {
   applyCreditTransition,
+  operationIdempotencyKey,
   reservationKey,
   validateCreditAmount,
   validateIdempotencyKey,
@@ -44,6 +45,9 @@ test("validates positive whole Credits and opaque idempotency keys", () => {
 
 test("derives one stable reservation idempotency key per research run", () => {
   assert.equal(reservationKey({ runId: "run-1" }), "research-run:run-1");
+  assert.equal(operationIdempotencyKey({ runId: "run-1", operation: "settle" }), "research-run:run-1:settle");
+  assert.equal(operationIdempotencyKey({ runId: "run-1", operation: "release" }), "research-run:run-1:release");
+  assert.throws(() => operationIdempotencyKey({ runId: "run-1", operation: "grant" }), /operation/i);
   assert.throws(() => reservationKey({ runId: "" }), /run id/i);
 });
 
@@ -60,4 +64,28 @@ test("migration keeps balances non-negative and defines atomic ledger RPCs", () 
     assert.match(migration, new RegExp(`create or replace function public\\.${functionName}`, "i"));
   }
   assert.match(migration, /for update/i);
+});
+
+test("security follow-up limits Credits RPCs and tables to the server service-role model", () => {
+  const migration = readFileSync("migrations/20260731010000_credits_ops_security_v1.sql", "utf8");
+
+  assert.match(migration, /revoke all on function public\.grant_credits/i);
+  assert.match(migration, /revoke all on table public\.credit_accounts from public/i);
+  assert.match(migration, /enable row level security/i);
+  assert.match(migration, /grant execute on function public\.grant_credits[\s\S]*service_role/i);
+  assert.match(migration, /server-side[\s\S]*service_role client/i);
+  assert.match(migration, /deployment access\/concurrency checks/i);
+  assert.match(migration, /set search_path = pg_catalog/i);
+});
+
+test("security follow-up audits grants and scopes deterministic settlement keys to one run", () => {
+  const migration = readFileSync("migrations/20260731010000_credits_ops_security_v1.sql", "utf8");
+
+  assert.match(migration, /insert into public\.ops_audit_events/i);
+  assert.match(migration, /on conflict \(credit_ledger_entry_id\) do nothing/i);
+  assert.match(migration, /create unique index if not exists ops_audit_events_ledger_entry_unique/i);
+  assert.match(migration, /research-run:' \|\| p_run_id::text \|\| ':settle'/i);
+  assert.match(migration, /research-run:' \|\| p_run_id::text \|\| ':release'/i);
+  assert.match(migration, /idempotency key does not match the run settlement operation/i);
+  assert.match(migration, /idempotency key does not match the run release operation/i);
 });
