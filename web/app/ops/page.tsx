@@ -29,7 +29,7 @@ type FailedReservation = {
   status: "released";
   amount: number;
   updated_at: string;
-  failure_reason: "credits_released" | "monitor_run_failed" | "monitor_run_cancelled";
+  failure_reason: "monitor_run_failed" | "monitor_run_cancelled";
 };
 
 function apiError(payload: unknown, fallback: string) {

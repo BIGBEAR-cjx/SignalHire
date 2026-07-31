@@ -1,6 +1,6 @@
 import { createClient } from "@insforge/sdk";
 import { authorizeOpsUser } from "../../../../../lib/ops-auth";
-import { createOpsFailedReservationsHandler } from "../../../../../lib/ops-credits-handlers.mjs";
+import { createOpsFailedReservationsHandler, terminalMonitorFailureReason } from "../../../../../lib/ops-credits-handlers.mjs";
 import { getUser } from "../../../../../lib/session";
 
 export const runtime = "nodejs";
@@ -10,11 +10,11 @@ type FailedReservation = {
   userId: string;
   email: string | null;
   runId: string;
-  taskId: string | null;
+  taskId: string;
   status: "released";
   amount: number;
   updatedAt: string;
-  failureReason: "credits_released" | "monitor_run_failed" | "monitor_run_cancelled";
+  failureReason: "monitor_run_failed" | "monitor_run_cancelled";
 };
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -76,37 +76,34 @@ async function configuredListFailedReservations(): Promise<FailedReservation[]> 
       .in("credit_reservation_id", reservations.map((reservation) => reservation.id)),
   ]);
 
+  if (labelResult.error || taskResult.error || !Array.isArray(labelResult.data) || !Array.isArray(taskResult.data)) {
+    throw new Error("Failed reservation enrichment lookup failed");
+  }
   const emails = new Map<string, string>();
-  if (!labelResult.error && Array.isArray(labelResult.data)) {
-    for (const row of labelResult.data) {
-      const userId = asUuid(row?.user_id);
-      const email = asEmail(row?.email);
-      if (userId && email) emails.set(userId, email);
-    }
+  for (const row of labelResult.data) {
+    const userId = asUuid(row?.user_id);
+    const email = asEmail(row?.email);
+    if (!userId || !email) throw new Error("Malformed operator-recorded identity label");
+    emails.set(userId, email);
   }
-  const tasks = new Map<string, { taskId: string; status: string }>();
-  if (!taskResult.error && Array.isArray(taskResult.data)) {
-    for (const row of taskResult.data) {
-      const reservationId = asUuid(row?.credit_reservation_id);
-      const taskId = asUuid(row?.search_task_id);
-      const status = typeof row?.status === "string" ? row.status : "";
-      if (reservationId && taskId && ["pending", "queued", "running", "done", "failed", "cancelled", "blocked"].includes(status)) tasks.set(reservationId, { taskId, status });
-    }
+  const tasks = new Map<string, { taskId: string; failureReason: FailedReservation["failureReason"] }>();
+  for (const row of taskResult.data) {
+    const reservationId = asUuid(row?.credit_reservation_id);
+    const taskId = asUuid(row?.search_task_id);
+    const failureReason = terminalMonitorFailureReason(row?.status) as FailedReservation["failureReason"] | null;
+    if (!reservationId || !taskId) throw new Error("Malformed monitor-run reservation link");
+    if (failureReason) tasks.set(reservationId, { taskId, failureReason });
   }
-  return reservations.map((reservation) => {
+  return reservations.flatMap((reservation) => {
     const task = tasks.get(reservation.id);
-    const failureReason = task?.status === "failed"
-      ? "monitor_run_failed"
-      : task?.status === "cancelled"
-        ? "monitor_run_cancelled"
-        : "credits_released";
-    return {
+    if (!task) return [];
+    return [{
       ...reservation,
       email: emails.get(reservation.userId) ?? null,
-      taskId: task?.taskId ?? null,
+      taskId: task.taskId,
       status: "released",
-      failureReason,
-    };
+      failureReason: task.failureReason,
+    }];
   });
 }
 

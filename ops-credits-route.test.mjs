@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-const { createOpsCreditsHandler, createOpsFailedReservationsHandler, createOpsLedgerHandler, projectOpsAccount } = await import("./web/lib/ops-credits-handlers.mjs");
+const { createOpsCreditsHandler, createOpsFailedReservationsHandler, createOpsLedgerHandler, projectOpsAccount, terminalMonitorFailureReason } = await import("./web/lib/ops-credits-handlers.mjs");
 const { authorizeOpsUser } = await import("./web/lib/ops-auth.ts");
 
 const IDS = {
@@ -318,6 +318,35 @@ test("failed reservation lookup rejects non-ops users and fails closed on storag
     listFailedReservations: async () => { throw new Error("database unavailable"); },
   });
   const response = await broken(new Request("http://ops.example/api/ops/credits/failed-reservations"));
+  assert.equal(response.status, 500);
+  assert.deepEqual(await response.json(), { error: "failed_reservations_lookup_failed" });
+});
+
+test("only terminal failed or cancelled monitor runs qualify as failed reservations", () => {
+  assert.equal(terminalMonitorFailureReason("failed"), "monitor_run_failed");
+  assert.equal(terminalMonitorFailureReason("cancelled"), "monitor_run_cancelled");
+  assert.equal(terminalMonitorFailureReason("done"), null);
+  assert.equal(terminalMonitorFailureReason("running"), null);
+});
+
+test("failed reservation handler fails closed if its reservation/task join cannot produce a terminal monitor failure", async () => {
+  const handler = createOpsFailedReservationsHandler({
+    getUser: async () => ({ id: IDS.admin, email: "ops@example.com" }),
+    configuredEmail: "ops@example.com",
+    authorizeUser: authorizeOpsUser,
+    listFailedReservations: async () => [{
+      id: "44444444-4444-4444-8444-444444444444",
+      userId: IDS.user,
+      email: null,
+      runId: "55555555-5555-4555-8555-555555555555",
+      taskId: null,
+      status: "released",
+      amount: 5,
+      updatedAt: "2026-07-31T00:00:00.000Z",
+      failureReason: "credits_released",
+    }],
+  });
+  const response = await handler(new Request("http://ops.example/api/ops/credits/failed-reservations"));
   assert.equal(response.status, 500);
   assert.deepEqual(await response.json(), { error: "failed_reservations_lookup_failed" });
 });

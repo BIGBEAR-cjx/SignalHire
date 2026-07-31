@@ -50,7 +50,13 @@ function projectIdentityLabel(label) {
   return { email: label.email, source: "ops_recorded" };
 }
 
-const FAILURE_REASONS = new Set(["credits_released", "monitor_run_failed", "monitor_run_cancelled"]);
+const FAILURE_REASONS = new Set(["monitor_run_failed", "monitor_run_cancelled"]);
+
+export function terminalMonitorFailureReason(status) {
+  if (status === "failed") return "monitor_run_failed";
+  if (status === "cancelled") return "monitor_run_cancelled";
+  return null;
+}
 
 function requiredTimestamp(value) {
   if (typeof value !== "string" || !Number.isFinite(Date.parse(value))) return null;
@@ -63,12 +69,12 @@ function projectFailedReservation(value) {
   const reservationId = requiredUuid(reservation.id);
   const userId = requiredUuid(reservation.userId);
   const runId = requiredUuid(reservation.runId);
-  const taskId = reservation.taskId === null || reservation.taskId === undefined ? null : requiredUuid(reservation.taskId);
+  const taskId = requiredUuid(reservation.taskId);
   const email = reservation.email === null || reservation.email === undefined ? null : normalizedEmail(reservation.email);
   const amount = reservation.amount;
   const updatedAt = requiredTimestamp(reservation.updatedAt);
   const reason = typeof reservation.failureReason === "string" ? reservation.failureReason : "";
-  if (!reservationId || !userId || !runId || (reservation.taskId != null && !taskId) || (reservation.email != null && !email)
+  if (!reservationId || !userId || !runId || !taskId || (reservation.email != null && !email)
     || reservation.status !== "released" || !Number.isInteger(amount) || Number(amount) <= 0 || !updatedAt || !FAILURE_REASONS.has(reason)) return null;
   return {
     reservation_id: reservationId,
