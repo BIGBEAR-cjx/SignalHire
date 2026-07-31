@@ -20,6 +20,18 @@ type LedgerEntry = {
 
 type User = { id: string; email: string };
 
+type FailedReservation = {
+  reservation_id: string;
+  user_id: string;
+  email: string | null;
+  run_id: string;
+  task_id: string | null;
+  status: "released";
+  amount: number;
+  updated_at: string;
+  failure_reason: "credits_released" | "monitor_run_failed" | "monitor_run_cancelled";
+};
+
 function apiError(payload: unknown, fallback: string) {
   return payload && typeof payload === "object" && "error" in payload && typeof payload.error === "string" ? payload.error : fallback;
 }
@@ -36,6 +48,9 @@ export default function OpsPage() {
   const [idempotencyKey, setIdempotencyKey] = useState("");
   const [grantMessage, setGrantMessage] = useState("");
   const [grantError, setGrantError] = useState("");
+  const [failedReservations, setFailedReservations] = useState<FailedReservation[]>([]);
+  const [failedReservationsError, setFailedReservationsError] = useState("");
+  const [failedReservationsLoading, setFailedReservationsLoading] = useState(false);
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
@@ -54,6 +69,27 @@ export default function OpsPage() {
     });
     return () => { active = false; };
   }, []);
+
+  useEffect(() => {
+    if (!user) return;
+    let active = true;
+    setFailedReservationsLoading(true);
+    setFailedReservationsError("");
+    fetch("/api/ops/credits/failed-reservations", { cache: "no-store" }).then(async (response) => {
+      const payload = await response.json().catch(() => null);
+      if (!active) return;
+      if (!response.ok) {
+        setFailedReservationsError(apiError(payload, "Unable to load failed reservations."));
+        return;
+      }
+      setFailedReservations(Array.isArray(payload?.reservations) ? payload.reservations : []);
+    }).catch(() => {
+      if (active) setFailedReservationsError("Unable to load failed reservations.");
+    }).finally(() => {
+      if (active) setFailedReservationsLoading(false);
+    });
+    return () => { active = false; };
+  }, [user]);
 
   async function loadLedger(userId: string) {
     const response = await fetch(`/api/ops/credits/${encodeURIComponent(userId)}/ledger`, { cache: "no-store" });
@@ -148,7 +184,7 @@ export default function OpsPage() {
         </section>
         <div className="space-y-7">
           <section className="sh-surface p-5 md:p-6"><h2 className="text-lg font-semibold">Ledger</h2><div className="mt-4 overflow-x-auto"><table className="w-full min-w-[460px] text-left text-sm"><thead className="border-b border-black/10 text-xs uppercase tracking-wide text-[var(--sh-faint)]"><tr><th className="pb-3 pr-3">Type</th><th className="pb-3 pr-3">Amount</th><th className="pb-3 pr-3">Balance</th><th className="pb-3">Recorded</th></tr></thead><tbody>{ledger.map((entry) => <tr className="border-b border-black/5" key={entry.id}><td className="py-3 pr-3">{entry.entry_type}</td><td className="py-3 pr-3">{entry.amount}</td><td className="py-3 pr-3">{entry.available_credits} available<br />{entry.reserved_credits} reserved</td><td className="py-3 text-[var(--sh-muted)]">{new Date(entry.created_at).toLocaleString()}</td></tr>)}</tbody></table>{ledger.length === 0 ? <p className="mt-4 text-sm text-[var(--sh-muted)]">No ledger entries recorded.</p> : null}</div></section>
-          <section className="rounded-3xl border border-dashed border-black/15 bg-white/45 p-5"><h2 className="text-lg font-semibold">Failed reservations</h2><p className="mt-2 text-sm leading-6 text-[var(--sh-muted)]">Not available yet. The current ops API deliberately exposes only account balances and immutable ledger summaries; it does not infer failures from research data.</p></section>
+          <section className="sh-surface p-5 md:p-6"><h2 className="text-lg font-semibold">Recent failed reservations</h2><p className="mt-1 text-sm text-[var(--sh-muted)]">Released Credits reservations only. Failure codes are bounded; no research logs or payloads are shown.</p>{failedReservationsError ? <p className="mt-3 text-sm text-red-700" role="alert">{failedReservationsError}</p> : null}{failedReservationsLoading ? <p className="mt-3 text-sm text-[var(--sh-muted)]">Loading failed reservations…</p> : null}{!failedReservationsLoading && !failedReservationsError && failedReservations.length === 0 ? <p className="mt-3 text-sm text-[var(--sh-muted)]">No released reservations recorded.</p> : null}{failedReservations.length > 0 ? <div className="mt-4 overflow-x-auto"><table className="w-full min-w-[560px] text-left text-sm"><thead className="border-b border-black/10 text-xs uppercase tracking-wide text-[var(--sh-faint)]"><tr><th className="pb-3 pr-3">User</th><th className="pb-3 pr-3">Run / task</th><th className="pb-3 pr-3">Credits</th><th className="pb-3 pr-3">Reason</th><th className="pb-3">Released</th></tr></thead><tbody>{failedReservations.map((reservation) => <tr className="border-b border-black/5" key={reservation.reservation_id}><td className="py-3 pr-3"><span className="block break-all">{reservation.email ?? reservation.user_id}</span></td><td className="py-3 pr-3 font-mono text-xs"><span className="block">{reservation.run_id}</span>{reservation.task_id ? <span className="mt-1 block text-[var(--sh-muted)]">task {reservation.task_id}</span> : null}</td><td className="py-3 pr-3">{reservation.amount}</td><td className="py-3 pr-3">{reservation.failure_reason.replaceAll("_", " ")}</td><td className="py-3 text-[var(--sh-muted)]">{new Date(reservation.updated_at).toLocaleString()}</td></tr>)}</tbody></table></div> : null}</section>
         </div>
       </div> : null}
     </main>

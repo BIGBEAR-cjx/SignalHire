@@ -50,6 +50,39 @@ function projectIdentityLabel(label) {
   return { email: label.email, source: "ops_recorded" };
 }
 
+const FAILURE_REASONS = new Set(["credits_released", "monitor_run_failed", "monitor_run_cancelled"]);
+
+function requiredTimestamp(value) {
+  if (typeof value !== "string" || !Number.isFinite(Date.parse(value))) return null;
+  return value;
+}
+
+function projectFailedReservation(value) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const reservation = value;
+  const reservationId = requiredUuid(reservation.id);
+  const userId = requiredUuid(reservation.userId);
+  const runId = requiredUuid(reservation.runId);
+  const taskId = reservation.taskId === null || reservation.taskId === undefined ? null : requiredUuid(reservation.taskId);
+  const email = reservation.email === null || reservation.email === undefined ? null : normalizedEmail(reservation.email);
+  const amount = reservation.amount;
+  const updatedAt = requiredTimestamp(reservation.updatedAt);
+  const reason = typeof reservation.failureReason === "string" ? reservation.failureReason : "";
+  if (!reservationId || !userId || !runId || (reservation.taskId != null && !taskId) || (reservation.email != null && !email)
+    || reservation.status !== "released" || !Number.isInteger(amount) || Number(amount) <= 0 || !updatedAt || !FAILURE_REASONS.has(reason)) return null;
+  return {
+    reservation_id: reservationId,
+    user_id: userId,
+    email,
+    run_id: runId,
+    task_id: taskId,
+    status: "released",
+    amount: Number(amount),
+    updated_at: updatedAt,
+    failure_reason: reason,
+  };
+}
+
 function parseGrant(body) {
   if (!body || typeof body !== "object" || Array.isArray(body)) return null;
   const value = body;
@@ -144,6 +177,21 @@ export function createOpsLedgerHandler(dependencies) {
       })) });
     } catch {
       return failure(500, "credits_ledger_lookup_failed");
+    }
+  };
+}
+
+export function createOpsFailedReservationsHandler(dependencies) {
+  return async function GET() {
+    const authorization = authorize(await dependencies.getUser(), dependencies.configuredEmail, dependencies.authorizeUser);
+    if (authorization.status !== 200) return failure(authorization.status, authorization.status === 401 ? "login_required" : "forbidden");
+    try {
+      const reservations = await dependencies.listFailedReservations();
+      const projected = Array.isArray(reservations) ? reservations.map(projectFailedReservation) : [];
+      if (projected.some((reservation) => reservation === null)) return failure(500, "failed_reservations_lookup_failed");
+      return Response.json({ reservations: projected });
+    } catch {
+      return failure(500, "failed_reservations_lookup_failed");
     }
   };
 }

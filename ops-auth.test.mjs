@@ -45,7 +45,7 @@ test("ops console keeps the isolated login and deployment contract visible", asy
   ]);
   assert.match(login, /normalizeOpsNext/);
   assert.match(consolePage, /\/api\/ops\/whoami/);
-  assert.match(consolePage, /Failed reservations/);
+  assert.match(consolePage, /\/api\/ops\/credits\/failed-reservations/);
   assert.match(env, /^OPS_ADMIN_EMAIL=/m);
   assert.match(env, /^OPS_APP_ORIGIN=/m);
 });

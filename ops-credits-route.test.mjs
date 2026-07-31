@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-const { createOpsCreditsHandler, createOpsLedgerHandler, projectOpsAccount } = await import("./web/lib/ops-credits-handlers.mjs");
+const { createOpsCreditsHandler, createOpsFailedReservationsHandler, createOpsLedgerHandler, projectOpsAccount } = await import("./web/lib/ops-credits-handlers.mjs");
 const { authorizeOpsUser } = await import("./web/lib/ops-auth.ts");
 
 const IDS = {
@@ -267,4 +267,57 @@ test("ledger lookup rejects non-ops users and only returns ledger summaries", as
       created_at: "2026-07-31T00:00:00.000Z",
     }],
   });
+});
+
+test("failed reservation lookup is ops-only and projects the minimum safe failure fields", async () => {
+  const handler = createOpsFailedReservationsHandler({
+    getUser: async () => ({ id: IDS.admin, email: "ops@example.com" }),
+    configuredEmail: "ops@example.com",
+    authorizeUser: authorizeOpsUser,
+    listFailedReservations: async () => [{
+      id: "44444444-4444-4444-8444-444444444444",
+      userId: IDS.user,
+      email: "target@example.com",
+      runId: "55555555-5555-4555-8555-555555555555",
+      taskId: "66666666-6666-4666-8666-666666666666",
+      status: "released",
+      amount: 5,
+      updatedAt: "2026-07-31T00:00:00.000Z",
+      failureReason: "monitor_run_failed",
+      rawError: "must not leak",
+    }],
+  });
+  const response = await handler(new Request("http://ops.example/api/ops/credits/failed-reservations"));
+  assert.equal(response.status, 200);
+  assert.deepEqual(await response.json(), { reservations: [{
+    reservation_id: "44444444-4444-4444-8444-444444444444",
+    user_id: IDS.user,
+    email: "target@example.com",
+    run_id: "55555555-5555-4555-8555-555555555555",
+    task_id: "66666666-6666-4666-8666-666666666666",
+    status: "released",
+    amount: 5,
+    updated_at: "2026-07-31T00:00:00.000Z",
+    failure_reason: "monitor_run_failed",
+  }] });
+});
+
+test("failed reservation lookup rejects non-ops users and fails closed on storage errors", async () => {
+  const denied = createOpsFailedReservationsHandler({
+    getUser: async () => null,
+    configuredEmail: "ops@example.com",
+    authorizeUser: authorizeOpsUser,
+    listFailedReservations: async () => [],
+  });
+  assert.equal((await denied(new Request("http://ops.example/api/ops/credits/failed-reservations"))).status, 401);
+
+  const broken = createOpsFailedReservationsHandler({
+    getUser: async () => ({ id: IDS.admin, email: "ops@example.com" }),
+    configuredEmail: "ops@example.com",
+    authorizeUser: authorizeOpsUser,
+    listFailedReservations: async () => { throw new Error("database unavailable"); },
+  });
+  const response = await broken(new Request("http://ops.example/api/ops/credits/failed-reservations"));
+  assert.equal(response.status, 500);
+  assert.deepEqual(await response.json(), { error: "failed_reservations_lookup_failed" });
 });
