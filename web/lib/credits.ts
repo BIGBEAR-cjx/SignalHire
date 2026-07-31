@@ -99,8 +99,10 @@ function nonNegativeInteger(value: unknown, label: string) {
   return Number(value);
 }
 
-function textOrNull(value: unknown) {
-  return typeof value === "string" && value.trim() ? value.trim() : null;
+function uuidOrNull(value: unknown, label: string) {
+  const normalized = typeof value === "string" ? value.trim() : "";
+  if (!normalized) return null;
+  return requiredUuid(normalized, label);
 }
 
 function operationKey(runId: string, operation: "settle" | "release", provided: unknown) {
@@ -132,8 +134,8 @@ function toSummary(value: unknown, expectedUserId?: string): CreditOperationSumm
     userId,
     available: nonNegativeInteger(row.available_credits, "available balance"),
     reserved: nonNegativeInteger(row.reserved_credits, "reserved balance"),
-    reservationId: textOrNull(row.reservation_id),
-    ledgerEntryId: textOrNull(row.ledger_entry_id),
+    reservationId: uuidOrNull(row.reservation_id, "Credits RPC reservation id"),
+    ledgerEntryId: uuidOrNull(row.ledger_entry_id, "Credits RPC ledger entry id"),
     status: row.status.trim(),
     duplicate: row.duplicate,
   };

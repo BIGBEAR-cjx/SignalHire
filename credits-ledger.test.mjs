@@ -252,6 +252,36 @@ test("server-only Credits service rejects invalid UUIDs, amounts, and idempotenc
   assert.equal(calls, 0);
 });
 
+test("Credits service rejects malformed RPC identifiers while sanitizing blank optional identifiers", async () => {
+  const service = createCreditsService({
+    rpc: async () => ({
+      ...rpcResult({ available: 10, status: "granted" }),
+      reservation_id: "not-a-reservation-uuid",
+    }),
+    readBalance: async () => null,
+  });
+  await assert.rejects(
+    service.grant({ userId: UUIDS.user, amount: 10, idempotencyKey: "grant-malformed-id" }),
+    /reservation id must be a UUID/i,
+  );
+
+  const blankIdService = createCreditsService({
+    rpc: async () => ({
+      ...rpcResult({ available: 10, status: "granted" }),
+      reservation_id: "   ",
+      ledger_entry_id: "\t",
+    }),
+    readBalance: async () => null,
+  });
+  const summary = await blankIdService.grant({
+    userId: UUIDS.user,
+    amount: 10,
+    idempotencyKey: "grant-blank-id",
+  });
+  assert.equal(summary.reservationId, null);
+  assert.equal(summary.ledgerEntryId, null);
+});
+
 test("Credits service stays server-only and does not bypass its service-role RPC gate", () => {
   const source = readFileSync("web/lib/credits.ts", "utf8");
 
