@@ -21,16 +21,17 @@ test("cron and Role Agent reach the same monitor-start path", () => {
   assert.match(taskLibrary, /const started = await startMonitorRun\(input\)/);
 });
 
-test("monitor service helpers scope every task-run lookup and mutation to its owner", () => {
-  assert.match(taskLibrary, /\.eq\("search_task_id", task\.id\)[\s\S]*\.eq\("user_id", task\.user_id\)/);
+test("monitor start passes the authenticated task owner into service-only RPCs", () => {
   assert.match(taskLibrary, /p_user_id: monitor\.user_id/);
-  assert.match(taskLibrary, /\.eq\("id", task\.id\)\.eq\("user_id", task\.user_id\)/);
+  assert.match(taskLibrary, /p_search_task_id: monitor\.id/);
   assert.doesNotMatch(taskLibrary, /from\("credit_accounts"\)\.update/);
 });
 
-test("monitor state persistence fails closed instead of accepting an absent client or SDK error", () => {
-  assert.match(taskLibrary, /if \(!client\) throw new Error\("Talent Monitor storage is not configured"\)/);
-  assert.match(taskLibrary, /if \(error\) throw new Error\("Talent Monitor pause was not persisted"\)/);
-  assert.match(taskLibrary, /if \(error\) throw new Error\("Talent Monitor queue state was not persisted"\)/);
+test("monitor routes use the database-owned atomic start and reconciliation contracts", () => {
+  assert.match(taskLibrary, /monitorRpc\("start_monitor_run"/);
+  assert.match(taskLibrary, /monitorRpc\("activate_monitor_run"/);
+  assert.match(taskLibrary, /monitorRpc\("reconcile_stalled_monitor_runs"/);
+  assert.doesNotMatch(taskLibrary, /credits\.reserve/);
+  assert.doesNotMatch(taskLibrary, /enqueueMonitorResearchRun/);
   assert.match(roleAgentCore, /if \(!queued \|\| \(!queued\.jobId && !queued\.duplicate\)\) throw new Error\("search_task_run_failed"\)/);
 });

@@ -1,9 +1,7 @@
 import { createClient } from "@insforge/sdk";
-import { enqueue, findCachedCandidateProfilesForSearch } from "./db";
-import { credits } from "./credits";
+import { findCachedCandidateProfilesForSearch } from "./db";
 import {
   buildNextRunAt,
-  buildSearchTaskRunLabel,
   nextRunAfterPatch,
   normalizeSearchTaskInput,
 } from "./search-tasks.mjs";
@@ -319,8 +317,12 @@ function firstRow(value: unknown): Record<string, unknown> | null {
 }
 
 function monitorRunFromRow(row: Record<string, unknown> | null): MonitorRun | null {
-  if (!row || typeof row.run_id !== "string" || !row.run_id) return null;
-  return { id: row.run_id, status: typeof row.run_status === "string" ? row.run_status : "queued" };
+  if (!row || typeof row.monitor_run_id !== "string" || !row.monitor_run_id) return null;
+  return {
+    id: row.monitor_run_id,
+    status: typeof row.run_status === "string" ? row.run_status : "pending",
+    researchRunId: typeof row.research_run_id === "string" ? row.research_run_id : null,
+  };
 }
 
 async function monitorRpc(name: string, args: Record<string, unknown>): Promise<unknown> {
@@ -330,119 +332,65 @@ async function monitorRpc(name: string, args: Record<string, unknown>): Promise<
   return data;
 }
 
-async function findActiveMonitorRun(task: SearchTask): Promise<MonitorRun | null> {
-  if (!monitorClient) return null;
-  const { data, error } = await monitorClient.database
-    .from("search_task_runs")
-    .select("id,status,user_id,research_run_id")
-    .eq("search_task_id", task.id)
-    .eq("user_id", task.user_id)
-    .in("status", ["queued", "running"])
-    .order("created_at", { ascending: true })
-    .limit(1);
-  if (error || !data || data.length === 0) return null;
-  const row = data[0] as Record<string, unknown>;
-  if (row.user_id !== task.user_id || typeof row.id !== "string") return null;
-  return {
-    id: row.id,
-    status: typeof row.status === "string" ? row.status : "queued",
-    researchRunId: typeof row.research_run_id === "string" ? row.research_run_id : null,
-  };
-}
-
-async function setMonitorPause(task: SearchTask, reason: string) {
-  if (!client) throw new Error("Talent Monitor storage is not configured");
-  const { error } = await client.database.from(TABLE).update({
-    status: "paused",
-    pause_reason: reason,
-    updated_at: new Date().toISOString(),
-  }).eq("id", task.id).eq("user_id", task.user_id);
-  if (error) throw new Error("Talent Monitor pause was not persisted");
-}
-
-async function markMonitorQueued(task: SearchTask) {
-  if (!client) throw new Error("Talent Monitor storage is not configured");
-  const now = new Date();
-  const nextRunAt = task.frequency === "manual" ? null : buildNextRunAt({
-    frequency: task.frequency,
-    timezone: task.timezone,
-    scheduleTime: task.schedule_time,
-    now,
-  });
-  const { error } = await client.database.from(TABLE).update({
-    last_run_at: now.toISOString(),
-    last_run_status: "queued",
-    pause_reason: null,
-    next_run_at: nextRunAt,
-    updated_at: now.toISOString(),
-  }).eq("id", task.id).eq("user_id", task.user_id);
-  if (error) throw new Error("Talent Monitor queue state was not persisted");
-}
-
-async function enqueueMonitorResearchRun(task: SearchTask, run: MonitorRun): Promise<string | null> {
-  const cachedCandidateHints = await findCachedCandidateProfilesForSearch({ userId: task.user_id, query: task.brief, limit: 8 });
-  return enqueue({
-    kind: "search",
-    flatKey: `monitor-run:${run.id}:${task.brief}`,
-    queryText: task.brief,
-    label: buildSearchTaskRunLabel({ taskName: task.name }),
-    userId: task.user_id,
-    projectId: task.project_id,
-    searchTaskId: task.id,
-    platformLanguage: "Chinese (Simplified)",
-    cachedCandidateHints,
-  });
-}
-
 export async function startMonitorRun(input: { userId: string; id: string }): Promise<MonitorStartResult> {
   const task = await getSearchTask(input.userId, input.id);
   if (!task) return { status: "blocked", reason: "monitor_not_found", enqueued: false };
   return (await startMonitorRunCore(task, {
     projectIsActive: async (monitor: SearchTask) => ensureSearchTaskProjectAccess(monitor.user_id, monitor.project_id),
-    findActiveRun: findActiveMonitorRun,
     createRunId: () => crypto.randomUUID(),
-    reserveCredits: credits.reserve,
-    releaseCredits: credits.release,
-    createRun: async ({ task: monitor, runId, creditReservationId, creditsReserved, configSnapshot }: {
+    createResearchRunId: () => crypto.randomUUID(),
+    buildResearchPayload: async (monitor: SearchTask) => ({
+      candidateHints: await findCachedCandidateProfilesForSearch({ userId: monitor.user_id, query: monitor.brief, limit: 8 }),
+    }),
+    startAtomic: async ({ task: monitor, monitorRunId, researchRunId, payload }: {
       task: SearchTask;
-      runId: string;
-      creditReservationId: string;
-      creditsReserved: number;
-      configSnapshot: Record<string, unknown>;
+      monitorRunId: string;
+      researchRunId: string;
+      payload: { candidateHints: unknown[] };
     }) => {
-      const row = firstRow(await monitorRpc("create_monitor_run", {
+      const row = firstRow(await monitorRpc("start_monitor_run", {
         p_user_id: monitor.user_id,
         p_search_task_id: monitor.id,
-        p_run_id: runId,
-        p_credit_reservation_id: creditReservationId,
-        p_credits_reserved: creditsReserved,
-        p_config_snapshot: configSnapshot,
+        p_monitor_run_id: monitorRunId,
+        p_research_run_id: researchRunId,
+        p_candidate_hints: payload.candidateHints,
+        p_platform_language: "Chinese (Simplified)",
       }));
-      if (row?.is_duplicate === true) return { duplicate: true, run: await findActiveMonitorRun(monitor) ?? monitorRunFromRow(row) };
-      if (typeof row?.pause_reason === "string" && row.pause_reason) return { paused: true, reason: row.pause_reason };
-      return { run: monitorRunFromRow(row) };
+      const run = monitorRunFromRow(row);
+      return {
+        state: typeof row?.run_status === "string" ? row.run_status : "blocked",
+        duplicate: row?.is_duplicate === true,
+        reason: typeof row?.pause_reason === "string" ? row.pause_reason : undefined,
+        run,
+        researchRunId: run?.researchRunId ?? null,
+      };
     },
-    enqueue: ({ task: monitor, run }: { task: SearchTask; run: MonitorRun }) => enqueueMonitorResearchRun(monitor, run),
-    linkResearchRun: async ({ runId, researchRunId }: { runId: string; researchRunId: string }) => {
-      const result = await monitorRpc("link_monitor_research_run", {
-        p_run_id: runId,
+    activateAtomic: async ({ task: monitor, monitorRunId, researchRunId, nextRunAt }: {
+      task: SearchTask;
+      monitorRunId: string;
+      researchRunId: string;
+      nextRunAt: string | null;
+    }) => {
+      const result = await monitorRpc("activate_monitor_run", {
+        p_user_id: monitor.user_id,
+        p_monitor_run_id: monitorRunId,
         p_research_run_id: researchRunId,
+        p_next_run_at: nextRunAt,
       });
       const row = firstRow(result);
-      return result === true || row?.link_monitor_research_run === true;
+      const state = typeof result === "string" ? result : row?.activate_monitor_run;
+      return { state: typeof state === "string" ? state : "blocked" };
     },
-    abortRun: async ({ runId, researchRunId, idempotencyKey }: { runId: string; researchRunId: string | null; idempotencyKey: string }) => {
-      const result = await monitorRpc("abort_monitor_run", {
-        p_run_id: runId,
-        p_release_idempotency_key: idempotencyKey,
-        p_research_run_id: researchRunId,
-      });
-      const row = firstRow(result);
-      return result === true || row?.abort_monitor_run === true;
-    },
-    pauseTask: setMonitorPause,
-    markQueued: markMonitorQueued,
   })) as MonitorStartResult;
+}
+
+async function reconcileStalledMonitorRuns() {
+  const result = await monitorRpc("reconcile_stalled_monitor_runs", {
+    p_before: new Date(Date.now() - 15 * 60_000).toISOString(),
+  });
+  const row = firstRow(result);
+  const count = typeof result === "number" ? result : row?.reconcile_stalled_monitor_runs;
+  return Number.isInteger(count) && Number(count) >= 0 ? Number(count) : 0;
 }
 
 export async function runSearchTaskNow(input: { userId: string; id: string }): Promise<{ jobId: string | null; task: SearchTask; duplicate?: boolean } | null> {
@@ -454,7 +402,8 @@ export async function runSearchTaskNow(input: { userId: string; id: string }): P
   return { jobId: started.jobId ?? started.run?.researchRunId ?? null, task, duplicate: started.duplicate };
 }
 
-export async function enqueueDueSearchTasks(limit = 10): Promise<{ queued: number; job_ids: string[] }> {
+export async function enqueueDueSearchTasks(limit = 10): Promise<{ queued: number; job_ids: string[]; reconciled: number }> {
+  const reconciled = await reconcileStalledMonitorRuns();
   const due = await runSQL<{ id: string; user_id: string }>(
     `SELECT t.id, t.user_id
      FROM search_tasks t
@@ -475,5 +424,5 @@ export async function enqueueDueSearchTasks(limit = 10): Promise<{ queued: numbe
     const queued = await startMonitorRun({ userId: row.user_id, id: row.id });
     if (queued.jobId) jobIds.push(queued.jobId);
   }
-  return { queued: jobIds.length, job_ids: jobIds };
+  return { queued: jobIds.length, job_ids: jobIds, reconciled };
 }

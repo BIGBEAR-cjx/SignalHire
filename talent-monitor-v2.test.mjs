@@ -131,113 +131,108 @@ function monitorTask(overrides = {}) {
 }
 
 function monitorDeps(overrides = {}) {
-  const calls = { reserve: [], release: [], create: [], enqueue: [], pause: [], abort: [] };
+  const calls = { payload: [], start: [], activate: [] };
   return {
     calls,
     projectIsActive: async () => true,
-    findActiveRun: async () => null,
     createRunId: () => "44444444-4444-4444-8444-444444444444",
-    reserveCredits: async (input) => {
-      calls.reserve.push(input);
-      return { reservationId: "55555555-5555-4555-8555-555555555555" };
+    createResearchRunId: () => "55555555-5555-4555-8555-555555555555",
+    buildResearchPayload: async (task) => {
+      calls.payload.push(task);
+      return { candidateHints: [] };
     },
-    releaseCredits: async (input) => { calls.release.push(input); },
-    createRun: async (input) => {
-      calls.create.push(input);
-      return { run: { id: input.runId, status: "queued" } };
+    startAtomic: async (input) => {
+      calls.start.push(input);
+      return {
+        state: "pending",
+        duplicate: false,
+        run: { id: input.monitorRunId, status: "pending" },
+        researchRunId: input.researchRunId,
+      };
     },
-    enqueue: async (input) => { calls.enqueue.push(input); return "66666666-6666-4666-8666-666666666666"; },
-    linkResearchRun: async () => true,
-    markQueued: async () => {},
-    pauseTask: async (_task, reason) => { calls.pause.push(reason); },
-    abortRun: async (input) => { calls.abort.push(input); return true; },
+    activateAtomic: async (input) => {
+      calls.activate.push(input);
+      return { state: "queued" };
+    },
     ...overrides,
   };
 }
 
-test("reserves Credits before creating and enqueuing a monitor run", async () => {
+test("creates a pending linked pair before its atomic queue activation", async () => {
   const deps = monitorDeps();
   const result = await startMonitorRun(monitorTask(), deps);
 
   assert.equal(result.status, "queued");
-  assert.equal(result.jobId, "66666666-6666-4666-8666-666666666666");
-  assert.equal(deps.calls.reserve.length, 1);
-  assert.equal(deps.calls.create.length, 1);
-  assert.equal(deps.calls.enqueue.length, 1);
-  assert.equal(deps.calls.create[0].creditsReserved, 10);
-  assert.equal(deps.calls.create[0].configSnapshot.candidate_batch_size, 10);
+  assert.equal(result.jobId, "55555555-5555-4555-8555-555555555555");
+  assert.equal(deps.calls.start.length, 1);
+  assert.equal(deps.calls.activate.length, 1);
+  assert.equal(deps.calls.activate[0].monitorRunId, "44444444-4444-4444-8444-444444444444");
+  assert.equal(deps.calls.activate[0].researchRunId, "55555555-5555-4555-8555-555555555555");
 });
 
-test("pauses without enqueueing when the monthly monitor budget is exhausted", async () => {
-  const deps = monitorDeps();
-  const result = await startMonitorRun(monitorTask({ monthly_credit_used: 15 }), deps);
+test("returns the DB-owned monthly budget pause without an activation", async () => {
+  const deps = monitorDeps({ startAtomic: async () => ({ state: "paused", reason: "monthly_credit_limit" }) });
+  const result = await startMonitorRun(monitorTask(), deps);
 
   assert.equal(result.status, "paused");
   assert.equal(result.reason, "monthly_credit_limit");
-  assert.equal(deps.calls.reserve.length, 0);
-  assert.equal(deps.calls.enqueue.length, 0);
-  assert.deepEqual(deps.calls.pause, ["monthly_credit_limit"]);
+  assert.equal(deps.calls.activate.length, 0);
 });
 
 test("returns an active duplicate before evaluating a now-exhausted monthly budget", async () => {
-  const deps = monitorDeps({ findActiveRun: async () => ({ id: "existing-run", status: "running" }) });
+  const deps = monitorDeps({
+    startAtomic: async () => ({
+      state: "running",
+      duplicate: true,
+      run: { id: "existing-run", status: "running" },
+      researchRunId: "existing-research-run",
+    }),
+  });
   const result = await startMonitorRun(monitorTask({ monthly_credit_used: 20 }), deps);
 
   assert.equal(result.status, "queued");
   assert.equal(result.duplicate, true);
-  assert.equal(deps.calls.reserve.length, 0);
-  assert.equal(deps.calls.pause.length, 0);
+  assert.equal(result.jobId, "existing-research-run");
+  assert.equal(deps.calls.activate.length, 0);
 });
 
-test("pauses insufficient Credits without creating or enqueueing a run", async () => {
-  const deps = monitorDeps({ reserveCredits: async () => { throw new Error("insufficient available Credits"); } });
+test("returns the DB-owned insufficient Credits pause without activating", async () => {
+  const deps = monitorDeps({ startAtomic: async () => ({ state: "paused", reason: "insufficient_credits" }) });
   const result = await startMonitorRun(monitorTask(), deps);
 
   assert.equal(result.status, "paused");
   assert.equal(result.reason, "insufficient_credits");
-  assert.equal(deps.calls.create.length, 0);
-  assert.equal(deps.calls.enqueue.length, 0);
-  assert.deepEqual(deps.calls.pause, ["insufficient_credits"]);
+  assert.equal(deps.calls.activate.length, 0);
 });
 
-test("returns an existing active run without spending another reservation", async () => {
-  const deps = monitorDeps({ findActiveRun: async () => ({ id: "existing-run", status: "running" }) });
+test("retries pending activation idempotently without creating another reservation", async () => {
+  const deps = monitorDeps({
+    startAtomic: async (input) => {
+      deps.calls.start.push(input);
+      return {
+        state: "pending",
+        duplicate: true,
+        run: { id: "existing-run", status: "pending" },
+        researchRunId: "existing-research-run",
+      };
+    },
+  });
   const result = await startMonitorRun(monitorTask(), deps);
 
   assert.equal(result.status, "queued");
   assert.equal(result.duplicate, true);
-  assert.equal(deps.calls.reserve.length, 0);
-  assert.equal(deps.calls.enqueue.length, 0);
+  assert.equal(deps.calls.start.length, 1);
+  assert.equal(deps.calls.activate.length, 1);
 });
 
-test("concurrent duplicate creation releases its just-created reservation", async () => {
-  const deps = monitorDeps({ createRun: async () => ({ duplicate: true, run: { id: "existing-run", status: "queued" } }) });
-  const result = await startMonitorRun(monitorTask(), deps);
-
-  assert.equal(result.duplicate, true);
-  assert.equal(deps.calls.release.length, 1);
-  assert.equal(deps.calls.enqueue.length, 0);
-});
-
-test("queue failure aborts the task run and releases through the DB cleanup RPC", async () => {
-  const deps = monitorDeps({ enqueue: async () => null });
+test("activation failure is blocked pending recovery and never reports an unlinked queued job", async () => {
+  const deps = monitorDeps({ activateAtomic: async () => ({ state: "blocked" }) });
   const result = await startMonitorRun(monitorTask(), deps);
 
   assert.equal(result.status, "blocked");
-  assert.equal(result.reason, "queue_unavailable");
-  assert.equal(deps.calls.abort.length, 1);
-  assert.equal(deps.calls.release.length, 0, "abort RPC performs the atomic Credits release");
-  assert.equal(deps.calls.abort[0].researchRunId, null);
-});
-
-test("a failed research-run link never reports queued success and deterministically aborts the queued job", async () => {
-  const deps = monitorDeps({ linkResearchRun: async () => false });
-  const result = await startMonitorRun(monitorTask(), deps);
-
-  assert.equal(result.status, "blocked");
+  assert.equal(result.reason, "pending_recovery");
   assert.equal(result.enqueued, false);
-  assert.equal(deps.calls.abort.length, 1);
-  assert.equal(deps.calls.abort[0].researchRunId, "66666666-6666-4666-8666-666666666666");
+  assert.equal(result.jobId, undefined);
 });
 
 test("monitor run security migration locks owner identity and browser access", () => {
@@ -250,13 +245,16 @@ test("monitor run security migration locks owner identity and browser access", (
   assert.match(migration, /perform public\.release_credits\(v_run\.id/i);
 });
 
-test("monitor handoff migration rejects a reservation from another user or run", () => {
-  const migration = readFileSync("migrations/20260731050000_talent_monitor_handoff_fixes.sql", "utf8");
+test("atomic start migration couples reservation, linked pending records, activation, and exact release reconciliation", () => {
+  const migration = readFileSync("migrations/20260731060000_talent_monitor_atomic_start.sql", "utf8");
+  const worker = readFileSync("worker/index.mjs", "utf8");
 
-  assert.match(migration, /from public\.credit_reservations as reservation[\s\S]*for update/i);
-  assert.match(migration, /v_reservation\.user_id <> p_user_id/i);
-  assert.match(migration, /v_reservation\.run_id <> p_run_id/i);
-  assert.match(migration, /v_reservation\.status <> 'reserved'/i);
-  assert.match(migration, /v_reservation\.reserved_amount <> p_credits_reserved/i);
-  assert.match(migration, /v_research\.status <> 'queued'/i);
+  assert.match(migration, /from public\.search_tasks as task[\s\S]*for update/i);
+  assert.match(migration, /from public\.reserve_credits\([\s\S]*p_monitor_run_id/i);
+  assert.match(migration, /if SQLERRM = 'insufficient available Credits'/i);
+  assert.match(migration, /insert into public\.research_runs[\s\S]*'pending'/i);
+  assert.match(migration, /insert into public\.search_task_runs[\s\S]*'pending'/i);
+  assert.match(migration, /set status = 'queued'[\s\S]*research\.status = 'pending'/i);
+  assert.match(migration, /perform public\.release_credits\(v_run\.id, 'research-run:' \|\| v_run\.id::text \|\| ':release'\)/i);
+  assert.doesNotMatch(worker, /claimByStatus\("pending"\)/);
 });
