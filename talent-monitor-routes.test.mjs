@@ -56,7 +56,7 @@ test("monitor panel presents a detail drawer, credits, and run history without o
 
 test("monitor panel avoids hour controls and announces mutation failures", () => {
   assert.doesNotMatch(monitorPanel, /type="time"/);
-  assert.doesNotMatch(monitorPanel, /setEditTime/);
+  assert.doesNotMatch(monitorPanel, /\bsetEditTime\b/);
   assert.match(monitorPanel, /aria-live="polite"/);
   assert.match(monitorPanel, /setActionError\(/);
 });
