@@ -3,6 +3,7 @@ import { enqueue, findCachedCandidateProfilesForSearch } from "./db";
 import {
   buildNextRunAt,
   buildSearchTaskRunLabel,
+  nextRunAfterPatch,
   normalizeSearchTaskInput,
 } from "./search-tasks.mjs";
 
@@ -22,6 +23,15 @@ export interface SearchTask {
   brief: string;
   frequency: SearchTaskFrequency;
   status: SearchTaskStatus;
+  candidate_batch_size: 5 | 10 | 20;
+  timezone: string;
+  schedule_time: string;
+  monthly_credit_limit: number;
+  monthly_credit_used: number;
+  monthly_credit_reserved: number;
+  notification_enabled: boolean;
+  pause_reason: string | null;
+  last_run_status: string | null;
   last_run_at: string | null;
   next_run_at: string | null;
   created_at: string;
@@ -82,6 +92,15 @@ function mapTask(row: Record<string, unknown>): SearchTask {
     brief: String(row.brief ?? ""),
     frequency: (row.frequency === "daily" || row.frequency === "weekly" ? row.frequency : "manual") as SearchTaskFrequency,
     status: (row.status === "paused" ? "paused" : "active") as SearchTaskStatus,
+    candidate_batch_size: row.candidate_batch_size === 5 || row.candidate_batch_size === 20 ? row.candidate_batch_size : 10,
+    timezone: typeof row.timezone === "string" && row.timezone ? row.timezone : "UTC",
+    schedule_time: typeof row.schedule_time === "string" && row.schedule_time ? row.schedule_time.slice(0, 5) : "09:00",
+    monthly_credit_limit: Math.max(0, Number(row.monthly_credit_limit ?? 20) || 0),
+    monthly_credit_used: Math.max(0, Number(row.monthly_credit_used ?? 0) || 0),
+    monthly_credit_reserved: Math.max(0, Number(row.monthly_credit_reserved ?? 0) || 0),
+    notification_enabled: row.notification_enabled === true,
+    pause_reason: typeof row.pause_reason === "string" && row.pause_reason ? row.pause_reason : null,
+    last_run_status: typeof row.last_run_status === "string" && row.last_run_status ? row.last_run_status : null,
     last_run_at: row.last_run_at ? String(row.last_run_at) : null,
     next_run_at: row.next_run_at ? String(row.next_run_at) : null,
     created_at: String(row.created_at ?? ""),
@@ -171,6 +190,12 @@ export async function createSearchTask(input: {
   brief: string;
   frequency?: string;
   status?: string;
+  candidate_batch_size?: number;
+  timezone?: string;
+  schedule_time?: string;
+  monthly_credit_limit?: number;
+  notification_enabled?: boolean;
+  pause_reason?: string | null;
 }): Promise<SearchTask | null> {
   if (!client) return null;
   if (!(await ensureSearchTaskProjectAccess(input.userId, input.projectId))) return null;
@@ -187,7 +212,18 @@ export async function createSearchTask(input: {
         brief: normalized.brief,
         frequency: normalized.frequency,
         status: normalized.status,
-        next_run_at: normalized.status === "active" ? buildNextRunAt({ frequency: normalized.frequency, now }) : null,
+        candidate_batch_size: normalized.candidate_batch_size,
+        timezone: normalized.timezone,
+        schedule_time: normalized.schedule_time,
+        monthly_credit_limit: normalized.monthly_credit_limit,
+        notification_enabled: normalized.notification_enabled,
+        pause_reason: normalized.pause_reason,
+        next_run_at: normalized.status === "active" ? buildNextRunAt({
+          frequency: normalized.frequency,
+          timezone: normalized.timezone,
+          scheduleTime: normalized.schedule_time,
+          now,
+        }) : null,
       })
       .select("*");
     if (error || !data || data.length === 0) return null;
@@ -204,6 +240,12 @@ export async function updateSearchTask(input: {
   brief?: string;
   frequency?: string;
   status?: string;
+  candidate_batch_size?: number;
+  timezone?: string;
+  schedule_time?: string;
+  monthly_credit_limit?: number;
+  notification_enabled?: boolean;
+  pause_reason?: string | null;
 }): Promise<SearchTask | null> {
   if (!client) return null;
   const existing = await getSearchTask(input.userId, input.id);
@@ -213,6 +255,12 @@ export async function updateSearchTask(input: {
     brief: input.brief ?? existing.brief,
     frequency: input.frequency ?? existing.frequency,
     status: input.status ?? existing.status,
+    candidate_batch_size: input.candidate_batch_size ?? existing.candidate_batch_size,
+    timezone: input.timezone ?? existing.timezone,
+    schedule_time: input.schedule_time ?? existing.schedule_time,
+    monthly_credit_limit: input.monthly_credit_limit ?? existing.monthly_credit_limit,
+    notification_enabled: input.notification_enabled ?? existing.notification_enabled,
+    pause_reason: Object.hasOwn(input, "pause_reason") ? input.pause_reason : existing.pause_reason,
   });
   const now = new Date();
   const patch = {
@@ -220,7 +268,13 @@ export async function updateSearchTask(input: {
     brief: normalized.brief,
     frequency: normalized.frequency,
     status: normalized.status,
-    next_run_at: normalized.status === "active" ? buildNextRunAt({ frequency: normalized.frequency, now }) : null,
+    candidate_batch_size: normalized.candidate_batch_size,
+    timezone: normalized.timezone,
+    schedule_time: normalized.schedule_time,
+    monthly_credit_limit: normalized.monthly_credit_limit,
+    notification_enabled: normalized.notification_enabled,
+    pause_reason: normalized.pause_reason,
+    next_run_at: nextRunAfterPatch(existing, normalized, now),
     updated_at: now.toISOString(),
   };
   try {
@@ -260,7 +314,12 @@ export async function runSearchTaskNow(input: { userId: string; id: string }): P
   });
   if (!jobId) return null;
   const now = new Date();
-  const nextRunAt = task.frequency === "manual" ? null : buildNextRunAt({ frequency: task.frequency, now });
+  const nextRunAt = task.frequency === "manual" ? null : buildNextRunAt({
+    frequency: task.frequency,
+    timezone: task.timezone,
+    scheduleTime: task.schedule_time,
+    now,
+  });
   await client?.database.from(TABLE).update({
     last_run_at: now.toISOString(),
     next_run_at: nextRunAt,

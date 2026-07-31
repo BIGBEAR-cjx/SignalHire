@@ -21,6 +21,12 @@ test("normalizes search task input with safe defaults", () => {
     brief: "Find founding agent engineers",
     frequency: "daily",
     status: "paused",
+    candidate_batch_size: 10,
+    timezone: "UTC",
+    schedule_time: "09:00",
+    monthly_credit_limit: 20,
+    notification_enabled: false,
+    pause_reason: null,
   });
 
   const fallback = normalizeSearchTaskInput({ name: "", brief: "LLM infra", frequency: "cron" });
