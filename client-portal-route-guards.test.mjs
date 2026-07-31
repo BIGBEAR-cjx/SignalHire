@@ -38,6 +38,28 @@ test("loads workspace details from one fresh batch authorization read", async ()
   assert.equal(Object.keys(result.projectDetails).length, 30);
 });
 
+test("paginates authorized projects without silently dropping the thirty-first project", async () => {
+  const projects = Array.from({ length: 31 }, (_, index) => project(`project-${index + 1}`));
+  const dependencies = {
+    findAuthorizedProjects: async () => projects,
+    loadProjectDetail: async (currentProject) => ({ project: currentProject }),
+  };
+
+  const firstPage = await loadClientPortalWorkspaceDetails({ viewer, dependencies });
+  assert.equal(firstPage.projects.length, 30);
+  assert.equal(firstPage.pagination.total, 31);
+  assert.equal(firstPage.pagination.has_more, true);
+  assert.equal(firstPage.pagination.next_offset, 30);
+  assert.equal(Object.keys(firstPage.projectDetails).length, 30);
+
+  const secondPage = await loadClientPortalWorkspaceDetails({ viewer, offset: 30, dependencies });
+  assert.deepEqual(secondPage.projects.map((item) => item.id), ["project-31"]);
+  assert.equal(secondPage.pagination.total, 31);
+  assert.equal(secondPage.pagination.has_more, false);
+  assert.equal(secondPage.pagination.next_offset, null);
+  assert.deepEqual(Object.keys(secondPage.projectDetails), ["project-31"]);
+});
+
 test("returns revoked without loading detail when access changes after the initial lookup", async () => {
   let detailReads = 0;
   const result = await resolveClientPortalProjectDetail({

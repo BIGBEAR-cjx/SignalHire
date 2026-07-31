@@ -183,7 +183,8 @@ export async function getProject(userId: string, id: string): Promise<ProjectWit
   };
 }
 
-export async function listClientPortalCandidateProjects(limit = 200): Promise<ProjectWithKpi[]> {
+export async function listClientPortalCandidateProjects(limit?: number): Promise<ProjectWithKpi[]> {
+  const safeLimit = Number.isInteger(limit) && Number(limit) > 0 ? Math.min(500, Number(limit)) : null;
   const rows = await runSQL<{
     id: string; user_id: string; name: string; brief: string | null;
     status: ProjectStatus; color: string | null;
@@ -216,9 +217,8 @@ export async function listClientPortalCandidateProjects(limit = 200): Promise<Pr
        GROUP BY user_id, project_id
      ) r ON r.user_id = p.user_id AND r.project_id = p.id
      WHERE p.outreach_settings->'client_delivery_access'->>'mode' = 'token_or_customer_account'
-     ORDER BY p.updated_at DESC
-     LIMIT $1`,
-    [Math.max(1, Math.min(500, Math.floor(Number(limit) || 200)))],
+     ORDER BY p.updated_at DESC${safeLimit ? "\n     LIMIT $1" : ""}`,
+    safeLimit ? [safeLimit] : [],
   );
   if (!rows) return [];
   return rows.map((r) => ({

@@ -24,6 +24,12 @@ export type ClientPortalWorkspaceView = {
     latest_activity: string;
   };
   latest_activity: string;
+  pagination: {
+    offset: number;
+    total: number;
+    has_more: boolean;
+    next_offset: number | null;
+  };
   recent_weekly_archives: unknown[];
   interview_ready_queue: unknown[];
   projects: Array<{

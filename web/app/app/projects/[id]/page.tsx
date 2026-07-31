@@ -391,6 +391,7 @@ interface ProjectDetail {
     result?: unknown;
   }>;
   searchTasks?: SearchTaskView[];
+  accountCredits?: { available: number; reserved: number } | null;
   outreachQueue?: OutreachQueueView;
   inboxQueue?: InboxQueueView;
   candidateGraph?: CandidateGraphView;
@@ -2907,9 +2908,14 @@ function monitorCopy(locale: "zh" | "en") {
     close: "Close",
     save: "Save changes",
     schedule: "Schedule",
+    timezone: "Timezone",
+    fixedSchedule: "Scheduled runs use 09:00 in the selected timezone.",
     batch: "Candidates per run",
     creditLimit: "Monthly Credits",
-    credits: "Credits",
+    credits: "Monthly monitor budget",
+    monthlyRemaining: "Monthly budget remaining",
+    accountCredits: "Account Credits",
+    accountUnavailable: "Account Credits are unavailable until the Credits service is configured.",
     available: "available",
     reserved: "reserved",
     used: "used",
@@ -2917,7 +2923,6 @@ function monitorCopy(locale: "zh" | "en") {
     noRuns: "No monitor runs yet.",
     researchRun: "Open research round",
     pauseReason: "Pause reason",
-    notifications: "Notify when a run completes",
     actionFailed: "The monitor could not be updated. Please try again.",
   } : {
     title: "Talent Monitor",
@@ -2941,9 +2946,14 @@ function monitorCopy(locale: "zh" | "en") {
     close: "关闭",
     save: "保存设置",
     schedule: "运行设置",
+    timezone: "时区",
+    fixedSchedule: "定时任务会在所选时区的 09:00 运行。",
     batch: "每轮候选人数",
     creditLimit: "每月 Credits",
-    credits: "Credits",
+    credits: "每月监控预算",
+    monthlyRemaining: "本月预算剩余",
+    accountCredits: "账户 Credits",
+    accountUnavailable: "Credits 服务配置完成后才会显示账户 Credits。",
     available: "可用",
     reserved: "已预留",
     used: "已使用",
@@ -2951,7 +2961,6 @@ function monitorCopy(locale: "zh" | "en") {
     noRuns: "暂无运行记录。",
     researchRun: "打开研究轮次",
     pauseReason: "暂停原因",
-    notifications: "运行完成后通知我",
     actionFailed: "监控操作未完成，请重试。",
   };
 }
@@ -3206,16 +3215,20 @@ function AutonomousSourcingPanel({
   );
 }
 
+const MONITOR_TIMEZONES = ["UTC", "America/Los_Angeles", "America/New_York", "Europe/London", "Europe/Berlin", "Asia/Shanghai", "Asia/Singapore", "Asia/Tokyo"];
+
 function TalentMonitorPanel({
   projectId,
   projectBrief,
   tasks,
+  accountCredits,
   locale,
   onChanged,
 }: {
   projectId: string;
   projectBrief: string;
   tasks: SearchTaskView[];
+  accountCredits?: { available: number; reserved: number } | null;
   locale: "zh" | "en";
   onChanged: () => void;
 }) {
@@ -3224,15 +3237,16 @@ function TalentMonitorPanel({
   const [name, setName] = useState("");
   const [brief, setBrief] = useState(projectBrief);
   const [frequency, setFrequency] = useState<"manual" | "daily" | "weekly">("weekly");
+  const [timezone, setTimezone] = useState("UTC");
   const [busyId, setBusyId] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
   const [selected, setSelected] = useState<SearchTaskView | null>(null);
   const [editName, setEditName] = useState("");
   const [editBrief, setEditBrief] = useState("");
   const [editFrequency, setEditFrequency] = useState<"manual" | "daily" | "weekly">("weekly");
+  const [editTimezone, setEditTimezone] = useState("UTC");
   const [editBatchSize, setEditBatchSize] = useState<5 | 10 | 20>(10);
   const [editCreditLimit, setEditCreditLimit] = useState(20);
-  const [editNotifications, setEditNotifications] = useState(false);
   const [actionError, setActionError] = useState("");
 
   async function ensureMonitorResponse(response: Response) {
@@ -3249,7 +3263,7 @@ function TalentMonitorPanel({
       const r = await fetch("/api/search-tasks", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ project_id: projectId, name, brief, frequency, locale }),
+        body: JSON.stringify({ project_id: projectId, name, brief, frequency, timezone, locale }),
       });
       await ensureMonitorResponse(r);
       setName("");
@@ -3304,9 +3318,9 @@ function TalentMonitorPanel({
     setEditName(task.name);
     setEditBrief(task.brief);
     setEditFrequency(task.frequency);
+    setEditTimezone(MONITOR_TIMEZONES.includes(task.timezone) ? task.timezone : "UTC");
     setEditBatchSize(task.candidate_batch_size);
     setEditCreditLimit(task.credits.limit);
-    setEditNotifications(task.notification_enabled);
     setActionError("");
   }
 
@@ -3322,9 +3336,9 @@ function TalentMonitorPanel({
           name: editName,
           brief: editBrief,
           frequency: editFrequency,
+          timezone: editTimezone,
           candidate_batch_size: editBatchSize,
           monthly_credit_limit: editCreditLimit,
-          notification_enabled: editNotifications,
           locale,
         }),
       });
@@ -3354,7 +3368,7 @@ function TalentMonitorPanel({
       </div>
 
       {open && (
-        <div className="grid gap-3 rounded-2xl border border-black/10 bg-white/70 p-4 md:grid-cols-[220px_minmax(0,1fr)_130px_auto]">
+        <div className="grid gap-3 rounded-2xl border border-black/10 bg-white/70 p-4 md:grid-cols-2 xl:grid-cols-[180px_minmax(0,1fr)_130px_190px_auto]">
           <input
             value={name}
             onChange={(event) => setName(event.target.value)}
@@ -3377,9 +3391,15 @@ function TalentMonitorPanel({
             <option value="daily">{c.daily}</option>
             <option value="weekly">{c.weekly}</option>
           </select>
+          <label className="grid gap-1 text-xs text-[var(--sh-muted)]">{c.timezone}
+            <select value={timezone} onChange={(event) => setTimezone(event.target.value)} className="min-h-10 rounded-2xl border border-black/10 bg-white px-3 text-sm text-[var(--sh-ink)]">
+              {MONITOR_TIMEZONES.map((value) => <option key={value} value={value}>{value}</option>)}
+            </select>
+          </label>
           <PrimaryAction onClick={createTask} disabled={creating || !brief.trim()} className="min-h-10 whitespace-nowrap px-4 py-2 text-xs">
             {c.create}
           </PrimaryAction>
+          <p className="text-xs leading-5 text-[var(--sh-muted)] md:col-span-2 xl:col-span-5">{c.fixedSchedule}</p>
         </div>
       )}
 
@@ -3409,7 +3429,7 @@ function TalentMonitorPanel({
                 <span className="rounded-xl bg-gray-50 px-3 py-2 ring-1 ring-black/5">{c.updatedCandidates}: {task.run_summary?.updated_candidates ?? 0}</span>
               </div>
               <div className="mt-2 grid grid-cols-3 gap-2 text-xs">
-                <span className="rounded-xl bg-blue-50 px-3 py-2 text-blue-800 ring-1 ring-blue-100">{task.credits.available} {c.available}</span>
+                <span className="rounded-xl bg-blue-50 px-3 py-2 text-blue-800 ring-1 ring-blue-100">{c.monthlyRemaining}: {task.credits.available}</span>
                 <span className="rounded-xl bg-gray-50 px-3 py-2 ring-1 ring-black/5">{task.credits.used} {c.used}</span>
                 <span className="rounded-xl bg-gray-50 px-3 py-2 ring-1 ring-black/5">{task.credits.reserved} {c.reserved}</span>
               </div>
@@ -3464,14 +3484,17 @@ function TalentMonitorPanel({
           <div className="mt-4 grid gap-3 md:grid-cols-2">
             <label className="grid gap-1 text-xs text-[var(--sh-muted)]">{c.name}<input value={editName} onChange={(event) => setEditName(event.target.value)} className="min-h-10 rounded-xl border border-black/10 bg-white px-3 text-sm text-[var(--sh-ink)]" /></label>
             <label className="grid gap-1 text-xs text-[var(--sh-muted)]">{c.frequency}<select value={editFrequency} onChange={(event) => setEditFrequency(event.target.value as "manual" | "daily" | "weekly")} className="min-h-10 rounded-xl border border-black/10 bg-white px-3 text-sm text-[var(--sh-ink)]"><option value="manual">{c.manual}</option><option value="daily">{c.daily}</option><option value="weekly">{c.weekly}</option></select></label>
+            <label className="grid gap-1 text-xs text-[var(--sh-muted)]">{c.timezone}<select value={editTimezone} onChange={(event) => setEditTimezone(event.target.value)} className="min-h-10 rounded-xl border border-black/10 bg-white px-3 text-sm text-[var(--sh-ink)]">{MONITOR_TIMEZONES.map((value) => <option key={value} value={value}>{value}</option>)}</select></label>
             <label className="grid gap-1 text-xs text-[var(--sh-muted)] md:col-span-2">{c.brief}<textarea value={editBrief} onChange={(event) => setEditBrief(event.target.value)} rows={3} className="rounded-xl border border-black/10 bg-white px-3 py-2 text-sm text-[var(--sh-ink)]" /></label>
             <label className="grid gap-1 text-xs text-[var(--sh-muted)]">{c.batch}<select value={editBatchSize} onChange={(event) => setEditBatchSize(Number(event.target.value) as 5 | 10 | 20)} className="min-h-10 rounded-xl border border-black/10 bg-white px-3 text-sm text-[var(--sh-ink)]"><option value={5}>5</option><option value={10}>10</option><option value={20}>20</option></select></label>
             <label className="grid gap-1 text-xs text-[var(--sh-muted)]">{c.creditLimit}<input type="number" min={0} step={1} value={editCreditLimit} onChange={(event) => setEditCreditLimit(Math.max(0, Number(event.target.value) || 0))} className="min-h-10 rounded-xl border border-black/10 bg-white px-3 text-sm text-[var(--sh-ink)]" /></label>
-            <label className="flex items-center gap-2 text-sm text-[var(--sh-ink)]"><input type="checkbox" checked={editNotifications} onChange={(event) => setEditNotifications(event.target.checked)} />{c.notifications}</label>
+            <p className="text-xs leading-5 text-[var(--sh-muted)] md:col-span-2">{c.fixedSchedule}</p>
           </div>
           <div className="mt-4 rounded-xl bg-gray-50 p-3 text-xs text-[var(--sh-muted)] ring-1 ring-black/5">
             <p className="font-semibold text-[var(--sh-ink)]">{c.credits}</p>
-            <p className="mt-1">{selected.credits.used} {c.used} · {selected.credits.reserved} {c.reserved} · {selected.credits.available} {c.available}</p>
+            <p className="mt-1">{c.monthlyRemaining}: {selected.credits.available} · {selected.credits.used} {c.used} · {selected.credits.reserved} {c.reserved}</p>
+            <p className="mt-3 font-semibold text-[var(--sh-ink)]">{c.accountCredits}</p>
+            {accountCredits ? <p className="mt-1">{accountCredits.available} {c.available} · {accountCredits.reserved} {c.reserved}</p> : <p className="mt-1">{c.accountUnavailable}</p>}
           </div>
           <div className="mt-4">
             <p className="text-sm font-semibold text-[var(--sh-ink)]">{c.runHistory}</p>
@@ -5754,6 +5777,7 @@ export default function ProjectDetailPage() {
         projectId={id}
         projectBrief={briefForSearch}
         tasks={detail.searchTasks ?? []}
+        accountCredits={detail.accountCredits}
         locale={locale}
         onChanged={reloadDetail}
       />

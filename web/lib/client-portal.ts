@@ -28,7 +28,7 @@ function cleanString(value: unknown) {
 }
 
 export async function findClientPortalAuthorizedProjects(viewer: Viewer) {
-  const projects = await listClientPortalCandidateProjects(300);
+  const projects = await listClientPortalCandidateProjects();
   return projects.filter((project) => verifyClientPortalProjectAccess(project, viewer).allowed);
 }
 
@@ -40,7 +40,7 @@ export async function findClientPortalAuthorizedProject(viewer: Viewer, projectI
 export async function findClientPortalCandidateProject(projectId: string) {
   const id = cleanString(projectId);
   if (!id) return null;
-  const projects = await listClientPortalCandidateProjects(300);
+  const projects = await listClientPortalCandidateProjects();
   return projects.find((project) => project.id === id) ?? null;
 }
 

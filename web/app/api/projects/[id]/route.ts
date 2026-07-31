@@ -16,6 +16,7 @@ import {
   type ProjectStatus,
 } from "@/lib/projects";
 import { buildMonitorView, listSearchTasks } from "@/lib/search-tasks";
+import { readBalance } from "@/lib/credits";
 import { listOutreachQueue, listOutreachThreads } from "@/lib/outreach-threads";
 import { buildSequenceAnalyticsView } from "@/lib/sequence-analytics.mjs";
 import { buildProfileLeadLayerView } from "@/lib/profile-lead-layer.mjs";
@@ -35,7 +36,7 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
   const { id } = await ctx.params;
   if (!id) return Response.json({ error: t(locale, "api.error.missingId") }, { status: 400 });
 
-  const [project, breakdown, runs, searchTasks, outreachQueue, outreachThreads, clientDeliveryAuditEvents] = await Promise.all([
+  const [project, breakdown, runs, searchTasks, outreachQueue, outreachThreads, clientDeliveryAuditEvents, accountCredits] = await Promise.all([
     getProject(user.id, id),
     projectCandidateBreakdown(user.id, id),
     projectRuns(user.id, id, 30),
@@ -43,6 +44,7 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
     listOutreachQueue({ userId: user.id, projectId: id }),
     listOutreachThreads({ userId: user.id, projectId: id }),
     listClientDeliveryAuditEvents({ userId: user.id, projectId: id, limit: 50 }),
+    readBalance({ userId: user.id }).catch(() => null),
   ]);
   if (!project) return Response.json({ error: t(locale, "api.error.projectNotFound") }, { status: 404 });
   await Promise.all(runs
@@ -70,6 +72,7 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
     breakdown: freshBreakdown ?? breakdown,
     runs,
     searchTasks: searchTasks.map(buildMonitorView),
+    accountCredits,
     outreachQueue,
     inboxQueue,
     clientDeliveryAuditEvents,

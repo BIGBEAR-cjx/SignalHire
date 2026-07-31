@@ -15,7 +15,7 @@ export async function GET(req: Request) {
   const locale = normalizeLocale(url.searchParams.get("locale") || url.searchParams.get("lang"));
   if (!user) return Response.json({ error: t(locale, "api.error.unauthorized") }, { status: 401 });
 
-  const { projects, projectDetails } = await loadClientPortalWorkspaceDetails({
+  const { projects, projectDetails, pagination } = await loadClientPortalWorkspaceDetails({
     viewer: user,
     locale,
     dependencies: {

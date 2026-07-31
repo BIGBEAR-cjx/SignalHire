@@ -1,3 +1,5 @@
+const CLIENT_PORTAL_PAGE_SIZE = 30;
+
 function cleanId(value) {
   return typeof value === "string" ? value.trim().slice(0, 160) : "";
 }
@@ -13,20 +15,34 @@ function requireDependency(dependencies, name) {
   return dependencies[name];
 }
 
-/** @param {{ viewer?: unknown, locale?: string, dependencies?: Record<string, unknown> }} input */
-export async function loadClientPortalWorkspaceDetails({ viewer, locale = "zh", dependencies = {} } = {}) {
+function pageOffset(value) {
+  const parsed = Number(value);
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : 0;
+}
+
+/** @param {{ viewer?: unknown, locale?: string, offset?: number, dependencies?: Record<string, unknown> }} input */
+export async function loadClientPortalWorkspaceDetails({ viewer, locale = "zh", offset = 0, dependencies = {} } = {}) {
   const findAuthorizedProjects = requireDependency(dependencies, "findAuthorizedProjects");
   const loadProjectDetail = requireDependency(dependencies, "loadProjectDetail");
-  const projects = await findAuthorizedProjects(viewer);
+  const foundProjects = await findAuthorizedProjects(viewer);
+  const authorizedProjects = Array.isArray(foundProjects) ? foundProjects : [];
+  const safeOffset = pageOffset(offset);
+  const projects = authorizedProjects.slice(safeOffset, safeOffset + CLIENT_PORTAL_PAGE_SIZE);
   const entries = await Promise.all(
-    (Array.isArray(projects) ? projects : []).slice(0, 30).map(async (project) => {
+    projects.map(async (project) => {
       const detail = await loadProjectDetail(project, locale);
       return [project.id, detail];
     }),
   );
   return {
-    projects: Array.isArray(projects) ? projects.slice(0, 30) : [],
+    projects,
     projectDetails: Object.fromEntries(entries),
+    pagination: {
+      offset: safeOffset,
+      total: authorizedProjects.length,
+      has_more: safeOffset + projects.length < authorizedProjects.length,
+      next_offset: safeOffset + projects.length < authorizedProjects.length ? safeOffset + projects.length : null,
+    },
   };
 }
 

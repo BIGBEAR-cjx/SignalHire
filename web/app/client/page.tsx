@@ -12,6 +12,7 @@ const EMPTY_VIEW: ClientPortalWorkspaceView = {
   viewer: { email: "" },
   summary: { authorized_projects: 0, interview_ready: 0, this_week_replies: 0, latest_activity: "" },
   latest_activity: "",
+  pagination: { offset: 0, total: 0, has_more: false, next_offset: null },
   recent_weekly_archives: [],
   interview_ready_queue: [],
   projects: [],
@@ -67,10 +68,10 @@ export default function ClientWorkspacePage() {
   const [needsLogin, setNeedsLogin] = useState(false);
   const [error, setError] = useState("");
 
-  const reload = useCallback(async () => {
+  const loadWorkspace = useCallback(async (offset = 0, append = false) => {
     setLoading(true);
     try {
-      const response = await fetch(`/api/client-portal/workspace?locale=${locale}`);
+      const response = await fetch(`/api/client-portal/workspace?locale=${locale}&offset=${offset}`);
       if (response.status === 401) {
         setNeedsLogin(true);
         setError("");
@@ -78,7 +79,16 @@ export default function ClientWorkspacePage() {
       }
       const json = await response.json();
       if (!response.ok) throw new Error(json.error || (isEn ? "Unable to load client workspace." : "无法加载客户工作台。"));
-      setView(json as ClientPortalWorkspaceView);
+      const nextView = json as ClientPortalWorkspaceView;
+      setView((current) => append ? {
+        ...nextView,
+        projects: [...current.projects, ...nextView.projects],
+        summary: {
+          ...nextView.summary,
+          interview_ready: current.summary.interview_ready + nextView.summary.interview_ready,
+          this_week_replies: current.summary.this_week_replies + nextView.summary.this_week_replies,
+        },
+      } : nextView);
       setNeedsLogin(false);
       setError("");
     } catch (err) {
@@ -87,6 +97,14 @@ export default function ClientWorkspacePage() {
       setLoading(false);
     }
   }, [isEn, locale]);
+
+  const reload = useCallback(() => loadWorkspace(), [loadWorkspace]);
+
+  const loadMore = useCallback(() => {
+    const offset = view.pagination.next_offset;
+    if (offset === null) return;
+    void loadWorkspace(offset, true);
+  }, [loadWorkspace, view.pagination.next_offset]);
 
   useEffect(() => {
     const id = window.setTimeout(() => { void reload(); }, 0);
@@ -135,8 +153,8 @@ export default function ClientWorkspacePage() {
           <>
             <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
               <MetricCard label={isEn ? "Authorized projects" : "已授权项目"} value={view.summary.authorized_projects} Icon={FiBriefcase} tone="blue" />
-              <MetricCard label="Interview-ready" value={view.summary.interview_ready} Icon={FiUsers} tone="green" />
-              <MetricCard label={isEn ? "This week replies" : "本周回复"} value={view.summary.this_week_replies} Icon={FiMessageSquare} tone="amber" />
+              <MetricCard label={isEn ? "Interview-ready (loaded)" : "可约面（已加载）"} value={view.summary.interview_ready} Icon={FiUsers} tone="green" />
+              <MetricCard label={isEn ? "This week replies (loaded)" : "本周回复（已加载）"} value={view.summary.this_week_replies} Icon={FiMessageSquare} tone="amber" />
               <MetricCard label={isEn ? "Latest activity" : "最近活动"} value={dateLabel(view.summary.latest_activity, locale)} Icon={FiClock} />
             </div>
 
@@ -158,6 +176,14 @@ export default function ClientWorkspacePage() {
                   </div>
                 </Surface>
               ))}
+            </div>
+            <div className="flex flex-wrap items-center justify-between gap-3 text-sm text-[var(--sh-muted)]">
+              <p>{isEn ? `Showing ${view.projects.length} of ${view.pagination.total} authorized projects.` : `已显示 ${view.projects.length}/${view.pagination.total} 个已授权项目。`}</p>
+              {view.pagination.has_more && view.pagination.next_offset !== null ? (
+                <SecondaryAction onClick={loadMore} disabled={loading}>
+                  {isEn ? "Show more projects" : "显示更多项目"}
+                </SecondaryAction>
+              ) : null}
             </div>
           </>
         )}
