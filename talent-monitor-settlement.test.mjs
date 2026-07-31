@@ -93,3 +93,21 @@ test("terminal monitor migration settles after research persistence and releases
   assert.match(worker, /nextAttempt > max[\s\S]*await releaseMonitorRun\(job\.id, "error"\)/);
   assert.doesNotMatch(settlement, /outreach/i);
 });
+
+test("terminal monitor RPCs reject mismatched research and Credits reservation linkages before ledger mutation", () => {
+  const migration = readFileSync("migrations/20260731070000_settle_talent_monitor_runs.sql", "utf8");
+  const settlementStart = migration.indexOf("create or replace function public.settle_monitor_run");
+  const releaseStart = migration.indexOf("create or replace function public.release_monitor_run");
+  const reconciliationStart = migration.indexOf("create or replace function public.reconcile_monitor_run_outcomes");
+  const settle = migration.slice(settlementStart, releaseStart);
+  const release = migration.slice(releaseStart, reconciliationStart);
+
+  for (const terminalRpc of [settle, release]) {
+    assert.match(terminalRpc, /declare[\s\S]*v_reservation public\.credit_reservations%rowtype;/i);
+    assert.match(terminalRpc, /v_research\.user_id <> v_run\.user_id\s+or v_research\.search_task_id <> v_run\.search_task_id/i);
+    assert.match(terminalRpc, /from public\.credit_reservations as reservation\s+where reservation\.id = v_run\.credit_reservation_id\s+for update/i);
+    assert.match(terminalRpc, /v_reservation\.run_id <> v_run\.id[\s\S]*v_reservation\.user_id <> v_run\.user_id[\s\S]*v_reservation\.reserved_amount <> v_run\.credits_reserved[\s\S]*v_reservation\.status <> 'reserved'/i);
+  }
+  assert.ok(settle.indexOf("monitor run research linkage is invalid") < settle.indexOf("perform public.settle_credits"));
+  assert.ok(release.indexOf("monitor run research linkage is invalid") < release.indexOf("perform public.release_credits"));
+});

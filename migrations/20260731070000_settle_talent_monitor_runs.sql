@@ -42,6 +42,7 @@ as $$
 declare
   v_run public.search_task_runs%rowtype;
   v_research public.research_runs%rowtype;
+  v_reservation public.credit_reservations%rowtype;
   v_requested integer;
   v_returned integer;
   v_new integer;
@@ -62,6 +63,20 @@ begin
   where research.id = p_research_run_id
   for update;
   if not found or v_research.status <> 'done' then return 'blocked'; end if;
+  if v_research.user_id <> v_run.user_id or v_research.search_task_id <> v_run.search_task_id then
+    raise exception 'monitor run research linkage is invalid';
+  end if;
+  select * into v_reservation
+  from public.credit_reservations as reservation
+  where reservation.id = v_run.credit_reservation_id
+  for update;
+  if not found
+    or v_reservation.run_id <> v_run.id
+    or v_reservation.user_id <> v_run.user_id
+    or v_reservation.reserved_amount <> v_run.credits_reserved
+    or v_reservation.status <> 'reserved' then
+    raise exception 'monitor run Credits reservation linkage is invalid';
+  end if;
   if pg_catalog.jsonb_typeof(v_run.config_snapshot -> 'candidate_batch_size') <> 'number' then
     raise exception 'monitor run snapshot has no valid candidate batch size';
   end if;
@@ -119,6 +134,7 @@ as $$
 declare
   v_run public.search_task_runs%rowtype;
   v_research public.research_runs%rowtype;
+  v_reservation public.credit_reservations%rowtype;
   v_terminal_status text;
 begin
   select * into v_run
@@ -134,6 +150,20 @@ begin
   where research.id = p_research_run_id
   for update;
   if not found or v_research.status not in ('error', 'canceled') then return 'blocked'; end if;
+  if v_research.user_id <> v_run.user_id or v_research.search_task_id <> v_run.search_task_id then
+    raise exception 'monitor run research linkage is invalid';
+  end if;
+  select * into v_reservation
+  from public.credit_reservations as reservation
+  where reservation.id = v_run.credit_reservation_id
+  for update;
+  if not found
+    or v_reservation.run_id <> v_run.id
+    or v_reservation.user_id <> v_run.user_id
+    or v_reservation.reserved_amount <> v_run.credits_reserved
+    or v_reservation.status <> 'reserved' then
+    raise exception 'monitor run Credits reservation linkage is invalid';
+  end if;
   v_terminal_status := case when v_research.status = 'canceled' then 'cancelled' else 'failed' end;
 
   perform public.release_credits(v_run.id, 'research-run:' || v_run.id::text || ':release');
