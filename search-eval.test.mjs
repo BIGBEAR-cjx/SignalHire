@@ -16,9 +16,9 @@ const baseCase = {
     { canonical_url: "https://github.com/grace-hopper" },
   ],
   judgments: [
-    { name: "Ada Lovelace", company: "Analytical Engines", relevance: "relevant", hard_conditions_met: true, identity_correct: true, evidence_verifiable: true, reviewer: "eval-team", version: "v1" },
-    { canonical_url: "https://github.com/grace-hopper", relevance: "relevant", hard_conditions_met: true, identity_correct: true, evidence_verifiable: true, reviewer: "eval-team", version: "v1" },
-    { name: "Off Target", company: "Agency", relevance: "non-relevant", hard_conditions_met: false, identity_correct: true, evidence_verifiable: true, reviewer: "eval-team", version: "v1" },
+    { name: "Ada Lovelace", company: "Analytical Engines", relevance: "relevant", hard_conditions_met: true, identity_correct: true, evidence_verifiable: true, reviewer: "human-reviewer", review_status: "approved_human_review", reviewed_at: "2026-07-30T00:00:00.000Z", version: "v1" },
+    { canonical_url: "https://github.com/grace-hopper", relevance: "relevant", hard_conditions_met: true, identity_correct: true, evidence_verifiable: true, reviewer: "human-reviewer", review_status: "approved_human_review", reviewed_at: "2026-07-30T00:00:00.000Z", version: "v1" },
+    { name: "Off Target", company: "Agency", relevance: "non-relevant", hard_conditions_met: false, identity_correct: true, evidence_verifiable: true, reviewer: "human-reviewer", review_status: "approved_human_review", reviewed_at: "2026-07-30T00:00:00.000Z", version: "v1" },
   ],
   minimum_evidence: ["public profile", "primary work evidence"],
   review_status: "approved_human_review",
@@ -107,6 +107,29 @@ test("keeps draft fixtures out of passing evaluation until human review is appro
   );
 });
 
+test("does not let a case review-status field bypass missing approved judgments", () => {
+  const score = scoreCase({ ...baseCase, judgments: [{ ...baseCase.judgments[0], reviewer: "pending-human-review", review_status: "approved_human_review" }] }, { candidates: [], ...metrics });
+  assert.deepEqual(score, { status: "inconclusive", reason: "case_review_pending" });
+  assert.deepEqual(
+    scoreCase({ ...baseCase, review_status: "draft_pending_human_review" }, { candidates: [], ...metrics }, { fixture: { review_status: "approved_human_review" } }),
+    { status: "inconclusive", reason: "case_review_pending" },
+  );
+});
+
+test("deduplicates stable identities before precision and hard-constraint scoring", () => {
+  const score = scoreCase(baseCase, {
+    candidates: [
+      { name: "Ada Lovelace", current_company: "Analytical Engines", evidence: [{ url: "https://example.com/ada" }] },
+      { name: "Ada Lovelace", current_company: "Analytical Engines", evidence: [{ url: "https://example.com/ada-again" }] },
+      { canonical_url: "https://github.com/grace-hopper", evidence: [{ url: "https://github.com/grace-hopper" }] },
+    ],
+    ...metrics,
+  });
+  assert.equal(score.known_relevant_recall_at_10, 1);
+  assert.equal(score.hard_constraint_recall, 1);
+  assert.equal(score.precision_at_5, 1);
+});
+
 test("ships exactly thirty human-review-pending cases with ten cases at every difficulty", () => {
   assert.equal(fixture.schema_version, "search-eval-v1-draft");
   assert.equal(fixture.review_status, "draft_pending_human_review");
@@ -120,14 +143,15 @@ test("ships exactly thirty human-review-pending cases with ten cases at every di
   for (const item of cases) {
     assert.ok(item.id && item.brief);
     assert.ok(Array.isArray(item.required_conditions) && Array.isArray(item.excluded_conditions));
-    assert.ok(Array.isArray(item.known_relevant) && item.known_relevant.length > 0);
+    assert.deepEqual(item.known_relevant, []);
+    assert.ok(Array.isArray(item.source_scaffolds) && item.source_scaffolds.length > 0);
     assert.ok(Array.isArray(item.judgments) && item.judgments.length > 0);
     assert.ok(Array.isArray(item.minimum_evidence) && item.minimum_evidence.length > 0);
-    for (const person of item.known_relevant) {
-      assert.ok(person.canonical_url || (person.name && person.company), `${item.id} has a stable known-relevant identity`);
+    for (const source of item.source_scaffolds) {
+      assert.ok(source.canonical_url, `${item.id} has a public source scaffold`);
     }
     for (const judgment of item.judgments) {
-      assert.ok(["relevant", "non-relevant", "uncertain"].includes(judgment.relevance));
+      assert.equal(judgment.relevance, "uncertain");
       assert.equal(typeof judgment.hard_conditions_met, "boolean");
       assert.equal(typeof judgment.identity_correct, "boolean");
       assert.equal(typeof judgment.evidence_verifiable, "boolean");

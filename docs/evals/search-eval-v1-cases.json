@@ -9,8 +9,9 @@
     "brief": "Find an engineer with public evidence of maintaining open-source ML inference infrastructure.",
     "required_conditions": ["open-source contribution", "ML inference infrastructure"],
     "excluded_conditions": ["sales-only profile"],
-    "known_relevant": [{ "canonical_url": "https://github.com/vllm-project" }],
-    "judgments": [{ "canonical_url": "https://github.com/vllm-project", "relevance": "relevant", "hard_conditions_met": true, "identity_correct": true, "evidence_verifiable": true, "reviewer": "pending-human-review", "version": "v1-draft" }, { "name": "Jordan Lee", "company": "Pipeline Sales", "relevance": "non-relevant", "hard_conditions_met": false, "identity_correct": true, "evidence_verifiable": true, "reviewer": "pending-human-review", "version": "v1-draft" }],
+    "source_scaffolds": [{ "canonical_url": "https://github.com/vllm-project" }],
+    "known_relevant": [],
+    "judgments": [{ "canonical_url": "https://github.com/vllm-project", "relevance": "uncertain", "hard_conditions_met": true, "identity_correct": true, "evidence_verifiable": true, "reviewer": "pending-human-review", "version": "v1-draft" }, { "name": "Jordan Lee", "company": "Pipeline Sales", "relevance": "uncertain", "hard_conditions_met": false, "identity_correct": true, "evidence_verifiable": true, "reviewer": "pending-human-review", "version": "v1-draft" }],
     "minimum_evidence": ["maintainer or commit history", "project documentation"]
   },
   {
@@ -19,8 +20,9 @@
     "brief": "Find a data engineer with public Rust data-processing work.",
     "required_conditions": ["Rust", "data processing"],
     "excluded_conditions": ["frontend-only work"],
-    "known_relevant": [{ "canonical_url": "https://github.com/pola-rs/polars" }],
-    "judgments": [{ "canonical_url": "https://github.com/pola-rs/polars", "relevance": "relevant", "hard_conditions_met": true, "identity_correct": true, "evidence_verifiable": true, "reviewer": "pending-human-review", "version": "v1-draft" }, { "name": "Morgan Park", "company": "Web Pixel Studio", "relevance": "non-relevant", "hard_conditions_met": false, "identity_correct": true, "evidence_verifiable": true, "reviewer": "pending-human-review", "version": "v1-draft" }],
+    "source_scaffolds": [{ "canonical_url": "https://github.com/pola-rs/polars" }],
+    "known_relevant": [],
+    "judgments": [{ "canonical_url": "https://github.com/pola-rs/polars", "relevance": "uncertain", "hard_conditions_met": true, "identity_correct": true, "evidence_verifiable": true, "reviewer": "pending-human-review", "version": "v1-draft" }, { "name": "Morgan Park", "company": "Web Pixel Studio", "relevance": "uncertain", "hard_conditions_met": false, "identity_correct": true, "evidence_verifiable": true, "reviewer": "pending-human-review", "version": "v1-draft" }],
     "minimum_evidence": ["repository contribution", "technical profile"]
   },
   {
@@ -29,8 +31,9 @@
     "brief": "Find a researcher with public work on language-model evaluation.",
     "required_conditions": ["language-model evaluation", "published research"],
     "excluded_conditions": ["unverifiable benchmark claim"],
-    "known_relevant": [{ "canonical_url": "https://huggingface.co/spaces/lmarena-ai/chatbot-arena-leaderboard" }],
-    "judgments": [{ "canonical_url": "https://huggingface.co/spaces/lmarena-ai/chatbot-arena-leaderboard", "relevance": "relevant", "hard_conditions_met": true, "identity_correct": true, "evidence_verifiable": true, "reviewer": "pending-human-review", "version": "v1-draft" }, { "name": "Sam Wu", "company": "Prompt Copy Co", "relevance": "non-relevant", "hard_conditions_met": false, "identity_correct": true, "evidence_verifiable": true, "reviewer": "pending-human-review", "version": "v1-draft" }],
+    "source_scaffolds": [{ "canonical_url": "https://huggingface.co/spaces/lmarena-ai/chatbot-arena-leaderboard" }],
+    "known_relevant": [],
+    "judgments": [{ "canonical_url": "https://huggingface.co/spaces/lmarena-ai/chatbot-arena-leaderboard", "relevance": "uncertain", "hard_conditions_met": true, "identity_correct": true, "evidence_verifiable": true, "reviewer": "pending-human-review", "version": "v1-draft" }, { "name": "Sam Wu", "company": "Prompt Copy Co", "relevance": "uncertain", "hard_conditions_met": false, "identity_correct": true, "evidence_verifiable": true, "reviewer": "pending-human-review", "version": "v1-draft" }],
     "minimum_evidence": ["paper or benchmark page", "author or maintainer identity"]
   },
   {
@@ -39,8 +42,9 @@
     "brief": "Find an engineer with public Kubernetes platform-maintenance evidence.",
     "required_conditions": ["Kubernetes", "platform engineering"],
     "excluded_conditions": ["certificate without delivery evidence"],
-    "known_relevant": [{ "canonical_url": "https://github.com/kubernetes/kubernetes" }],
-    "judgments": [{ "canonical_url": "https://github.com/kubernetes/kubernetes", "relevance": "relevant", "hard_conditions_met": true, "identity_correct": true, "evidence_verifiable": true, "reviewer": "pending-human-review", "version": "v1-draft" }, { "name": "Taylor Smith", "company": "Cloud Courseware", "relevance": "non-relevant", "hard_conditions_met": false, "identity_correct": true, "evidence_verifiable": true, "reviewer": "pending-human-review", "version": "v1-draft" }],
+    "source_scaffolds": [{ "canonical_url": "https://github.com/kubernetes/kubernetes" }],
+    "known_relevant": [],
+    "judgments": [{ "canonical_url": "https://github.com/kubernetes/kubernetes", "relevance": "uncertain", "hard_conditions_met": true, "identity_correct": true, "evidence_verifiable": true, "reviewer": "pending-human-review", "version": "v1-draft" }, { "name": "Taylor Smith", "company": "Cloud Courseware", "relevance": "uncertain", "hard_conditions_met": false, "identity_correct": true, "evidence_verifiable": true, "reviewer": "pending-human-review", "version": "v1-draft" }],
     "minimum_evidence": ["merged contribution", "technical profile"]
   },
   {
@@ -49,8 +53,9 @@
     "brief": "Find a computer-vision engineer with a public peer-reviewed paper.",
     "required_conditions": ["computer vision", "peer-reviewed paper"],
     "excluded_conditions": ["marketing case study only"],
-    "known_relevant": [{ "canonical_url": "https://openreview.net/group?id=thecvf.com/CVPR/2025/Conference" }],
-    "judgments": [{ "canonical_url": "https://openreview.net/group?id=thecvf.com/CVPR/2025/Conference", "relevance": "relevant", "hard_conditions_met": true, "identity_correct": true, "evidence_verifiable": true, "reviewer": "pending-human-review", "version": "v1-draft" }, { "name": "Riley Chen", "company": "Lens Marketing", "relevance": "non-relevant", "hard_conditions_met": false, "identity_correct": true, "evidence_verifiable": true, "reviewer": "pending-human-review", "version": "v1-draft" }],
+    "source_scaffolds": [{ "canonical_url": "https://openreview.net/group?id=thecvf.com/CVPR/2025/Conference" }],
+    "known_relevant": [],
+    "judgments": [{ "canonical_url": "https://openreview.net/group?id=thecvf.com/CVPR/2025/Conference", "relevance": "uncertain", "hard_conditions_met": true, "identity_correct": true, "evidence_verifiable": true, "reviewer": "pending-human-review", "version": "v1-draft" }, { "name": "Riley Chen", "company": "Lens Marketing", "relevance": "uncertain", "hard_conditions_met": false, "identity_correct": true, "evidence_verifiable": true, "reviewer": "pending-human-review", "version": "v1-draft" }],
     "minimum_evidence": ["paper metadata", "author identity"]
   },
   {
@@ -59,8 +64,9 @@
     "brief": "Find a security engineer with public incident-response or vulnerability-disclosure evidence.",
     "required_conditions": ["security engineering", "public disclosure or advisory"],
     "excluded_conditions": ["security sales"],
-    "known_relevant": [{ "canonical_url": "https://github.com/google/security-research" }],
-    "judgments": [{ "canonical_url": "https://github.com/google/security-research", "relevance": "relevant", "hard_conditions_met": true, "identity_correct": true, "evidence_verifiable": true, "reviewer": "pending-human-review", "version": "v1-draft" }, { "name": "Casey Kim", "company": "Secure Leads", "relevance": "non-relevant", "hard_conditions_met": false, "identity_correct": true, "evidence_verifiable": true, "reviewer": "pending-human-review", "version": "v1-draft" }],
+    "source_scaffolds": [{ "canonical_url": "https://github.com/google/security-research" }],
+    "known_relevant": [],
+    "judgments": [{ "canonical_url": "https://github.com/google/security-research", "relevance": "uncertain", "hard_conditions_met": true, "identity_correct": true, "evidence_verifiable": true, "reviewer": "pending-human-review", "version": "v1-draft" }, { "name": "Casey Kim", "company": "Secure Leads", "relevance": "uncertain", "hard_conditions_met": false, "identity_correct": true, "evidence_verifiable": true, "reviewer": "pending-human-review", "version": "v1-draft" }],
     "minimum_evidence": ["advisory or disclosure", "author attribution"]
   },
   {
@@ -69,8 +75,9 @@
     "brief": "Find an engineer with public database performance work in PostgreSQL.",
     "required_conditions": ["PostgreSQL", "performance engineering"],
     "excluded_conditions": ["generic SQL training"],
-    "known_relevant": [{ "canonical_url": "https://github.com/postgres/postgres" }],
-    "judgments": [{ "canonical_url": "https://github.com/postgres/postgres", "relevance": "relevant", "hard_conditions_met": true, "identity_correct": true, "evidence_verifiable": true, "reviewer": "pending-human-review", "version": "v1-draft" }, { "name": "Avery Lin", "company": "SQL Academy", "relevance": "non-relevant", "hard_conditions_met": false, "identity_correct": true, "evidence_verifiable": true, "reviewer": "pending-human-review", "version": "v1-draft" }],
+    "source_scaffolds": [{ "canonical_url": "https://github.com/postgres/postgres" }],
+    "known_relevant": [],
+    "judgments": [{ "canonical_url": "https://github.com/postgres/postgres", "relevance": "uncertain", "hard_conditions_met": true, "identity_correct": true, "evidence_verifiable": true, "reviewer": "pending-human-review", "version": "v1-draft" }, { "name": "Avery Lin", "company": "SQL Academy", "relevance": "uncertain", "hard_conditions_met": false, "identity_correct": true, "evidence_verifiable": true, "reviewer": "pending-human-review", "version": "v1-draft" }],
     "minimum_evidence": ["database contribution", "technical evidence"]
   },
   {
@@ -79,8 +86,9 @@
     "brief": "Find a product analytics engineer with public event-pipeline implementation evidence.",
     "required_conditions": ["product analytics", "event pipeline"],
     "excluded_conditions": ["dashboard-only analyst"],
-    "known_relevant": [{ "canonical_url": "https://github.com/PostHog/posthog" }],
-    "judgments": [{ "canonical_url": "https://github.com/PostHog/posthog", "relevance": "relevant", "hard_conditions_met": true, "identity_correct": true, "evidence_verifiable": true, "reviewer": "pending-human-review", "version": "v1-draft" }, { "name": "Drew Patel", "company": "Chart Templates", "relevance": "non-relevant", "hard_conditions_met": false, "identity_correct": true, "evidence_verifiable": true, "reviewer": "pending-human-review", "version": "v1-draft" }],
+    "source_scaffolds": [{ "canonical_url": "https://github.com/PostHog/posthog" }],
+    "known_relevant": [],
+    "judgments": [{ "canonical_url": "https://github.com/PostHog/posthog", "relevance": "uncertain", "hard_conditions_met": true, "identity_correct": true, "evidence_verifiable": true, "reviewer": "pending-human-review", "version": "v1-draft" }, { "name": "Drew Patel", "company": "Chart Templates", "relevance": "uncertain", "hard_conditions_met": false, "identity_correct": true, "evidence_verifiable": true, "reviewer": "pending-human-review", "version": "v1-draft" }],
     "minimum_evidence": ["implementation repository", "public technical profile"]
   },
   {
@@ -89,8 +97,9 @@
     "brief": "Find a frontend engineer with open-source TypeScript design-system work.",
     "required_conditions": ["TypeScript", "design system"],
     "excluded_conditions": ["visual design without code"],
-    "known_relevant": [{ "canonical_url": "https://github.com/shadcn-ui/ui" }],
-    "judgments": [{ "canonical_url": "https://github.com/shadcn-ui/ui", "relevance": "relevant", "hard_conditions_met": true, "identity_correct": true, "evidence_verifiable": true, "reviewer": "pending-human-review", "version": "v1-draft" }, { "name": "Jamie Rivera", "company": "Brand Moodboards", "relevance": "non-relevant", "hard_conditions_met": false, "identity_correct": true, "evidence_verifiable": true, "reviewer": "pending-human-review", "version": "v1-draft" }],
+    "source_scaffolds": [{ "canonical_url": "https://github.com/shadcn-ui/ui" }],
+    "known_relevant": [],
+    "judgments": [{ "canonical_url": "https://github.com/shadcn-ui/ui", "relevance": "uncertain", "hard_conditions_met": true, "identity_correct": true, "evidence_verifiable": true, "reviewer": "pending-human-review", "version": "v1-draft" }, { "name": "Jamie Rivera", "company": "Brand Moodboards", "relevance": "uncertain", "hard_conditions_met": false, "identity_correct": true, "evidence_verifiable": true, "reviewer": "pending-human-review", "version": "v1-draft" }],
     "minimum_evidence": ["repository activity", "component documentation"]
   },
   {
@@ -99,8 +108,9 @@
     "brief": "Find an engineer with public observability instrumentation work.",
     "required_conditions": ["observability", "instrumentation"],
     "excluded_conditions": ["monitoring procurement"],
-    "known_relevant": [{ "canonical_url": "https://github.com/open-telemetry/opentelemetry-js" }],
-    "judgments": [{ "canonical_url": "https://github.com/open-telemetry/opentelemetry-js", "relevance": "relevant", "hard_conditions_met": true, "identity_correct": true, "evidence_verifiable": true, "reviewer": "pending-human-review", "version": "v1-draft" }, { "name": "Alex Morgan", "company": "Monitor Resellers", "relevance": "non-relevant", "hard_conditions_met": false, "identity_correct": true, "evidence_verifiable": true, "reviewer": "pending-human-review", "version": "v1-draft" }],
+    "source_scaffolds": [{ "canonical_url": "https://github.com/open-telemetry/opentelemetry-js" }],
+    "known_relevant": [],
+    "judgments": [{ "canonical_url": "https://github.com/open-telemetry/opentelemetry-js", "relevance": "uncertain", "hard_conditions_met": true, "identity_correct": true, "evidence_verifiable": true, "reviewer": "pending-human-review", "version": "v1-draft" }, { "name": "Alex Morgan", "company": "Monitor Resellers", "relevance": "uncertain", "hard_conditions_met": false, "identity_correct": true, "evidence_verifiable": true, "reviewer": "pending-human-review", "version": "v1-draft" }],
     "minimum_evidence": ["instrumentation code", "maintainer attribution"]
   },
   {
@@ -109,8 +119,9 @@
     "brief": "Find a founding engineer who has shipped LLM agents, owns production infrastructure, and has public technical evidence.",
     "required_conditions": ["LLM agents", "production infrastructure", "founding-stage ownership"],
     "excluded_conditions": ["agency recruiter", "prompt-only profile"],
-    "known_relevant": [{ "canonical_url": "https://github.com/langchain-ai/langgraph" }],
-    "judgments": [{ "canonical_url": "https://github.com/langchain-ai/langgraph", "relevance": "relevant", "hard_conditions_met": true, "identity_correct": true, "evidence_verifiable": true, "reviewer": "pending-human-review", "version": "v1-draft" }, { "name": "Nico Shah", "company": "Prompt Services", "relevance": "non-relevant", "hard_conditions_met": false, "identity_correct": true, "evidence_verifiable": true, "reviewer": "pending-human-review", "version": "v1-draft" }],
+    "source_scaffolds": [{ "canonical_url": "https://github.com/langchain-ai/langgraph" }],
+    "known_relevant": [],
+    "judgments": [{ "canonical_url": "https://github.com/langchain-ai/langgraph", "relevance": "uncertain", "hard_conditions_met": true, "identity_correct": true, "evidence_verifiable": true, "reviewer": "pending-human-review", "version": "v1-draft" }, { "name": "Nico Shah", "company": "Prompt Services", "relevance": "uncertain", "hard_conditions_met": false, "identity_correct": true, "evidence_verifiable": true, "reviewer": "pending-human-review", "version": "v1-draft" }],
     "minimum_evidence": ["agent code", "production architecture evidence"]
   },
   {
@@ -119,8 +130,9 @@
     "brief": "Find a product-minded engineer with public work on AI-assisted recruiting workflows and privacy-aware data handling.",
     "required_conditions": ["AI workflow", "recruiting workflow", "privacy-aware data handling"],
     "excluded_conditions": ["bulk outbound automation"],
-    "known_relevant": [{ "canonical_url": "https://github.com/supabase/supabase" }],
-    "judgments": [{ "canonical_url": "https://github.com/supabase/supabase", "relevance": "relevant", "hard_conditions_met": true, "identity_correct": true, "evidence_verifiable": true, "reviewer": "pending-human-review", "version": "v1-draft" }, { "name": "Peyton Zhao", "company": "Email Blast Ltd", "relevance": "non-relevant", "hard_conditions_met": false, "identity_correct": true, "evidence_verifiable": true, "reviewer": "pending-human-review", "version": "v1-draft" }],
+    "source_scaffolds": [{ "canonical_url": "https://github.com/supabase/supabase" }],
+    "known_relevant": [],
+    "judgments": [{ "canonical_url": "https://github.com/supabase/supabase", "relevance": "uncertain", "hard_conditions_met": true, "identity_correct": true, "evidence_verifiable": true, "reviewer": "pending-human-review", "version": "v1-draft" }, { "name": "Peyton Zhao", "company": "Email Blast Ltd", "relevance": "uncertain", "hard_conditions_met": false, "identity_correct": true, "evidence_verifiable": true, "reviewer": "pending-human-review", "version": "v1-draft" }],
     "minimum_evidence": ["workflow implementation", "privacy or data-control documentation"]
   },
   {
@@ -129,8 +141,9 @@
     "brief": "Find an engineer who combines embedded systems, on-device ML, and performance profiling.",
     "required_conditions": ["embedded systems", "on-device ML", "performance profiling"],
     "excluded_conditions": ["cloud-only ML"],
-    "known_relevant": [{ "canonical_url": "https://github.com/tensorflow/tflite-micro" }],
-    "judgments": [{ "canonical_url": "https://github.com/tensorflow/tflite-micro", "relevance": "relevant", "hard_conditions_met": true, "identity_correct": true, "evidence_verifiable": true, "reviewer": "pending-human-review", "version": "v1-draft" }, { "name": "Skyler Tan", "company": "Cloud Vision Ads", "relevance": "non-relevant", "hard_conditions_met": false, "identity_correct": true, "evidence_verifiable": true, "reviewer": "pending-human-review", "version": "v1-draft" }],
+    "source_scaffolds": [{ "canonical_url": "https://github.com/tensorflow/tflite-micro" }],
+    "known_relevant": [],
+    "judgments": [{ "canonical_url": "https://github.com/tensorflow/tflite-micro", "relevance": "uncertain", "hard_conditions_met": true, "identity_correct": true, "evidence_verifiable": true, "reviewer": "pending-human-review", "version": "v1-draft" }, { "name": "Skyler Tan", "company": "Cloud Vision Ads", "relevance": "uncertain", "hard_conditions_met": false, "identity_correct": true, "evidence_verifiable": true, "reviewer": "pending-human-review", "version": "v1-draft" }],
     "minimum_evidence": ["embedded code", "profiling or benchmark evidence"]
   },
   {
@@ -139,8 +152,9 @@
     "brief": "Find an NLP engineer with multilingual model work, evaluation evidence, and production Python experience.",
     "required_conditions": ["multilingual NLP", "evaluation", "production Python"],
     "excluded_conditions": ["English-only content writing"],
-    "known_relevant": [{ "canonical_url": "https://github.com/explosion/spaCy" }],
-    "judgments": [{ "canonical_url": "https://github.com/explosion/spaCy", "relevance": "relevant", "hard_conditions_met": true, "identity_correct": true, "evidence_verifiable": true, "reviewer": "pending-human-review", "version": "v1-draft" }, { "name": "Bailey Zhou", "company": "Translation Copy", "relevance": "non-relevant", "hard_conditions_met": false, "identity_correct": true, "evidence_verifiable": true, "reviewer": "pending-human-review", "version": "v1-draft" }],
+    "source_scaffolds": [{ "canonical_url": "https://github.com/explosion/spaCy" }],
+    "known_relevant": [],
+    "judgments": [{ "canonical_url": "https://github.com/explosion/spaCy", "relevance": "uncertain", "hard_conditions_met": true, "identity_correct": true, "evidence_verifiable": true, "reviewer": "pending-human-review", "version": "v1-draft" }, { "name": "Bailey Zhou", "company": "Translation Copy", "relevance": "uncertain", "hard_conditions_met": false, "identity_correct": true, "evidence_verifiable": true, "reviewer": "pending-human-review", "version": "v1-draft" }],
     "minimum_evidence": ["model or library contribution", "evaluation artifact"]
   },
   {
@@ -149,8 +163,9 @@
     "brief": "Find a data-platform engineer with open-source privacy tooling, SQL systems work, and security evidence.",
     "required_conditions": ["data platform", "privacy tooling", "security evidence"],
     "excluded_conditions": ["policy-only privacy role"],
-    "known_relevant": [{ "canonical_url": "https://github.com/openmined/PySyft" }],
-    "judgments": [{ "canonical_url": "https://github.com/openmined/PySyft", "relevance": "relevant", "hard_conditions_met": true, "identity_correct": true, "evidence_verifiable": true, "reviewer": "pending-human-review", "version": "v1-draft" }, { "name": "Harper Sun", "company": "Compliance Slides", "relevance": "non-relevant", "hard_conditions_met": false, "identity_correct": true, "evidence_verifiable": true, "reviewer": "pending-human-review", "version": "v1-draft" }],
+    "source_scaffolds": [{ "canonical_url": "https://github.com/openmined/PySyft" }],
+    "known_relevant": [],
+    "judgments": [{ "canonical_url": "https://github.com/openmined/PySyft", "relevance": "uncertain", "hard_conditions_met": true, "identity_correct": true, "evidence_verifiable": true, "reviewer": "pending-human-review", "version": "v1-draft" }, { "name": "Harper Sun", "company": "Compliance Slides", "relevance": "uncertain", "hard_conditions_met": false, "identity_correct": true, "evidence_verifiable": true, "reviewer": "pending-human-review", "version": "v1-draft" }],
     "minimum_evidence": ["privacy implementation", "technical security evidence"]
   },
   {
@@ -159,8 +174,9 @@
     "brief": "Find a full-stack engineer who has built developer tools, public API documentation, and workflow integrations.",
     "required_conditions": ["developer tools", "public API", "workflow integration"],
     "excluded_conditions": ["no-code-only automation"],
-    "known_relevant": [{ "canonical_url": "https://github.com/n8n-io/n8n" }],
-    "judgments": [{ "canonical_url": "https://github.com/n8n-io/n8n", "relevance": "relevant", "hard_conditions_met": true, "identity_correct": true, "evidence_verifiable": true, "reviewer": "pending-human-review", "version": "v1-draft" }, { "name": "Quinn Lee", "company": "Zap Templates", "relevance": "non-relevant", "hard_conditions_met": false, "identity_correct": true, "evidence_verifiable": true, "reviewer": "pending-human-review", "version": "v1-draft" }],
+    "source_scaffolds": [{ "canonical_url": "https://github.com/n8n-io/n8n" }],
+    "known_relevant": [],
+    "judgments": [{ "canonical_url": "https://github.com/n8n-io/n8n", "relevance": "uncertain", "hard_conditions_met": true, "identity_correct": true, "evidence_verifiable": true, "reviewer": "pending-human-review", "version": "v1-draft" }, { "name": "Quinn Lee", "company": "Zap Templates", "relevance": "uncertain", "hard_conditions_met": false, "identity_correct": true, "evidence_verifiable": true, "reviewer": "pending-human-review", "version": "v1-draft" }],
     "minimum_evidence": ["tooling repository", "API or integration documentation"]
   },
   {
@@ -169,8 +185,9 @@
     "brief": "Find an MLOps engineer with model-serving, observability, and on-call reliability evidence.",
     "required_conditions": ["model serving", "observability", "reliability"],
     "excluded_conditions": ["notebook-only ML"],
-    "known_relevant": [{ "canonical_url": "https://github.com/bentoml/BentoML" }],
-    "judgments": [{ "canonical_url": "https://github.com/bentoml/BentoML", "relevance": "relevant", "hard_conditions_met": true, "identity_correct": true, "evidence_verifiable": true, "reviewer": "pending-human-review", "version": "v1-draft" }, { "name": "Rowan Hu", "company": "Model Demos", "relevance": "non-relevant", "hard_conditions_met": false, "identity_correct": true, "evidence_verifiable": true, "reviewer": "pending-human-review", "version": "v1-draft" }],
+    "source_scaffolds": [{ "canonical_url": "https://github.com/bentoml/BentoML" }],
+    "known_relevant": [],
+    "judgments": [{ "canonical_url": "https://github.com/bentoml/BentoML", "relevance": "uncertain", "hard_conditions_met": true, "identity_correct": true, "evidence_verifiable": true, "reviewer": "pending-human-review", "version": "v1-draft" }, { "name": "Rowan Hu", "company": "Model Demos", "relevance": "uncertain", "hard_conditions_met": false, "identity_correct": true, "evidence_verifiable": true, "reviewer": "pending-human-review", "version": "v1-draft" }],
     "minimum_evidence": ["serving implementation", "operational evidence"]
   },
   {
@@ -179,8 +196,9 @@
     "brief": "Find a frontend systems engineer with React, web performance, and accessible-component evidence.",
     "required_conditions": ["React", "web performance", "accessibility"],
     "excluded_conditions": ["static design portfolio only"],
-    "known_relevant": [{ "canonical_url": "https://github.com/vercel/next.js" }],
-    "judgments": [{ "canonical_url": "https://github.com/vercel/next.js", "relevance": "relevant", "hard_conditions_met": true, "identity_correct": true, "evidence_verifiable": true, "reviewer": "pending-human-review", "version": "v1-draft" }, { "name": "Emerson Li", "company": "Landing Pages Inc", "relevance": "non-relevant", "hard_conditions_met": false, "identity_correct": true, "evidence_verifiable": true, "reviewer": "pending-human-review", "version": "v1-draft" }],
+    "source_scaffolds": [{ "canonical_url": "https://github.com/vercel/next.js" }],
+    "known_relevant": [],
+    "judgments": [{ "canonical_url": "https://github.com/vercel/next.js", "relevance": "uncertain", "hard_conditions_met": true, "identity_correct": true, "evidence_verifiable": true, "reviewer": "pending-human-review", "version": "v1-draft" }, { "name": "Emerson Li", "company": "Landing Pages Inc", "relevance": "uncertain", "hard_conditions_met": false, "identity_correct": true, "evidence_verifiable": true, "reviewer": "pending-human-review", "version": "v1-draft" }],
     "minimum_evidence": ["production framework contribution", "accessibility or performance evidence"]
   },
   {
@@ -189,8 +207,9 @@
     "brief": "Find a backend engineer with payments integration, ledger correctness, and Go or Java evidence.",
     "required_conditions": ["payments integration", "ledger correctness", "Go or Java"],
     "excluded_conditions": ["consumer finance marketing"],
-    "known_relevant": [{ "canonical_url": "https://github.com/stripe/stripe-go" }],
-    "judgments": [{ "canonical_url": "https://github.com/stripe/stripe-go", "relevance": "relevant", "hard_conditions_met": true, "identity_correct": true, "evidence_verifiable": true, "reviewer": "pending-human-review", "version": "v1-draft" }, { "name": "Finley Rao", "company": "Payment Ads", "relevance": "non-relevant", "hard_conditions_met": false, "identity_correct": true, "evidence_verifiable": true, "reviewer": "pending-human-review", "version": "v1-draft" }],
+    "source_scaffolds": [{ "canonical_url": "https://github.com/stripe/stripe-go" }],
+    "known_relevant": [],
+    "judgments": [{ "canonical_url": "https://github.com/stripe/stripe-go", "relevance": "uncertain", "hard_conditions_met": true, "identity_correct": true, "evidence_verifiable": true, "reviewer": "pending-human-review", "version": "v1-draft" }, { "name": "Finley Rao", "company": "Payment Ads", "relevance": "uncertain", "hard_conditions_met": false, "identity_correct": true, "evidence_verifiable": true, "reviewer": "pending-human-review", "version": "v1-draft" }],
     "minimum_evidence": ["integration code", "correctness or API evidence"]
   },
   {
@@ -199,8 +218,9 @@
     "brief": "Find a research engineer with retrieval-augmented generation, evaluation, and documentation evidence.",
     "required_conditions": ["retrieval augmented generation", "evaluation", "documentation"],
     "excluded_conditions": ["generic chatbot implementation"],
-    "known_relevant": [{ "canonical_url": "https://github.com/deepset-ai/haystack" }],
-    "judgments": [{ "canonical_url": "https://github.com/deepset-ai/haystack", "relevance": "relevant", "hard_conditions_met": true, "identity_correct": true, "evidence_verifiable": true, "reviewer": "pending-human-review", "version": "v1-draft" }, { "name": "Ira Wong", "company": "Bot Landing Pages", "relevance": "non-relevant", "hard_conditions_met": false, "identity_correct": true, "evidence_verifiable": true, "reviewer": "pending-human-review", "version": "v1-draft" }],
+    "source_scaffolds": [{ "canonical_url": "https://github.com/deepset-ai/haystack" }],
+    "known_relevant": [],
+    "judgments": [{ "canonical_url": "https://github.com/deepset-ai/haystack", "relevance": "uncertain", "hard_conditions_met": true, "identity_correct": true, "evidence_verifiable": true, "reviewer": "pending-human-review", "version": "v1-draft" }, { "name": "Ira Wong", "company": "Bot Landing Pages", "relevance": "uncertain", "hard_conditions_met": false, "identity_correct": true, "evidence_verifiable": true, "reviewer": "pending-human-review", "version": "v1-draft" }],
     "minimum_evidence": ["RAG implementation", "evaluation or technical documentation"]
   },
   {
@@ -209,8 +229,9 @@
     "brief": "Find a hands-on engineer outside obvious AI-lab brands who has quietly maintained agent-evaluation tooling and shared reproducible evidence.",
     "required_conditions": ["agent evaluation", "reproducible tooling", "hands-on maintenance"],
     "excluded_conditions": ["major-lab brand only", "unverified social claim"],
-    "known_relevant": [{ "canonical_url": "https://github.com/confident-ai/deepeval" }],
-    "judgments": [{ "canonical_url": "https://github.com/confident-ai/deepeval", "relevance": "relevant", "hard_conditions_met": true, "identity_correct": true, "evidence_verifiable": true, "reviewer": "pending-human-review", "version": "v1-draft" }, { "name": "Logan Yi", "company": "AI Growth Agency", "relevance": "non-relevant", "hard_conditions_met": false, "identity_correct": true, "evidence_verifiable": true, "reviewer": "pending-human-review", "version": "v1-draft" }],
+    "source_scaffolds": [{ "canonical_url": "https://github.com/confident-ai/deepeval" }],
+    "known_relevant": [],
+    "judgments": [{ "canonical_url": "https://github.com/confident-ai/deepeval", "relevance": "uncertain", "hard_conditions_met": true, "identity_correct": true, "evidence_verifiable": true, "reviewer": "pending-human-review", "version": "v1-draft" }, { "name": "Logan Yi", "company": "AI Growth Agency", "relevance": "uncertain", "hard_conditions_met": false, "identity_correct": true, "evidence_verifiable": true, "reviewer": "pending-human-review", "version": "v1-draft" }],
     "minimum_evidence": ["maintained evaluation code", "reproducible example"]
   },
   {
@@ -219,8 +240,9 @@
     "brief": "Find a low-profile distributed-systems engineer with public incident, consensus, and production-operations evidence.",
     "required_conditions": ["distributed systems", "consensus or replication", "production operations"],
     "excluded_conditions": ["tutorial-only profile"],
-    "known_relevant": [{ "canonical_url": "https://github.com/etcd-io/etcd" }],
-    "judgments": [{ "canonical_url": "https://github.com/etcd-io/etcd", "relevance": "relevant", "hard_conditions_met": true, "identity_correct": true, "evidence_verifiable": true, "reviewer": "pending-human-review", "version": "v1-draft" }, { "name": "Milan Gu", "company": "DevOps Courses", "relevance": "non-relevant", "hard_conditions_met": false, "identity_correct": true, "evidence_verifiable": true, "reviewer": "pending-human-review", "version": "v1-draft" }],
+    "source_scaffolds": [{ "canonical_url": "https://github.com/etcd-io/etcd" }],
+    "known_relevant": [],
+    "judgments": [{ "canonical_url": "https://github.com/etcd-io/etcd", "relevance": "uncertain", "hard_conditions_met": true, "identity_correct": true, "evidence_verifiable": true, "reviewer": "pending-human-review", "version": "v1-draft" }, { "name": "Milan Gu", "company": "DevOps Courses", "relevance": "uncertain", "hard_conditions_met": false, "identity_correct": true, "evidence_verifiable": true, "reviewer": "pending-human-review", "version": "v1-draft" }],
     "minimum_evidence": ["systems code", "operational or incident evidence"]
   },
   {
@@ -229,8 +251,9 @@
     "brief": "Find a practitioner with under-the-radar open-source AI safety tooling, empirical testing, and clear limitations documentation.",
     "required_conditions": ["AI safety tooling", "empirical testing", "limitations documentation"],
     "excluded_conditions": ["policy commentary only"],
-    "known_relevant": [{ "canonical_url": "https://github.com/UKGovernmentBEIS/inspect_ai" }],
-    "judgments": [{ "canonical_url": "https://github.com/UKGovernmentBEIS/inspect_ai", "relevance": "relevant", "hard_conditions_met": true, "identity_correct": true, "evidence_verifiable": true, "reviewer": "pending-human-review", "version": "v1-draft" }, { "name": "Sasha Bell", "company": "Safety Newsletter", "relevance": "non-relevant", "hard_conditions_met": false, "identity_correct": true, "evidence_verifiable": true, "reviewer": "pending-human-review", "version": "v1-draft" }],
+    "source_scaffolds": [{ "canonical_url": "https://github.com/UKGovernmentBEIS/inspect_ai" }],
+    "known_relevant": [],
+    "judgments": [{ "canonical_url": "https://github.com/UKGovernmentBEIS/inspect_ai", "relevance": "uncertain", "hard_conditions_met": true, "identity_correct": true, "evidence_verifiable": true, "reviewer": "pending-human-review", "version": "v1-draft" }, { "name": "Sasha Bell", "company": "Safety Newsletter", "relevance": "uncertain", "hard_conditions_met": false, "identity_correct": true, "evidence_verifiable": true, "reviewer": "pending-human-review", "version": "v1-draft" }],
     "minimum_evidence": ["safety-tool code", "test or limitation documentation"]
   },
   {
@@ -239,8 +262,9 @@
     "brief": "Find a developer educator who also has public evidence of shipping a production developer platform, not only content.",
     "required_conditions": ["developer education", "production platform", "code ownership"],
     "excluded_conditions": ["content creator without engineering evidence"],
-    "known_relevant": [{ "canonical_url": "https://github.com/freeCodeCamp/freeCodeCamp" }],
-    "judgments": [{ "canonical_url": "https://github.com/freeCodeCamp/freeCodeCamp", "relevance": "relevant", "hard_conditions_met": true, "identity_correct": true, "evidence_verifiable": true, "reviewer": "pending-human-review", "version": "v1-draft" }, { "name": "Robin Gao", "company": "Course Influencers", "relevance": "non-relevant", "hard_conditions_met": false, "identity_correct": true, "evidence_verifiable": true, "reviewer": "pending-human-review", "version": "v1-draft" }],
+    "source_scaffolds": [{ "canonical_url": "https://github.com/freeCodeCamp/freeCodeCamp" }],
+    "known_relevant": [],
+    "judgments": [{ "canonical_url": "https://github.com/freeCodeCamp/freeCodeCamp", "relevance": "uncertain", "hard_conditions_met": true, "identity_correct": true, "evidence_verifiable": true, "reviewer": "pending-human-review", "version": "v1-draft" }, { "name": "Robin Gao", "company": "Course Influencers", "relevance": "uncertain", "hard_conditions_met": false, "identity_correct": true, "evidence_verifiable": true, "reviewer": "pending-human-review", "version": "v1-draft" }],
     "minimum_evidence": ["production repository", "education contribution"]
   },
   {
@@ -249,8 +273,9 @@
     "brief": "Find a data engineer with public climate-data infrastructure work, scientific data standards, and practical software evidence.",
     "required_conditions": ["climate data", "scientific data standards", "software engineering"],
     "excluded_conditions": ["climate advocacy only"],
-    "known_relevant": [{ "canonical_url": "https://github.com/pangeo-data/pangeo" }],
-    "judgments": [{ "canonical_url": "https://github.com/pangeo-data/pangeo", "relevance": "relevant", "hard_conditions_met": true, "identity_correct": true, "evidence_verifiable": true, "reviewer": "pending-human-review", "version": "v1-draft" }, { "name": "Kendall Ren", "company": "Green PR", "relevance": "non-relevant", "hard_conditions_met": false, "identity_correct": true, "evidence_verifiable": true, "reviewer": "pending-human-review", "version": "v1-draft" }],
+    "source_scaffolds": [{ "canonical_url": "https://github.com/pangeo-data/pangeo" }],
+    "known_relevant": [],
+    "judgments": [{ "canonical_url": "https://github.com/pangeo-data/pangeo", "relevance": "uncertain", "hard_conditions_met": true, "identity_correct": true, "evidence_verifiable": true, "reviewer": "pending-human-review", "version": "v1-draft" }, { "name": "Kendall Ren", "company": "Green PR", "relevance": "uncertain", "hard_conditions_met": false, "identity_correct": true, "evidence_verifiable": true, "reviewer": "pending-human-review", "version": "v1-draft" }],
     "minimum_evidence": ["scientific data repository", "implementation evidence"]
   },
   {
@@ -259,8 +284,9 @@
     "brief": "Find a backend engineer with open-source healthcare interoperability, data reliability, and privacy-aware implementation evidence.",
     "required_conditions": ["healthcare interoperability", "data reliability", "privacy-aware implementation"],
     "excluded_conditions": ["clinical role without software work"],
-    "known_relevant": [{ "canonical_url": "https://github.com/hapifhir/hapi-fhir" }],
-    "judgments": [{ "canonical_url": "https://github.com/hapifhir/hapi-fhir", "relevance": "relevant", "hard_conditions_met": true, "identity_correct": true, "evidence_verifiable": true, "reviewer": "pending-human-review", "version": "v1-draft" }, { "name": "Reese Han", "company": "Health Lead Gen", "relevance": "non-relevant", "hard_conditions_met": false, "identity_correct": true, "evidence_verifiable": true, "reviewer": "pending-human-review", "version": "v1-draft" }],
+    "source_scaffolds": [{ "canonical_url": "https://github.com/hapifhir/hapi-fhir" }],
+    "known_relevant": [],
+    "judgments": [{ "canonical_url": "https://github.com/hapifhir/hapi-fhir", "relevance": "uncertain", "hard_conditions_met": true, "identity_correct": true, "evidence_verifiable": true, "reviewer": "pending-human-review", "version": "v1-draft" }, { "name": "Reese Han", "company": "Health Lead Gen", "relevance": "uncertain", "hard_conditions_met": false, "identity_correct": true, "evidence_verifiable": true, "reviewer": "pending-human-review", "version": "v1-draft" }],
     "minimum_evidence": ["interoperability implementation", "privacy or reliability evidence"]
   },
   {
@@ -269,8 +295,9 @@
     "brief": "Find an accessibility specialist who has maintained engineering infrastructure and public automated-testing evidence.",
     "required_conditions": ["accessibility", "engineering infrastructure", "automated testing"],
     "excluded_conditions": ["manual audit only"],
-    "known_relevant": [{ "canonical_url": "https://github.com/dequelabs/axe-core" }],
-    "judgments": [{ "canonical_url": "https://github.com/dequelabs/axe-core", "relevance": "relevant", "hard_conditions_met": true, "identity_correct": true, "evidence_verifiable": true, "reviewer": "pending-human-review", "version": "v1-draft" }, { "name": "Charlie Luo", "company": "Accessibility Consulting", "relevance": "non-relevant", "hard_conditions_met": false, "identity_correct": true, "evidence_verifiable": true, "reviewer": "pending-human-review", "version": "v1-draft" }],
+    "source_scaffolds": [{ "canonical_url": "https://github.com/dequelabs/axe-core" }],
+    "known_relevant": [],
+    "judgments": [{ "canonical_url": "https://github.com/dequelabs/axe-core", "relevance": "uncertain", "hard_conditions_met": true, "identity_correct": true, "evidence_verifiable": true, "reviewer": "pending-human-review", "version": "v1-draft" }, { "name": "Charlie Luo", "company": "Accessibility Consulting", "relevance": "uncertain", "hard_conditions_met": false, "identity_correct": true, "evidence_verifiable": true, "reviewer": "pending-human-review", "version": "v1-draft" }],
     "minimum_evidence": ["automation code", "maintainer or technical attribution"]
   },
   {
@@ -279,8 +306,9 @@
     "brief": "Find a robotics engineer with public simulation, hardware-in-the-loop, and reproducible control-stack evidence.",
     "required_conditions": ["robotics simulation", "hardware in the loop", "control stack"],
     "excluded_conditions": ["CAD-only portfolio"],
-    "known_relevant": [{ "canonical_url": "https://github.com/ros2/ros2" }],
-    "judgments": [{ "canonical_url": "https://github.com/ros2/ros2", "relevance": "relevant", "hard_conditions_met": true, "identity_correct": true, "evidence_verifiable": true, "reviewer": "pending-human-review", "version": "v1-draft" }, { "name": "Dakota Xu", "company": "Robot Render Studio", "relevance": "non-relevant", "hard_conditions_met": false, "identity_correct": true, "evidence_verifiable": true, "reviewer": "pending-human-review", "version": "v1-draft" }],
+    "source_scaffolds": [{ "canonical_url": "https://github.com/ros2/ros2" }],
+    "known_relevant": [],
+    "judgments": [{ "canonical_url": "https://github.com/ros2/ros2", "relevance": "uncertain", "hard_conditions_met": true, "identity_correct": true, "evidence_verifiable": true, "reviewer": "pending-human-review", "version": "v1-draft" }, { "name": "Dakota Xu", "company": "Robot Render Studio", "relevance": "uncertain", "hard_conditions_met": false, "identity_correct": true, "evidence_verifiable": true, "reviewer": "pending-human-review", "version": "v1-draft" }],
     "minimum_evidence": ["control-stack code", "simulation or hardware evidence"]
   },
   {
@@ -289,8 +317,9 @@
     "brief": "Find a compiler engineer with public toolchain work, performance evidence, and contributions beyond a single tutorial project.",
     "required_conditions": ["compiler toolchain", "performance", "sustained contribution"],
     "excluded_conditions": ["one-off toy compiler"],
-    "known_relevant": [{ "canonical_url": "https://github.com/llvm/llvm-project" }],
-    "judgments": [{ "canonical_url": "https://github.com/llvm/llvm-project", "relevance": "relevant", "hard_conditions_met": true, "identity_correct": true, "evidence_verifiable": true, "reviewer": "pending-human-review", "version": "v1-draft" }, { "name": "Ari Flores", "company": "Coding Tutorial Hub", "relevance": "non-relevant", "hard_conditions_met": false, "identity_correct": true, "evidence_verifiable": true, "reviewer": "pending-human-review", "version": "v1-draft" }],
+    "source_scaffolds": [{ "canonical_url": "https://github.com/llvm/llvm-project" }],
+    "known_relevant": [],
+    "judgments": [{ "canonical_url": "https://github.com/llvm/llvm-project", "relevance": "uncertain", "hard_conditions_met": true, "identity_correct": true, "evidence_verifiable": true, "reviewer": "pending-human-review", "version": "v1-draft" }, { "name": "Ari Flores", "company": "Coding Tutorial Hub", "relevance": "uncertain", "hard_conditions_met": false, "identity_correct": true, "evidence_verifiable": true, "reviewer": "pending-human-review", "version": "v1-draft" }],
     "minimum_evidence": ["toolchain contribution", "performance or release evidence"]
   },
   {
@@ -299,8 +328,9 @@
     "brief": "Find a security engineer working on public-interest infrastructure with reproducible threat-model or verification evidence.",
     "required_conditions": ["security engineering", "public-interest infrastructure", "verification evidence"],
     "excluded_conditions": ["general cybersecurity certification"],
-    "known_relevant": [{ "canonical_url": "https://github.com/sigstore/sigstore" }],
-    "judgments": [{ "canonical_url": "https://github.com/sigstore/sigstore", "relevance": "relevant", "hard_conditions_met": true, "identity_correct": true, "evidence_verifiable": true, "reviewer": "pending-human-review", "version": "v1-draft" }, { "name": "Blair Song", "company": "Security Webinar Co", "relevance": "non-relevant", "hard_conditions_met": false, "identity_correct": true, "evidence_verifiable": true, "reviewer": "pending-human-review", "version": "v1-draft" }],
+    "source_scaffolds": [{ "canonical_url": "https://github.com/sigstore/sigstore" }],
+    "known_relevant": [],
+    "judgments": [{ "canonical_url": "https://github.com/sigstore/sigstore", "relevance": "uncertain", "hard_conditions_met": true, "identity_correct": true, "evidence_verifiable": true, "reviewer": "pending-human-review", "version": "v1-draft" }, { "name": "Blair Song", "company": "Security Webinar Co", "relevance": "uncertain", "hard_conditions_met": false, "identity_correct": true, "evidence_verifiable": true, "reviewer": "pending-human-review", "version": "v1-draft" }],
     "minimum_evidence": ["security implementation", "threat model or verification artifact"]
   }
   ]

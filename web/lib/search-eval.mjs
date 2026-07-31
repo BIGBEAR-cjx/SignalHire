@@ -58,8 +58,16 @@ function requiredRunMetrics(result = {}) {
 }
 
 export function evaluationEligibility({ caseDefinition, fixture } = {}) {
-  const reviewStatus = cleanString(fixture?.review_status || caseDefinition?.review_status);
-  return reviewStatus === "approved_human_review"
+  const caseReviewStatus = cleanString(caseDefinition?.review_status);
+  const fixtureReviewStatus = fixture ? cleanString(fixture.review_status) : "approved_human_review";
+  const judgments = Array.isArray(caseDefinition?.judgments) ? caseDefinition.judgments : [];
+  const hasApprovedJudgments = judgments.length > 0 && judgments.every((judgment) =>
+    cleanString(judgment?.reviewer) &&
+    cleanString(judgment.reviewer) !== "pending-human-review" &&
+    cleanString(judgment?.review_status) === "approved_human_review" &&
+    Number.isFinite(Date.parse(cleanString(judgment?.reviewed_at))),
+  );
+  return caseReviewStatus === "approved_human_review" && fixtureReviewStatus === "approved_human_review" && hasApprovedJudgments
     ? { status: "eligible" }
     : { status: "inconclusive", reason: "case_review_pending" };
 }
@@ -71,6 +79,16 @@ function judgmentFor(candidate, judgments) {
 
 function rate(numerator, denominator) {
   return denominator ? numerator / denominator : 0;
+}
+
+function uniqueCandidates(candidates) {
+  const seen = new Set();
+  return candidates.filter((candidate) => {
+    const identity = stableCandidateIdentity(candidate);
+    if (!identity || seen.has(identity)) return false;
+    seen.add(identity);
+    return true;
+  });
 }
 
 export function scoreCase(caseDefinition, result, { fixture } = {}) {
@@ -85,7 +103,7 @@ export function scoreCase(caseDefinition, result, { fixture } = {}) {
     ...knownRelevant,
     ...judgments.filter((item) => item.relevance === "relevant").map(stableCandidateIdentity).filter(Boolean),
   ]);
-  const topTen = result.candidates.slice(0, 10);
+  const topTen = uniqueCandidates(result.candidates).slice(0, 10);
   const topFive = topTen.slice(0, 5);
   const matchedKnown = new Set();
   let hardMatches = 0;
