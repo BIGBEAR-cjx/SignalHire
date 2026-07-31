@@ -8,6 +8,7 @@ import {
   monitorNotificationPayload,
   prepareMonitorResult,
 } from "./worker/talent-monitor-settlement.mjs";
+import { applyCreditTransition, settleTransitionSnapshots } from "./web/lib/credits.mjs";
 
 const runId = "11111111-1111-4111-8111-111111111111";
 
@@ -84,7 +85,7 @@ test("terminal monitor migration settles after research persistence and releases
 
   assert.match(migration, /create or replace function public\.settle_monitor_run\(p_research_run_id uuid\)/i);
   assert.match(migration, /research\.status <> 'done'/i);
-  assert.match(migration, /perform public\.settle_credits\(\s*v_run\.id,\s*v_run\.credits_reserved/i);
+  assert.match(migration, /perform public\.settle_credits\(\s*v_run\.id,\s*v_returned/i);
   assert.match(migration, /create or replace function public\.release_monitor_run\(\s*p_research_run_id uuid/i);
   assert.match(migration, /perform public\.release_credits\(v_run\.id, 'research-run:' \|\| v_run\.id::text \|\| ':release'\)/i);
   assert.match(migration, /v_run\.status in \('done', 'failed', 'cancelled'\)/i);
@@ -92,6 +93,29 @@ test("terminal monitor migration settles after research persistence and releases
   assert.match(worker, /await releaseMonitorRun\(job\.id, failureRow\.status\)/);
   assert.match(worker, /nextAttempt > max[\s\S]*await releaseMonitorRun\(job\.id, "error"\)/);
   assert.doesNotMatch(settlement, /outreach/i);
+});
+
+test("completed monitor runs settle actual candidates or release an empty batch without double charging", () => {
+  const partial = settleTransitionSnapshots({ available: 0, reserved: 10 }, { amount: 3, reservationAmount: 10 });
+  assert.deepEqual(partial, {
+    settle: { available: 0, reserved: 7 },
+    release: { available: 7, reserved: 0 },
+  });
+  assert.deepEqual(applyCreditTransition({ available: 0, reserved: 10 }, { type: "release", amount: 10 }), {
+    available: 10,
+    reserved: 0,
+  });
+
+  const migration = readFileSync("migrations/20260731070000_settle_talent_monitor_runs.sql", "utf8");
+  const settlementStart = migration.indexOf("create or replace function public.settle_monitor_run");
+  const releaseStart = migration.indexOf("create or replace function public.release_monitor_run");
+  const settle = migration.slice(settlementStart, releaseStart);
+  assert.match(settle, /if v_returned = 0 then\s+perform public\.release_credits\(v_run\.id/i);
+  assert.match(settle, /perform public\.settle_credits\(\s*v_run\.id,\s*v_returned/i);
+  assert.match(settle, /v_returned > v_requested or v_returned > v_run\.credits_reserved/i);
+  assert.match(settle, /credits_consumed = v_returned,\s+credits_released = v_run\.credits_reserved - v_returned/i);
+  assert.match(settle, /monthly_credit_used = task\.monthly_credit_used \+ v_returned/i);
+  assert.ok(settle.indexOf("if v_run.status = 'done' then return 'settled'; end if;") < settle.indexOf("perform public.settle_credits"));
 });
 
 test("terminal monitor RPCs reject mismatched research and Credits reservation linkages before ledger mutation", () => {

@@ -88,7 +88,7 @@ begin
     raise exception 'completed monitor research has no candidate array';
   end if;
   v_returned := pg_catalog.jsonb_array_length(v_research.result -> 'candidates');
-  if v_returned > v_requested then
+  if v_returned > v_requested or v_returned > v_run.credits_reserved then
     raise exception 'completed monitor research exceeds immutable candidate batch';
   end if;
 
@@ -101,21 +101,28 @@ begin
   v_skipped := greatest(0, coalesce((v_research.result #>> '{task_discovery,summary,skipped_candidates}')::integer, 0));
 
   -- This happens only after the worker's done result has been persisted. The
-  -- Credits RPC has its own run-id lock and exact idempotency key.
-  perform public.settle_credits(
-    v_run.id,
-    v_run.credits_reserved,
-    'research-run:' || v_run.id::text || ':settle'
-  );
+  -- Credits RPC has its own run-id lock and exact idempotency key. A completed
+  -- empty search is successful but consumes no Credits, so it releases instead
+  -- of attempting the invalid settle_credits(..., 0, ...) operation.
+  if v_returned = 0 then
+    perform public.release_credits(v_run.id, 'research-run:' || v_run.id::text || ':release');
+  else
+    perform public.settle_credits(
+      v_run.id,
+      v_returned,
+      'research-run:' || v_run.id::text || ':settle'
+    );
+  end if;
   update public.search_task_runs as run
   set status = 'done', requested_count = v_requested, returned_count = v_returned,
       new_candidates = v_new, updated_candidates = v_updated, seen_candidates = v_seen,
-      skipped_candidates = v_skipped, credits_consumed = v_run.credits_reserved,
-      credits_released = 0, error_summary = null, finished_at = pg_catalog.now(), updated_at = pg_catalog.now()
+      skipped_candidates = v_skipped, credits_consumed = v_returned,
+      credits_released = v_run.credits_reserved - v_returned,
+      error_summary = null, finished_at = pg_catalog.now(), updated_at = pg_catalog.now()
   where run.id = v_run.id;
   update public.search_tasks as task
   set monthly_credit_reserved = greatest(0, task.monthly_credit_reserved - v_run.credits_reserved),
-      monthly_credit_used = task.monthly_credit_used + v_run.credits_reserved,
+      monthly_credit_used = task.monthly_credit_used + v_returned,
       last_run_status = 'done', updated_at = pg_catalog.now()
   where task.id = v_run.search_task_id and task.user_id = v_run.user_id;
   return 'settled';
