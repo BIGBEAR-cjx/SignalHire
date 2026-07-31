@@ -125,3 +125,18 @@ export function attachActiveCandidateLiveSignals({ candidates = [], signals = []
     return matched.length ? { ...candidate, live_signals: matched } : { ...candidate, live_signals: [] };
   });
 }
+
+// The persistence layer stays in the typed server module. These bridges make
+// extensionless imports resolve to the same implementation at Next runtime
+// without adding the server SDK to this pure candidate-view module eagerly.
+function candidateLiveSignalStore() {
+  return import("./candidate-live-signals.ts");
+}
+
+export async function upsertCandidateLiveSignals(signals) {
+  return (await candidateLiveSignalStore()).upsertCandidateLiveSignals(signals);
+}
+
+export async function listActiveCandidateLiveSignals(input) {
+  return (await candidateLiveSignalStore()).listActiveCandidateLiveSignals(input);
+}

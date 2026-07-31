@@ -267,3 +267,47 @@ export function summarizeTaskRuns(runs = []) {
     ...totals,
   };
 }
+
+// This file owns pure scheduling helpers and is selected first for
+// extensionless imports. Route-only operations stay in search-tasks.ts and
+// are loaded on demand so this utility module does not eagerly pull its
+// server clients into any consumer.
+import { buildMonitorView } from "./talent-monitor-view.mjs";
+
+export { buildMonitorView };
+
+function searchTaskService() {
+  return import("./search-tasks.ts");
+}
+
+export async function ensureSearchTaskProjectAccess(...args) {
+  return (await searchTaskService()).ensureSearchTaskProjectAccess(...args);
+}
+
+export async function listSearchTasks(...args) {
+  return (await searchTaskService()).listSearchTasks(...args);
+}
+
+export async function createSearchTask(...args) {
+  return (await searchTaskService()).createSearchTask(...args);
+}
+
+export async function getSearchTask(...args) {
+  return (await searchTaskService()).getSearchTask(...args);
+}
+
+export async function updateSearchTask(...args) {
+  return (await searchTaskService()).updateSearchTask(...args);
+}
+
+export async function runSearchTaskNow(...args) {
+  return (await searchTaskService()).runSearchTaskNow(...args);
+}
+
+export async function startMonitorRun(...args) {
+  return (await searchTaskService()).startMonitorRun(...args);
+}
+
+export async function enqueueDueSearchTasks(...args) {
+  return (await searchTaskService()).enqueueDueSearchTasks(...args);
+}

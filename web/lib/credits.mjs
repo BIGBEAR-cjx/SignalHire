@@ -78,3 +78,18 @@ export function applyCreditTransition(balance = {}, transition = {}) {
 
   throw new Error(`Unsupported Credit transition: ${type}`);
 }
+
+// Next resolves an extensionless `./credits` import to this runtime module
+// before the typed service module. Keep the pure contract above browser-safe,
+// and load the service implementation only when a server route invokes it.
+function creditsService() {
+  return import("./credits.ts");
+}
+
+export async function grant(input) {
+  return (await creditsService()).grant(input);
+}
+
+export async function recordOpsIdentityLabel(input) {
+  return (await creditsService()).recordOpsIdentityLabel(input);
+}
