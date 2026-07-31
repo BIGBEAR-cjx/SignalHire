@@ -179,6 +179,16 @@ test("pauses without enqueueing when the monthly monitor budget is exhausted", a
   assert.deepEqual(deps.calls.pause, ["monthly_credit_limit"]);
 });
 
+test("returns an active duplicate before evaluating a now-exhausted monthly budget", async () => {
+  const deps = monitorDeps({ findActiveRun: async () => ({ id: "existing-run", status: "running" }) });
+  const result = await startMonitorRun(monitorTask({ monthly_credit_used: 20 }), deps);
+
+  assert.equal(result.status, "queued");
+  assert.equal(result.duplicate, true);
+  assert.equal(deps.calls.reserve.length, 0);
+  assert.equal(deps.calls.pause.length, 0);
+});
+
 test("pauses insufficient Credits without creating or enqueueing a run", async () => {
   const deps = monitorDeps({ reserveCredits: async () => { throw new Error("insufficient available Credits"); } });
   const result = await startMonitorRun(monitorTask(), deps);
@@ -217,6 +227,17 @@ test("queue failure aborts the task run and releases through the DB cleanup RPC"
   assert.equal(result.reason, "queue_unavailable");
   assert.equal(deps.calls.abort.length, 1);
   assert.equal(deps.calls.release.length, 0, "abort RPC performs the atomic Credits release");
+  assert.equal(deps.calls.abort[0].researchRunId, null);
+});
+
+test("a failed research-run link never reports queued success and deterministically aborts the queued job", async () => {
+  const deps = monitorDeps({ linkResearchRun: async () => false });
+  const result = await startMonitorRun(monitorTask(), deps);
+
+  assert.equal(result.status, "blocked");
+  assert.equal(result.enqueued, false);
+  assert.equal(deps.calls.abort.length, 1);
+  assert.equal(deps.calls.abort[0].researchRunId, "66666666-6666-4666-8666-666666666666");
 });
 
 test("monitor run security migration locks owner identity and browser access", () => {
@@ -227,4 +248,15 @@ test("monitor run security migration locks owner identity and browser access", (
   assert.match(migration, /revoke all on table public\.search_task_runs from public/i);
   assert.match(migration, /search_task_runs_one_active_per_task_idx/i);
   assert.match(migration, /perform public\.release_credits\(v_run\.id/i);
+});
+
+test("monitor handoff migration rejects a reservation from another user or run", () => {
+  const migration = readFileSync("migrations/20260731050000_talent_monitor_handoff_fixes.sql", "utf8");
+
+  assert.match(migration, /from public\.credit_reservations as reservation[\s\S]*for update/i);
+  assert.match(migration, /v_reservation\.user_id <> p_user_id/i);
+  assert.match(migration, /v_reservation\.run_id <> p_run_id/i);
+  assert.match(migration, /v_reservation\.status <> 'reserved'/i);
+  assert.match(migration, /v_reservation\.reserved_amount <> p_credits_reserved/i);
+  assert.match(migration, /v_research\.status <> 'queued'/i);
 });

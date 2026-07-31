@@ -36,18 +36,19 @@ export async function startMonitorRun(task, deps) {
     return { status: "blocked", reason: "monitor_inactive", enqueued: false };
   }
 
+  const existing = await deps.findActiveRun(task);
+  if (existing) return { status: "queued", duplicate: true, run: existing, enqueued: false };
+
   const amount = task.candidate_batch_size;
   if (!monthlyBudgetAllows(task, amount)) {
     await deps.pauseTask(task, MONITOR_PAUSE_REASONS.monthlyCreditLimit);
     return { status: "paused", reason: MONITOR_PAUSE_REASONS.monthlyCreditLimit, enqueued: false };
   }
 
-  const existing = await deps.findActiveRun(task);
-  if (existing) return { status: "queued", duplicate: true, run: existing, enqueued: false };
-
   const runId = deps.createRunId();
   let reserved = false;
   let createdRun = null;
+  let researchRunId = null;
   try {
     const reservation = await deps.reserveCredits({
       userId: task.user_id,
@@ -82,12 +83,18 @@ export async function startMonitorRun(task, deps) {
 
     const jobId = await deps.enqueue({ task, run: createdRun });
     if (!jobId) throw new Error("Monitor run was not enqueued");
-    const linked = await deps.linkResearchRun({ runId: createdRun.id, researchRunId: jobId }).catch(() => false);
-    await deps.markQueued(task).catch(() => undefined);
-    return { status: "queued", duplicate: false, run: createdRun, jobId, linked, enqueued: true };
+    researchRunId = jobId;
+    const linked = await deps.linkResearchRun({ runId: createdRun.id, researchRunId: jobId });
+    if (linked !== true) throw new Error("Monitor run was not linked to its research run");
+    await deps.markQueued(task);
+    return { status: "queued", duplicate: false, run: createdRun, jobId, linked: true, enqueued: true };
   } catch (error) {
     if (createdRun) {
-      const aborted = await deps.abortRun({ runId: createdRun.id, idempotencyKey: `monitor-run:${runId}:release` });
+      const aborted = await deps.abortRun({
+        runId: createdRun.id,
+        researchRunId,
+        idempotencyKey: `monitor-run:${runId}:release`,
+      });
       return { status: "blocked", reason: aborted ? "queue_unavailable" : "cleanup_required", enqueued: false };
     }
     if (reserved) await releaseReservation(deps, runId);

@@ -40,6 +40,23 @@ test("runs RoleAgentRun sourcing through injected backend dependencies", async (
   assert.deepEqual(events.map((event) => event.action_status), ["started", "succeeded"]);
 });
 
+test("treats an already-queued duplicate monitor as successful Role Agent sourcing", async () => {
+  const result = await runRoleAgentRunCore({
+    userId: "user-1",
+    project: { id: "project-1", name: "Founding AI Engineer", brief: "Find applied AI engineers" },
+    actionType: "run_sourcing",
+    deps: {
+      createSearchTask: async () => ({ id: "task-1" }),
+      runSearchTaskNow: async () => ({ jobId: null, duplicate: true }),
+      recordEvent: async () => {},
+    },
+  });
+
+  assert.equal(result.status, "succeeded");
+  assert.equal(result.result.duplicate, true);
+  assert.equal(result.result.job_id, null);
+});
+
 test("persists verified live signals before recording the refresh event", async () => {
   const events = [];
   const order = [];

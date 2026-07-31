@@ -60,6 +60,7 @@ export interface SearchTask {
 type MonitorRun = {
   id: string;
   status: string;
+  researchRunId?: string | null;
 };
 
 export type MonitorStartResult = {
@@ -333,7 +334,7 @@ async function findActiveMonitorRun(task: SearchTask): Promise<MonitorRun | null
   if (!monitorClient) return null;
   const { data, error } = await monitorClient.database
     .from("search_task_runs")
-    .select("id,status,user_id")
+    .select("id,status,user_id,research_run_id")
     .eq("search_task_id", task.id)
     .eq("user_id", task.user_id)
     .in("status", ["queued", "running"])
@@ -342,18 +343,25 @@ async function findActiveMonitorRun(task: SearchTask): Promise<MonitorRun | null
   if (error || !data || data.length === 0) return null;
   const row = data[0] as Record<string, unknown>;
   if (row.user_id !== task.user_id || typeof row.id !== "string") return null;
-  return { id: row.id, status: typeof row.status === "string" ? row.status : "queued" };
+  return {
+    id: row.id,
+    status: typeof row.status === "string" ? row.status : "queued",
+    researchRunId: typeof row.research_run_id === "string" ? row.research_run_id : null,
+  };
 }
 
 async function setMonitorPause(task: SearchTask, reason: string) {
-  await client?.database.from(TABLE).update({
+  if (!client) throw new Error("Talent Monitor storage is not configured");
+  const { error } = await client.database.from(TABLE).update({
     status: "paused",
     pause_reason: reason,
     updated_at: new Date().toISOString(),
   }).eq("id", task.id).eq("user_id", task.user_id);
+  if (error) throw new Error("Talent Monitor pause was not persisted");
 }
 
 async function markMonitorQueued(task: SearchTask) {
+  if (!client) throw new Error("Talent Monitor storage is not configured");
   const now = new Date();
   const nextRunAt = task.frequency === "manual" ? null : buildNextRunAt({
     frequency: task.frequency,
@@ -361,13 +369,14 @@ async function markMonitorQueued(task: SearchTask) {
     scheduleTime: task.schedule_time,
     now,
   });
-  await client?.database.from(TABLE).update({
+  const { error } = await client.database.from(TABLE).update({
     last_run_at: now.toISOString(),
     last_run_status: "queued",
     pause_reason: null,
     next_run_at: nextRunAt,
     updated_at: now.toISOString(),
   }).eq("id", task.id).eq("user_id", task.user_id);
+  if (error) throw new Error("Talent Monitor queue state was not persisted");
 }
 
 async function enqueueMonitorResearchRun(task: SearchTask, run: MonitorRun): Promise<string | null> {
@@ -409,7 +418,7 @@ export async function startMonitorRun(input: { userId: string; id: string }): Pr
         p_credits_reserved: creditsReserved,
         p_config_snapshot: configSnapshot,
       }));
-      if (row?.is_duplicate === true) return { duplicate: true, run: monitorRunFromRow(row) };
+      if (row?.is_duplicate === true) return { duplicate: true, run: await findActiveMonitorRun(monitor) ?? monitorRunFromRow(row) };
       if (typeof row?.pause_reason === "string" && row.pause_reason) return { paused: true, reason: row.pause_reason };
       return { run: monitorRunFromRow(row) };
     },
@@ -422,10 +431,11 @@ export async function startMonitorRun(input: { userId: string; id: string }): Pr
       const row = firstRow(result);
       return result === true || row?.link_monitor_research_run === true;
     },
-    abortRun: async ({ runId, idempotencyKey }: { runId: string; idempotencyKey: string }) => {
+    abortRun: async ({ runId, researchRunId, idempotencyKey }: { runId: string; researchRunId: string | null; idempotencyKey: string }) => {
       const result = await monitorRpc("abort_monitor_run", {
         p_run_id: runId,
         p_release_idempotency_key: idempotencyKey,
+        p_research_run_id: researchRunId,
       });
       const row = firstRow(result);
       return result === true || row?.abort_monitor_run === true;
@@ -435,12 +445,13 @@ export async function startMonitorRun(input: { userId: string; id: string }): Pr
   })) as MonitorStartResult;
 }
 
-export async function runSearchTaskNow(input: { userId: string; id: string }): Promise<{ jobId: string; task: SearchTask; duplicate?: boolean } | null> {
+export async function runSearchTaskNow(input: { userId: string; id: string }): Promise<{ jobId: string | null; task: SearchTask; duplicate?: boolean } | null> {
   const task = await getSearchTask(input.userId, input.id);
   if (!task) return null;
   const started = await startMonitorRun(input);
-  if (started.status !== "queued" || !started.jobId) return null;
-  return { jobId: started.jobId, task, duplicate: started.duplicate };
+  if (started.status !== "queued") return null;
+  if (!started.jobId && !started.duplicate) return null;
+  return { jobId: started.jobId ?? started.run?.researchRunId ?? null, task, duplicate: started.duplicate };
 }
 
 export async function enqueueDueSearchTasks(limit = 10): Promise<{ queued: number; job_ids: string[] }> {

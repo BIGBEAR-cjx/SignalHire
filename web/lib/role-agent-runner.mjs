@@ -127,8 +127,8 @@ export async function runRoleAgentRunCore({
     });
     if (!task?.id) throw new Error("search_task_create_failed");
     const queued = await deps.runSearchTaskNow?.({ userId, id: task.id });
-    if (!queued?.jobId) throw new Error("search_task_run_failed");
-    const result = { search_task_id: task.id, job_id: queued.jobId };
+    if (!queued || (!queued.jobId && !queued.duplicate)) throw new Error("search_task_run_failed");
+    const result = { search_task_id: task.id, job_id: queued.jobId ?? null, duplicate: queued.duplicate === true };
     await record(deps, run.project_id, run.user_id, {
       event_type: "next_action_execution",
       action_type: "run_sourcing",
