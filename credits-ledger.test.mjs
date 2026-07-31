@@ -282,6 +282,52 @@ test("Credits service rejects malformed RPC identifiers while sanitizing blank o
   assert.equal(summary.ledgerEntryId, null);
 });
 
+test("Credits service records an immutable operator-entered identity label through an RPC", async () => {
+  const calls = [];
+  const service = createCreditsService({
+    rpc: async (name, args) => {
+      calls.push({ name, args });
+      return [{ user_id: UUIDS.user, email: "target@example.com", label_source: "ops_recorded", duplicate: false }];
+    },
+    readBalance: async () => null,
+  });
+  assert.deepEqual(await service.recordOpsIdentityLabel({ userId: UUIDS.user, email: " TARGET@EXAMPLE.COM " }), {
+    userId: UUIDS.user,
+    email: "target@example.com",
+    source: "ops_recorded",
+    duplicate: false,
+  });
+  assert.deepEqual(calls, [{
+    name: "record_ops_credit_identity_label",
+    args: { p_user_id: UUIDS.user, p_email: "target@example.com" },
+  }]);
+});
+
+test("Credits service rejects malformed operator identity labels before RPC", async () => {
+  let calls = 0;
+  const service = createCreditsService({
+    rpc: async () => { calls += 1; return []; },
+    readBalance: async () => null,
+  });
+  await assert.rejects(
+    service.recordOpsIdentityLabel({ userId: UUIDS.user, email: "not-an-email" }),
+    /email/i,
+  );
+  assert.equal(calls, 0);
+});
+
+test("operator-recorded identity labels are one-to-one and inaccessible to public roles", () => {
+  const migration = readFileSync("migrations/20260731030000_ops_credit_identity_labels.sql", "utf8");
+  assert.match(migration, /create table if not exists public\.ops_credit_identity_labels/i);
+  assert.match(migration, /user_id uuid primary key/i);
+  assert.match(migration, /email text not null unique/i);
+  assert.match(migration, /label_source = 'ops_recorded'/i);
+  assert.match(migration, /on conflict do nothing/i);
+  assert.match(migration, /enable row level security/i);
+  assert.match(migration, /revoke all on table public\.ops_credit_identity_labels from public/i);
+  assert.match(migration, /grant execute on function public\.record_ops_credit_identity_label\(uuid, text\) to service_role/i);
+});
+
 test("Credits service stays server-only and does not bypass its service-role RPC gate", () => {
   const source = readFileSync("web/lib/credits.ts", "utf8");
 

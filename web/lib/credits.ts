@@ -27,6 +27,13 @@ export type CreditOperationSummary = CreditBalance & {
   duplicate: boolean;
 };
 
+export type OpsCreditIdentityLabel = {
+  userId: string;
+  email: string;
+  source: "ops_recorded";
+  duplicate: boolean;
+};
+
 export type CreditsService = {
   readBalance(input: { userId: string }): Promise<CreditBalance>;
   grant(input: {
@@ -44,6 +51,7 @@ export type CreditsService = {
   }): Promise<CreditOperationSummary>;
   settle(input: { runId: string; amount: number; idempotencyKey?: string }): Promise<CreditOperationSummary>;
   release(input: { runId: string; idempotencyKey?: string }): Promise<CreditOperationSummary>;
+  recordOpsIdentityLabel(input: { userId: string; email: string }): Promise<OpsCreditIdentityLabel>;
 };
 
 export type CreditsServiceDependencies = {
@@ -52,6 +60,7 @@ export type CreditsServiceDependencies = {
 };
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const BASE = process.env.INSFORGE_API_BASE_URL;
 const SERVICE_ROLE_KEY = process.env.INSFORGE_CREDITS_SERVICE_ROLE_KEY;
 const client = BASE && SERVICE_ROLE_KEY
@@ -82,6 +91,12 @@ function requiredUuid(value: unknown, label: string) {
 function optionalUuid(value: unknown, label: string) {
   if (value === undefined || value === null || value === "") return null;
   return requiredUuid(value, label);
+}
+
+function requiredEmail(value: unknown) {
+  const normalized = typeof value === "string" ? value.trim().toLowerCase() : "";
+  if (!EMAIL_PATTERN.test(normalized)) throw new CreditsServiceError("Email must be valid");
+  return normalized;
 }
 
 function note(value: unknown) {
@@ -148,6 +163,16 @@ function toBalance(value: CreditBalanceRow | null, userId: string): CreditBalanc
     available: nonNegativeInteger(value.available_credits, "available balance"),
     reserved: nonNegativeInteger(value.reserved_credits, "reserved balance"),
   };
+}
+
+function toOpsIdentityLabel(value: unknown, expectedUserId: string): OpsCreditIdentityLabel {
+  const row = firstRpcRow(value);
+  const userId = requiredUuid(row.user_id, "Credits identity user id");
+  if (userId !== expectedUserId) throw new CreditsServiceError("Credits identity RPC returned an unexpected account");
+  if (row.label_source !== "ops_recorded" || typeof row.duplicate !== "boolean") {
+    throw new CreditsServiceError("Credits identity RPC returned an invalid result");
+  }
+  return { userId, email: requiredEmail(row.email), source: "ops_recorded", duplicate: row.duplicate };
 }
 
 async function invoke(deps: CreditsServiceDependencies, functionName: string, args: Record<string, unknown>) {
@@ -221,6 +246,17 @@ export function createCreditsService(deps: CreditsServiceDependencies): CreditsS
       });
       return toSummary(result);
     },
+
+    async recordOpsIdentityLabel({ userId, email }) {
+      assertServerOnly();
+      const normalizedUserId = requiredUuid(userId, "User id");
+      const normalizedEmail = requiredEmail(email);
+      const result = await invoke(deps, "record_ops_credit_identity_label", {
+        p_user_id: normalizedUserId,
+        p_email: normalizedEmail,
+      });
+      return toOpsIdentityLabel(result, normalizedUserId);
+    },
   };
 }
 
@@ -254,3 +290,4 @@ export const grant = credits.grant;
 export const reserve = credits.reserve;
 export const settle = credits.settle;
 export const release = credits.release;
+export const recordOpsIdentityLabel = credits.recordOpsIdentityLabel;

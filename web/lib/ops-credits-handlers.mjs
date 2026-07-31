@@ -30,6 +30,11 @@ function projectGrant(summary) {
   };
 }
 
+function projectIdentityLabel(label) {
+  if (!label) return null;
+  return { email: label.email, source: "ops_recorded" };
+}
+
 function parseGrant(body) {
   if (!body || typeof body !== "object" || Array.isArray(body)) return null;
   const value = body;
@@ -37,8 +42,10 @@ function parseGrant(body) {
   const amount = value.amount;
   const reason = typeof value.reason === "string" ? value.reason.trim() : "";
   const idempotencyKey = typeof value.idempotency_key === "string" ? value.idempotency_key : "";
+  const email = value.email === undefined ? null : normalizedEmail(value.email);
   if (!userId || !Number.isInteger(amount) || Number(amount) <= 0 || !reason || reason.length > 500 || !idempotencyKey.trim()) return null;
-  return { userId, amount: Number(amount), reason, idempotencyKey };
+  if (value.email !== undefined && !email) return null;
+  return { userId, amount: Number(amount), reason, idempotencyKey, email };
 }
 
 function accountQuery(request) {
@@ -56,12 +63,12 @@ export function createOpsCreditsHandler(dependencies) {
       if (authorization.status !== 200) return failure(authorization.status, authorization.status === 401 ? "login_required" : "forbidden");
       const query = accountQuery(request);
       if (!query || (!query.userId && !query.email)) return failure(400, "user_id_or_email_required");
-      if (query.email) return failure(400, "email_lookup_unavailable");
       try {
         const accounts = await dependencies.findAccounts(query);
         return Response.json({ accounts: accounts.map((account) => ({
           user_id: account.userId,
           email: account.email,
+          identity_label_source: account.labelSource ?? null,
           available_credits: account.available,
           reserved_credits: account.reserved,
         })) });
@@ -77,6 +84,14 @@ export function createOpsCreditsHandler(dependencies) {
       try { body = await request.json(); } catch { return failure(400, "invalid_json"); }
       const input = parseGrant(body);
       if (!input || !authorization.user) return failure(400, "invalid_grant");
+      let identityLabel = null;
+      if (input.email) {
+        try {
+          identityLabel = await dependencies.recordIdentity({ userId: input.userId, email: input.email });
+        } catch {
+          return failure(400, "identity_label_failed");
+        }
+      }
       try {
         const grant = await dependencies.grant({
           userId: input.userId,
@@ -85,7 +100,9 @@ export function createOpsCreditsHandler(dependencies) {
           actorUserId: authorization.user.id,
           note: input.reason,
         });
-        return Response.json({ grant: projectGrant(grant) });
+        return Response.json(identityLabel
+          ? { grant: projectGrant(grant), identity_label: projectIdentityLabel(identityLabel) }
+          : { grant: projectGrant(grant) });
       } catch {
         return failure(500, "credits_grant_failed");
       }

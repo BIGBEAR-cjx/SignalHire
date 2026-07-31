@@ -21,6 +21,7 @@ function handlerFor({ user = null, configuredEmail = "ops@example.com" } = {}) {
       findAccounts: async () => [{
         userId: IDS.user,
         email: "target@example.com",
+        labelSource: "ops_recorded",
         available: 6,
         reserved: 2,
       }],
@@ -36,6 +37,7 @@ function handlerFor({ user = null, configuredEmail = "ops@example.com" } = {}) {
           duplicate: false,
         };
       },
+      recordIdentity: async ({ userId, email }) => ({ userId, email, source: "ops_recorded", duplicate: false }),
     }),
   };
 }
@@ -102,26 +104,80 @@ test("account lookup projects only identifiers, email, and balances", async () =
     accounts: [{
       user_id: IDS.user,
       email: "target@example.com",
+      identity_label_source: "ops_recorded",
       available_credits: 6,
       reserved_credits: 2,
     }],
   });
 });
 
-test("email lookup fails closed until a verified identity directory or supported Auth lookup is available", async () => {
+test("email lookup resolves only an operator-recorded identity label", async () => {
+  const seen = [];
   const { handler } = handlerFor({ user: { id: IDS.admin, email: "ops@example.com" } });
   const emailHandler = createOpsCreditsHandler({
     getUser: async () => ({ id: IDS.admin, email: "ops@example.com" }),
     configuredEmail: "ops@example.com",
     authorizeUser: authorizeOpsUser,
-    findAccounts: async () => { throw new Error("must not read accounts"); },
+    findAccounts: async (query) => { seen.push(query); return [{ userId: IDS.user, email: "target@example.com", labelSource: "ops_recorded", available: 0, reserved: 0 }]; },
     grant: async () => { throw new Error("not used"); },
+    recordIdentity: async () => { throw new Error("not used"); },
   });
   const response = await emailHandler.GET(new Request("http://ops.example/api/ops/credits?email=TARGET%40EXAMPLE.COM"));
-  assert.equal(response.status, 400);
-  assert.deepEqual(await response.json(), { error: "email_lookup_unavailable" });
+  assert.equal(response.status, 200);
+  assert.deepEqual(seen, [{ userId: null, email: "target@example.com" }]);
+  assert.deepEqual(await response.json(), { accounts: [{
+    user_id: IDS.user,
+    email: "target@example.com",
+    identity_label_source: "ops_recorded",
+    available_credits: 0,
+    reserved_credits: 0,
+  }] });
   const ambiguous = await handler.GET(new Request(`http://ops.example/api/ops/credits?user_id=${IDS.user}&email=target@example.com`));
   assert.equal(ambiguous.status, 400);
+});
+
+test("optional operator identity label is recorded before the idempotent grant", async () => {
+  const calls = [];
+  const handler = createOpsCreditsHandler({
+    getUser: async () => ({ id: IDS.admin, email: "ops@example.com" }),
+    configuredEmail: "ops@example.com",
+    authorizeUser: authorizeOpsUser,
+    findAccounts: async () => [],
+    recordIdentity: async (input) => {
+      calls.push({ kind: "label", input });
+      return { userId: input.userId, email: input.email, source: "ops_recorded", duplicate: false };
+    },
+    grant: async (input) => {
+      calls.push({ kind: "grant", input });
+      return { userId: input.userId, available: 5, reserved: 0, reservationId: null, ledgerEntryId: IDS.ledger, status: "granted", duplicate: false };
+    },
+  });
+  const response = await handler.POST(new Request("http://ops.example/api/ops/credits", {
+    method: "POST",
+    body: JSON.stringify({ user_id: IDS.user, email: "target@example.com", amount: 5, reason: "pilot", idempotency_key: "labelled-grant-1" }),
+  }));
+  assert.equal(response.status, 200);
+  assert.deepEqual(calls.map((call) => call.kind), ["label", "grant"]);
+  assert.deepEqual((await response.json()).identity_label, { email: "target@example.com", source: "ops_recorded" });
+});
+
+test("identity label failure prevents the grant callback", async () => {
+  let grants = 0;
+  const handler = createOpsCreditsHandler({
+    getUser: async () => ({ id: IDS.admin, email: "ops@example.com" }),
+    configuredEmail: "ops@example.com",
+    authorizeUser: authorizeOpsUser,
+    findAccounts: async () => [],
+    recordIdentity: async () => { throw new Error("identity conflict"); },
+    grant: async () => { grants += 1; throw new Error("must not run"); },
+  });
+  const response = await handler.POST(new Request("http://ops.example/api/ops/credits", {
+    method: "POST",
+    body: JSON.stringify({ user_id: IDS.user, email: "target@example.com", amount: 5, reason: "pilot", idempotency_key: "labelled-grant-failure" }),
+  }));
+  assert.equal(response.status, 400);
+  assert.deepEqual(await response.json(), { error: "identity_label_failed" });
+  assert.equal(grants, 0);
 });
 
 test("ledger lookup rejects non-ops users and only returns ledger summaries", async () => {

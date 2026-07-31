@@ -1,5 +1,5 @@
 import { createClient } from "@insforge/sdk";
-import { grant } from "../../../../lib/credits";
+import { grant, recordOpsIdentityLabel } from "../../../../lib/credits";
 import { authorizeOpsUser } from "../../../../lib/ops-auth";
 import { createOpsCreditsHandler } from "../../../../lib/ops-credits-handlers.mjs";
 import { getUser } from "../../../../lib/session";
@@ -9,6 +9,7 @@ export const runtime = "nodejs";
 type OpsAccount = {
   userId: string;
   email: string | null;
+  labelSource: "ops_recorded" | null;
   available: number;
   reserved: number;
 };
@@ -29,9 +30,17 @@ function asUuid(value: unknown) {
   return UUID_PATTERN.test(id) ? id : null;
 }
 
-async function configuredFindAccounts(query: { userId: string | null }): Promise<OpsAccount[]> {
+async function configuredFindAccounts(query: { userId: string | null; email: string | null }): Promise<OpsAccount[]> {
   if (!client) throw new Error("Credits service-role lookup is not configured");
-  const userId = query.userId;
+  const directoryQuery = client.database.from("ops_credit_identity_labels").select("user_id,email,label_source");
+  const { data: directoryRows, error: directoryError } = query.email
+    ? await directoryQuery.eq("email", query.email)
+    : query.userId
+      ? await directoryQuery.eq("user_id", query.userId)
+      : { data: [], error: null };
+  if (directoryError) throw new Error("Credits identity lookup failed");
+  const directory = Array.isArray(directoryRows) ? directoryRows[0] : null;
+  const userId = asUuid(directory?.user_id) ?? query.userId;
   if (!userId) return [];
   const { data: accountRows, error: accountError } = await client.database
     .from("credit_accounts")
@@ -40,10 +49,11 @@ async function configuredFindAccounts(query: { userId: string | null }): Promise
     .limit(1);
   if (accountError) throw new Error("Credits account lookup failed");
   const account = Array.isArray(accountRows) ? accountRows[0] : null;
-  if (!account) return [];
+  if (!account && !directory) return [];
   return [{
     userId,
-    email: null,
+    email: typeof directory?.email === "string" ? directory.email : null,
+    labelSource: directory?.label_source === "ops_recorded" ? "ops_recorded" : null,
     available: safeNumber(account?.available_credits),
     reserved: safeNumber(account?.reserved_credits),
   }];
@@ -55,6 +65,7 @@ const handler = createOpsCreditsHandler({
   authorizeUser: authorizeOpsUser,
   findAccounts: configuredFindAccounts,
   grant,
+  recordIdentity: recordOpsIdentityLabel,
 });
 
 export const GET = handler.GET;
