@@ -1,5 +1,7 @@
 import { createClient } from "@insforge/sdk";
-import { authorizeOpsUser } from "../../../../../../lib/ops-auth.ts";
+import { authorizeOpsUser } from "../../../../../../lib/ops-auth";
+import { createOpsLedgerHandler } from "../../../../../../lib/ops-credits-handlers.mjs";
+import { getUser } from "../../../../../../lib/session";
 
 export const runtime = "nodejs";
 
@@ -10,14 +12,6 @@ type LedgerSummary = {
   available: number;
   reserved: number;
   createdAt: string;
-};
-
-type SessionUser = { id: string; email: string };
-
-type OpsLedgerDependencies = {
-  getUser: () => Promise<SessionUser | null>;
-  configuredEmail?: string;
-  listLedger: (userId: string) => Promise<LedgerSummary[]>;
 };
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -49,7 +43,7 @@ function projectLedger(value: unknown): LedgerSummary | null {
   return { id, entryType, amount, available, reserved, createdAt };
 }
 
-async function configuredListLedger(userId: string): Promise<LedgerSummary[]> {
+async function listLedger(userId: string): Promise<LedgerSummary[]> {
   if (!client) throw new Error("Credits service-role lookup is not configured");
   const { data, error } = await client.database
     .from("credit_ledger_entries")
@@ -61,35 +55,9 @@ async function configuredListLedger(userId: string): Promise<LedgerSummary[]> {
   return (Array.isArray(data) ? data : []).map(projectLedger).filter((entry): entry is LedgerSummary => entry !== null);
 }
 
-export function createOpsLedgerHandler(dependencies: OpsLedgerDependencies) {
-  return async function GET(_request: Request, context: { params: Promise<{ userId?: string }> }) {
-    const authorization = authorizeOpsUser(await dependencies.getUser(), dependencies.configuredEmail);
-    if (authorization.status !== 200) {
-      return Response.json({ error: authorization.status === 401 ? "login_required" : "forbidden" }, { status: authorization.status });
-    }
-    const userId = asUuid((await context.params).userId);
-    if (!userId) return Response.json({ error: "user_id_required" }, { status: 400 });
-    try {
-      const ledger = await dependencies.listLedger(userId);
-      return Response.json({ ledger: ledger.map((entry) => ({
-        id: entry.id,
-        entry_type: entry.entryType,
-        amount: entry.amount,
-        available_credits: entry.available,
-        reserved_credits: entry.reserved,
-        created_at: entry.createdAt,
-      })) });
-    } catch {
-      return Response.json({ error: "credits_ledger_lookup_failed" }, { status: 500 });
-    }
-  };
-}
-
 export const GET = createOpsLedgerHandler({
-  async getUser() {
-    const { getUser } = await import("../../../../../../lib/session.ts");
-    return getUser();
-  },
+  getUser,
   configuredEmail: process.env.OPS_ADMIN_EMAIL,
-  listLedger: configuredListLedger,
+  authorizeUser: authorizeOpsUser,
+  listLedger,
 });

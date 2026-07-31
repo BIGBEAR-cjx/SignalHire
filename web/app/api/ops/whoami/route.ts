@@ -1,5 +1,5 @@
-import { authorizeOpsUser } from "../../../lib/ops-auth.ts";
-import { getUser } from "../../../lib/session.ts";
+import { authorizeOpsUser } from "../../../../lib/ops-auth";
+import { getUser } from "../../../../lib/session";
 
 export const runtime = "nodejs";
 

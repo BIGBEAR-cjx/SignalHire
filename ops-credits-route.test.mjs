@@ -1,8 +1,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-const { createOpsCreditsHandler } = await import("./web/app/api/ops/credits/route.ts");
-const { createOpsLedgerHandler } = await import("./web/app/api/ops/credits/[userId]/ledger/route.ts");
+const { createOpsCreditsHandler, createOpsLedgerHandler } = await import("./web/lib/ops-credits-handlers.mjs");
+const { authorizeOpsUser } = await import("./web/lib/ops-auth.ts");
 
 const IDS = {
   admin: "11111111-1111-4111-8111-111111111111",
@@ -17,6 +17,7 @@ function handlerFor({ user = null, configuredEmail = "ops@example.com" } = {}) {
     handler: createOpsCreditsHandler({
       getUser: async () => user,
       configuredEmail,
+      authorizeUser: authorizeOpsUser,
       findAccounts: async () => [{
         userId: IDS.user,
         email: "target@example.com",
@@ -107,10 +108,27 @@ test("account lookup projects only identifiers, email, and balances", async () =
   });
 });
 
+test("email lookup fails closed until a verified identity directory or supported Auth lookup is available", async () => {
+  const { handler } = handlerFor({ user: { id: IDS.admin, email: "ops@example.com" } });
+  const emailHandler = createOpsCreditsHandler({
+    getUser: async () => ({ id: IDS.admin, email: "ops@example.com" }),
+    configuredEmail: "ops@example.com",
+    authorizeUser: authorizeOpsUser,
+    findAccounts: async () => { throw new Error("must not read accounts"); },
+    grant: async () => { throw new Error("not used"); },
+  });
+  const response = await emailHandler.GET(new Request("http://ops.example/api/ops/credits?email=TARGET%40EXAMPLE.COM"));
+  assert.equal(response.status, 400);
+  assert.deepEqual(await response.json(), { error: "email_lookup_unavailable" });
+  const ambiguous = await handler.GET(new Request(`http://ops.example/api/ops/credits?user_id=${IDS.user}&email=target@example.com`));
+  assert.equal(ambiguous.status, 400);
+});
+
 test("ledger lookup rejects non-ops users and only returns ledger summaries", async () => {
   const handler = createOpsLedgerHandler({
     getUser: async () => ({ id: IDS.admin, email: "ops@example.com" }),
     configuredEmail: "ops@example.com",
+    authorizeUser: authorizeOpsUser,
     listLedger: async () => [{
       id: IDS.ledger,
       entryType: "grant",
