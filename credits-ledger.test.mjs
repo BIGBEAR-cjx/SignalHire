@@ -5,6 +5,7 @@ import {
   applyCreditTransition,
   operationIdempotencyKey,
   reservationKey,
+  settleTransitionSnapshots,
   validateCreditAmount,
   validateIdempotencyKey,
 } from "./web/lib/credits.mjs";
@@ -32,6 +33,23 @@ test("settle and release cannot consume more than a reservation", () => {
   assert.throws(
     () => applyCreditTransition({ available: 4, reserved: 2 }, { type: "settle", amount: 3 }),
     /reserved/i,
+  );
+});
+
+test("partial settlement records the interim balance before its release snapshot", () => {
+  assert.deepEqual(
+    settleTransitionSnapshots({ available: 4, reserved: 6 }, 4),
+    {
+      settle: { available: 4, reserved: 2 },
+      release: { available: 6, reserved: 0 },
+    },
+  );
+  assert.deepEqual(
+    settleTransitionSnapshots({ available: 4, reserved: 4 }, 4),
+    {
+      settle: { available: 4, reserved: 0 },
+      release: { available: 4, reserved: 0 },
+    },
   );
 });
 
@@ -88,4 +106,16 @@ test("security follow-up audits grants and scopes deterministic settlement keys 
   assert.match(migration, /research-run:' \|\| p_run_id::text \|\| ':release'/i);
   assert.match(migration, /idempotency key does not match the run settlement operation/i);
   assert.match(migration, /idempotency key does not match the run release operation/i);
+});
+
+test("settlement snapshot follow-up preserves per-entry balances and exact duplicate amounts", () => {
+  const migration = readFileSync("migrations/20260731020000_credits_settle_snapshot_v1.sql", "utf8");
+
+  assert.match(migration, /v_settle_available integer/i);
+  assert.match(migration, /v_settle_reserved integer/i);
+  assert.match(migration, /v_settlement_amount integer/i);
+  assert.match(migration, /v_reservation\.settled_amount <> p_amount/i);
+  assert.match(migration, /v_existing_entry_amount <> p_amount/i);
+  assert.match(migration, /v_settle_available, v_settle_reserved, v_settle_key/i);
+  assert.match(migration, /v_account\.available_credits, v_account\.reserved_credits, v_release_key/i);
 });

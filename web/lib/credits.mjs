@@ -36,6 +36,15 @@ export function operationIdempotencyKey({ runId, operation } = {}) {
   return `research-run:${normalizedRunId}:${operation}`;
 }
 
+export function settleTransitionSnapshots(balance = {}, amount) {
+  const settle = applyCreditTransition(balance, { type: "settle", amount });
+  const releaseAmount = balance.reserved - amount;
+  return {
+    settle,
+    release: releaseAmount ? applyCreditTransition(settle, { type: "release", amount: releaseAmount }) : settle,
+  };
+}
+
 export function applyCreditTransition(balance = {}, transition = {}) {
   const available = balance.available;
   const reserved = balance.reserved;
