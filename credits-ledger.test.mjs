@@ -38,18 +38,29 @@ test("settle and release cannot consume more than a reservation", () => {
 
 test("partial settlement records the interim balance before its release snapshot", () => {
   assert.deepEqual(
-    settleTransitionSnapshots({ available: 4, reserved: 6 }, 4),
+    settleTransitionSnapshots({ available: 4, reserved: 6 }, { amount: 4, reservationAmount: 6 }),
     {
       settle: { available: 4, reserved: 2 },
       release: { available: 6, reserved: 0 },
     },
   );
   assert.deepEqual(
-    settleTransitionSnapshots({ available: 4, reserved: 4 }, 4),
+    settleTransitionSnapshots({ available: 4, reserved: 4 }, { amount: 4, reservationAmount: 4 }),
     {
       settle: { available: 4, reserved: 0 },
       release: { available: 4, reserved: 0 },
     },
+  );
+  assert.deepEqual(
+    settleTransitionSnapshots({ available: 4, reserved: 10 }, { amount: 4, reservationAmount: 6 }),
+    {
+      settle: { available: 4, reserved: 6 },
+      release: { available: 6, reserved: 4 },
+    },
+  );
+  assert.throws(
+    () => settleTransitionSnapshots({ available: 4, reserved: 6 }, { amount: 5, reservationAmount: 4 }),
+    /reservation/i,
   );
 });
 

@@ -36,9 +36,16 @@ export function operationIdempotencyKey({ runId, operation } = {}) {
   return `research-run:${normalizedRunId}:${operation}`;
 }
 
-export function settleTransitionSnapshots(balance = {}, amount) {
+export function settleTransitionSnapshots(balance = {}, { amount, reservationAmount } = {}) {
+  const normalizedReservationAmount = validateCreditAmount(reservationAmount);
   const settle = applyCreditTransition(balance, { type: "settle", amount });
-  const releaseAmount = balance.reserved - amount;
+  if (amount > normalizedReservationAmount) {
+    throw new Error("Settlement amount cannot exceed the reservation amount");
+  }
+  if (normalizedReservationAmount > balance.reserved) {
+    throw new Error("Reservation amount cannot exceed the reserved Credits balance");
+  }
+  const releaseAmount = normalizedReservationAmount - amount;
   return {
     settle,
     release: releaseAmount ? applyCreditTransition(settle, { type: "release", amount: releaseAmount }) : settle,
