@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-const { createOpsCreditsHandler, createOpsLedgerHandler } = await import("./web/lib/ops-credits-handlers.mjs");
+const { createOpsCreditsHandler, createOpsLedgerHandler, projectOpsAccount } = await import("./web/lib/ops-credits-handlers.mjs");
 const { authorizeOpsUser } = await import("./web/lib/ops-auth.ts");
 
 const IDS = {
@@ -70,7 +70,7 @@ test("calls the Credits service with the authenticated official actor and only r
   assert.deepEqual(calls, [{
     userId: IDS.user,
     amount: 5,
-    idempotencyKey: " grant-1 ",
+    idempotencyKey: "grant-1",
     actorUserId: IDS.admin,
     note: "pilot allowance",
   }]);
@@ -175,9 +175,68 @@ test("identity label failure prevents the grant callback", async () => {
     method: "POST",
     body: JSON.stringify({ user_id: IDS.user, email: "target@example.com", amount: 5, reason: "pilot", idempotency_key: "labelled-grant-failure" }),
   }));
-  assert.equal(response.status, 400);
+  assert.equal(response.status, 500);
   assert.deepEqual(await response.json(), { error: "identity_label_failed" });
   assert.equal(grants, 0);
+});
+
+test("invalid long idempotency keys fail before identity-label persistence or grant", async () => {
+  for (const email of [undefined, "target@example.com"]) {
+    let labels = 0;
+    let grants = 0;
+    const handler = createOpsCreditsHandler({
+      getUser: async () => ({ id: IDS.admin, email: "ops@example.com" }),
+      configuredEmail: "ops@example.com",
+      authorizeUser: authorizeOpsUser,
+      findAccounts: async () => [],
+      recordIdentity: async () => { labels += 1; },
+      grant: async () => { grants += 1; },
+    });
+    const response = await handler.POST(new Request("http://ops.example/api/ops/credits", {
+      method: "POST",
+      body: JSON.stringify({
+        user_id: IDS.user,
+        ...(email ? { email } : {}),
+        amount: 5,
+        reason: "pilot",
+        idempotency_key: "x".repeat(201),
+      }),
+    }));
+    assert.equal(response.status, 400);
+    assert.equal(labels, 0);
+    assert.equal(grants, 0);
+  }
+});
+
+test("transient identity-label errors fail as 5xx before grant", async () => {
+  let grants = 0;
+  const handler = createOpsCreditsHandler({
+    getUser: async () => ({ id: IDS.admin, email: "ops@example.com" }),
+    configuredEmail: "ops@example.com",
+    authorizeUser: authorizeOpsUser,
+    findAccounts: async () => [],
+    recordIdentity: async () => { throw new Error("database unavailable"); },
+    grant: async () => { grants += 1; },
+  });
+  const response = await handler.POST(new Request("http://ops.example/api/ops/credits", {
+    method: "POST",
+    body: JSON.stringify({ user_id: IDS.user, email: "target@example.com", amount: 5, reason: "pilot", idempotency_key: "identity-transient" }),
+  }));
+  assert.equal(response.status, 500);
+  assert.deepEqual(await response.json(), { error: "identity_label_failed" });
+  assert.equal(grants, 0);
+});
+
+test("malformed service-role account balances fail closed instead of becoming free Credits", () => {
+  assert.throws(
+    () => projectOpsAccount({
+      userId: IDS.user,
+      email: null,
+      labelSource: null,
+      account: { available_credits: "not-a-number", reserved_credits: 0 },
+    }),
+    /invalid available balance/i,
+  );
 });
 
 test("ledger lookup rejects non-ops users and only returns ledger summaries", async () => {

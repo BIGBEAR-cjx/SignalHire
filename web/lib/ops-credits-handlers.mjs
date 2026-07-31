@@ -11,6 +11,21 @@ function normalizedEmail(value) {
   return EMAIL_PATTERN.test(email) ? email : null;
 }
 
+export function requireOpsBalance(value, label) {
+  if (!Number.isInteger(value) || Number(value) < 0) throw new Error(`invalid ${label}`);
+  return Number(value);
+}
+
+export function projectOpsAccount({ userId, email, labelSource, account }) {
+  return {
+    userId,
+    email: typeof email === "string" ? email : null,
+    labelSource: labelSource === "ops_recorded" ? "ops_recorded" : null,
+    available: requireOpsBalance(account?.available_credits, "available balance"),
+    reserved: requireOpsBalance(account?.reserved_credits, "reserved balance"),
+  };
+}
+
 function failure(status, error) {
   return Response.json({ error }, { status });
 }
@@ -43,9 +58,10 @@ function parseGrant(body) {
   const reason = typeof value.reason === "string" ? value.reason.trim() : "";
   const idempotencyKey = typeof value.idempotency_key === "string" ? value.idempotency_key : "";
   const email = value.email === undefined ? null : normalizedEmail(value.email);
-  if (!userId || !Number.isInteger(amount) || Number(amount) <= 0 || !reason || reason.length > 500 || !idempotencyKey.trim()) return null;
+  const normalizedIdempotencyKey = idempotencyKey.trim();
+  if (!userId || !Number.isInteger(amount) || Number(amount) <= 0 || !reason || reason.length > 500 || !normalizedIdempotencyKey || normalizedIdempotencyKey.length > 200) return null;
   if (value.email !== undefined && !email) return null;
-  return { userId, amount: Number(amount), reason, idempotencyKey, email };
+  return { userId, amount: Number(amount), reason, idempotencyKey: normalizedIdempotencyKey, email };
 }
 
 function accountQuery(request) {
@@ -89,7 +105,7 @@ export function createOpsCreditsHandler(dependencies) {
         try {
           identityLabel = await dependencies.recordIdentity({ userId: input.userId, email: input.email });
         } catch {
-          return failure(400, "identity_label_failed");
+          return failure(500, "identity_label_failed");
         }
       }
       try {

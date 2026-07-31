@@ -1,7 +1,7 @@
 import { createClient } from "@insforge/sdk";
 import { grant, recordOpsIdentityLabel } from "../../../../lib/credits";
 import { authorizeOpsUser } from "../../../../lib/ops-auth";
-import { createOpsCreditsHandler } from "../../../../lib/ops-credits-handlers.mjs";
+import { createOpsCreditsHandler, projectOpsAccount } from "../../../../lib/ops-credits-handlers.mjs";
 import { getUser } from "../../../../lib/session";
 
 export const runtime = "nodejs";
@@ -20,10 +20,6 @@ const SERVICE_ROLE_KEY = process.env.INSFORGE_CREDITS_SERVICE_ROLE_KEY;
 const client = BASE && SERVICE_ROLE_KEY
   ? createClient({ baseUrl: BASE, anonKey: SERVICE_ROLE_KEY, isServerMode: true })
   : null;
-
-function safeNumber(value: unknown) {
-  return Number.isInteger(value) && Number(value) >= 0 ? Number(value) : 0;
-}
 
 function asUuid(value: unknown) {
   const id = typeof value === "string" ? value.trim() : "";
@@ -50,13 +46,12 @@ async function configuredFindAccounts(query: { userId: string | null; email: str
   if (accountError) throw new Error("Credits account lookup failed");
   const account = Array.isArray(accountRows) ? accountRows[0] : null;
   if (!account && !directory) return [];
-  return [{
+  return [projectOpsAccount({
     userId,
     email: typeof directory?.email === "string" ? directory.email : null,
     labelSource: directory?.label_source === "ops_recorded" ? "ops_recorded" : null,
-    available: safeNumber(account?.available_credits),
-    reserved: safeNumber(account?.reserved_credits),
-  }];
+    account,
+  }) as OpsAccount];
 }
 
 const handler = createOpsCreditsHandler({
