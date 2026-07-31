@@ -17,7 +17,7 @@ import {
 } from "@/lib/projects";
 import { buildMonitorView, listSearchTasks } from "@/lib/search-tasks";
 import { readBalance } from "@/lib/credits";
-import { listOutreachQueue, listOutreachThreads } from "@/lib/outreach-threads";
+import { listOutreachQueue, listOutreachThreads } from "@/lib/outreach-threads.ts";
 import { buildSequenceAnalyticsView } from "@/lib/sequence-analytics.mjs";
 import { buildProfileLeadLayerView } from "@/lib/profile-lead-layer.mjs";
 import { buildProjectInboxQueueView } from "@/lib/inbox";

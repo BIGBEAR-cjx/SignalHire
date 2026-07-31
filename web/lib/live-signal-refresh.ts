@@ -1,6 +1,6 @@
 import { createClient } from "@insforge/sdk";
 import { buildProjectCandidateGraphView, getProject, recordProjectRoleAgentEvent } from "./projects";
-import { listOutreachQueue } from "./outreach-threads";
+import { listOutreachQueue } from "./outreach-threads.ts";
 import { buildProjectInboxQueueView } from "./inbox";
 import { listSearchTasks } from "./search-tasks";
 import { buildRoleAgentWorkspaceView } from "./role-agent-workspace.mjs";

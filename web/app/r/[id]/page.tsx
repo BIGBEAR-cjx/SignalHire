@@ -5,7 +5,7 @@ import type { Metadata } from "next";
 import { FiArrowRight } from "react-icons/fi";
 import { getRunById } from "@/lib/db";
 import { buildProjectCandidateGraphView, getProject, listProjectClientDeliveryWeeklyArchives, projectRuns, recordProjectRoleAgentEvent, upsertProjectClientDeliveryWeeklyArchive } from "@/lib/projects";
-import { listOutreachQueue } from "@/lib/outreach-threads";
+import { listOutreachQueue } from "@/lib/outreach-threads.ts";
 import { buildProjectInboxQueueView } from "@/lib/inbox";
 import { buildRoleOutreachSettings } from "@/lib/outreach-settings.mjs";
 import { buildRoleAgentWorkspaceView } from "@/lib/role-agent-workspace.mjs";

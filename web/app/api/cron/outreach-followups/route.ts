@@ -1,4 +1,4 @@
-import { processDueFollowUpDrafts } from "@/lib/outreach-followups";
+import { processDueFollowUpDrafts } from "@/lib/outreach-followups.ts";
 
 export const runtime = "nodejs";
 

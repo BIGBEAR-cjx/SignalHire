@@ -3,7 +3,7 @@ import { buildInboxQueue, mergeInboxThreadsWithDueFollowUps } from "./inbox-agen
 import { buildTwoSidedMessageHistory } from "./message-history.mjs";
 import { syncGmailInboxForProjectCore } from "./inbox-sync-core.mjs";
 import { getGmailConnectionStatus, getGmailThreadMessages, type GmailThreadMessage } from "./gmail";
-import { listOutreachThreads, updateOutreachThread, type OutreachThread } from "./outreach-threads";
+import { listOutreachThreads, updateOutreachThread, type OutreachThread } from "./outreach-threads.ts";
 
 const BASE = process.env.INSFORGE_API_BASE_URL;
 const KEY = process.env.INSFORGE_API_KEY;

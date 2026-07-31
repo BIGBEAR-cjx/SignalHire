@@ -1,7 +1,7 @@
 import { createClient } from "@insforge/sdk";
 import { buildDueFollowUpDraftPatch, buildFollowUpDraftRunSummary } from "./outreach-followups.mjs";
 import { buildRoleOutreachSettings } from "./outreach-settings.mjs";
-import { updateOutreachThread, type OutreachThread } from "./outreach-threads";
+import { updateOutreachThread, type OutreachThread } from "./outreach-threads.ts";
 import { recordProjectOutreachFollowUpSummary } from "./projects";
 
 const BASE = process.env.INSFORGE_API_BASE_URL;

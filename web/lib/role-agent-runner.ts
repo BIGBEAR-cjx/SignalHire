@@ -1,5 +1,5 @@
 import { buildProjectCandidateGraphView, getProject, recordProjectRoleAgentEvent } from "./projects";
-import { listOutreachQueue } from "./outreach-threads";
+import { listOutreachQueue } from "./outreach-threads.ts";
 import { buildProjectInboxQueueView } from "./inbox";
 import { listSearchTasks, createSearchTask, runSearchTaskNow } from "./search-tasks";
 import { buildRoleAgentWorkspaceView } from "./role-agent-workspace.mjs";
@@ -7,7 +7,7 @@ import { runRoleAgentRunCore } from "./role-agent-runner.mjs";
 import { createHttpLiveSignalProvider } from "./live-signal-refresh.mjs";
 import { upsertCandidateLiveSignals } from "./candidate-live-signals";
 import { runBulkContactResolution } from "./contact-resolution-route.mjs";
-import { updateOutreachThread } from "./outreach-threads";
+import { updateOutreachThread } from "./outreach-threads.ts";
 
 export type RoleAgentRunAction = "run_sourcing" | "refresh_live_signals" | "prepare_outreach";
 

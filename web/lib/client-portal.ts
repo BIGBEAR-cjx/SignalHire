@@ -10,7 +10,7 @@ import {
   type ProjectWithKpi,
 } from "./projects";
 import { buildProjectInboxQueueView } from "./inbox";
-import { listOutreachQueue } from "./outreach-threads";
+import { listOutreachQueue } from "./outreach-threads.ts";
 import { buildRoleOutreachSettings } from "./outreach-settings.mjs";
 import { buildRoleAgentWorkspaceView } from "./role-agent-workspace.mjs";
 import {

@@ -1,4 +1,4 @@
-import { updateOutreachThread } from "@/lib/outreach-threads";
+import { updateOutreachThread } from "@/lib/outreach-threads.ts";
 import { normalizeLocale, t } from "@/lib/i18n.mjs";
 import { getUser } from "@/lib/session";
 

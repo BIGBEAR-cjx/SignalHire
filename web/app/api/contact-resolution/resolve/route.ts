@@ -1,5 +1,5 @@
 import { runContactResolution } from "@/lib/contact-resolution-route.mjs";
-import { getOutreachThread, updateOutreachThread } from "@/lib/outreach-threads";
+import { getOutreachThread, updateOutreachThread } from "@/lib/outreach-threads.ts";
 import { normalizeLocale, t } from "@/lib/i18n.mjs";
 import { getUser } from "@/lib/session";
 

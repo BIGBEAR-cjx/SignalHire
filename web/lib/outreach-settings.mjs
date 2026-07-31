@@ -1,4 +1,4 @@
-import { normalizeClientDeliveryAccessPolicy } from "./report-share-access.mjs";
+import { normalizeClientDeliveryAccessPolicy } from "./client-delivery-access-policy.mjs";
 
 const STOPPED_THREAD_STATUSES = new Set(["stopped", "replied", "bounced", "not_interested"]);
 const CAPACITY_GOAL_KEYS = ["contacted", "replied", "interested", "interview_ready"];

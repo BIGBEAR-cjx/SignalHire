@@ -165,3 +165,18 @@ export function buildOutreachQueue({ threads = [], now = new Date() } = {}) {
     items,
   };
 }
+
+async function serverOutreachThreads() {
+  return import("./outreach-threads.ts");
+}
+
+export async function ensureOutreachRelationshipAccess(input) { return (await serverOutreachThreads()).ensureOutreachRelationshipAccess(input); }
+export async function listOutreachThreads(input) { return (await serverOutreachThreads()).listOutreachThreads(input); }
+export async function listOutreachQueue(input) { return (await serverOutreachThreads()).listOutreachQueue(input); }
+export async function getOutreachThread(input) { return (await serverOutreachThreads()).getOutreachThread(input); }
+export async function createOutreachThread(input) { return (await serverOutreachThreads()).createOutreachThread(input); }
+export async function updateOutreachThread(input) { return (await serverOutreachThreads()).updateOutreachThread(input); }
+export async function claimOutreachThreadSend(input) { return (await serverOutreachThreads()).claimOutreachThreadSend(input); }
+export async function completeOutreachThreadSend(input) { return (await serverOutreachThreads()).completeOutreachThreadSend(input); }
+export async function releaseOutreachThreadSendClaim(input) { return (await serverOutreachThreads()).releaseOutreachThreadSendClaim(input); }
+export async function markOutreachThreadDeliveryUnknown(input) { return (await serverOutreachThreads()).markOutreachThreadDeliveryUnknown(input); }

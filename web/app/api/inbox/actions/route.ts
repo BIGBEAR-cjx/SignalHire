@@ -1,4 +1,4 @@
-import { getOutreachThread, updateOutreachThread } from "@/lib/outreach-threads";
+import { getOutreachThread, updateOutreachThread } from "@/lib/outreach-threads.ts";
 import { cancelCalendarInterviewEvent, createCalendarInterviewEvent, updateCalendarInterviewEvent } from "@/lib/gmail";
 import { runInboxAction } from "@/lib/inbox-actions-route.mjs";
 import { getUser } from "@/lib/session";
