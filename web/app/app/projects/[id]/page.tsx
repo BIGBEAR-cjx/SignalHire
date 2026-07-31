@@ -260,6 +260,15 @@ type CandidateGraphView = {
     evidence_quality: string;
     contactability_score: number;
     merge_keys: string[];
+    live_signals: Array<{
+      provider: string;
+      type: string;
+      source_url: string;
+      summary: string;
+      confidence: "high" | "medium" | "low";
+      observed_at: string;
+      expires_at: string;
+    }>;
   }>;
 };
 
@@ -2095,6 +2104,18 @@ function RoleAgentGuardrailsPanel({
                         <span className="font-semibold text-[var(--sh-ink)]">{signal.type}</span>
                         <span> · {signal.freshness}</span>
                         <span> · {signal.confidence}</span>
+                        {signal.at && <span> · {isEn ? "Observed" : "发现于"} {signal.at.slice(0, 10)}</span>}
+                        {signal.expires_at && <span> · {isEn ? "Expires" : "有效至"} {signal.expires_at.slice(0, 10)}</span>}
+                        {signal.source_url && (
+                          <a
+                            href={signal.source_url}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="ml-1 font-semibold text-[var(--sh-blue)] underline underline-offset-2"
+                          >
+                            {isEn ? "Evidence" : "查看证据"}
+                          </a>
+                        )}
                       </div>
                     ))}
                   </div>

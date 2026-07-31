@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import {
   buildCandidateLiveSignalUpsertRows,
+  attachActiveCandidateLiveSignals,
   isCandidateLiveSignalActive,
   liveSignalKey,
   normalizeCandidateLiveSignal,
@@ -62,6 +63,42 @@ test("skips malformed batch rows without merging matching evidence across projec
   assert.equal(normalizeCandidateLiveSignal(null), null);
   assert.equal(isCandidateLiveSignalActive(null), false);
   assert.equal(rows.length, 2);
+});
+
+test("attaches only fresh persisted signals through an existing stable candidate merge key", () => {
+  const candidates = [{
+    candidate_id: "linkedin:linkedin.com/in/ada",
+    merge_keys: ["linkedin:linkedin.com/in/ada", "person:ada-lovelace:example-ai"],
+  }];
+
+  const rows = attachActiveCandidateLiveSignals({
+    candidates,
+    signals: [
+      { ...validSignal, candidate_merge_key: "linkedin:linkedin.com/in/ada" },
+      {
+        ...validSignal,
+        candidate_merge_key: "person:ada-lovelace:example-ai",
+        source_url: "https://github.com/ada/fresh-update",
+        summary: "Published a fresh GitHub update.",
+        content_hash: "hash-fresh",
+      },
+      {
+        ...validSignal,
+        source_url: "https://github.com/ada/expired-update",
+        expires_at: "2026-07-29T10:00:00.000Z",
+        content_hash: "hash-expired",
+      },
+    ],
+    now: "2026-07-30T12:00:00.000Z",
+  });
+
+  assert.equal(rows.length, 1);
+  assert.equal(rows[0].live_signals.length, 2);
+  assert.deepEqual(rows[0].live_signals.map((signal) => signal.source_url), [
+    "https://github.com/ada/repo",
+    "https://github.com/ada/fresh-update",
+  ]);
+  assert.equal(rows[0].live_signals.every((signal) => signal.expires_at > "2026-07-30T12:00:00.000Z"), true);
 });
 
 test("deployment migration replaces the legacy evidence key with a scoped unique constraint", () => {

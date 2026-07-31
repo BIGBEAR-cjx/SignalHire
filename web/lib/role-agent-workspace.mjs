@@ -715,6 +715,19 @@ function maybeIso(value) {
   return Number.isFinite(date.getTime()) ? date.toISOString() : "";
 }
 
+function safeHttpsUrl(value) {
+  const clean = cleanString(value);
+  if (!clean) return "";
+  try {
+    const url = new URL(clean);
+    if (url.protocol !== "https:" || !url.hostname || url.username || url.password) return "";
+    url.hash = "";
+    return url.toString();
+  } catch {
+    return "";
+  }
+}
+
 function signalConfidence(value) {
   const clean = cleanString(value).toLowerCase();
   if (["high", "medium", "low"].includes(clean)) return clean;
@@ -734,7 +747,7 @@ function normalizedSignal(row, fallbackType, now) {
   const source = cleanString(row.source || row.provider || row.type || fallbackType);
   const type = cleanString(row.type || fallbackType);
   const label = cleanString(row.label || row.summary || row.status || row.type);
-  const at = maybeIso(row.at || row.updated_at || row.refreshed_at || row.created_at);
+  const at = maybeIso(row.at || row.observed_at || row.updated_at || row.refreshed_at || row.created_at);
   const expiresAt = maybeIso(row.expires_at || row.expiresAt);
   if (!label) return null;
   return {
@@ -745,6 +758,9 @@ function normalizedSignal(row, fallbackType, now) {
     freshness: signalFreshness({ at, expiresAt, now }),
     at,
     expires_at: expiresAt,
+    source_url: row.persisted_live_signal === true
+      ? safeHttpsUrl(row.source_url || row.sourceUrl)
+      : "",
   };
 }
 
@@ -865,6 +881,21 @@ function dedupeSignals(signals) {
 
 function liveSignalRows(candidate, now = new Date().toISOString()) {
   const rows = [];
+  for (const signal of arrayOf(candidate?.live_signals).filter(isRecord)) {
+    const observedAt = maybeIso(signal.observed_at || signal.observedAt);
+    const expiresAt = maybeIso(signal.expires_at || signal.expiresAt);
+    if (!observedAt || !expiresAt || new Date(expiresAt).getTime() <= new Date(now).getTime()) continue;
+    rows.push(normalizedSignal({
+      type: signal.type,
+      source: signal.provider,
+      label: signal.summary,
+      confidence: signal.confidence,
+      observed_at: observedAt,
+      expires_at: expiresAt,
+      source_url: signal.source_url,
+      persisted_live_signal: true,
+    }, "candidate_activity", now));
+  }
   for (const signal of arrayOf(candidate?.activity_signals).filter(isRecord)) {
     rows.push(normalizedSignal(signal, "candidate_activity", now));
   }
@@ -1080,6 +1111,7 @@ function upsertWhyNowCandidate(map, source, patch) {
         freshness: cleanString(signal.freshness) || "fresh",
         at: maybeIso(signal.at),
         expires_at: maybeIso(signal.expires_at),
+        source_url: safeHttpsUrl(signal.source_url),
       });
     }
   }

@@ -95,3 +95,33 @@ export function isCandidateLiveSignalActive(value = {}, now = new Date()) {
   const expiresAt = validIso(value.expires_at || value.expiresAt);
   return Boolean(expiresAt && Date.parse(expiresAt) > new Date(now).getTime());
 }
+
+// Live-signal providers never create candidate identities. A persisted row is
+// visible only when its stored merge key belongs to the already-built graph.
+/**
+ * @param {{ candidates?: any[], signals?: any[], now?: Date | string }} input
+ * @returns {any[]}
+ */
+export function attachActiveCandidateLiveSignals({ candidates = [], signals = [], now = new Date() } = {}) {
+  const activeByMergeKey = new Map();
+  for (const value of Array.isArray(signals) ? signals : []) {
+    const signal = normalizeCandidateLiveSignal(value);
+    if (!signal || !isCandidateLiveSignalActive(signal, now)) continue;
+    const key = signal.candidate_merge_key.toLowerCase();
+    const rows = activeByMergeKey.get(key) ?? [];
+    rows.push(signal);
+    activeByMergeKey.set(key, rows);
+  }
+
+  return (Array.isArray(candidates) ? candidates : []).map((candidate) => {
+    if (!isRecord(candidate)) return candidate;
+    const matched = [];
+    for (const key of Array.isArray(candidate.merge_keys) ? candidate.merge_keys : []) {
+      const rows = activeByMergeKey.get(cleanString(key).toLowerCase()) ?? [];
+      for (const signal of rows) {
+        if (!matched.some((item) => liveSignalKey(item) === liveSignalKey(signal))) matched.push(signal);
+      }
+    }
+    return matched.length ? { ...candidate, live_signals: matched } : { ...candidate, live_signals: [] };
+  });
+}

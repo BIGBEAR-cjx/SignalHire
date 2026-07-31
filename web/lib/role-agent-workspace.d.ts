@@ -131,6 +131,7 @@ export type RoleAgentWorkspaceView = {
       freshness: "fresh" | "stale" | "expired" | string;
       at: string;
       expires_at: string;
+      source_url: string;
     }>;
     contact_timing: {
       urgency: "now" | "this_week" | "later";

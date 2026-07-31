@@ -693,6 +693,59 @@ test("adds live signal explanations to why-now candidates", () => {
   assert.deepEqual(view.why_now[0].signal_sources, ["github", "profile", "company_hiring", "tech_stack", "paper"]);
 });
 
+test("uses a fresh persisted GitHub signal for why-now without surfacing expired evidence", () => {
+  const view = buildRoleAgentWorkspaceView({
+    role: { id: "role-persisted-live-signal", status: "active" },
+    settings: {},
+    candidateGraph: {
+      candidates: [
+        {
+          candidate_id: "github:ada",
+          canonical_name: "Ada Lovelace",
+          live_signals: [
+            {
+              provider: "github",
+              type: "candidate_activity",
+              source_url: "https://github.com/ada/retrieval-evals",
+              summary: "Published a retrieval evaluation update.",
+              confidence: "high",
+              observed_at: "2026-07-03T08:30:00.000Z",
+              expires_at: "2026-07-10T08:30:00.000Z",
+            },
+            {
+              provider: "github",
+              type: "candidate_activity",
+              source_url: "https://github.com/ada/old-update",
+              summary: "Old update.",
+              confidence: "high",
+              observed_at: "2026-06-01T08:30:00.000Z",
+              expires_at: "2026-06-10T08:30:00.000Z",
+            },
+          ],
+        },
+      ],
+    },
+    outreachQueue: { items: [] },
+    inboxQueue: { items: [] },
+    now: "2026-07-03T12:00:00.000Z",
+    locale: "en",
+  });
+
+  assert.equal(view.why_now[0].candidate_name, "Ada Lovelace");
+  assert.match(view.why_now[0].why_now, /retrieval evaluation/i);
+  assert.equal(view.why_now[0].signal_contract.length, 1);
+  assert.deepEqual(view.why_now[0].signal_contract[0], {
+    type: "candidate_activity",
+    source: "github",
+    label: "Published a retrieval evaluation update.",
+    confidence: "high",
+    freshness: "fresh",
+    at: "2026-07-03T08:30:00.000Z",
+    expires_at: "2026-07-10T08:30:00.000Z",
+    source_url: "https://github.com/ada/retrieval-evals",
+  });
+});
+
 test("ingests live signals from candidate evidence and role context", () => {
   const view = buildRoleAgentWorkspaceView({
     role: { id: "role-live-ingestion", status: "active" },

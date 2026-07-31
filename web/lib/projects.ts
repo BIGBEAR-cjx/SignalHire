@@ -19,6 +19,8 @@ import type { ClientDeliveryWeeklyArchiveRow } from "./client-delivery-weekly-ar
 import { buildPeopleProviderConfig, providerRowsToSourceLeads } from "./people-providers.mjs";
 import { buildReferralPathViews, normalizeNetworkSeed } from "./referral-paths.mjs";
 import { buildClientDeliveryShareHref, buildClientDeliveryShareToken } from "./report-share-access.mjs";
+import { attachActiveCandidateLiveSignals } from "./candidate-live-signals.mjs";
+import { listActiveCandidateLiveSignals } from "./candidate-live-signals";
 import { listItems } from "./shortlist";
 
 const BASE = process.env.INSFORGE_API_BASE_URL;
@@ -717,6 +719,15 @@ export interface ProjectCandidateGraphView {
     evidence_quality: string;
     contactability_score: number;
     merge_keys: string[];
+    live_signals: Array<{
+      provider: string;
+      type: string;
+      source_url: string;
+      summary: string;
+      confidence: "high" | "medium" | "low";
+      observed_at: string;
+      expires_at: string;
+    }>;
   }>;
 }
 
@@ -734,12 +745,17 @@ export async function buildProjectCandidateGraphView(userId: string, projectId: 
     candidates,
     sourceLeads: providerRowsToSourceLeads(providerRows as never),
   });
+  const persistedLiveSignals = await listActiveCandidateLiveSignals({ userId, projectId });
+  const candidatesWithLiveSignals = attachActiveCandidateLiveSignals({
+    candidates: graph.candidates,
+    signals: persistedLiveSignals,
+  });
   const providerStatus = buildPeopleProviderConfig().providers as ProjectCandidateGraphView["provider_status"];
   const candidateGraph: ProjectCandidateGraphView = {
     provider_status: providerStatus,
     summary: graph.summary,
     source_mix: graph.source_mix,
-    candidates: graph.candidates.map((candidate) => {
+    candidates: candidatesWithLiveSignals.map((candidate) => {
       const contactProfile = candidate.contact_profile as { contactability_score?: number } | null;
       const readiness = String(candidate.readiness);
       const sourceTypes: string[] = Array.from(new Set<string>(
@@ -758,6 +774,15 @@ export async function buildProjectCandidateGraphView(userId: string, projectId: 
         evidence_quality: String(candidate.evidence_summary.quality ?? "low"),
         contactability_score: Number(contactProfile?.contactability_score ?? 0),
         merge_keys: Array.isArray(candidate.merge_keys) ? candidate.merge_keys.map((key: unknown) => String(key)) : [],
+        live_signals: Array.isArray(candidate.live_signals) ? candidate.live_signals.map((signal: Record<string, unknown>) => ({
+          provider: String(signal.provider ?? ""),
+          type: String(signal.type ?? "candidate_activity"),
+          source_url: String(signal.source_url ?? ""),
+          summary: String(signal.summary ?? ""),
+          confidence: (signal.confidence === "high" || signal.confidence === "medium" || signal.confidence === "low" ? signal.confidence : "low") as "high" | "medium" | "low",
+          observed_at: String(signal.observed_at ?? ""),
+          expires_at: String(signal.expires_at ?? ""),
+        })) : [],
       };
     }),
   };
