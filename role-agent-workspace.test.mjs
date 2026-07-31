@@ -990,6 +990,7 @@ test("builds a live signal refresh queue for stale or expired candidates", () =>
   });
 
   assert.equal(view.signal_refresh.status, "due");
+  assert.equal(view.signal_refresh.provider_status, "ready");
   assert.equal(view.signal_refresh.due_count, 2);
   assert.equal(view.signal_refresh.stale_count, 1);
   assert.equal(view.signal_refresh.expired_count, 1);

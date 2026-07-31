@@ -1088,6 +1088,7 @@ function RoleAgentGuardrailsPanel({
     latestRun,
     locale,
   }) as RoleAgentWorkspaceView;
+  const liveSignalProviderReady = roleAgentWorkspace.signal_refresh.provider_status === "ready";
   const counters = [
     { key: "candidates", label: isEn ? "Candidates" : "候选人", value: roleAgentWorkspace.counts.candidates },
     { key: "preview_leads", label: isEn ? "Preview leads" : "预览线索", value: roleAgentWorkspace.counts.preview_leads },
@@ -2057,6 +2058,20 @@ function RoleAgentGuardrailsPanel({
               {isEn ? "No active gap" : "暂无明显缺口"}
             </span>
           )}
+        </div>
+      </div>
+
+      <div className="rounded-2xl border border-black/10 bg-white/72 p-4" aria-live="polite">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div>
+            <p className="text-xs font-semibold text-[var(--sh-muted)]">{isEn ? "Live signals" : "实时信号"}</p>
+            <p className="mt-1 text-xs leading-5 text-[var(--sh-muted)]">{roleAgentWorkspace.signal_refresh.summary}</p>
+          </div>
+          <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ring-1 ${liveSignalProviderReady ? "bg-emerald-50 text-emerald-700 ring-emerald-100" : "bg-amber-50 text-amber-800 ring-amber-100"}`}>
+            {liveSignalProviderReady
+              ? (isEn ? "Live signal provider ready" : "实时信号 provider 已就绪")
+              : (isEn ? "Live signal provider unavailable" : "实时信号 provider 未配置")}
+          </span>
         </div>
       </div>
 
