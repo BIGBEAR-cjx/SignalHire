@@ -67,9 +67,18 @@ export function evaluationEligibility({ caseDefinition, fixture } = {}) {
     cleanString(judgment?.review_status) === "approved_human_review" &&
     Number.isFinite(Date.parse(cleanString(judgment?.reviewed_at))),
   );
-  return caseReviewStatus === "approved_human_review" && fixtureReviewStatus === "approved_human_review" && hasApprovedJudgments
+  if (caseReviewStatus !== "approved_human_review" || fixtureReviewStatus !== "approved_human_review" || !hasApprovedJudgments) {
+    return { status: "inconclusive", reason: "case_review_pending" };
+  }
+  const knownRelevant = (caseDefinition?.known_relevant || []).map(stableCandidateIdentity).filter(Boolean);
+  const hasApprovedGoldenLabel = knownRelevant.some((identity) => judgments.some((judgment) =>
+    stableCandidateIdentity(judgment) === identity &&
+    judgment.relevance === "relevant" &&
+    judgment.hard_conditions_met === true,
+  ));
+  return hasApprovedGoldenLabel
     ? { status: "eligible" }
-    : { status: "inconclusive", reason: "case_review_pending" };
+    : { status: "inconclusive", reason: "missing_approved_golden_labels" };
 }
 
 function judgmentFor(candidate, judgments) {
@@ -85,7 +94,8 @@ function uniqueCandidates(candidates) {
   const seen = new Set();
   return candidates.filter((candidate) => {
     const identity = stableCandidateIdentity(candidate);
-    if (!identity || seen.has(identity)) return false;
+    if (!identity) return true;
+    if (seen.has(identity)) return false;
     seen.add(identity);
     return true;
   });
@@ -112,6 +122,7 @@ export function scoreCase(caseDefinition, result, { fixture } = {}) {
   for (const candidate of topTen) {
     const identity = stableCandidateIdentity(candidate);
     const judgment = judgmentFor(candidate, judgments);
+    if (!identity) identityErrors += 1;
     if (knownRelevant.has(identity)) matchedKnown.add(identity);
     if (judgment?.relevance === "relevant" && judgment.hard_conditions_met === true) hardMatches += 1;
     if (judgment?.identity_correct === false) identityErrors += 1;

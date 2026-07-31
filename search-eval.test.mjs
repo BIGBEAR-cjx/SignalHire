@@ -116,6 +116,17 @@ test("does not let a case review-status field bypass missing approved judgments"
   );
 });
 
+test("requires a stable approved known-relevant label before a case can score", () => {
+  assert.deepEqual(
+    scoreCase({ ...baseCase, known_relevant: [] }, { candidates: [], ...metrics }),
+    { status: "inconclusive", reason: "missing_approved_golden_labels" },
+  );
+  assert.deepEqual(
+    scoreCase({ ...baseCase, known_relevant: [{ name: "Unmatched", company: "Company" }] }, { candidates: [], ...metrics }),
+    { status: "inconclusive", reason: "missing_approved_golden_labels" },
+  );
+});
+
 test("deduplicates stable identities before precision and hard-constraint scoring", () => {
   const score = scoreCase(baseCase, {
     candidates: [
@@ -128,6 +139,21 @@ test("deduplicates stable identities before precision and hard-constraint scorin
   assert.equal(score.known_relevant_recall_at_10, 1);
   assert.equal(score.hard_constraint_recall, 1);
   assert.equal(score.precision_at_5, 1);
+});
+
+test("keeps identity-less returned candidates in the denominator and flags them", () => {
+  const score = scoreCase(baseCase, {
+    candidates: [
+      { name: "Ada Lovelace", current_company: "Analytical Engines", evidence: [{ url: "https://example.com/ada" }] },
+      { name: "Unknown One", evidence: [{ url: "https://example.com/unknown-one" }] },
+      { name: "Unknown Two", evidence: [{ url: "https://example.com/unknown-two" }] },
+      { evidence: [{ url: "https://example.com/unknown-three" }] },
+      { name: "Unknown Four" },
+    ],
+    ...metrics,
+  });
+  assert.equal(score.precision_at_5, 0.2);
+  assert.equal(score.identity_errors, 4);
 });
 
 test("ships exactly thirty human-review-pending cases with ten cases at every difficulty", () => {
