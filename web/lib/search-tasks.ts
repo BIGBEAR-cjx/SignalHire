@@ -6,6 +6,9 @@ import {
   normalizeSearchTaskInput,
 } from "./search-tasks.mjs";
 import { startMonitorRun as startMonitorRunCore } from "./talent-monitor-run.mjs";
+import { buildMonitorView } from "./talent-monitor-view.mjs";
+
+export { buildMonitorView };
 
 const BASE = process.env.INSFORGE_API_BASE_URL;
 const KEY = process.env.INSFORGE_API_KEY;
@@ -53,19 +56,35 @@ export interface SearchTask {
       evidence_updated: boolean;
     }>;
   };
+  runs?: MonitorRun[];
 }
 
-type MonitorRun = {
+export type MonitorRun = {
   id: string;
   status: string;
-  researchRunId?: string | null;
+  research_run_id: string | null;
+  started_at: string | null;
+  finished_at: string | null;
+  requested_count: number;
+  returned_count: number;
+  new_candidates: number;
+  updated_candidates: number;
+  seen_candidates: number;
+  skipped_candidates: number;
+  credits_reserved: number;
+  credits_consumed: number;
+  credits_released: number;
+  stop_reason: string | null;
+  config_snapshot: Record<string, unknown>;
 };
+
+type MonitorStartRun = Pick<MonitorRun, "id" | "status" | "research_run_id">;
 
 export type MonitorStartResult = {
   status: "queued" | "paused" | "blocked";
   reason?: string;
   duplicate?: boolean;
-  run?: MonitorRun;
+  run?: MonitorStartRun;
   jobId?: string;
   linked?: boolean;
   enqueued: boolean;
@@ -128,6 +147,62 @@ function mapTask(row: Record<string, unknown>): SearchTask {
   };
 }
 
+function nonNegativeInteger(value: unknown): number {
+  const number = Number(value);
+  return Number.isInteger(number) && number >= 0 ? number : 0;
+}
+
+function mapMonitorRun(row: Record<string, unknown>): MonitorRun {
+  const snapshot = row.config_snapshot && typeof row.config_snapshot === "object" && !Array.isArray(row.config_snapshot)
+    ? row.config_snapshot as Record<string, unknown>
+    : {};
+  return {
+    id: String(row.id ?? ""),
+    status: typeof row.status === "string" ? row.status : "unknown",
+    research_run_id: typeof row.research_run_id === "string" ? row.research_run_id : null,
+    started_at: row.started_at ? String(row.started_at) : null,
+    finished_at: row.finished_at ? String(row.finished_at) : null,
+    requested_count: nonNegativeInteger(row.requested_count),
+    returned_count: nonNegativeInteger(row.returned_count),
+    new_candidates: nonNegativeInteger(row.new_candidates),
+    updated_candidates: nonNegativeInteger(row.updated_candidates),
+    seen_candidates: nonNegativeInteger(row.seen_candidates),
+    skipped_candidates: nonNegativeInteger(row.skipped_candidates),
+    credits_reserved: nonNegativeInteger(row.credits_reserved),
+    credits_consumed: nonNegativeInteger(row.credits_consumed),
+    credits_released: nonNegativeInteger(row.credits_released),
+    stop_reason: typeof row.stop_reason === "string" && row.stop_reason ? row.stop_reason : null,
+    config_snapshot: snapshot,
+  };
+}
+
+async function listMonitorRuns(userId: string, taskIds: string[]): Promise<Map<string, MonitorRun[]>> {
+  const result = new Map<string, MonitorRun[]>();
+  if (taskIds.length === 0) return result;
+  const rows = await runSQL<Record<string, unknown>>(
+    `SELECT * FROM (
+       SELECT r.id, r.search_task_id, r.research_run_id, r.status, r.started_at, r.finished_at,
+         r.requested_count, r.returned_count, r.new_candidates, r.updated_candidates,
+         r.seen_candidates, r.skipped_candidates, r.credits_reserved, r.credits_consumed,
+         r.credits_released, r.stop_reason, r.config_snapshot,
+         row_number() OVER (PARTITION BY r.search_task_id ORDER BY r.updated_at DESC) AS history_rank
+       FROM public.search_task_runs r
+       WHERE r.user_id = $1 AND r.search_task_id = ANY($2::uuid[])
+     ) history
+     WHERE history_rank <= 10
+     ORDER BY search_task_id, history_rank`,
+    [userId, taskIds],
+  );
+  for (const row of rows ?? []) {
+    const taskId = typeof row.search_task_id === "string" ? row.search_task_id : "";
+    if (!taskId) continue;
+    const runs = result.get(taskId) ?? [];
+    runs.push(mapMonitorRun(row));
+    result.set(taskId, runs);
+  }
+  return result;
+}
+
 function discoveryItemsFromResult(value: unknown): NonNullable<SearchTask["run_summary"]>["discovery_items"] {
   if (!value || typeof value !== "object") return [];
   const taskDiscovery = (value as { task_discovery?: unknown }).task_discovery;
@@ -175,7 +250,7 @@ export async function listSearchTasks(input: { userId: string; projectId?: strin
     [input.userId, input.projectId ?? null],
   );
   if (!rows) return [];
-  return rows.map((row) => ({
+  const tasks = rows.map((row) => ({
     ...mapTask(row),
     run_summary: {
       last_status: String(row.last_status ?? "idle"),
@@ -185,6 +260,8 @@ export async function listSearchTasks(input: { userId: string; projectId?: strin
       discovery_items: discoveryItemsFromResult(row.last_result),
     },
   }));
+  const runsByTask = await listMonitorRuns(input.userId, tasks.map((task) => task.id));
+  return tasks.map((task) => ({ ...task, runs: runsByTask.get(task.id) ?? [] }));
 }
 
 export async function getSearchTask(userId: string, id: string): Promise<SearchTask | null> {
@@ -197,7 +274,9 @@ export async function getSearchTask(userId: string, id: string): Promise<SearchT
       .eq("user_id", userId)
       .limit(1);
     if (error || !data || data.length === 0) return null;
-    return mapTask(data[0] as Record<string, unknown>);
+    const task = mapTask(data[0] as Record<string, unknown>);
+    const runs = await listMonitorRuns(userId, [task.id]);
+    return { ...task, runs: runs.get(task.id) ?? [] };
   } catch {
     return null;
   }
@@ -316,12 +395,12 @@ function firstRow(value: unknown): Record<string, unknown> | null {
   return row && typeof row === "object" && !Array.isArray(row) ? row as Record<string, unknown> : null;
 }
 
-function monitorRunFromRow(row: Record<string, unknown> | null): MonitorRun | null {
+function monitorRunFromRow(row: Record<string, unknown> | null): MonitorStartRun | null {
   if (!row || typeof row.monitor_run_id !== "string" || !row.monitor_run_id) return null;
   return {
     id: row.monitor_run_id,
     status: typeof row.run_status === "string" ? row.run_status : "pending",
-    researchRunId: typeof row.research_run_id === "string" ? row.research_run_id : null,
+    research_run_id: typeof row.research_run_id === "string" ? row.research_run_id : null,
   };
 }
 
@@ -362,7 +441,7 @@ export async function startMonitorRun(input: { userId: string; id: string }): Pr
         duplicate: row?.is_duplicate === true,
         reason: typeof row?.pause_reason === "string" ? row.pause_reason : undefined,
         run,
-        researchRunId: run?.researchRunId ?? null,
+        researchRunId: run?.research_run_id ?? null,
       };
     },
     activateAtomic: async ({ task: monitor, monitorRunId, researchRunId, nextRunAt }: {
@@ -399,7 +478,7 @@ export async function runSearchTaskNow(input: { userId: string; id: string }): P
   const started = await startMonitorRun(input);
   if (started.status !== "queued") return null;
   if (!started.jobId && !started.duplicate) return null;
-  return { jobId: started.jobId ?? started.run?.researchRunId ?? null, task, duplicate: started.duplicate };
+  return { jobId: started.jobId ?? started.run?.research_run_id ?? null, task, duplicate: started.duplicate };
 }
 
 export async function enqueueDueSearchTasks(limit = 10): Promise<{ queued: number; job_ids: string[]; reconciled: number }> {

@@ -407,8 +407,14 @@ type SearchTaskView = {
   brief: string;
   frequency: "manual" | "daily" | "weekly";
   status: "active" | "paused";
+  candidate_batch_size: 5 | 10 | 20;
+  timezone: string;
+  schedule_time: string;
+  notification_enabled: boolean;
+  pause_reason: string | null;
   last_run_at: string | null;
   next_run_at: string | null;
+  credits: { limit: number; used: number; reserved: number; available: number };
   run_summary?: {
     last_status: string;
     last_run_at: string | null;
@@ -422,6 +428,28 @@ type SearchTaskView = {
       evidence_updated: boolean;
     }>;
   };
+  runs: Array<{
+    id: string;
+    status: string;
+    research_run_id: string | null;
+    started_at: string | null;
+    finished_at: string | null;
+    requested_count: number;
+    returned_count: number;
+    new_candidates: number;
+    updated_candidates: number;
+    seen_candidates: number;
+    skipped_candidates: number;
+    credits_reserved: number;
+    credits_consumed: number;
+    credits_released: number;
+    stop_reason: string | null;
+    config_snapshot: {
+      candidate_batch_size: number;
+      timezone: string;
+      schedule_time: string;
+    };
+  }>;
 };
 
 type OutreachQueueView = {
@@ -2874,6 +2902,21 @@ function monitorCopy(locale: "zh" | "en") {
     next: "Next run",
     newCandidates: "New",
     updatedCandidates: "Updated",
+    details: "Details",
+    close: "Close",
+    save: "Save changes",
+    schedule: "Schedule",
+    batch: "Candidates per run",
+    creditLimit: "Monthly Credits",
+    credits: "Credits",
+    available: "available",
+    reserved: "reserved",
+    used: "used",
+    runHistory: "Run history",
+    noRuns: "No monitor runs yet.",
+    researchRun: "Open research round",
+    pauseReason: "Pause reason",
+    notifications: "Notify when a run completes",
   } : {
     title: "Talent Monitor",
     desc: "让这个项目拥有持续运行的 AI Sourcer。每轮都会生成新的研究记录，并标记新增或证据更新的候选人。",
@@ -2892,6 +2935,21 @@ function monitorCopy(locale: "zh" | "en") {
     next: "下次运行",
     newCandidates: "新增",
     updatedCandidates: "更新",
+    details: "查看与设置",
+    close: "关闭",
+    save: "保存设置",
+    schedule: "运行设置",
+    batch: "每轮候选人数",
+    creditLimit: "每月 Credits",
+    credits: "Credits",
+    available: "可用",
+    reserved: "已预留",
+    used: "已使用",
+    runHistory: "运行历史",
+    noRuns: "暂无运行记录。",
+    researchRun: "打开研究轮次",
+    pauseReason: "暂停原因",
+    notifications: "运行完成后通知我",
   };
 }
 
@@ -3165,6 +3223,14 @@ function TalentMonitorPanel({
   const [frequency, setFrequency] = useState<"manual" | "daily" | "weekly">("weekly");
   const [busyId, setBusyId] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
+  const [selected, setSelected] = useState<SearchTaskView | null>(null);
+  const [editName, setEditName] = useState("");
+  const [editBrief, setEditBrief] = useState("");
+  const [editFrequency, setEditFrequency] = useState<"manual" | "daily" | "weekly">("weekly");
+  const [editBatchSize, setEditBatchSize] = useState<5 | 10 | 20>(10);
+  const [editTime, setEditTime] = useState("09:00");
+  const [editCreditLimit, setEditCreditLimit] = useState(20);
+  const [editNotifications, setEditNotifications] = useState(false);
 
   async function createTask() {
     if (!brief.trim() || creating) return;
@@ -3207,6 +3273,43 @@ function TalentMonitorPanel({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ status: task.status === "active" ? "paused" : "active", locale }),
       });
+      onChanged();
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  function openDetails(task: SearchTaskView) {
+    setSelected(task);
+    setEditName(task.name);
+    setEditBrief(task.brief);
+    setEditFrequency(task.frequency);
+    setEditBatchSize(task.candidate_batch_size);
+    setEditTime(task.schedule_time);
+    setEditCreditLimit(task.credits.limit);
+    setEditNotifications(task.notification_enabled);
+  }
+
+  async function saveDetails() {
+    if (!selected || !editName.trim() || !editBrief.trim()) return;
+    setBusyId(selected.id);
+    try {
+      const r = await fetch(`/api/search-tasks/${selected.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: editName,
+          brief: editBrief,
+          frequency: editFrequency,
+          candidate_batch_size: editBatchSize,
+          schedule_time: editTime,
+          monthly_credit_limit: editCreditLimit,
+          notification_enabled: editNotifications,
+          locale,
+        }),
+      });
+      if (!r.ok) throw new Error();
+      setSelected(null);
       onChanged();
     } finally {
       setBusyId(null);
@@ -3281,6 +3384,14 @@ function TalentMonitorPanel({
                 <span className="rounded-xl bg-gray-50 px-3 py-2 ring-1 ring-black/5">{c.newCandidates}: {task.run_summary?.new_candidates ?? 0}</span>
                 <span className="rounded-xl bg-gray-50 px-3 py-2 ring-1 ring-black/5">{c.updatedCandidates}: {task.run_summary?.updated_candidates ?? 0}</span>
               </div>
+              <div className="mt-2 grid grid-cols-3 gap-2 text-xs">
+                <span className="rounded-xl bg-blue-50 px-3 py-2 text-blue-800 ring-1 ring-blue-100">{task.credits.available} {c.available}</span>
+                <span className="rounded-xl bg-gray-50 px-3 py-2 ring-1 ring-black/5">{task.credits.used} {c.used}</span>
+                <span className="rounded-xl bg-gray-50 px-3 py-2 ring-1 ring-black/5">{task.credits.reserved} {c.reserved}</span>
+              </div>
+              {task.pause_reason && (
+                <p className="mt-2 rounded-xl bg-amber-50 px-3 py-2 text-xs text-amber-800 ring-1 ring-amber-100">{c.pauseReason}: {task.pause_reason}</p>
+              )}
               {(task.run_summary?.discovery_items?.length ?? 0) > 0 && (
                 <div className="mt-3 space-y-1.5">
                   {task.run_summary?.discovery_items?.slice(0, 4).map((item) => (
@@ -3308,9 +3419,53 @@ function TalentMonitorPanel({
                   <FiPauseCircle className="h-3.5 w-3.5" aria-hidden="true" />
                   {task.status === "active" ? c.pause : c.resume}
                 </SecondaryAction>
+                <SecondaryAction onClick={() => openDetails(task)} disabled={busyId === task.id} className="min-h-9 px-3 py-2 text-xs">
+                  {c.details}
+                </SecondaryAction>
               </div>
             </div>
           ))}
+        </div>
+      )}
+
+      {selected && (
+        <div role="dialog" aria-modal="true" aria-label={`${selected.name} ${c.details}`} className="rounded-2xl border border-[var(--sh-blue)] bg-white p-4 shadow-sm">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <p className="text-sm font-semibold text-[var(--sh-ink)]">{selected.name}</p>
+              <p className="mt-1 text-xs text-[var(--sh-muted)]">{c.schedule}</p>
+            </div>
+            <SecondaryAction onClick={() => setSelected(null)} disabled={busyId === selected.id} className="min-h-9 px-3 py-2 text-xs">{c.close}</SecondaryAction>
+          </div>
+          <div className="mt-4 grid gap-3 md:grid-cols-2">
+            <label className="grid gap-1 text-xs text-[var(--sh-muted)]">{c.name}<input value={editName} onChange={(event) => setEditName(event.target.value)} className="min-h-10 rounded-xl border border-black/10 bg-white px-3 text-sm text-[var(--sh-ink)]" /></label>
+            <label className="grid gap-1 text-xs text-[var(--sh-muted)]">{c.frequency}<select value={editFrequency} onChange={(event) => setEditFrequency(event.target.value as "manual" | "daily" | "weekly")} className="min-h-10 rounded-xl border border-black/10 bg-white px-3 text-sm text-[var(--sh-ink)]"><option value="manual">{c.manual}</option><option value="daily">{c.daily}</option><option value="weekly">{c.weekly}</option></select></label>
+            <label className="grid gap-1 text-xs text-[var(--sh-muted)] md:col-span-2">{c.brief}<textarea value={editBrief} onChange={(event) => setEditBrief(event.target.value)} rows={3} className="rounded-xl border border-black/10 bg-white px-3 py-2 text-sm text-[var(--sh-ink)]" /></label>
+            <label className="grid gap-1 text-xs text-[var(--sh-muted)]">{c.batch}<select value={editBatchSize} onChange={(event) => setEditBatchSize(Number(event.target.value) as 5 | 10 | 20)} className="min-h-10 rounded-xl border border-black/10 bg-white px-3 text-sm text-[var(--sh-ink)]"><option value={5}>5</option><option value={10}>10</option><option value={20}>20</option></select></label>
+            <label className="grid gap-1 text-xs text-[var(--sh-muted)]">{c.schedule}<input type="time" value={editTime} onChange={(event) => setEditTime(event.target.value)} className="min-h-10 rounded-xl border border-black/10 bg-white px-3 text-sm text-[var(--sh-ink)]" /></label>
+            <label className="grid gap-1 text-xs text-[var(--sh-muted)]">{c.creditLimit}<input type="number" min={0} step={1} value={editCreditLimit} onChange={(event) => setEditCreditLimit(Math.max(0, Number(event.target.value) || 0))} className="min-h-10 rounded-xl border border-black/10 bg-white px-3 text-sm text-[var(--sh-ink)]" /></label>
+            <label className="flex items-center gap-2 text-sm text-[var(--sh-ink)]"><input type="checkbox" checked={editNotifications} onChange={(event) => setEditNotifications(event.target.checked)} />{c.notifications}</label>
+          </div>
+          <div className="mt-4 rounded-xl bg-gray-50 p-3 text-xs text-[var(--sh-muted)] ring-1 ring-black/5">
+            <p className="font-semibold text-[var(--sh-ink)]">{c.credits}</p>
+            <p className="mt-1">{selected.credits.used} {c.used} · {selected.credits.reserved} {c.reserved} · {selected.credits.available} {c.available}</p>
+          </div>
+          <div className="mt-4">
+            <p className="text-sm font-semibold text-[var(--sh-ink)]">{c.runHistory}</p>
+            {selected.runs.length === 0 ? <p className="mt-2 text-sm text-[var(--sh-muted)]">{c.noRuns}</p> : (
+              <div className="mt-2 space-y-2">
+                {selected.runs.map((run) => (
+                  <div key={run.id} className="rounded-xl bg-gray-50 px-3 py-2 text-xs ring-1 ring-black/5">
+                    <div className="flex flex-wrap items-center justify-between gap-2"><span className="font-semibold text-[var(--sh-ink)]">{run.status}</span><span>{run.returned_count}/{run.requested_count} · +{run.new_candidates} · {run.credits_consumed} Credits</span></div>
+                    <p className="mt-1 text-[var(--sh-muted)]">{run.config_snapshot.candidate_batch_size} candidates · {run.config_snapshot.timezone} · {run.config_snapshot.schedule_time}</p>
+                    {run.stop_reason && <p className="mt-1 text-amber-800">{run.stop_reason}</p>}
+                    {run.research_run_id && <Link href="/app/history" className="mt-1 inline-block text-[var(--sh-blue)] hover:underline">{c.researchRun}</Link>}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+          <div className="mt-4 flex justify-end"><PrimaryAction onClick={saveDetails} disabled={busyId === selected.id || !editName.trim() || !editBrief.trim()} className="min-h-10 px-4 py-2 text-xs">{c.save}</PrimaryAction></div>
         </div>
       )}
     </Surface>

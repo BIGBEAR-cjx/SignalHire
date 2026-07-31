@@ -1,4 +1,4 @@
-import { createSearchTask, ensureSearchTaskProjectAccess, listSearchTasks } from "@/lib/search-tasks";
+import { buildMonitorView, createSearchTask, ensureSearchTaskProjectAccess, listSearchTasks } from "@/lib/search-tasks";
 import { normalizeLocale, t } from "@/lib/i18n.mjs";
 import { getUser } from "@/lib/session";
 
@@ -11,11 +11,15 @@ export async function GET(req: Request) {
   if (!user) return Response.json({ error: t(locale, "api.error.loginRequired") }, { status: 401 });
   const projectId = url.searchParams.get("project");
   const tasks = await listSearchTasks({ userId: user.id, projectId: projectId || undefined });
-  return Response.json({ tasks });
+  return Response.json({ tasks: tasks.map(buildMonitorView) });
 }
 
 export async function POST(req: Request) {
-  let body: { project_id?: unknown; name?: unknown; brief?: unknown; frequency?: unknown; status?: unknown; locale?: unknown } = {};
+  let body: {
+    project_id?: unknown; name?: unknown; brief?: unknown; frequency?: unknown; status?: unknown;
+    candidate_batch_size?: unknown; timezone?: unknown; schedule_time?: unknown;
+    monthly_credit_limit?: unknown; notification_enabled?: unknown; pause_reason?: unknown; locale?: unknown;
+  } = {};
   try { body = await req.json(); } catch {}
   const locale = normalizeLocale(body.locale);
   const user = await getUser();
@@ -34,7 +38,13 @@ export async function POST(req: Request) {
     brief: body.brief,
     frequency: typeof body.frequency === "string" ? body.frequency : undefined,
     status: typeof body.status === "string" ? body.status : undefined,
+    candidate_batch_size: typeof body.candidate_batch_size === "number" ? body.candidate_batch_size : undefined,
+    timezone: typeof body.timezone === "string" ? body.timezone : undefined,
+    schedule_time: typeof body.schedule_time === "string" ? body.schedule_time : undefined,
+    monthly_credit_limit: typeof body.monthly_credit_limit === "number" ? body.monthly_credit_limit : undefined,
+    notification_enabled: typeof body.notification_enabled === "boolean" ? body.notification_enabled : undefined,
+    pause_reason: typeof body.pause_reason === "string" || body.pause_reason === null ? body.pause_reason : undefined,
   });
   if (!task) return Response.json({ error: t(locale, "api.error.queueUnavailableTrySample") }, { status: 500 });
-  return Response.json({ task });
+  return Response.json({ task: buildMonitorView(task) });
 }

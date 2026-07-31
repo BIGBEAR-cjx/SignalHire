@@ -8,6 +8,7 @@ import {
   snapshotMonitorConfig,
 } from "./web/lib/search-tasks.mjs";
 import { startMonitorRun } from "./web/lib/talent-monitor-run.mjs";
+import { buildMonitorView } from "./web/lib/talent-monitor-view.mjs";
 
 test("normalizes monitor configuration to supported values", () => {
   const normalized = normalizeMonitorInput({
@@ -85,6 +86,54 @@ test("takes an immutable snapshot of monitor configuration", () => {
     monthly_credit_limit: 60,
     notification_enabled: true,
   });
+});
+
+test("builds a user-safe monitor view with immutable run configuration", () => {
+  const view = buildMonitorView({
+    id: "monitor-1",
+    name: "Agent monitor",
+    brief: "Find applied AI engineers",
+    frequency: "weekly",
+    status: "paused",
+    candidate_batch_size: 10,
+    timezone: "Asia/Shanghai",
+    schedule_time: "09:00",
+    monthly_credit_limit: 30,
+    monthly_credit_used: 10,
+    monthly_credit_reserved: 5,
+    notification_enabled: true,
+    pause_reason: "monthly_credit_limit",
+    last_run_at: "2026-07-30T01:00:00.000Z",
+    next_run_at: null,
+    runs: [{
+      id: "run-1",
+      status: "done",
+      research_run_id: "research-1",
+      requested_count: 10,
+      returned_count: 7,
+      new_candidates: 4,
+      updated_candidates: 2,
+      seen_candidates: 1,
+      skipped_candidates: 3,
+      credits_reserved: 10,
+      credits_consumed: 7,
+      credits_released: 3,
+      outreach_sent: 99,
+      candidate_snapshot: { email: "private@example.com" },
+      report: { secret: "private" },
+      config_snapshot: {
+        candidate_batch_size: 10,
+        timezone: "Asia/Shanghai",
+        schedule_time: "09:00",
+      },
+    }],
+  });
+
+  assert.equal(view.runs[0].config_snapshot.candidate_batch_size, 10);
+  assert.equal(view.runs[0].outreach_sent, undefined);
+  assert.equal(view.runs[0].candidate_snapshot, undefined);
+  assert.equal(view.runs[0].report, undefined);
+  assert.deepEqual(view.credits, { limit: 30, used: 10, reserved: 5, available: 15 });
 });
 
 test("forward migration preserves legacy scheduled monitor cadence", () => {

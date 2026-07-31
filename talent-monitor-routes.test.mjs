@@ -7,6 +7,9 @@ const cronRoute = readFileSync("web/app/api/cron/search-tasks/route.ts", "utf8")
 const taskLibrary = readFileSync("web/lib/search-tasks.ts", "utf8");
 const roleAgent = readFileSync("web/lib/role-agent-runner.ts", "utf8");
 const roleAgentCore = readFileSync("web/lib/role-agent-runner.mjs", "utf8");
+const taskRoute = readFileSync("web/app/api/search-tasks/[id]/route.ts", "utf8");
+const projectRoute = readFileSync("web/app/api/projects/[id]/route.ts", "utf8");
+const monitorPanel = readFileSync("web/app/app/projects/[id]/page.tsx", "utf8");
 
 test("manual monitor route authenticates before using the shared start path", () => {
   assert.match(runRoute, /const user = await getUser\(\)/);
@@ -34,4 +37,19 @@ test("monitor routes use the database-owned atomic start and reconciliation cont
   assert.doesNotMatch(taskLibrary, /credits\.reserve/);
   assert.doesNotMatch(taskLibrary, /enqueueMonitorResearchRun/);
   assert.match(roleAgentCore, /if \(!queued \|\| \(!queued\.jobId && !queued\.duplicate\)\) throw new Error\("search_task_run_failed"\)/);
+});
+
+test("monitor API scopes lookup to the authenticated user and returns only the safe view", () => {
+  assert.match(taskRoute, /getSearchTask\(user\.id, id\)/);
+  assert.match(taskRoute, /buildMonitorView\(task\)/);
+  assert.match(projectRoute, /searchTasks: searchTasks\.map\(buildMonitorView\)/);
+  assert.doesNotMatch(taskRoute, /outreach_sent/);
+});
+
+test("monitor panel presents a detail drawer, credits, and run history without outreach", () => {
+  assert.match(monitorPanel, /role="dialog"/);
+  assert.match(monitorPanel, /task\.credits\.available/);
+  assert.match(monitorPanel, /selected\.runs\.map/);
+  assert.match(monitorPanel, /\/app\/history/);
+  assert.doesNotMatch(monitorPanel, /outreach CTA/);
 });

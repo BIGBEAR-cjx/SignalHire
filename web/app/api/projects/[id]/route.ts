@@ -15,7 +15,7 @@ import {
   updateProject,
   type ProjectStatus,
 } from "@/lib/projects";
-import { listSearchTasks } from "@/lib/search-tasks";
+import { buildMonitorView, listSearchTasks } from "@/lib/search-tasks";
 import { listOutreachQueue, listOutreachThreads } from "@/lib/outreach-threads";
 import { buildSequenceAnalyticsView } from "@/lib/sequence-analytics.mjs";
 import { buildProfileLeadLayerView } from "@/lib/profile-lead-layer.mjs";
@@ -69,7 +69,7 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
     project: { ...projectResponse, inbox_sync_summary: projectResponse.inbox_sync_summary ?? {} },
     breakdown: freshBreakdown ?? breakdown,
     runs,
-    searchTasks,
+    searchTasks: searchTasks.map(buildMonitorView),
     outreachQueue,
     inboxQueue,
     clientDeliveryAuditEvents,
