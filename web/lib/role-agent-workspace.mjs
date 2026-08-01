@@ -950,6 +950,7 @@ function liveSignalRefreshTarget(candidate, now) {
     expired_count: expiredSignals.length,
     last_signal_at: lastSignalAt,
     refresh_reason: status === "expired" ? "expired_live_signal" : "stale_live_signal",
+    github_login: cleanString(candidate?.github_login),
   };
 }
 

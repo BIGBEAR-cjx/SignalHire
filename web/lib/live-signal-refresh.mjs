@@ -498,6 +498,101 @@ export function createHttpLiveSignalProvider({
   };
 }
 
+function githubLogin(value) {
+  const clean = cleanString(value).replace(/^@/, "");
+  return /^[a-z\d](?:[a-z\d-]{0,37}[a-z\d])?$/i.test(clean) ? clean : "";
+}
+
+function githubEventType(event = {}) {
+  const type = cleanString(event.type);
+  if (type === "PullRequestEvent") return "pull_request";
+  if (type === "CreateEvent" || type === "DeleteEvent") return "repository_activity";
+  return "candidate_activity";
+}
+
+function githubEventSummary(event = {}) {
+  const repo = cleanString(event?.repo?.name);
+  const type = cleanString(event.type).replace(/Event$/, "") || "activity";
+  return repo ? `GitHub ${type} activity on ${repo}.` : "GitHub public activity updated.";
+}
+
+function githubEventUrl(event = {}, login = "") {
+  const repo = cleanString(event?.repo?.name).replace(/^\/+|\/+$/g, "");
+  return repo ? `https://github.com/${repo}` : login ? `https://github.com/${login}` : "";
+}
+
+function githubEventSignal(event = {}, login = "", { now = new Date() } = {}) {
+  const observedAt = strictIso(event.created_at);
+  const sourceUrl = githubEventUrl(event, login);
+  if (!observedAt || !sourceUrl) return null;
+  const expiresAt = new Date(Date.parse(observedAt) + 14 * 24 * 60 * 60 * 1000).toISOString();
+  if (Date.parse(expiresAt) <= new Date(now).getTime()) return null;
+  return {
+    type: githubEventType(event),
+    source: "github_public_events",
+    confidence: "high",
+    freshness: "fresh",
+    observed_at: observedAt,
+    expires_at: expiresAt,
+    summary: githubEventSummary(event),
+    url: sourceUrl,
+  };
+}
+
+// GitHub's public Events API gives the initial live-signal provider a real,
+// evidence-linked source without inventing candidate activity. An optional
+// server-only token only raises GitHub's rate limit; it is not required.
+export function createGitHubPublicLiveSignalProvider({
+  apiKey = "",
+  fetchImpl = globalThis.fetch,
+  now = () => new Date(),
+} = {}) {
+  return {
+    async refresh(input = {}) {
+      const targets = Array.isArray(providerInput(input).targets) ? providerInput(input).targets.filter(isRecord) : [];
+      const refreshed = [];
+      const failed = [];
+      for (const target of targets) {
+        const login = githubLogin(target.github_login || target.githubLogin);
+        if (!login) {
+          failed.push({ ...safeTarget(target), error: "github_identity_not_found" });
+          continue;
+        }
+        try {
+          const headers = {
+            Accept: "application/vnd.github+json",
+            "User-Agent": "SignalHire-live-signal-refresh",
+            "X-GitHub-Api-Version": "2022-11-28",
+          };
+          if (cleanString(apiKey)) headers.Authorization = `Bearer ${cleanString(apiKey)}`;
+          const response = await fetchImpl(`https://api.github.com/users/${encodeURIComponent(login)}/events/public?per_page=10`, { headers });
+          if (!response?.ok) {
+            failed.push({ ...safeTarget(target), error: `github_http_${response?.status || "failed"}` });
+            continue;
+          }
+          const events = typeof response.json === "function" ? await response.json() : [];
+          const signals = (Array.isArray(events) ? events : [])
+            .map((event) => githubEventSignal(event, login, { now: now() }))
+            .filter(Boolean)
+            .slice(0, 3);
+          if (signals.length) {
+            refreshed.push({
+              candidate_id: cleanString(target.candidate_id || target.id),
+              candidate_name: cleanString(target.candidate_name || target.name) || "Candidate",
+              provider: "github_public_events",
+              signal_count: signals.length,
+              live_signals: signals,
+            });
+          }
+        } catch {
+          failed.push({ ...safeTarget(target), error: "github_request_failed" });
+        }
+      }
+      return { refreshed, failed };
+    },
+  };
+}
+
 // Extensionless cron imports select this pure provider module first. Delegate
 // the database-backed refresh only when the server route invokes it.
 function liveSignalRefreshService() {

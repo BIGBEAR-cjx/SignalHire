@@ -4,7 +4,7 @@ import { listOutreachQueue } from "./outreach-threads.ts";
 import { buildProjectInboxQueueView } from "./inbox";
 import { listSearchTasks } from "./search-tasks";
 import { buildRoleAgentWorkspaceView } from "./role-agent-workspace.mjs";
-import { buildLiveSignalRefreshSummary, createHttpLiveSignalProvider, selectLiveSignalRefreshProjects } from "./live-signal-refresh.mjs";
+import { buildLiveSignalRefreshSummary, createGitHubPublicLiveSignalProvider, createHttpLiveSignalProvider, selectLiveSignalRefreshProjects } from "./live-signal-refresh.mjs";
 import { runRoleAgentRunCore } from "./role-agent-runner.mjs";
 import { upsertCandidateLiveSignals } from "./candidate-live-signals";
 
@@ -78,15 +78,9 @@ async function refreshLiveSignals(input: { userId?: string; project?: unknown; t
     apiKey: process.env.LIVE_SIGNAL_PROVIDER_API_KEY,
   });
   if (!provider) {
-    const targets = Array.isArray(input.targets) ? input.targets : [];
-    return {
-      refreshed: [],
-      failed: targets.map((target) => ({
-        ...(target && typeof target === "object" && !Array.isArray(target) ? target : {}),
-        error: "provider_not_configured",
-      })),
-      error: "provider_not_configured",
-    };
+    return createGitHubPublicLiveSignalProvider({
+      apiKey: process.env.GITHUB_TOKEN || process.env.GITHUB_API_KEY,
+    }).refresh(input);
   }
   return provider.refresh(input);
 }

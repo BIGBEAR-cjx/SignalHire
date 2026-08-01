@@ -956,6 +956,7 @@ test("builds a live signal refresh queue for stale or expired candidates", () =>
         {
           candidate_id: "stale-signal",
           canonical_name: "Stale Signal Candidate",
+          github_login: "ada",
           activity_signals: [
             { type: "candidate_activity", source: "github", label: "Old project update", confidence: "medium", at: "2026-05-20T08:30:00.000Z" },
           ],
@@ -998,6 +999,7 @@ test("builds a live signal refresh queue for stale or expired candidates", () =>
     "Expired Signal Candidate",
     "Stale Signal Candidate",
   ]);
+  assert.equal(view.signal_refresh.targets.find((item) => item.candidate_id === "stale-signal")?.github_login, "ada");
   assert.ok(view.health.blocked_actions.includes("stale_live_signals"));
   const action = view.next_actions.find((item) => item.type === "refresh_live_signals");
   assert.equal(action?.affected_count, 2);

@@ -156,6 +156,7 @@ export type RoleAgentWorkspaceView = {
       expired_count: number;
       last_signal_at: string;
       refresh_reason: string;
+      github_login: string;
     }>;
     last_run: null | {
       run_id: string;

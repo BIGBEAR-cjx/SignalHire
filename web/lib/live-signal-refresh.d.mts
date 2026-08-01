@@ -24,3 +24,10 @@ export function createHttpLiveSignalProvider(input?: {
 }): null | {
   refresh(input?: unknown): Promise<{ refreshed: unknown[]; failed: unknown[]; error?: string }>;
 };
+export function createGitHubPublicLiveSignalProvider(input?: {
+  apiKey?: string;
+  fetchImpl?: typeof fetch;
+  now?: () => Date;
+}): {
+  refresh(input?: unknown): Promise<{ refreshed: unknown[]; failed: unknown[] }>;
+};

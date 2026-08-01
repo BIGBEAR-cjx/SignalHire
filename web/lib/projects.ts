@@ -720,6 +720,7 @@ export interface ProjectCandidateGraphView {
     evidence_quality: string;
     contactability_score: number;
     merge_keys: string[];
+    github_login: string;
     live_signals: Array<{
       provider: string;
       type: string;
@@ -739,7 +740,35 @@ function providerCandidateRowsFromCandidates(candidates: unknown[]) {
 }
 
 function liveSignalProviderStatus(): "ready" | "not_configured" {
-  return process.env.LIVE_SIGNAL_PROVIDER_URL?.trim() ? "ready" : "not_configured";
+  return "ready";
+}
+
+function githubLoginFromUrl(value: unknown) {
+  if (typeof value !== "string" || !value.trim()) return "";
+  try {
+    const url = new URL(value);
+    if (url.protocol !== "https:" || url.hostname.toLowerCase() !== "github.com") return "";
+    const login = url.pathname.split("/").filter(Boolean)[0] ?? "";
+    return /^[a-z\d](?:[a-z\d-]{0,37}[a-z\d])?$/i.test(login) ? login : "";
+  } catch {
+    return "";
+  }
+}
+
+function candidateGitHubLogin(candidate: Record<string, unknown>) {
+  const rawCandidate = candidate.raw_candidate as Record<string, unknown> | undefined;
+  const links = rawCandidate?.links as Record<string, unknown> | undefined;
+  const urls = [
+    links?.github,
+    ...(Array.isArray(candidate.source_nodes)
+      ? candidate.source_nodes.map((node: Record<string, unknown>) => node.source_url)
+      : []),
+  ];
+  for (const url of urls) {
+    const login = githubLoginFromUrl(url);
+    if (login) return login;
+  }
+  return "";
 }
 
 export async function buildProjectCandidateGraphView(userId: string, projectId: string): Promise<ProjectCandidateGraphView> {
@@ -780,6 +809,7 @@ export async function buildProjectCandidateGraphView(userId: string, projectId: 
         evidence_quality: String(candidate.evidence_summary.quality ?? "low"),
         contactability_score: Number(contactProfile?.contactability_score ?? 0),
         merge_keys: Array.isArray(candidate.merge_keys) ? candidate.merge_keys.map((key: unknown) => String(key)) : [],
+        github_login: candidateGitHubLogin(candidate as Record<string, unknown>),
         live_signals: Array.isArray(candidate.live_signals) ? candidate.live_signals.map((signal: Record<string, unknown>) => ({
           provider: String(signal.provider ?? ""),
           type: String(signal.type ?? "candidate_activity"),
