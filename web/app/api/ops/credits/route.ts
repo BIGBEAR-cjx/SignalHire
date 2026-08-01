@@ -1,5 +1,5 @@
-import { createClient } from "@insforge/sdk";
 import { grant, recordOpsIdentityLabel } from "../../../../lib/credits";
+import { insforgeAdmin } from "../../../../lib/insforge-admin.mjs";
 import { authorizeOpsUser } from "../../../../lib/ops-auth";
 import { createOpsCreditsHandler, projectOpsAccount } from "../../../../lib/ops-credits-handlers.mjs";
 import { getUser } from "../../../../lib/session";
@@ -15,11 +15,7 @@ type OpsAccount = {
 };
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-const BASE = process.env.INSFORGE_API_BASE_URL;
-const SERVICE_ROLE_KEY = process.env.INSFORGE_CREDITS_SERVICE_ROLE_KEY;
-const client = BASE && SERVICE_ROLE_KEY
-  ? createClient({ baseUrl: BASE, anonKey: SERVICE_ROLE_KEY, isServerMode: true })
-  : null;
+const client = insforgeAdmin;
 
 function asUuid(value: unknown) {
   const id = typeof value === "string" ? value.trim() : "";
@@ -27,7 +23,7 @@ function asUuid(value: unknown) {
 }
 
 async function configuredFindAccounts(query: { userId: string | null; email: string | null }): Promise<OpsAccount[]> {
-  if (!client) throw new Error("Credits service-role lookup is not configured");
+  if (!client) throw new Error("Credits admin lookup is not configured");
   const directoryQuery = client.database.from("ops_credit_identity_labels").select("user_id,email,label_source");
   const { data: directoryRows, error: directoryError } = query.email
     ? await directoryQuery.eq("email", query.email)

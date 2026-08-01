@@ -1,4 +1,4 @@
-import { createClient } from "@insforge/sdk";
+import { insforgeAdmin } from "./insforge-admin.mjs";
 import {
   operationIdempotencyKey,
   validateCreditAmount,
@@ -61,11 +61,7 @@ export type CreditsServiceDependencies = {
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const BASE = process.env.INSFORGE_API_BASE_URL;
-const SERVICE_ROLE_KEY = process.env.INSFORGE_CREDITS_SERVICE_ROLE_KEY;
-const client = BASE && SERVICE_ROLE_KEY
-  ? createClient({ baseUrl: BASE, anonKey: SERVICE_ROLE_KEY, isServerMode: true })
-  : null;
+const client = insforgeAdmin;
 
 class CreditsServiceError extends Error {
   constructor(message: string) {
@@ -264,14 +260,14 @@ function configuredCreditsDependencies(): CreditsServiceDependencies {
   return {
     async rpc(functionName, args) {
       assertServerOnly();
-      if (!client) throw new CreditsServiceError("Credits service-role RPC is not configured");
+      if (!client) throw new CreditsServiceError("Credits admin RPC is not configured");
       const { data, error } = await client.database.rpc(functionName, args);
-      if (error) throw new CreditsServiceError("Credits service-role RPC rejected the request");
+      if (error) throw new CreditsServiceError("Credits admin RPC rejected the request");
       return data;
     },
     async readBalance(userId) {
       assertServerOnly();
-      if (!client) throw new CreditsServiceError("Credits service-role RPC is not configured");
+      if (!client) throw new CreditsServiceError("Credits admin RPC is not configured");
       const { data, error } = await client.database
         .from("credit_accounts")
         .select("available_credits,reserved_credits")

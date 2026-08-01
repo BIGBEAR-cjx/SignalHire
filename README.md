@@ -169,9 +169,9 @@ cp web/.env.example web/.env.local
 
 Credits 和 Ops 控制台（不包含支付）：
 
-- `INSFORGE_CREDITS_SERVICE_ROLE_KEY`：仅服务端使用，必须对应可执行 Credits RPC 的受信数据库 service role。
+- `INSFORGE_API_KEY`：仅服务端使用的 InsForge 项目管理 API Key；用于 Credits RPC、账本读取与 Ops 控制台，绝不暴露给浏览器。
 - `OPS_ADMIN_EMAIL`：唯一官方运营账号的精确邮箱；缺失或格式不合法时所有 `/api/ops/*` 都拒绝访问。
-- `OPS_APP_ORIGIN`：将同一个 Next.js 部署绑定到 `https://ops.<主域名>`（如 `https://ops.example.com`）。
+- `OPS_APP_ORIGIN`：将同一个 Next.js 部署绑定到独立运营后台域名（如 `https://admin.example.com`）。
 
 Ops 在 `https://ops.<主域名>/ops/login` 重新登录同一个 InsForge 用户库。`sh_token` 必须保持 host-only（不设置 `Domain=.主域名`），所以主站 cookie 不会自动登录 ops host；ops 的服务器端 email allowlist 仍会在每一个 API 请求执行。不要把 service role key 或任何候选人、项目、邮件、报告数据输出给 Ops UI。
 

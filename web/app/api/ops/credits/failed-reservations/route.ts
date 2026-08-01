@@ -1,6 +1,6 @@
-import { createClient } from "@insforge/sdk";
 import { authorizeOpsUser } from "../../../../../lib/ops-auth";
 import { createOpsFailedReservationsHandler, terminalMonitorFailureReason } from "../../../../../lib/ops-credits-handlers.mjs";
+import { insforgeAdmin } from "../../../../../lib/insforge-admin.mjs";
 import { getUser } from "../../../../../lib/session";
 
 export const runtime = "nodejs";
@@ -19,11 +19,7 @@ type FailedReservation = {
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const BASE = process.env.INSFORGE_API_BASE_URL;
-const SERVICE_ROLE_KEY = process.env.INSFORGE_CREDITS_SERVICE_ROLE_KEY;
-const client = BASE && SERVICE_ROLE_KEY
-  ? createClient({ baseUrl: BASE, anonKey: SERVICE_ROLE_KEY, isServerMode: true })
-  : null;
+const client = insforgeAdmin;
 
 function asUuid(value: unknown) {
   const id = typeof value === "string" ? value.trim() : "";
@@ -44,7 +40,7 @@ function asTimestamp(value: unknown) {
 }
 
 async function configuredListFailedReservations(): Promise<FailedReservation[]> {
-  if (!client) throw new Error("Credits service-role lookup is not configured");
+  if (!client) throw new Error("Credits admin lookup is not configured");
   const { data: taskRows, error: taskError } = await client.database
     .from("search_task_runs")
     .select("credit_reservation_id,search_task_id,status")

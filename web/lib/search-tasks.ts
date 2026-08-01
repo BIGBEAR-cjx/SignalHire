@@ -1,5 +1,6 @@
 import { createClient } from "@insforge/sdk";
 import { findCachedCandidateProfilesForSearch } from "./db";
+import { insforgeAdmin } from "./insforge-admin.mjs";
 import {
   buildNextRunAt,
   nextRunAfterPatch,
@@ -12,11 +13,8 @@ export { buildMonitorView };
 
 const BASE = process.env.INSFORGE_API_BASE_URL;
 const KEY = process.env.INSFORGE_API_KEY;
-const CREDITS_SERVICE_ROLE_KEY = process.env.INSFORGE_CREDITS_SERVICE_ROLE_KEY;
 const client = BASE && KEY ? createClient({ baseUrl: BASE, anonKey: KEY, isServerMode: true }) : null;
-const monitorClient = BASE && CREDITS_SERVICE_ROLE_KEY
-  ? createClient({ baseUrl: BASE, anonKey: CREDITS_SERVICE_ROLE_KEY, isServerMode: true })
-  : null;
+const monitorClient = insforgeAdmin;
 const TABLE = "search_tasks";
 
 export type SearchTaskFrequency = "manual" | "daily" | "weekly";
@@ -407,9 +405,9 @@ function monitorRunFromRow(row: Record<string, unknown> | null): MonitorStartRun
 }
 
 async function monitorRpc(name: string, args: Record<string, unknown>): Promise<unknown> {
-  if (!monitorClient) throw new Error("Talent Monitor service role is not configured");
+  if (!monitorClient) throw new Error("Talent Monitor admin client is not configured");
   const { data, error } = await monitorClient.database.rpc(name, args);
-  if (error) throw new Error("Talent Monitor service RPC rejected the request");
+  if (error) throw new Error("Talent Monitor admin RPC rejected the request");
   return data;
 }
 
