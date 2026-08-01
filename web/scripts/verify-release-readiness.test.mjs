@@ -1,7 +1,15 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { runReleaseBrowserCase } from "./verify-release-readiness.mjs";
+import { browserQaFixture, runReleaseBrowserCase } from "./verify-release-readiness.mjs";
+
+test("browser release fixtures never reuse a customer QA session as an owner session", () => {
+  const fixture = browserQaFixture({ cookie: "sh_token=customer-session", projectId: "project-123" });
+
+  assert.equal(fixture.owner, "");
+  assert.equal(fixture.customer, "sh_token=customer-session");
+  assert.equal(fixture.projectId, "project-123");
+});
 
 test("release browser cases redact cookie setup and page creation failures", async () => {
   const rawSession = "sh_token=token%2Fdecoded";

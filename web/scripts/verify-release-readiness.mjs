@@ -191,8 +191,11 @@ async function resolveQaSession() {
   };
 }
 
-function browserQaFixture(qaSession = null) {
+export function browserQaFixture(qaSession = null) {
   return {
+    // The generated QA session represents the configured customer account.
+    // Owner access must always be explicit so release QA cannot pass with one
+    // account exercising both permission boundaries.
     owner: cleanString(process.env.SIGNALHIRE_QA_OWNER_SESSION_TOKEN),
     customer: cleanString(process.env.SIGNALHIRE_QA_CUSTOMER_SESSION_TOKEN) || qaSession?.cookie || "",
     projectId: cleanString(process.env.SIGNALHIRE_QA_PROJECT_ID) || qaSession?.projectId || "",
@@ -240,8 +243,8 @@ function runtimeEnvChecks({ requireLiveProvider = false } = {}) {
     detail: cleanString(process.env.SIGNALHIRE_QA_SESSION_TOKEN || process.env.SIGNALHIRE_QA_ACCESS_TOKEN)
       ? "explicit QA session token present"
       : cleanString(process.env.SIGNALHIRE_QA_USER_ID) && cleanString(process.env.SIGNALHIRE_QA_EMAIL)
-        ? "QA user id and email present for token-based client portal QA"
-        : "set SIGNALHIRE_QA_USER_ID and SIGNALHIRE_QA_EMAIL for token-based client portal QA",
+        ? "QA user id and email present for a short-lived customer QA session"
+        : "set SIGNALHIRE_QA_USER_ID and SIGNALHIRE_QA_EMAIL for token-based customer QA",
   });
   return rows;
 }
@@ -376,7 +379,7 @@ export async function runReleaseBrowserCase({ browser, item, qaSession = null, o
           && !/正在加载工作台/.test(text);
       }
       return /登录|Sign in|邮箱|Email/i.test(text);
-    }, Boolean(item.useQaSession), { timeout: 5000 }).catch(() => {});
+    }, Boolean(item.useQaSession), { timeout: 12000 }).catch(() => {});
     const bodyText = (await page.locator("body").innerText({ timeout: 5000 })).replace(/\s+/g, " ");
     const rects = await page.locator("h1, h2, h3, p, a, button, input, label").evaluateAll((nodes) => nodes.map((node) => {
       const r = node.getBoundingClientRect();
@@ -402,7 +405,7 @@ export async function runReleaseBrowserCase({ browser, item, qaSession = null, o
     return {
       name: item.name,
       status: ok ? "pass" : checkpoint ? "blocked" : "fail",
-      detail: `status=${response?.status() || "n/a"}${overlap ? `, overlap=${overlap.a}/${overlap.b}` : ""}${checkpoint ? ", Vercel Security Checkpoint" : ""}`,
+      detail: `status=${response?.status() || "n/a"}${hasClientPortalContent ? "" : ", client portal copy missing"}${hasLoginPrompt ? ", login prompt visible" : ""}${hasLoadingOnly ? ", workspace still loading" : ""}${overlap ? `, overlap=${overlap.a}/${overlap.b}` : ""}${checkpoint ? ", Vercel Security Checkpoint" : ""}`,
     };
   } catch (error) {
     return {
