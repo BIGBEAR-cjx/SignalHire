@@ -12,8 +12,10 @@ function uniqueList(values) {
   return Array.from(new Set((Array.isArray(values) ? values : []).map(cleanLower).filter(Boolean)));
 }
 
+const DEFAULT_PUBLIC_APP_ORIGIN = "https://evidenthire.work";
+
 function absoluteBaseUrl(value) {
-  return cleanString(value).replace(/\/+$/, "") || "https://signal-hire-eight.vercel.app";
+  return (cleanString(value) || cleanString(process.env.PUBLIC_APP_ORIGIN)).replace(/\/+$/, "") || DEFAULT_PUBLIC_APP_ORIGIN;
 }
 
 function safeProjectName(value) {

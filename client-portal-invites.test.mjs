@@ -101,3 +101,13 @@ test("client portal invite email copy includes workspace and verification path",
   assert.match(email.text, /\/client/);
   assert.match(email.text, /\/register\?next=\/client/);
 });
+
+test("client portal invite email falls back to the canonical public origin", () => {
+  const email = buildClientPortalInviteEmail({
+    email: "hiring@client.ai",
+    projectName: "AI Infrastructure Lead",
+  });
+
+  assert.match(email.text, /https:\/\/evidenthire\.work\/register\?next=\/client/);
+  assert.match(email.text, /https:\/\/evidenthire\.work\/client/);
+});
