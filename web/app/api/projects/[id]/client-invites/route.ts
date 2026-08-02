@@ -51,11 +51,13 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
   if (!savedSettings) return Response.json({ error: t(locale, "api.error.projectUpdateUnavailable") }, { status: 404 });
 
   const access = (savedSettings as ReturnType<typeof upsertClientDeliveryInvite>).client_delivery_access;
-  const origin = new URL(req.url).origin;
   const email_status = await sendInviteEmail({
     email,
     projectName: project.name,
-    baseUrl: origin,
+    // Invitation links must remain canonical across preview, branch, and
+    // production aliases. The invite helper falls back to evidenthire.work
+    // when the production variable is missing.
+    baseUrl: cleanString(process.env.PUBLIC_APP_ORIGIN),
     allowedEmails: access.allowed_emails,
     allowedDomains: access.allowed_domains,
     locale,
