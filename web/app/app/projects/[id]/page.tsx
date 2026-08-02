@@ -3,6 +3,7 @@
 // /app/projects/[id] —— 招聘项目详情
 // 头部 (name/brief 可编辑 + 状态 + 删除) + KPI + 候选人列表 (按 project 过滤) + 历史搜索
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { flushSync } from "react-dom";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { FiAlertTriangle, FiArrowLeft, FiCheckCircle, FiClock, FiCopy, FiExternalLink, FiMail, FiPauseCircle, FiPlay, FiRefreshCw, FiSearch, FiSend, FiTrash2 } from "react-icons/fi";
@@ -1535,7 +1536,9 @@ function RoleAgentGuardrailsPanel({
     const actionType = "refresh_live_signals";
     if (roleAgentActionBusy) return;
     const targets = roleAgentWorkspace.signal_refresh.targets;
-    setRoleAgentActionBusy(actionType);
+    // Commit the lock before awaiting fetch so a second click cannot queue a
+    // duplicate live-signal refresh while React batches this async event.
+    flushSync(() => setRoleAgentActionBusy(actionType));
     setRoleAgentActionErrors((prev) => ({ ...prev, [actionType]: "" }));
     setRoleAgentActionSuccess((prev) => ({ ...prev, [actionType]: "" }));
     const runId = recordRoleAgentActionStart(actionType, action.cta);
