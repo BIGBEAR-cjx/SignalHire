@@ -145,6 +145,8 @@ function signQaJwt(payload, secret) {
   return `${encodedHeader}.${encodedPayload}.${signature}`;
 }
 
+let qaJwtSecretPromise;
+
 async function resolveQaSession() {
   const explicitToken = cleanString(process.env.SIGNALHIRE_QA_SESSION_TOKEN || process.env.SIGNALHIRE_QA_ACCESS_TOKEN);
   const projectId = cleanString(process.env.SIGNALHIRE_QA_PROJECT_ID);
@@ -179,6 +181,12 @@ async function resolveQaSession() {
 }
 
 async function resolveQaJwtSecret() {
+  if (qaJwtSecretPromise) return qaJwtSecretPromise;
+  qaJwtSecretPromise = resolveQaJwtSecretUncached();
+  return qaJwtSecretPromise;
+}
+
+async function resolveQaJwtSecretUncached() {
   const configured = cleanString(process.env.SIGNALHIRE_QA_JWT_SECRET);
   if (configured) return configured;
   const insforgeBase = cleanString(process.env.INSFORGE_API_BASE_URL).replace(/\/+$/, "");
