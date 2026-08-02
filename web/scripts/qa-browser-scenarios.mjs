@@ -240,11 +240,20 @@ async function openOwnerProject(browser, options) {
     viewport: CUSTOMER_VIEWPORT,
     customerSession: options.fixture.owner,
   });
+  const projectApiPath = `/api/projects/${encodeURIComponent(options.fixture.projectId)}`;
+  const projectDataReady = typeof page.waitForResponse === "function"
+    ? page.waitForResponse((response) => {
+      let pathname = "";
+      try { pathname = new URL(response.url()).pathname; } catch {}
+      return response.status() === 200 && pathname === projectApiPath;
+    }, { timeout: 30000 }).catch(() => null)
+    : Promise.resolve(null);
   const status = await visit(page, `${options.origin}/app/projects/${encodeURIComponent(options.fixture.projectId)}`);
   if (status !== 200) {
     await context.close();
     throw new Error(`unexpected_owner_project_status=${status}`);
   }
+  await projectDataReady;
   await requireVisible(page.getByRole("heading", { name: /role agent guardrails/i }).first(), "role_agent_guardrails");
   return { context, page };
 }
