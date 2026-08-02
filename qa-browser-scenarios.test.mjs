@@ -11,6 +11,7 @@ import {
   runCustomerFeedbackMutation,
   runOwnerBrowserScenarios,
   installStrictRoleAgentErrorRoute,
+  isRevokedCustomerAccessDenied,
   ownerScenarioNames,
   summarizeBrowserChecks,
 } from "./web/scripts/qa-browser-scenarios.mjs";
@@ -198,6 +199,12 @@ test("anonymous access denial remains separate from revoked-customer verificatio
   const anonymous = results.find((result) => result.name === "anonymous_access_denied");
 
   assert.equal(anonymous?.role, "anonymous_access_negative");
+});
+
+test("revoked customer access accepts both hidden and unauthenticated responses", () => {
+  assert.equal(isRevokedCustomerAccessDenied(401), true);
+  assert.equal(isRevokedCustomerAccessDenied(404), true);
+  assert.equal(isRevokedCustomerAccessDenied(200), false);
 });
 
 function fakeFeedbackPage() {

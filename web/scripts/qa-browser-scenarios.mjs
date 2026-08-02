@@ -264,6 +264,10 @@ async function addDisposableInvite(page, email) {
   await requireVisible(page.getByText(email, { exact: true }).first(), "disposable_invite");
 }
 
+export function isRevokedCustomerAccessDenied(status) {
+  return status === 401 || status === 404;
+}
+
 async function verifyRevokedCustomerAccess(browser, options, session) {
   const { context, page } = await openPage(browser, {
     ...options,
@@ -278,10 +282,12 @@ async function verifyRevokedCustomerAccess(browser, options, session) {
         const response = await fetch(path);
         return response.status;
       }, `/api/client-portal/projects/${encodeURIComponent(options.fixture.projectId)}`);
-      if (status === 401) return;
+      if (isRevokedCustomerAccessDenied(status)) return;
       await page.waitForTimeout(300);
     }
-    if (status !== 401) throw new Error(`expected_revoked_customer_unauthorized_status=401 actual=${status}`);
+    if (!isRevokedCustomerAccessDenied(status)) {
+      throw new Error(`expected_revoked_customer_access_denied_status=401_or_404 actual=${status}`);
+    }
   } finally {
     await context.close();
   }
