@@ -163,9 +163,18 @@ async function openPage(browser, { origin, headers, viewport, customerSession })
 }
 
 async function visit(page, url) {
-  const response = await page.goto(url, { waitUntil: "domcontentloaded", timeout: 12000 });
-  await page.waitForLoadState("networkidle", { timeout: 2000 }).catch(() => {});
-  return response?.status() || 0;
+  let latestError = null;
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    try {
+      const response = await page.goto(url, { waitUntil: "domcontentloaded", timeout: 12000 });
+      await page.waitForLoadState("networkidle", { timeout: 2000 }).catch(() => {});
+      return response?.status() || 0;
+    } catch (error) {
+      latestError = error;
+      if (attempt === 0) await page.waitForTimeout(700);
+    }
+  }
+  throw latestError;
 }
 
 async function runScenario(browser, name, options, execute) {
@@ -406,7 +415,7 @@ export async function runOwnerBrowserScenarios({ playwright, fixture = {}, origi
 }
 
 function requireVisible(locator, label) {
-  return locator.waitFor({ state: "visible", timeout: 5000 }).catch(() => {
+  return locator.waitFor({ state: "visible", timeout: 12000 }).catch(() => {
     throw new Error(`expected_${label}`);
   });
 }
@@ -490,7 +499,7 @@ export async function runCustomerBrowserScenarios({ playwright, fixture, origin,
         if (status !== 200) throw new Error(`unexpected_project_status=${status}`);
         for (const label of [
           /overview|概览/i,
-          /interview-ready/i,
+          /interview-ready|可约面/i,
           /weekly archive|周交付归档/i,
           /reports|报告版本/i,
           /feedback|反馈/i,

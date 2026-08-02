@@ -3,10 +3,13 @@ import test from "node:test";
 
 import { browserQaFixture, runReleaseBrowserCase } from "./verify-release-readiness.mjs";
 
-test("browser release fixtures never reuse a customer QA session as an owner session", () => {
-  const fixture = browserQaFixture({ cookie: "sh_token=customer-session", projectId: "project-123" });
+test("browser release fixtures keep generated owner and customer sessions separate", () => {
+  const fixture = browserQaFixture(
+    { cookie: "sh_token=customer-session", projectId: "project-123" },
+    { cookie: "sh_token=owner-session" },
+  );
 
-  assert.equal(fixture.owner, "");
+  assert.equal(fixture.owner, "sh_token=owner-session");
   assert.equal(fixture.customer, "sh_token=customer-session");
   assert.equal(fixture.projectId, "project-123");
 });

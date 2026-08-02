@@ -160,21 +160,8 @@ async function resolveQaSession() {
   const email = cleanString(process.env.SIGNALHIRE_QA_EMAIL);
   if (!userId || !email) return null;
 
-  let secret = cleanString(process.env.SIGNALHIRE_QA_JWT_SECRET);
-  if (!secret) {
-    const insforgeBase = cleanString(process.env.INSFORGE_API_BASE_URL).replace(/\/+$/, "");
-    const apiKey = cleanString(process.env.INSFORGE_API_KEY);
-    if (!insforgeBase || !apiKey) {
-      return { error: "INSFORGE_API_BASE_URL or INSFORGE_API_KEY missing for QA token generation" };
-    }
-    const response = await fetchJsonWithRetry(`${insforgeBase}/api/secrets/JWT_SECRET`, {
-      headers: { "x-api-key": apiKey },
-    });
-    secret = cleanString(response.json?.value);
-    if (response.status !== 200 || !secret) {
-      return { error: `JWT_SECRET lookup failed with status=${response.status}` };
-    }
-  }
+  const secret = await resolveQaJwtSecret();
+  if (!secret) return { error: "JWT_SECRET lookup failed" };
 
   const now = Math.floor(Date.now() / 1000);
   const token = signQaJwt({
@@ -191,12 +178,48 @@ async function resolveQaSession() {
   };
 }
 
-export function browserQaFixture(qaSession = null) {
+async function resolveQaJwtSecret() {
+  const configured = cleanString(process.env.SIGNALHIRE_QA_JWT_SECRET);
+  if (configured) return configured;
+  const insforgeBase = cleanString(process.env.INSFORGE_API_BASE_URL).replace(/\/+$/, "");
+  const apiKey = cleanString(process.env.INSFORGE_API_KEY);
+  if (!insforgeBase || !apiKey) return "";
+  const response = await fetchJsonWithRetry(`${insforgeBase}/api/secrets/JWT_SECRET`, {
+    headers: { "x-api-key": apiKey },
+  });
+  return response.status === 200 ? cleanString(response.json?.value) : "";
+}
+
+async function resolveOwnerQaSession() {
+  const explicitToken = cleanString(process.env.SIGNALHIRE_QA_OWNER_SESSION_TOKEN);
+  if (explicitToken) {
+    return { cookie: `sh_token=${encodeURIComponent(explicitToken)}`, detail: "using SIGNALHIRE_QA_OWNER_SESSION_TOKEN" };
+  }
+  const userId = cleanString(process.env.SIGNALHIRE_QA_OWNER_USER_ID);
+  const email = cleanString(process.env.SIGNALHIRE_QA_OWNER_EMAIL);
+  if (!userId || !email) return null;
+  const secret = await resolveQaJwtSecret();
+  if (!secret) return { error: "JWT_SECRET lookup failed" };
+  const now = Math.floor(Date.now() / 1000);
+  const token = signQaJwt({
+    sub: userId,
+    email,
+    role: "authenticated",
+    iat: now,
+    exp: now + 15 * 60,
+  }, secret);
+  return {
+    cookie: `sh_token=${encodeURIComponent(token)}`,
+    detail: "generated short-lived owner QA sh_token",
+  };
+}
+
+export function browserQaFixture(qaSession = null, ownerQaSession = null) {
   return {
     // The generated QA session represents the configured customer account.
     // Owner access must always be explicit so release QA cannot pass with one
     // account exercising both permission boundaries.
-    owner: cleanString(process.env.SIGNALHIRE_QA_OWNER_SESSION_TOKEN),
+    owner: cleanString(process.env.SIGNALHIRE_QA_OWNER_SESSION_TOKEN) || ownerQaSession?.cookie || "",
     customer: cleanString(process.env.SIGNALHIRE_QA_CUSTOMER_SESSION_TOKEN) || qaSession?.cookie || "",
     projectId: cleanString(process.env.SIGNALHIRE_QA_PROJECT_ID) || qaSession?.projectId || "",
     reportId: cleanString(process.env.SIGNALHIRE_QA_REPORT_ID),
@@ -418,9 +441,9 @@ export async function runReleaseBrowserCase({ browser, item, qaSession = null, o
   }
 }
 
-async function browserChecks(origin, qaSession = null) {
+async function browserChecks(origin, qaSession = null, ownerQaSession = null) {
   const playwright = loadPlaywright();
-  const fixture = browserQaFixture(qaSession);
+  const fixture = browserQaFixture(qaSession, ownerQaSession);
   if (!playwright?.chromium) {
     return [{
       name: "browser:playwright",
@@ -498,6 +521,8 @@ async function main() {
   const strictBrowser = hasFlag("--browser");
   const qaSessionResult = await resolveQaSession();
   const qaSession = qaSessionResult?.cookie ? qaSessionResult : null;
+  const ownerQaSessionResult = await resolveOwnerQaSession();
+  const ownerQaSession = ownerQaSessionResult?.cookie ? ownerQaSessionResult : null;
   const rows = [
     ...runtimeEnvChecks({ requireLiveProvider }),
     ...await checkLiveSignalProviderHealth(origin, { requireLiveProvider }),
@@ -508,8 +533,13 @@ async function main() {
   } else if (qaSessionResult?.error) {
     rows.push({ name: "qa:token-session", status: "fail", detail: qaSessionResult.error });
   }
+  if (ownerQaSession) {
+    rows.push({ name: "qa:owner-token-session", status: "pass", detail: ownerQaSession.detail });
+  } else if (ownerQaSessionResult?.error) {
+    rows.push({ name: "qa:owner-token-session", status: "fail", detail: ownerQaSessionResult.error });
+  }
   if (strictBrowser || hasFlag("--browser-if-available")) {
-    const browserRows = await browserChecks(origin, qaSession);
+    const browserRows = await browserChecks(origin, qaSession, ownerQaSession);
     rows.push(...browserRows);
     if (strictBrowser) {
       const browserSummary = summarizeBrowserChecks(browserRows);
