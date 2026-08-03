@@ -37,3 +37,22 @@
 | `l1-open-source-observability` | Daniel Dyla | [GitHub](https://github.com/dyladan) | [OpenTelemetry JS 维护者名单](https://github.com/open-telemetry/opentelemetry-js)；[官方成员目录中的 `dyladan` JavaScript 归属](https://opentelemetry.io/community/members/) | **已确认 relevant**：公开维护 OpenTelemetry JavaScript 及其 instrumentation 工作。 |
 
 审核时请逐条确认候选与证据链接的对应关系；确认后再单独写入评测 JSON。
+
+## L2：第一轮证据采集（未形成金标）
+
+L2 必须同时满足多个硬条件。本表把可用线索和尚缺的个人级证据分开记录；任何 `待补证` 条目都不得进入 `known_relevant`。
+
+| Case | 当前研究线索 | 已验证的公开证据 | 仍缺的关键证据 | 状态 |
+| --- | --- | --- | --- | --- |
+| `l2-agent-platform-founder-engineer` | Harrison Chase | [LangGraph 生产 Agent 架构说明](https://www.langchain.com/blog/building-langgraph)；[LangGraph Platform GA](https://blog.langchain.dev/langgraph-platform-ga/) | 个人身份与创始阶段基础设施所有权的同一来源 | 待补证 |
+| `l2-ai-recruiting-workflow-builder` | 暂无可靠个人候选 | [Vekt 的隐私优先招聘编排说明](https://vekt.website/)；[Calyflow 的自托管招聘 AI 工作流说明](https://www.calyflow.ai/) | 同时拥有产品工程身份、AI 招聘工作流与隐私数据处理的个人级归属 | 待补证 |
+| `l2-edge-ai-systems-engineer` | 暂无可靠个人候选 | [TFLite Micro 嵌入式 ML 基础设施、基准与 profiling](https://github.com/tensorflow/tflite-micro)；[per-op profiling 文档](https://android.googlesource.com/platform/external/tensorflow/%2Bshow/d7992c051ee/tensorflow/lite/micro/docs/profiling.md) | 代码作者与嵌入式、on-device ML、性能分析三项条件的个人级绑定 | 待补证 |
+| `l2-multilingual-nlp-engineer` | Matthew Honnibal | [GitHub 身份](https://github.com/honnibal)；[spaCy 开源仓库](https://github.com/explosion/spaCy) | 可归属到该个人的多语言模型评测工件 | 待补证 |
+| `l2-privacy-data-platform-engineer` | 暂无可靠个人候选 | [PySyft 隐私数据处理机制](https://openmined.org/pysyft/)；[安全与透明度说明](https://openmined.org/pysyft/faqs/) | 个人级 SQL 系统工作与安全技术证据，不能只以隐私项目身份替代 | 待补证 |
+| `l2-developer-tools-product-engineer` | Jan Oberhauser | [n8n 开源工作流与 API/integration 平台](https://github.com/n8n-io/n8n)；[GitHub integration 文档](https://n8n.io/integrations/github/) | 个人 GitHub 身份与上述创始人归属的直接交叉证据 | 待补证 |
+| `l2-mlops-reliability-engineer` | 暂无可靠个人候选 | [BentoML 模型服务与 observability](https://github.com/bentoml/BentoML)；[可靠性和监控配置](https://docs.bentoml.org/en/latest/reference/bentoml/configurations.html) | 具备 serving、observability 与 on-call/运行可靠性证据的同一工程师 | 待补证 |
+| `l2-web-performance-engineer` | 暂无可靠个人候选 | 仅有项目级 React/a11y 线索，尚不足以支持个人判断 | 同一人同时具备 React 生产贡献、性能与可访问组件证据 | 待补证 |
+| `l2-fintech-backend-engineer` | 暂无可靠个人候选 | 尚未找到可公开归属的支付接入与账本正确性实现组合 | 同一人的支付集成、账本正确性及 Go/Java 代码证据 | 待补证 |
+| `l2-research-engineer-rag` | 暂无可靠个人候选 | [Haystack RAG 实现仓库](https://github.com/deepset-ai/haystack)；[RAG 评测文档](https://docs.haystack.deepset.ai/docs/evaluation) | 个人级 RAG 维护、评测与技术文档三项归属 | 待补证 |
+
+下一轮按缺口最小的顺序补证：`developer-tools`、`agent-platform`、`multilingual-nlp`，再处理需要跨项目和跨来源关联的其余 7 条。
