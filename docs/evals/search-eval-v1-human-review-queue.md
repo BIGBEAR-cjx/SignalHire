@@ -3,7 +3,7 @@
 状态：`partially_approved_review`
 创建日期：2026-08-03
 
-本文件记录研究依据与审核状态，不是完整黄金集，也不是招聘结论。10 条 L1 case 与 5 条 L2 case 已由产品负责人确认；5 条 L2 case 与 8 条 L3 case 已通过自动化公开证据审核并可作为局部金标；2 条 L3 因公开证据未闭合而保持待补证。所有标签仍需独立人工总复核，才能成为正式黄金集。
+本文件记录研究依据与审核状态，不是完整黄金集，也不是招聘结论。10 条 L1 case 与 5 条 L2 case 已由产品负责人确认；5 条 L2 case 与 10 条 L3 case 已通过自动化公开证据审核并可作为局部金标。所有 30 条标签仍需独立人工总复核，才能成为正式黄金集。
 
 ## 审核规则
 
@@ -64,14 +64,14 @@ L2 必须同时满足多个硬条件。本表把可用线索和尚缺的个人�
 | Case | 候选人 | 公开证据 | 自动审核结论与 caveat |
 | --- | --- | --- | --- |
 | `l3-underground-agent-evals-builder` | Jeffrey Ip | [本人署名的 DeepEval 创建背景](https://www.confident-ai.com/blog/how-i-closed-confident-ais-2-2m-seed-round-in-5-days)；[DeepEval 代码与可运行 test 命令](https://github.com/confident-ai/deepeval)；[发布记录中的 Jeffrey Ip 贡献](https://github.com/confident-ai/deepeval/releases) | **自动公开证据审核通过**：可复现评测工具和维护归属可交叉验证；其公司项目并非“大型 AI 实验室”，但不是匿名个人项目。 |
-| `l3-quiet-distributed-systems-operator` | — | [etcd 代码](https://github.com/etcd-io/etcd)；[v3.5 数据不一致复盘](https://fossies.org/linux/etcd/Documentation/postmortems/v3.5-data-inconsistency.md) | **待补证**：项目与事故材料可用，但本轮没有取得同时能归属到一位个人、并覆盖共识/复制及生产运维的第一方证据。 |
+| `l3-quiet-distributed-systems-operator` | Marek Siarkowicz | [GitHub 身份：SIG-etcd tech lead](https://github.com/serathius)；[本人署名的 etcd v3.5 数据不一致复盘](https://fossies.org/linux/etcd/Documentation/postmortems/v3.5-data-inconsistency.md)；[etcd 维护者文件中 Marek 与 `serathius` 的对应](https://chromium.googlesource.com/external/github.com/coreos/etcd/%2B/ab9563dc8e4d84d06080c765f9c6c0d50313f794/MAINTAINERS) | **自动公开证据审核通过**：身份、共识/WAL/复制一致性复盘与生产发布后的事故处理可归属同一人；“低调”仅是相对大型实验室可见度的描述，不作技能断言。 |
 | `l3-open-source-ai-safety-builder` | JJ Allaire | [GitHub 个人身份与 Inspect pin](https://github.com/jjallaire)；[Inspect 代码、开发测试命令](https://github.com/UKGovernmentBEIS/inspect_ai)；[错误与限制文档](https://inspect.aisi.org.uk/errors-and-limits.html) | **自动公开证据审核通过**：个人主页将其与 Inspect 项目关联，代码库包含可复现测试路径，限制文档不是政策评论。 |
 | `l3-developer-education-to-platform-builder` | Quincy Larson | [GitHub 个人身份](https://github.com/QuincyLarson)；[线上运行的 freeCodeCamp 代码库](https://github.com/freeCodeCamp/freeCodeCamp)；[历史提交归属](https://openhub.net/p/freecodecamp/commits?page=1318) | **自动公开证据审核通过**：教育者身份、生产平台与公开代码贡献均有记录；提交记录较早，独立复核时宜确认其当前代码所有权范围。 |
 | `l3-climate-data-engineer` | Anderson Banihirwe | [个人 GitHub 身份](https://github.com/andersy005)；[Xarray core maintainer 身份](https://xarray.dev/team)；[本人署名的 Pangeo 气候/天气数据实现 notebook](https://par.nsf.gov/servlets/purl/10284955) | **自动公开证据审核通过**：个人身份、气候/天气数据技术工件和开源科学数据工程角色均可交叉验证；标准/生态关系仍应在总复核中复查。 |
 | `l3-healthcare-interoperability-builder` | James Agnew | [个人 GitHub 身份与 FHIR 工件](https://github.com/jamesagnew)；[HAPI FHIR 授权拦截器与测试边界](https://hapifhir.io/hapi-fhir/docs/security/authorization_interceptor.html)；[本人署名的 HAPI 发布与安全修复记录](https://hapifhir.github.io/hapi-hl7v2/changes-report.html) | **自动公开证据审核通过**：互操作实现、授权/隐私控制和本人技术发布记录可交叉验证，不依赖临床职位或组织履历。 |
 | `l3-accessibility-infrastructure-engineer` | Wilco Fiers | [个人自动化测试技术材料](https://wilcofiers.github.io/presentations/build/cia.html)；[Deque 自动化职责与 axe-core 归属](https://www.deque.com/axe-con/presenters/wilco-fiers-2/)；[axe-core 自动化代码](https://github.com/dequelabs/axe-core) | **自动公开证据审核通过**：自动化可访问性工程、工具归属和代码工件一致，不是人工审计履历。 |
-| `l3-robotics-simulation-engineer` | — | [Nav2 loopback simulation](https://docs.ros.org/en/jazzy/p/nav2_loopback_sim/__README.html)；[Nav2 维护者论文](https://arxiv.org/abs/2307.15236)；[HIL 定义参考](https://robotforge.org/tutorials/simulators/hardware-in-the-loop) | **待补证**：Steve Macenski 的仿真与控制栈证据强，但当前材料明确是非物理 loopback simulation，不能替代“hardware in the loop”硬条件。 |
+| `l3-robotics-simulation-engineer` | Peter Barker | [GitHub 个人身份](https://github.com/peterbarker)；[本人署名的 `sitl-on-hardware` 提交记录](https://github.com/ArduPilot/ardupilot/commits/master/Tools/scripts/sitl-on-hardware)；[Simulation on Hardware：真实 autopilot、控制面与失效保护](https://ardupilot.org/dev/docs/sim-on-hardware.html)；[ArduPilot 开源控制栈](https://github.com/ArduPilot/ardupilot) | **自动公开证据审核通过**：个人提交与硬件在环等价路径直接关联；文档明确说明 firmware 在 autopilot 硬件上运行、可验证控制面与失效保护，不把纯 SITL 当作 HIL。 |
 | `l3-compiler-toolchain-engineer` | Nikita Popov | [GitHub 个人身份](https://github.com/nikic)；[LLVM 公开提交](https://llvm.googlesource.com/llvm-project/llvm/%2B/038cd3d86e6fda0b0f404d8c6ee3cd75cb4ec1eb)；[本人 LLVM 编译时性能文章](https://developers.redhat.com/articles/2023/12/07/how-single-iteration-instcombine-improves-llvm-compile-time) | **自动公开证据审核通过**：LLVM 代码、长期工具链贡献及量化编译性能工作均可复现，不是教程项目。 |
 | `l3-public-interest-security-engineer` | Priya Wadhwa | [GitHub 个人身份](https://github.com/priyawadhwa)；[Sigstore 基础设施维护者名单](https://www.sigstore.dev/trust-security)；[可复现威胁模型](https://docs.sigstore.dev/about/threat-model/) | **自动公开证据审核通过**：个人维护者身份与公共软件供应链安全基础设施可交叉验证；威胁模型作为验证工件，非证书或营销材料。 |
 
-本轮 L3 结果为 8 条自动审核通过、2 条待补证。根 fixture 固定保持 `draft_pending_human_review`；自动审核只增加可追溯候选标签，不代表搜索质量已经通过或招聘结论成立。
+本轮 L3 结果为 10 条自动审核通过、0 条待补证。根 fixture 固定保持 `draft_pending_human_review`；自动审核只增加可追溯候选标签，不代表搜索质量已经通过或招聘结论成立。

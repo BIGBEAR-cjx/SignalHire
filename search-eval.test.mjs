@@ -172,7 +172,7 @@ test("does not let an unrelated relevant judgment inflate hard-constraint recall
   assert.ok(score.hard_constraint_recall <= 1);
 });
 
-test("tracks twenty-eight approved labels while two L3 cases await evidence and the fixture remains draft", () => {
+test("tracks thirty approved labels while the fixture remains draft", () => {
   const approvedCaseIds = new Set([
     "l1-open-source-ml-inference",
     "l1-github-rust-data-engineer",
@@ -195,11 +195,13 @@ test("tracks twenty-eight approved labels while two L3 cases await evidence and 
     "l2-web-performance-engineer",
     "l2-fintech-backend-engineer",
     "l3-underground-agent-evals-builder",
+    "l3-quiet-distributed-systems-operator",
     "l3-open-source-ai-safety-builder",
     "l3-developer-education-to-platform-builder",
     "l3-climate-data-engineer",
     "l3-healthcare-interoperability-builder",
     "l3-accessibility-infrastructure-engineer",
+    "l3-robotics-simulation-engineer",
     "l3-compiler-toolchain-engineer",
     "l3-public-interest-security-engineer",
   ]);
@@ -210,18 +212,20 @@ test("tracks twenty-eight approved labels while two L3 cases await evidence and 
     "l2-web-performance-engineer",
     "l2-fintech-backend-engineer",
     "l3-underground-agent-evals-builder",
+    "l3-quiet-distributed-systems-operator",
     "l3-open-source-ai-safety-builder",
     "l3-developer-education-to-platform-builder",
     "l3-climate-data-engineer",
     "l3-healthcare-interoperability-builder",
     "l3-accessibility-infrastructure-engineer",
+    "l3-robotics-simulation-engineer",
     "l3-compiler-toolchain-engineer",
     "l3-public-interest-security-engineer",
   ]);
 
   assert.equal(fixture.schema_version, "search-eval-v1-draft");
   assert.equal(fixture.review_status, "draft_pending_human_review");
-  assert.match(fixture.annotation_note, /two L3 cases remain pending/i);
+  assert.match(fixture.annotation_note, /all 30 labels require independent human fixture review/i);
   assert.match(fixture.annotation_note, /independent human fixture review/i);
   assert.match(fixture.annotation_note, /not a recruitment performance conclusion/i);
   assert.equal(cases.length, 30);
@@ -269,5 +273,5 @@ test("tracks twenty-eight approved labels while two L3 cases await evidence and 
     }
   }
 
-  assert.equal(cases.filter((item) => item.review_status === "approved_human_review").length, 28);
+  assert.equal(cases.filter((item) => item.review_status === "approved_human_review").length, 30);
 });

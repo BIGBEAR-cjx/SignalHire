@@ -1,7 +1,7 @@
 {
   "schema_version": "search-eval-v1-draft",
   "review_status": "draft_pending_human_review",
-  "annotation_note": "Ten L1 cases and five L2 cases were approved by the product owner, and five L2 cases plus eight L3 cases were approved through documented public-evidence review; two L3 cases remain pending because public evidence did not close their required conditions. All labels require independent human fixture review before this becomes a golden set and it is not a recruitment performance conclusion.",
+  "annotation_note": "Ten L1 cases and five L2 cases were approved by the product owner, and five L2 cases plus ten L3 cases were approved through documented public-evidence review. All 30 labels require independent human fixture review before this becomes a golden set and it is not a recruitment performance conclusion.",
   "cases": [
   {
     "id": "l1-open-source-ml-inference",
@@ -262,8 +262,9 @@
     "required_conditions": ["distributed systems", "consensus or replication", "production operations"],
     "excluded_conditions": ["tutorial-only profile"],
     "source_scaffolds": [{ "canonical_url": "https://github.com/etcd-io/etcd" }],
-    "known_relevant": [],
-    "judgments": [{ "canonical_url": "https://github.com/etcd-io/etcd", "relevance": "uncertain", "hard_conditions_met": true, "identity_correct": true, "evidence_verifiable": true, "reviewer": "pending-human-review", "version": "v1-draft" }, { "name": "Milan Gu", "company": "DevOps Courses", "relevance": "uncertain", "hard_conditions_met": false, "identity_correct": true, "evidence_verifiable": true, "reviewer": "pending-human-review", "version": "v1-draft" }],
+    "known_relevant": [{ "name": "Marek Siarkowicz", "canonical_url": "https://github.com/serathius" }],
+    "judgments": [{ "name": "Marek Siarkowicz", "canonical_url": "https://github.com/serathius", "relevance": "relevant", "hard_conditions_met": true, "identity_correct": true, "evidence_verifiable": true, "evidence_urls": ["https://github.com/serathius", "https://fossies.org/linux/etcd/Documentation/postmortems/v3.5-data-inconsistency.md", "https://chromium.googlesource.com/external/github.com/coreos/etcd/%2B/ab9563dc8e4d84d06080c765f9c6c0d50313f794/MAINTAINERS"], "reviewer": "automated-public-evidence-review", "review_status": "approved_human_review", "reviewed_at": "2026-08-03T11:00:00Z", "version": "v1-automated-public-evidence-review-1" }],
+    "review_status": "approved_human_review",
     "minimum_evidence": ["systems code", "operational or incident evidence"]
   },
   {
@@ -333,8 +334,9 @@
     "required_conditions": ["robotics simulation", "hardware in the loop", "control stack"],
     "excluded_conditions": ["CAD-only portfolio"],
     "source_scaffolds": [{ "canonical_url": "https://github.com/ros2/ros2" }],
-    "known_relevant": [],
-    "judgments": [{ "canonical_url": "https://github.com/ros2/ros2", "relevance": "uncertain", "hard_conditions_met": true, "identity_correct": true, "evidence_verifiable": true, "reviewer": "pending-human-review", "version": "v1-draft" }, { "name": "Dakota Xu", "company": "Robot Render Studio", "relevance": "uncertain", "hard_conditions_met": false, "identity_correct": true, "evidence_verifiable": true, "reviewer": "pending-human-review", "version": "v1-draft" }],
+    "known_relevant": [{ "name": "Peter Barker", "canonical_url": "https://github.com/peterbarker" }],
+    "judgments": [{ "name": "Peter Barker", "canonical_url": "https://github.com/peterbarker", "relevance": "relevant", "hard_conditions_met": true, "identity_correct": true, "evidence_verifiable": true, "evidence_urls": ["https://github.com/peterbarker", "https://github.com/ArduPilot/ardupilot/commits/master/Tools/scripts/sitl-on-hardware", "https://ardupilot.org/dev/docs/sim-on-hardware.html", "https://github.com/ArduPilot/ardupilot"], "reviewer": "automated-public-evidence-review", "review_status": "approved_human_review", "reviewed_at": "2026-08-03T11:00:00Z", "version": "v1-automated-public-evidence-review-1" }],
+    "review_status": "approved_human_review",
     "minimum_evidence": ["control-stack code", "simulation or hardware evidence"]
   },
   {
