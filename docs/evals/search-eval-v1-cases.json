@@ -1,7 +1,7 @@
 {
   "schema_version": "search-eval-v1-draft",
   "review_status": "draft_pending_human_review",
-  "annotation_note": "Ten L1 cases were approved by the product owner from documented public evidence; the remaining 20 cases require independent human annotation before this becomes a golden set and it is not a recruitment performance conclusion.",
+  "annotation_note": "Ten L1 cases and three L2 cases were approved by the product owner from documented public evidence; the remaining 17 cases require independent human annotation before this becomes a golden set and it is not a recruitment performance conclusion.",
   "cases": [
   {
     "id": "l1-open-source-ml-inference",
@@ -130,8 +130,9 @@
     "required_conditions": ["LLM agents", "production infrastructure", "founding-stage ownership"],
     "excluded_conditions": ["agency recruiter", "prompt-only profile"],
     "source_scaffolds": [{ "canonical_url": "https://github.com/langchain-ai/langgraph" }],
-    "known_relevant": [],
-    "judgments": [{ "canonical_url": "https://github.com/langchain-ai/langgraph", "relevance": "uncertain", "hard_conditions_met": true, "identity_correct": true, "evidence_verifiable": true, "reviewer": "pending-human-review", "version": "v1-draft" }, { "name": "Nico Shah", "company": "Prompt Services", "relevance": "uncertain", "hard_conditions_met": false, "identity_correct": true, "evidence_verifiable": true, "reviewer": "pending-human-review", "version": "v1-draft" }],
+    "known_relevant": [{ "name": "Harrison Chase", "canonical_url": "https://www.langchain.com/about" }],
+    "judgments": [{ "name": "Harrison Chase", "canonical_url": "https://www.langchain.com/about", "relevance": "relevant", "hard_conditions_met": true, "identity_correct": true, "evidence_verifiable": true, "evidence_urls": ["https://www.langchain.com/about", "https://github.com/langchain-ai/langgraph"], "reviewer": "product-owner", "review_status": "approved_human_review", "reviewed_at": "2026-08-03T08:41:26Z", "version": "v1-human-review-1" }],
+    "review_status": "approved_human_review",
     "minimum_evidence": ["agent code", "production architecture evidence"]
   },
   {
@@ -163,8 +164,9 @@
     "required_conditions": ["multilingual NLP", "evaluation", "production Python"],
     "excluded_conditions": ["English-only content writing"],
     "source_scaffolds": [{ "canonical_url": "https://github.com/explosion/spaCy" }],
-    "known_relevant": [],
-    "judgments": [{ "canonical_url": "https://github.com/explosion/spaCy", "relevance": "uncertain", "hard_conditions_met": true, "identity_correct": true, "evidence_verifiable": true, "reviewer": "pending-human-review", "version": "v1-draft" }, { "name": "Bailey Zhou", "company": "Translation Copy", "relevance": "uncertain", "hard_conditions_met": false, "identity_correct": true, "evidence_verifiable": true, "reviewer": "pending-human-review", "version": "v1-draft" }],
+    "known_relevant": [{ "name": "Matthew Honnibal", "canonical_url": "https://honnibal.dev/" }],
+    "judgments": [{ "name": "Matthew Honnibal", "canonical_url": "https://honnibal.dev/", "relevance": "relevant", "hard_conditions_met": true, "identity_correct": true, "evidence_verifiable": true, "evidence_urls": ["https://honnibal.dev/", "https://github.com/explosion/spaCy", "https://aclanthology.org/W09-3306/"], "reviewer": "product-owner", "review_status": "approved_human_review", "reviewed_at": "2026-08-03T08:41:26Z", "version": "v1-human-review-1" }],
+    "review_status": "approved_human_review",
     "minimum_evidence": ["model or library contribution", "evaluation artifact"]
   },
   {
@@ -185,8 +187,9 @@
     "required_conditions": ["developer tools", "public API", "workflow integration"],
     "excluded_conditions": ["no-code-only automation"],
     "source_scaffolds": [{ "canonical_url": "https://github.com/n8n-io/n8n" }],
-    "known_relevant": [],
-    "judgments": [{ "canonical_url": "https://github.com/n8n-io/n8n", "relevance": "uncertain", "hard_conditions_met": true, "identity_correct": true, "evidence_verifiable": true, "reviewer": "pending-human-review", "version": "v1-draft" }, { "name": "Quinn Lee", "company": "Zap Templates", "relevance": "uncertain", "hard_conditions_met": false, "identity_correct": true, "evidence_verifiable": true, "reviewer": "pending-human-review", "version": "v1-draft" }],
+    "known_relevant": [{ "name": "Jan Oberhauser", "canonical_url": "https://n8n.io/creators/jan/" }],
+    "judgments": [{ "name": "Jan Oberhauser", "canonical_url": "https://n8n.io/creators/jan/", "relevance": "relevant", "hard_conditions_met": true, "identity_correct": true, "evidence_verifiable": true, "evidence_urls": ["https://n8n.io/creators/jan/", "https://github.com/n8n-io/n8n", "https://n8n.io/integrations/github/"], "reviewer": "product-owner", "review_status": "approved_human_review", "reviewed_at": "2026-08-03T08:41:26Z", "version": "v1-human-review-1" }],
+    "review_status": "approved_human_review",
     "minimum_evidence": ["tooling repository", "API or integration documentation"]
   },
   {
