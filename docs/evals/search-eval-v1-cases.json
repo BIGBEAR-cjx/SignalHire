@@ -1,7 +1,7 @@
 {
   "schema_version": "search-eval-v1-draft",
   "review_status": "draft_pending_human_review",
-  "annotation_note": "Review queue built from public-source identity and criterion scaffolds only; each case requires independent human annotation before it becomes a golden set and is not a recruitment performance conclusion.",
+  "annotation_note": "Four L1 cases were approved by the product owner from documented public evidence; the remaining 26 cases require independent human annotation before this becomes a golden set and it is not a recruitment performance conclusion.",
   "cases": [
   {
     "id": "l1-open-source-ml-inference",
@@ -10,8 +10,9 @@
     "required_conditions": ["open-source contribution", "ML inference infrastructure"],
     "excluded_conditions": ["sales-only profile"],
     "source_scaffolds": [{ "canonical_url": "https://github.com/vllm-project" }],
-    "known_relevant": [],
-    "judgments": [{ "canonical_url": "https://github.com/vllm-project", "relevance": "uncertain", "hard_conditions_met": true, "identity_correct": true, "evidence_verifiable": true, "reviewer": "pending-human-review", "version": "v1-draft" }, { "name": "Jordan Lee", "company": "Pipeline Sales", "relevance": "uncertain", "hard_conditions_met": false, "identity_correct": true, "evidence_verifiable": true, "reviewer": "pending-human-review", "version": "v1-draft" }],
+    "known_relevant": [{ "name": "Woosuk Kwon", "canonical_url": "https://github.com/WoosukKwon" }],
+    "judgments": [{ "name": "Woosuk Kwon", "canonical_url": "https://github.com/WoosukKwon", "relevance": "relevant", "hard_conditions_met": true, "identity_correct": true, "evidence_verifiable": true, "evidence_urls": ["https://github.com/vllm-project/vllm", "https://github.com/vllm-project/vllm/issues/23446"], "reviewer": "product-owner", "review_status": "approved_human_review", "reviewed_at": "2026-08-03T08:01:21Z", "version": "v1-human-review-1" }],
+    "review_status": "approved_human_review",
     "minimum_evidence": ["maintainer or commit history", "project documentation"]
   },
   {
@@ -21,8 +22,9 @@
     "required_conditions": ["Rust", "data processing"],
     "excluded_conditions": ["frontend-only work"],
     "source_scaffolds": [{ "canonical_url": "https://github.com/pola-rs/polars" }],
-    "known_relevant": [],
-    "judgments": [{ "canonical_url": "https://github.com/pola-rs/polars", "relevance": "uncertain", "hard_conditions_met": true, "identity_correct": true, "evidence_verifiable": true, "reviewer": "pending-human-review", "version": "v1-draft" }, { "name": "Morgan Park", "company": "Web Pixel Studio", "relevance": "uncertain", "hard_conditions_met": false, "identity_correct": true, "evidence_verifiable": true, "reviewer": "pending-human-review", "version": "v1-draft" }],
+    "known_relevant": [{ "name": "Ritchie Vink", "canonical_url": "https://github.com/ritchie46" }],
+    "judgments": [{ "name": "Ritchie Vink", "canonical_url": "https://github.com/ritchie46", "relevance": "relevant", "hard_conditions_met": true, "identity_correct": true, "evidence_verifiable": true, "evidence_urls": ["https://github.com/pola-rs/polars", "https://github.com/pola-rs/polars/releases"], "reviewer": "product-owner", "review_status": "approved_human_review", "reviewed_at": "2026-08-03T08:01:21Z", "version": "v1-human-review-1" }],
+    "review_status": "approved_human_review",
     "minimum_evidence": ["repository contribution", "technical profile"]
   },
   {
@@ -32,8 +34,9 @@
     "required_conditions": ["language-model evaluation", "published research"],
     "excluded_conditions": ["unverifiable benchmark claim"],
     "source_scaffolds": [{ "canonical_url": "https://huggingface.co/spaces/lmarena-ai/chatbot-arena-leaderboard" }],
-    "known_relevant": [],
-    "judgments": [{ "canonical_url": "https://huggingface.co/spaces/lmarena-ai/chatbot-arena-leaderboard", "relevance": "uncertain", "hard_conditions_met": true, "identity_correct": true, "evidence_verifiable": true, "reviewer": "pending-human-review", "version": "v1-draft" }, { "name": "Sam Wu", "company": "Prompt Copy Co", "relevance": "uncertain", "hard_conditions_met": false, "identity_correct": true, "evidence_verifiable": true, "reviewer": "pending-human-review", "version": "v1-draft" }],
+    "known_relevant": [{ "name": "Wei-Lin Chiang", "canonical_url": "https://infwinston.github.io/" }],
+    "judgments": [{ "name": "Wei-Lin Chiang", "canonical_url": "https://infwinston.github.io/", "relevance": "relevant", "hard_conditions_met": true, "identity_correct": true, "evidence_verifiable": true, "evidence_urls": ["https://arxiv.org/abs/2403.04132", "https://github.com/lm-sys/FastChat"], "reviewer": "product-owner", "review_status": "approved_human_review", "reviewed_at": "2026-08-03T08:01:21Z", "version": "v1-human-review-1" }],
+    "review_status": "approved_human_review",
     "minimum_evidence": ["paper or benchmark page", "author or maintainer identity"]
   },
   {
@@ -76,8 +79,9 @@
     "required_conditions": ["PostgreSQL", "performance engineering"],
     "excluded_conditions": ["generic SQL training"],
     "source_scaffolds": [{ "canonical_url": "https://github.com/postgres/postgres" }],
-    "known_relevant": [],
-    "judgments": [{ "canonical_url": "https://github.com/postgres/postgres", "relevance": "uncertain", "hard_conditions_met": true, "identity_correct": true, "evidence_verifiable": true, "reviewer": "pending-human-review", "version": "v1-draft" }, { "name": "Avery Lin", "company": "SQL Academy", "relevance": "uncertain", "hard_conditions_met": false, "identity_correct": true, "evidence_verifiable": true, "reviewer": "pending-human-review", "version": "v1-draft" }],
+    "known_relevant": [{ "name": "Andres Freund", "canonical_url": "https://gist.github.com/anarazel" }],
+    "judgments": [{ "name": "Andres Freund", "canonical_url": "https://gist.github.com/anarazel", "relevance": "relevant", "hard_conditions_met": true, "identity_correct": true, "evidence_verifiable": true, "evidence_urls": ["https://www.postgresql.org/community/contributors/", "https://www.postgresql.org/message-id/20240407044935.ox4d3limgt5g3re3%40awork3.anarazel.de"], "reviewer": "product-owner", "review_status": "approved_human_review", "reviewed_at": "2026-08-03T08:01:21Z", "version": "v1-human-review-1" }],
+    "review_status": "approved_human_review",
     "minimum_evidence": ["database contribution", "technical evidence"]
   },
   {

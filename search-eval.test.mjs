@@ -172,9 +172,17 @@ test("does not let an unrelated relevant judgment inflate hard-constraint recall
   assert.ok(score.hard_constraint_recall <= 1);
 });
 
-test("ships exactly thirty human-review-pending cases with ten cases at every difficulty", () => {
+test("tracks four approved L1 labels while the remaining cases await human review", () => {
+  const approvedCaseIds = new Set([
+    "l1-open-source-ml-inference",
+    "l1-github-rust-data-engineer",
+    "l1-llm-evaluation-researcher",
+    "l1-database-performance-engineer",
+  ]);
+
   assert.equal(fixture.schema_version, "search-eval-v1-draft");
   assert.equal(fixture.review_status, "draft_pending_human_review");
+  assert.match(fixture.annotation_note, /remaining 26 cases/i);
   assert.match(fixture.annotation_note, /not a recruitment performance conclusion/i);
   assert.equal(cases.length, 30);
   assert.deepEqual(
@@ -185,20 +193,38 @@ test("ships exactly thirty human-review-pending cases with ten cases at every di
   for (const item of cases) {
     assert.ok(item.id && item.brief);
     assert.ok(Array.isArray(item.required_conditions) && Array.isArray(item.excluded_conditions));
-    assert.deepEqual(item.known_relevant, []);
     assert.ok(Array.isArray(item.source_scaffolds) && item.source_scaffolds.length > 0);
     assert.ok(Array.isArray(item.judgments) && item.judgments.length > 0);
     assert.ok(Array.isArray(item.minimum_evidence) && item.minimum_evidence.length > 0);
     for (const source of item.source_scaffolds) {
       assert.ok(source.canonical_url, `${item.id} has a public source scaffold`);
     }
-    for (const judgment of item.judgments) {
-      assert.equal(judgment.relevance, "uncertain");
-      assert.equal(typeof judgment.hard_conditions_met, "boolean");
-      assert.equal(typeof judgment.identity_correct, "boolean");
-      assert.equal(typeof judgment.evidence_verifiable, "boolean");
-      assert.equal(judgment.reviewer, "pending-human-review");
-      assert.equal(judgment.version, "v1-draft");
+    if (approvedCaseIds.has(item.id)) {
+      assert.equal(item.review_status, "approved_human_review");
+      assert.equal(item.known_relevant.length, 1);
+      assert.equal(item.judgments.length, 1);
+      const [judgment] = item.judgments;
+      assert.equal(judgment.relevance, "relevant");
+      assert.equal(judgment.hard_conditions_met, true);
+      assert.equal(judgment.identity_correct, true);
+      assert.equal(judgment.evidence_verifiable, true);
+      assert.equal(judgment.reviewer, "product-owner");
+      assert.equal(judgment.review_status, "approved_human_review");
+      assert.equal(judgment.version, "v1-human-review-1");
+      assert.ok(Number.isFinite(Date.parse(judgment.reviewed_at)));
+      assert.ok(Array.isArray(judgment.evidence_urls) && judgment.evidence_urls.length >= 2);
+    } else {
+      assert.deepEqual(item.known_relevant, []);
+      for (const judgment of item.judgments) {
+        assert.equal(judgment.relevance, "uncertain");
+        assert.equal(typeof judgment.hard_conditions_met, "boolean");
+        assert.equal(typeof judgment.identity_correct, "boolean");
+        assert.equal(typeof judgment.evidence_verifiable, "boolean");
+        assert.equal(judgment.reviewer, "pending-human-review");
+        assert.equal(judgment.version, "v1-draft");
+      }
     }
   }
+
+  assert.equal(cases.filter((item) => item.review_status === "approved_human_review").length, 4);
 });
