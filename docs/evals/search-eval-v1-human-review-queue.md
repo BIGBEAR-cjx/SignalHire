@@ -44,12 +44,12 @@ L2 必须同时满足多个硬条件。本表把可用线索和尚缺的个人�
 
 | Case | 当前研究线索 | 已验证的公开证据 | 仍缺的关键证据 | 状态 |
 | --- | --- | --- | --- | --- |
-| `l2-agent-platform-founder-engineer` | Harrison Chase | [LangGraph 生产 Agent 架构说明](https://www.langchain.com/blog/building-langgraph)；[LangGraph Platform GA](https://blog.langchain.dev/langgraph-platform-ga/) | 个人身份与创始阶段基础设施所有权的同一来源 | 待补证 |
+| `l2-agent-platform-founder-engineer` | Harrison Chase | [LangChain 官方介绍：共同创办 LangChain、为生产 Agent 提供运行时](https://www.langchain.com/about)；[LangGraph 生产部署说明](https://github.com/langchain-ai/langgraph) | 无 | **可人工确认** |
 | `l2-ai-recruiting-workflow-builder` | 暂无可靠个人候选 | [Vekt 的隐私优先招聘编排说明](https://vekt.website/)；[Calyflow 的自托管招聘 AI 工作流说明](https://www.calyflow.ai/) | 同时拥有产品工程身份、AI 招聘工作流与隐私数据处理的个人级归属 | 待补证 |
 | `l2-edge-ai-systems-engineer` | 暂无可靠个人候选 | [TFLite Micro 嵌入式 ML 基础设施、基准与 profiling](https://github.com/tensorflow/tflite-micro)；[per-op profiling 文档](https://android.googlesource.com/platform/external/tensorflow/%2Bshow/d7992c051ee/tensorflow/lite/micro/docs/profiling.md) | 代码作者与嵌入式、on-device ML、性能分析三项条件的个人级绑定 | 待补证 |
-| `l2-multilingual-nlp-engineer` | Matthew Honnibal | [GitHub 身份](https://github.com/honnibal)；[spaCy 开源仓库](https://github.com/explosion/spaCy) | 可归属到该个人的多语言模型评测工件 | 待补证 |
+| `l2-multilingual-nlp-engineer` | Matthew Honnibal | [个人主页：spaCy 作者与 Explosion 联合创办人](https://honnibal.dev/)；[spaCy 开源 Python 库](https://github.com/explosion/spaCy)；[其署名的 NLP 评测论文](https://aclanthology.org/W09-3306/) | 多语言能力来自其所创库的公开语言模型能力；需人工确认这是否足以代表候选人的直接多语言交付 | **可人工确认，证据强度较低** |
 | `l2-privacy-data-platform-engineer` | 暂无可靠个人候选 | [PySyft 隐私数据处理机制](https://openmined.org/pysyft/)；[安全与透明度说明](https://openmined.org/pysyft/faqs/) | 个人级 SQL 系统工作与安全技术证据，不能只以隐私项目身份替代 | 待补证 |
-| `l2-developer-tools-product-engineer` | Jan Oberhauser | [n8n 开源工作流与 API/integration 平台](https://github.com/n8n-io/n8n)；[GitHub integration 文档](https://n8n.io/integrations/github/) | 个人 GitHub 身份与上述创始人归属的直接交叉证据 | 待补证 |
+| `l2-developer-tools-product-engineer` | Jan Oberhauser | [n8n 官方 Creator 身份与公开工作流](https://n8n.io/creators/jan/)；[n8n 开源工作流/API/integration 平台](https://github.com/n8n-io/n8n) | 无 | **可人工确认** |
 | `l2-mlops-reliability-engineer` | 暂无可靠个人候选 | [BentoML 模型服务与 observability](https://github.com/bentoml/BentoML)；[可靠性和监控配置](https://docs.bentoml.org/en/latest/reference/bentoml/configurations.html) | 具备 serving、observability 与 on-call/运行可靠性证据的同一工程师 | 待补证 |
 | `l2-web-performance-engineer` | 暂无可靠个人候选 | 仅有项目级 React/a11y 线索，尚不足以支持个人判断 | 同一人同时具备 React 生产贡献、性能与可访问组件证据 | 待补证 |
 | `l2-fintech-backend-engineer` | 暂无可靠个人候选 | 尚未找到可公开归属的支付接入与账本正确性实现组合 | 同一人的支付集成、账本正确性及 Go/Java 代码证据 | 待补证 |
