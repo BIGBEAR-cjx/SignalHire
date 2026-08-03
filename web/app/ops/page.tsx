@@ -156,7 +156,7 @@ export default function OpsPage() {
     <main className="mx-auto max-w-5xl px-5 py-8 md:py-12">
       <header className="flex flex-wrap items-end justify-between gap-4 border-b border-black/10 pb-6">
         <div><p className="text-sm font-semibold uppercase tracking-[0.16em] text-[var(--sh-faint)]">SignalHire</p><h1 className="mt-2 text-3xl font-semibold tracking-tight">Credits operations</h1></div>
-        <p className="text-sm text-[var(--sh-muted)]">{user ? user.email : "Verifying access…"}</p>
+        <div className="flex flex-wrap items-center gap-3"><a className="sh-secondary-action" href="/ops/search-eval-review">Review Search Eval</a><p className="text-sm text-[var(--sh-muted)]">{user ? user.email : "Verifying access…"}</p></div>
       </header>
 
       <section className="sh-surface mt-7 p-5 md:p-6">
