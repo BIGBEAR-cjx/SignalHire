@@ -117,12 +117,16 @@ test("reports inconclusive instead of passing missing labels or incomplete run e
 });
 
 test("keeps evaluation internal and documents the approved review boundary", async () => {
-  const [productionSearchRoute, readme] = await Promise.all([
+  const [productionSearchRoute, readme, independentReviewChecklist] = await Promise.all([
     readFile(new URL("../app/api/search/route.ts", import.meta.url), "utf8"),
     readFile(new URL("../../README.md", import.meta.url), "utf8"),
+    readFile(new URL("../../docs/evals/search-eval-v1-independent-review.md", import.meta.url), "utf8"),
   ]);
 
   assert.doesNotMatch(productionSearchRoute, /(?:from\s+["'][^"']*(?:search-eval|run-search-eval)[^"']*["']|import\(\s*["'][^"']*(?:search-eval|run-search-eval))/);
   assert.match(readme, /known-relevant recall/i);
   assert.match(readme, /does not route or enqueue production search/i);
+  assert.match(independentReviewChecklist, /未参与自动公开证据审核的人/);
+  assert.match(independentReviewChecklist, /30 条均为 `pass`/);
+  assert.match(independentReviewChecklist, /draft_pending_human_review/);
 });
