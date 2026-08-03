@@ -30,7 +30,7 @@
 | Case | 候选人草案 | 个人稳定身份 | 支持证据 | 研究判断 |
 | --- | --- | --- | --- | --- |
 | `l1-kubernetes-platform-engineer` | Tim Hockin | [个人主页](https://hockin.org/~thockin/)；[GitHub](https://github.com/thockin) | [个人履历：Kubernetes 技术负责人、共同创始人及 Steering Committee 成员](https://hockin.org/~thockin/resume/) | **建议 relevant**：公开项目维护与平台工程职责均有本人一手归属。 |
-| `l1-computer-vision-paper-author` | Lingjie Kong | [个人主页](https://lingjiekong-fdu.github.io/)；[GitHub](https://github.com/lingjiekong) | [CVPR 2025 公开论文页：CustAny](https://openaccess.thecvf.com/content/CVPR2025/html/Kong_CustAny_Customizing_Anything_from_A_Single_Example_CVPR_2025_paper.html) | **建议 relevant**：公开个人身份与 CVPR 论文作者元数据可交叉核验。 |
+| `l1-computer-vision-paper-author` | Kaiming He | [MIT 个人主页](https://people.csail.mit.edu/kaiming/) | [CVF 公开论文页：Mask R-CNN（ICCV 2017）](https://openaccess.thecvf.com/content_iccv_2017/html/He_Mask_R-CNN_ICCV_2017_paper.html) | **建议 relevant**：个人主页和 CVF 作者元数据可稳定交叉核验，且论文直接属于计算机视觉。 |
 | `l1-security-incident-responder` | Tavis Ormandy | [GitHub](https://github.com/taviso) | [Project Zero 署名漏洞复盘](https://projectzero.google/2021/12/this-shouldnt-have-happened.html) | **建议 relevant**：公开安全工程工作与漏洞披露/复盘由本人署名。 |
 | `l1-product-analytics-builder` | Marius Andra | [GitHub](https://github.com/macobo) | [PostHog 事件管线重构提案](https://github.com/PostHog/posthog/issues/10192)；[PostHog 官方员工经历：初始 SDK](https://newsletter.posthog.com/p/what-we-learned-about-hiring-from) | **建议 relevant**：公开身份可关联至 PostHog，且有具体事件处理与入库管线技术证据。 |
 | `l1-typescript-design-systems` | shadcn | [个人主页](https://shadcn.com/)；[GitHub](https://github.com/shadcn) | [shadcn/ui 开源仓库](https://github.com/shadcn-ui/ui) | **建议 relevant**：本人声明创建 shadcn/ui，仓库为 TypeScript 组件与代码分发平台。 |
