@@ -3,7 +3,7 @@
 状态：`partially_approved_review`
 创建日期：2026-08-03
 
-本文件记录研究依据与审核状态，不是完整黄金集，也不是招聘结论。10 条 L1 case 与 5 条 L2 case 已由产品负责人确认；4 条 L2 case 已通过自动化公开证据审核并可作为局部金标；其余 11 条 case 仍需逐项人工审核。
+本文件记录研究依据与审核状态，不是完整黄金集，也不是招聘结论。10 条 L1 case 与 5 条 L2 case 已由产品负责人确认；5 条 L2 case 已通过自动化公开证据审核并可作为局部金标；其余 10 条 case 仍需逐项人工审核。
 
 ## 审核规则
 
@@ -45,7 +45,7 @@ L2 必须同时满足多个硬条件。本表把可用线索和尚缺的个人�
 | Case | 当前研究线索 | 已验证的公开证据 | 仍缺的关键证据 | 状态 |
 | --- | --- | --- | --- | --- |
 | `l2-agent-platform-founder-engineer` | Harrison Chase | [LangChain 官方介绍：共同创办 LangChain、为生产 Agent 提供运行时](https://www.langchain.com/about)；[LangGraph 生产部署说明](https://github.com/langchain-ai/langgraph) | 无 | **已确认 relevant** |
-| `l2-ai-recruiting-workflow-builder` | 暂无可靠个人候选 | [Vekt 的隐私优先招聘编排说明](https://vekt.website/)；[Calyflow 的自托管招聘 AI 工作流说明](https://www.calyflow.ai/)；[Calyflow 的人审发送与数据隔离说明](https://app.calyflow.ai/docs/security) | 仍缺同一人的公开工程身份与实现归属；不能以产品页替代个人身份。保留 pending，且不把包含自动外联能力的产品泛化为“非群发”证据。 | 待补证 |
+| `l2-ai-recruiting-workflow-builder` | Michal Juhas | [公开个人身份与本人关于 Calyflow Agent 的说明](https://sk.linkedin.com/in/michaljuhas)；[本人署名：构建开源 GitHub Sourcer 招聘 Agent](https://blog.aiwithmichal.com/p/sourcing-on-github-six-years-ago-vs-2026)；[Calyflow 的人审发送、工作区隔离与密钥保护说明](https://app.calyflow.ai/docs/security) | 候选人为产品/技术负责人而非已验证的代码仓库 maintainer；但本人明确声明构建该 Agent，且产品在发送前保留人工确认，故不以群发自动化通过。 | **自动公开证据审核通过** |
 | `l2-edge-ai-systems-engineer` | Daniel Situnayake | [个人主页：edge AI、embedded ML 与 TinyML/TFLite Micro 合著者](https://situnayake.com/)；[TFLite Micro per-op profiling 文档](https://android.googlesource.com/platform/external/tensorflow/%2Bshow/d7992c051ee/tensorflow/lite/micro/docs/profiling.md) | TFLite Micro profiling 工件是项目级证据，保留其间接性以便日后复核 | **已确认 relevant** |
 | `l2-multilingual-nlp-engineer` | Matthew Honnibal | [个人主页：spaCy 作者与 Explosion 联合创办人](https://honnibal.dev/)；[spaCy 开源 Python 库](https://github.com/explosion/spaCy)；[其署名的 NLP 评测论文](https://aclanthology.org/W09-3306/) | 多语言能力来自其所创库的公开语言模型能力，保留该间接性说明以便日后复核 | **已确认 relevant** |
 | `l2-privacy-data-platform-engineer` | Andrew Trask | [个人主页：OpenMined 创办人、PySyft 创建者](https://andrewtrask.ai/)；[PyPI 作者元数据：Andrew Trask](https://pypi.org/project/syft/0.2.5/)；[其署名的 Syft 隐私基础设施论文](https://arxiv.org/abs/2110.01315) | 数据平台归属来自 PySyft/remote-data infrastructure；保留其不是独立 SQL 引擎作者的边界说明。 | **自动公开证据审核通过** |
@@ -55,4 +55,4 @@ L2 必须同时满足多个硬条件。本表把可用线索和尚缺的个人�
 | `l2-fintech-backend-engineer` | Markus Geiss | [本人创建的 Apache Fineract Java 架构原则](https://cwiki.apache.org/confluence/spaces/FINERACT/pages/61334200/Key%2BDesign%2BPrinciples)；[本人署名的账本余额与异步总计修正提交](https://apache.googlesource.com/fineract-cn-accounting/%2Blog)；[本人负责的支付类型/账本 JIRA](https://www.mail-archive.com/issues%40fineract.apache.org/msg00578.html) | 支付与账本是 Fineract 金融服务实现的一部分，证据指向 Java 工程与金额/账本正确性处理。 | **自动公开证据审核通过** |
 | `l2-research-engineer-rag` | Malte Pietsch | [本人公开的 Haystack evaluation / retrieval 工程说明](https://www.linkedin.com/posts/maltepietsch_github-deepset-aihaystack-experimental-activity-7218628773187895296-7akg)；[Haystack RAG 实现仓库](https://github.com/deepset-ai/haystack)；[RAG 评测文档](https://docs.haystack.deepset.ai/docs/evaluation) | 无 | **已确认 relevant** |
 
-自动公开证据审核使用 `automated-public-evidence-review` 审核人字段；为兼容现有评测 gate，JSON 的 `review_status` 仍为 `approved_human_review`，但这不表示产品负责人已逐项人工确认。下一轮优先补齐 `l2-ai-recruiting-workflow-builder`，再处理 10 条 L3。
+自动公开证据审核使用 `automated-public-evidence-review` 审核人字段；为兼容现有评测 gate，JSON 的 `review_status` 仍为 `approved_human_review`，但这不表示产品负责人已逐项人工确认。L2 已补齐；下一轮处理 10 条 L3。

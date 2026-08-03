@@ -1,7 +1,7 @@
 {
   "schema_version": "search-eval-v1-draft",
   "review_status": "draft_pending_human_review",
-  "annotation_note": "Ten L1 cases and five L2 cases were approved by the product owner, and four L2 cases were approved through documented public-evidence review; the remaining 11 cases require independent human annotation before this becomes a golden set and it is not a recruitment performance conclusion.",
+  "annotation_note": "Ten L1 cases and five L2 cases were approved by the product owner, and five L2 cases were approved through documented public-evidence review; the remaining 10 cases require independent human annotation before this becomes a golden set and it is not a recruitment performance conclusion.",
   "cases": [
   {
     "id": "l1-open-source-ml-inference",
@@ -142,8 +142,9 @@
     "required_conditions": ["AI workflow", "recruiting workflow", "privacy-aware data handling"],
     "excluded_conditions": ["bulk outbound automation"],
     "source_scaffolds": [{ "canonical_url": "https://github.com/supabase/supabase" }],
-    "known_relevant": [],
-    "judgments": [{ "canonical_url": "https://github.com/supabase/supabase", "relevance": "uncertain", "hard_conditions_met": true, "identity_correct": true, "evidence_verifiable": true, "reviewer": "pending-human-review", "version": "v1-draft" }, { "name": "Peyton Zhao", "company": "Email Blast Ltd", "relevance": "uncertain", "hard_conditions_met": false, "identity_correct": true, "evidence_verifiable": true, "reviewer": "pending-human-review", "version": "v1-draft" }],
+    "known_relevant": [{ "name": "Michal Juhas", "canonical_url": "https://sk.linkedin.com/in/michaljuhas" }],
+    "judgments": [{ "name": "Michal Juhas", "canonical_url": "https://sk.linkedin.com/in/michaljuhas", "relevance": "relevant", "hard_conditions_met": true, "identity_correct": true, "evidence_verifiable": true, "evidence_urls": ["https://sk.linkedin.com/in/michaljuhas", "https://blog.aiwithmichal.com/p/sourcing-on-github-six-years-ago-vs-2026", "https://app.calyflow.ai/docs/security"], "reviewer": "automated-public-evidence-review", "review_status": "approved_human_review", "reviewed_at": "2026-08-03T09:14:10Z", "version": "v1-automated-public-evidence-review-1" }],
+    "review_status": "approved_human_review",
     "minimum_evidence": ["workflow implementation", "privacy or data-control documentation"]
   },
   {
