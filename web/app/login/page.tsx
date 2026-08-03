@@ -2,11 +2,15 @@
 
 import { useEffect, useState, useSyncExternalStore } from "react";
 import Link from "next/link";
-import { FiArrowRight, FiLock, FiMail } from "react-icons/fi";
+import { FiArrowRight, FiCheckCircle, FiLock, FiMail } from "react-icons/fi";
 import LanguageSwitcher from "@/components/LanguageSwitcher";
 import { useI18n } from "@/components/LanguageProvider";
 import { login } from "@/lib/auth";
 import { LogoMark } from "@/components/ui/signal-ui";
+
+function safeNextPath(value: string | null) {
+  return value && value.startsWith("/") && !value.startsWith("//") ? value : "/";
+}
 
 export default function LoginPage() {
   const { locale, t } = useI18n();
@@ -17,10 +21,16 @@ export default function LoginPage() {
   const [hydrated, setHydrated] = useState(false);
   const next = useSyncExternalStore(
     () => () => {},
-    () => new URLSearchParams(location.search).get("next") || "/",
+    () => safeNextPath(new URLSearchParams(location.search).get("next")),
     () => "/",
   );
+  const resetState = useSyncExternalStore(
+    () => () => {},
+    () => new URLSearchParams(location.search).get("reset") || "",
+    () => "",
+  );
   const clientPortalLogin = next.startsWith("/client");
+  const forgotPasswordHref = `/forgot-password?next=${encodeURIComponent(next)}`;
 
   useEffect(() => {
     const id = window.setTimeout(() => setHydrated(true), 0);
@@ -84,7 +94,12 @@ export default function LoginPage() {
               </span>
             </label>
             <label className="block">
-              <span className="mb-2 block text-sm font-medium text-[var(--sh-muted)]">{t("auth.password")}</span>
+              <span className="mb-2 flex items-center justify-between gap-3 text-sm font-medium text-[var(--sh-muted)]">
+                <span>{t("auth.password")}</span>
+                <Link href={forgotPasswordHref} className="font-semibold text-[var(--sh-blue)] hover:underline">
+                  {t("auth.forgotPassword")}
+                </Link>
+              </span>
               <span className="flex items-center gap-3 rounded-2xl border border-black/10 bg-white/78 px-4 py-3 transition focus-within:border-[var(--sh-blue)] focus-within:bg-white">
                 <FiLock className="h-4 w-4 text-[var(--sh-faint)]" aria-hidden="true" />
                 <input
@@ -94,6 +109,12 @@ export default function LoginPage() {
                 />
               </span>
             </label>
+            {resetState === "success" && (
+              <p className="flex items-start gap-2 rounded-2xl bg-emerald-50 px-4 py-3 text-sm text-emerald-700 ring-1 ring-emerald-100">
+                <FiCheckCircle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+                <span>{t("auth.resetPasswordSuccess")}</span>
+              </p>
+            )}
             {err && <p className="rounded-2xl bg-red-50 px-4 py-3 text-sm text-red-700 ring-1 ring-red-100">{err}</p>}
             <button type="submit" disabled={!hydrated || loading} className="sh-primary-action w-full disabled:pointer-events-none disabled:opacity-50">
               {loading ? t("auth.loggingIn") : t("common.login")}

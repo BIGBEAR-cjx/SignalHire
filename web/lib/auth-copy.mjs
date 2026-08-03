@@ -9,6 +9,9 @@ const ERROR_KEYS = {
   loginVerifyFirst: "auth.error.loginVerifyFirst",
   loginFailed: "auth.error.loginFailed",
   loginNoToken: "auth.error.loginNoToken",
+  passwordResetRequestFailed: "auth.error.passwordResetRequestFailed",
+  passwordResetCodeFailed: "auth.error.passwordResetCodeFailed",
+  passwordResetFailed: "auth.error.passwordResetFailed",
 };
 
 export function authErrorMessage(locale, key, serviceMessage) {

@@ -21,6 +21,28 @@ export type AuthResult =
   | { ok: true }
   | { ok: false; needVerify?: boolean; error: string };
 
+export type PasswordResetResult =
+  | { ok: true }
+  | { ok: false; error: string };
+
+export type PasswordResetTokenResult =
+  | { ok: true; token: string }
+  | { ok: false; error: string };
+
+function safeNextPath(next: string) {
+  const value = typeof next === "string" ? next.trim() : "";
+  return value.startsWith("/") && !value.startsWith("//") ? value : "/";
+}
+
+function passwordResetRedirect(next: string) {
+  const origin = typeof window !== "undefined" ? window.location.origin : "https://evidenthire.work";
+  const params = new URLSearchParams();
+  const safeNext = safeNextPath(next);
+  if (safeNext !== "/") params.set("next", safeNext);
+  const query = params.toString();
+  return `${origin}/reset-password${query ? `?${query}` : ""}`;
+}
+
 export async function register(email: string, password: string, name?: string, locale = "zh"): Promise<AuthResult> {
   try {
     const { data, error } = await client.auth.signUp({ email, password, name });
@@ -63,6 +85,46 @@ export async function login(email: string, password: string, locale = "zh"): Pro
     return { ok: false, error: authErrorMessage(locale, "loginNoToken") };
   } catch (e) {
     return { ok: false, error: authErrorMessage(locale, "loginFailed", (e as Error).message) };
+  }
+}
+
+export async function sendPasswordResetEmail(email: string, next = "/", locale = "zh"): Promise<PasswordResetResult> {
+  try {
+    const { data, error } = await client.auth.sendResetPasswordEmail({
+      email,
+      redirectTo: passwordResetRedirect(next),
+    });
+    if (error || !data?.success) {
+      return { ok: false, error: authErrorMessage(locale, "passwordResetRequestFailed") };
+    }
+    return { ok: true };
+  } catch {
+    return { ok: false, error: authErrorMessage(locale, "passwordResetRequestFailed") };
+  }
+}
+
+export async function exchangePasswordResetCode(email: string, code: string, locale = "zh"): Promise<PasswordResetTokenResult> {
+  try {
+    const { data, error } = await client.auth.exchangeResetPasswordToken({ email, code });
+    const token = typeof data?.token === "string" ? data.token.trim() : "";
+    if (error || !token) {
+      return { ok: false, error: authErrorMessage(locale, "passwordResetCodeFailed") };
+    }
+    return { ok: true, token };
+  } catch {
+    return { ok: false, error: authErrorMessage(locale, "passwordResetCodeFailed") };
+  }
+}
+
+export async function resetPassword(newPassword: string, token: string, locale = "zh"): Promise<PasswordResetResult> {
+  try {
+    const { data, error } = await client.auth.resetPassword({ newPassword, otp: token });
+    if (error || !data) {
+      return { ok: false, error: authErrorMessage(locale, "passwordResetFailed") };
+    }
+    return { ok: true };
+  } catch {
+    return { ok: false, error: authErrorMessage(locale, "passwordResetFailed") };
   }
 }
 

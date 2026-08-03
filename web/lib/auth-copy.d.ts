@@ -6,7 +6,10 @@ export type AuthErrorKey =
   | "verifyNoToken"
   | "loginVerifyFirst"
   | "loginFailed"
-  | "loginNoToken";
+  | "loginNoToken"
+  | "passwordResetRequestFailed"
+  | "passwordResetCodeFailed"
+  | "passwordResetFailed";
 
 export function authErrorMessage(
   locale: "zh" | "en" | string,
