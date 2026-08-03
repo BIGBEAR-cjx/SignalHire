@@ -1,7 +1,7 @@
 {
   "schema_version": "search-eval-v1-draft",
   "review_status": "draft_pending_human_review",
-  "annotation_note": "Four L1 cases were approved by the product owner from documented public evidence; the remaining 26 cases require independent human annotation before this becomes a golden set and it is not a recruitment performance conclusion.",
+  "annotation_note": "Ten L1 cases were approved by the product owner from documented public evidence; the remaining 20 cases require independent human annotation before this becomes a golden set and it is not a recruitment performance conclusion.",
   "cases": [
   {
     "id": "l1-open-source-ml-inference",
@@ -46,8 +46,9 @@
     "required_conditions": ["Kubernetes", "platform engineering"],
     "excluded_conditions": ["certificate without delivery evidence"],
     "source_scaffolds": [{ "canonical_url": "https://github.com/kubernetes/kubernetes" }],
-    "known_relevant": [],
-    "judgments": [{ "canonical_url": "https://github.com/kubernetes/kubernetes", "relevance": "uncertain", "hard_conditions_met": true, "identity_correct": true, "evidence_verifiable": true, "reviewer": "pending-human-review", "version": "v1-draft" }, { "name": "Taylor Smith", "company": "Cloud Courseware", "relevance": "uncertain", "hard_conditions_met": false, "identity_correct": true, "evidence_verifiable": true, "reviewer": "pending-human-review", "version": "v1-draft" }],
+    "known_relevant": [{ "name": "Tim Hockin", "canonical_url": "https://github.com/thockin" }],
+    "judgments": [{ "name": "Tim Hockin", "canonical_url": "https://github.com/thockin", "relevance": "relevant", "hard_conditions_met": true, "identity_correct": true, "evidence_verifiable": true, "evidence_urls": ["https://hockin.org/~thockin/", "https://hockin.org/~thockin/resume/"], "reviewer": "product-owner", "review_status": "approved_human_review", "reviewed_at": "2026-08-03T08:12:04Z", "version": "v1-human-review-1" }],
+    "review_status": "approved_human_review",
     "minimum_evidence": ["merged contribution", "technical profile"]
   },
   {
@@ -57,8 +58,9 @@
     "required_conditions": ["computer vision", "peer-reviewed paper"],
     "excluded_conditions": ["marketing case study only"],
     "source_scaffolds": [{ "canonical_url": "https://openreview.net/group?id=thecvf.com/CVPR/2025/Conference" }],
-    "known_relevant": [],
-    "judgments": [{ "canonical_url": "https://openreview.net/group?id=thecvf.com/CVPR/2025/Conference", "relevance": "uncertain", "hard_conditions_met": true, "identity_correct": true, "evidence_verifiable": true, "reviewer": "pending-human-review", "version": "v1-draft" }, { "name": "Riley Chen", "company": "Lens Marketing", "relevance": "uncertain", "hard_conditions_met": false, "identity_correct": true, "evidence_verifiable": true, "reviewer": "pending-human-review", "version": "v1-draft" }],
+    "known_relevant": [{ "name": "Kaiming He", "canonical_url": "https://people.csail.mit.edu/kaiming/" }],
+    "judgments": [{ "name": "Kaiming He", "canonical_url": "https://people.csail.mit.edu/kaiming/", "relevance": "relevant", "hard_conditions_met": true, "identity_correct": true, "evidence_verifiable": true, "evidence_urls": ["https://people.csail.mit.edu/kaiming/", "https://openaccess.thecvf.com/content_iccv_2017/html/He_Mask_R-CNN_ICCV_2017_paper.html"], "reviewer": "product-owner", "review_status": "approved_human_review", "reviewed_at": "2026-08-03T08:12:04Z", "version": "v1-human-review-1" }],
+    "review_status": "approved_human_review",
     "minimum_evidence": ["paper metadata", "author identity"]
   },
   {
@@ -68,8 +70,9 @@
     "required_conditions": ["security engineering", "public disclosure or advisory"],
     "excluded_conditions": ["security sales"],
     "source_scaffolds": [{ "canonical_url": "https://github.com/google/security-research" }],
-    "known_relevant": [],
-    "judgments": [{ "canonical_url": "https://github.com/google/security-research", "relevance": "uncertain", "hard_conditions_met": true, "identity_correct": true, "evidence_verifiable": true, "reviewer": "pending-human-review", "version": "v1-draft" }, { "name": "Casey Kim", "company": "Secure Leads", "relevance": "uncertain", "hard_conditions_met": false, "identity_correct": true, "evidence_verifiable": true, "reviewer": "pending-human-review", "version": "v1-draft" }],
+    "known_relevant": [{ "name": "Tavis Ormandy", "canonical_url": "https://github.com/taviso" }],
+    "judgments": [{ "name": "Tavis Ormandy", "canonical_url": "https://github.com/taviso", "relevance": "relevant", "hard_conditions_met": true, "identity_correct": true, "evidence_verifiable": true, "evidence_urls": ["https://github.com/taviso", "https://projectzero.google/2021/12/this-shouldnt-have-happened.html"], "reviewer": "product-owner", "review_status": "approved_human_review", "reviewed_at": "2026-08-03T08:12:04Z", "version": "v1-human-review-1" }],
+    "review_status": "approved_human_review",
     "minimum_evidence": ["advisory or disclosure", "author attribution"]
   },
   {
@@ -91,8 +94,9 @@
     "required_conditions": ["product analytics", "event pipeline"],
     "excluded_conditions": ["dashboard-only analyst"],
     "source_scaffolds": [{ "canonical_url": "https://github.com/PostHog/posthog" }],
-    "known_relevant": [],
-    "judgments": [{ "canonical_url": "https://github.com/PostHog/posthog", "relevance": "uncertain", "hard_conditions_met": true, "identity_correct": true, "evidence_verifiable": true, "reviewer": "pending-human-review", "version": "v1-draft" }, { "name": "Drew Patel", "company": "Chart Templates", "relevance": "uncertain", "hard_conditions_met": false, "identity_correct": true, "evidence_verifiable": true, "reviewer": "pending-human-review", "version": "v1-draft" }],
+    "known_relevant": [{ "name": "Marius Andra", "canonical_url": "https://github.com/macobo" }],
+    "judgments": [{ "name": "Marius Andra", "canonical_url": "https://github.com/macobo", "relevance": "relevant", "hard_conditions_met": true, "identity_correct": true, "evidence_verifiable": true, "evidence_urls": ["https://github.com/PostHog/posthog/issues/10192", "https://newsletter.posthog.com/p/what-we-learned-about-hiring-from"], "reviewer": "product-owner", "review_status": "approved_human_review", "reviewed_at": "2026-08-03T08:12:04Z", "version": "v1-human-review-1" }],
+    "review_status": "approved_human_review",
     "minimum_evidence": ["implementation repository", "public technical profile"]
   },
   {
@@ -102,8 +106,9 @@
     "required_conditions": ["TypeScript", "design system"],
     "excluded_conditions": ["visual design without code"],
     "source_scaffolds": [{ "canonical_url": "https://github.com/shadcn-ui/ui" }],
-    "known_relevant": [],
-    "judgments": [{ "canonical_url": "https://github.com/shadcn-ui/ui", "relevance": "uncertain", "hard_conditions_met": true, "identity_correct": true, "evidence_verifiable": true, "reviewer": "pending-human-review", "version": "v1-draft" }, { "name": "Jamie Rivera", "company": "Brand Moodboards", "relevance": "uncertain", "hard_conditions_met": false, "identity_correct": true, "evidence_verifiable": true, "reviewer": "pending-human-review", "version": "v1-draft" }],
+    "known_relevant": [{ "name": "shadcn", "canonical_url": "https://github.com/shadcn" }],
+    "judgments": [{ "name": "shadcn", "canonical_url": "https://github.com/shadcn", "relevance": "relevant", "hard_conditions_met": true, "identity_correct": true, "evidence_verifiable": true, "evidence_urls": ["https://shadcn.com/", "https://github.com/shadcn-ui/ui"], "reviewer": "product-owner", "review_status": "approved_human_review", "reviewed_at": "2026-08-03T08:12:04Z", "version": "v1-human-review-1" }],
+    "review_status": "approved_human_review",
     "minimum_evidence": ["repository activity", "component documentation"]
   },
   {
@@ -113,8 +118,9 @@
     "required_conditions": ["observability", "instrumentation"],
     "excluded_conditions": ["monitoring procurement"],
     "source_scaffolds": [{ "canonical_url": "https://github.com/open-telemetry/opentelemetry-js" }],
-    "known_relevant": [],
-    "judgments": [{ "canonical_url": "https://github.com/open-telemetry/opentelemetry-js", "relevance": "uncertain", "hard_conditions_met": true, "identity_correct": true, "evidence_verifiable": true, "reviewer": "pending-human-review", "version": "v1-draft" }, { "name": "Alex Morgan", "company": "Monitor Resellers", "relevance": "uncertain", "hard_conditions_met": false, "identity_correct": true, "evidence_verifiable": true, "reviewer": "pending-human-review", "version": "v1-draft" }],
+    "known_relevant": [{ "name": "Daniel Dyla", "canonical_url": "https://github.com/dyladan" }],
+    "judgments": [{ "name": "Daniel Dyla", "canonical_url": "https://github.com/dyladan", "relevance": "relevant", "hard_conditions_met": true, "identity_correct": true, "evidence_verifiable": true, "evidence_urls": ["https://github.com/open-telemetry/opentelemetry-js", "https://opentelemetry.io/community/members/"], "reviewer": "product-owner", "review_status": "approved_human_review", "reviewed_at": "2026-08-03T08:12:04Z", "version": "v1-human-review-1" }],
+    "review_status": "approved_human_review",
     "minimum_evidence": ["instrumentation code", "maintainer attribution"]
   },
   {

@@ -172,17 +172,23 @@ test("does not let an unrelated relevant judgment inflate hard-constraint recall
   assert.ok(score.hard_constraint_recall <= 1);
 });
 
-test("tracks four approved L1 labels while the remaining cases await human review", () => {
+test("tracks ten approved L1 labels while the remaining cases await human review", () => {
   const approvedCaseIds = new Set([
     "l1-open-source-ml-inference",
     "l1-github-rust-data-engineer",
     "l1-llm-evaluation-researcher",
     "l1-database-performance-engineer",
+    "l1-kubernetes-platform-engineer",
+    "l1-computer-vision-paper-author",
+    "l1-security-incident-responder",
+    "l1-product-analytics-builder",
+    "l1-typescript-design-systems",
+    "l1-open-source-observability",
   ]);
 
   assert.equal(fixture.schema_version, "search-eval-v1-draft");
   assert.equal(fixture.review_status, "draft_pending_human_review");
-  assert.match(fixture.annotation_note, /remaining 26 cases/i);
+  assert.match(fixture.annotation_note, /remaining 20 cases/i);
   assert.match(fixture.annotation_note, /not a recruitment performance conclusion/i);
   assert.equal(cases.length, 30);
   assert.deepEqual(
@@ -226,5 +232,5 @@ test("tracks four approved L1 labels while the remaining cases await human revie
     }
   }
 
-  assert.equal(cases.filter((item) => item.review_status === "approved_human_review").length, 4);
+  assert.equal(cases.filter((item) => item.review_status === "approved_human_review").length, 10);
 });

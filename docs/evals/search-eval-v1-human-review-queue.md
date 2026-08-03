@@ -3,7 +3,7 @@
 状态：`partially_approved_human_review`
 创建日期：2026-08-03
 
-本文件记录研究依据与人工确认状态，不是完整黄金集，也不是招聘结论。已确认的 case 仅可作为局部金标；其余 case 仍需逐项审核。
+本文件记录研究依据与人工确认状态，不是完整黄金集，也不是招聘结论。10 条 L1 case 已确认并可作为局部金标；其余 20 条 case 仍需逐项审核。
 
 ## 审核规则
 
@@ -23,17 +23,17 @@
 | `l1-llm-evaluation-researcher` | Wei-Lin Chiang | [公开主页](https://infwinston.github.io/) | [Chatbot Arena 论文](https://arxiv.org/abs/2403.04132)；[FastChat / Chatbot Arena 代码](https://github.com/lm-sys/FastChat) | **已确认 relevant**：语言模型评测研究与公开评测平台均可交叉验证。 |
 | `l1-database-performance-engineer` | Andres Freund | [GitHub](https://gist.github.com/anarazel) | [PostgreSQL 官方贡献者档案](https://www.postgresql.org/community/contributors/)；[性能相关官方邮件记录](https://www.postgresql.org/message-id/20240407044935.ox4d3limgt5g3re3%40awork3.anarazel.de) | **已确认 relevant**：PostgreSQL 性能与可扩展性贡献有官方一手归属。 |
 
-## L1：第二批待人工确认研究条目
+## L1：第二批已确认金标
 
-下列候选都补齐了个人级身份与至少一条直接技术证据，但尚未经过人工确认；因此不得写入 `known_relevant`，也不得标记为 `approved_human_review`。
+下列候选已由产品负责人确认，并已写入评测 JSON 的 `known_relevant` 与 `approved_human_review` judgment。
 
 | Case | 候选人草案 | 个人稳定身份 | 支持证据 | 研究判断 |
 | --- | --- | --- | --- | --- |
-| `l1-kubernetes-platform-engineer` | Tim Hockin | [个人主页](https://hockin.org/~thockin/)；[GitHub](https://github.com/thockin) | [个人履历：Kubernetes 技术负责人、共同创始人及 Steering Committee 成员](https://hockin.org/~thockin/resume/) | **建议 relevant**：公开项目维护与平台工程职责均有本人一手归属。 |
-| `l1-computer-vision-paper-author` | Kaiming He | [MIT 个人主页](https://people.csail.mit.edu/kaiming/) | [CVF 公开论文页：Mask R-CNN（ICCV 2017）](https://openaccess.thecvf.com/content_iccv_2017/html/He_Mask_R-CNN_ICCV_2017_paper.html) | **建议 relevant**：个人主页和 CVF 作者元数据可稳定交叉核验，且论文直接属于计算机视觉。 |
-| `l1-security-incident-responder` | Tavis Ormandy | [GitHub](https://github.com/taviso) | [Project Zero 署名漏洞复盘](https://projectzero.google/2021/12/this-shouldnt-have-happened.html) | **建议 relevant**：公开安全工程工作与漏洞披露/复盘由本人署名。 |
-| `l1-product-analytics-builder` | Marius Andra | [GitHub](https://github.com/macobo) | [PostHog 事件管线重构提案](https://github.com/PostHog/posthog/issues/10192)；[PostHog 官方员工经历：初始 SDK](https://newsletter.posthog.com/p/what-we-learned-about-hiring-from) | **建议 relevant**：公开身份可关联至 PostHog，且有具体事件处理与入库管线技术证据。 |
-| `l1-typescript-design-systems` | shadcn | [个人主页](https://shadcn.com/)；[GitHub](https://github.com/shadcn) | [shadcn/ui 开源仓库](https://github.com/shadcn-ui/ui) | **建议 relevant**：本人声明创建 shadcn/ui，仓库为 TypeScript 组件与代码分发平台。 |
-| `l1-open-source-observability` | Daniel Dyla | [GitHub](https://github.com/dyladan) | [OpenTelemetry JS 维护者名单](https://github.com/open-telemetry/opentelemetry-js)；[官方成员目录中的 `dyladan` JavaScript 归属](https://opentelemetry.io/community/members/) | **建议 relevant**：公开维护 OpenTelemetry JavaScript 及其 instrumentation 工作。 |
+| `l1-kubernetes-platform-engineer` | Tim Hockin | [个人主页](https://hockin.org/~thockin/)；[GitHub](https://github.com/thockin) | [个人履历：Kubernetes 技术负责人、共同创始人及 Steering Committee 成员](https://hockin.org/~thockin/resume/) | **已确认 relevant**：公开项目维护与平台工程职责均有本人一手归属。 |
+| `l1-computer-vision-paper-author` | Kaiming He | [MIT 个人主页](https://people.csail.mit.edu/kaiming/) | [CVF 公开论文页：Mask R-CNN（ICCV 2017）](https://openaccess.thecvf.com/content_iccv_2017/html/He_Mask_R-CNN_ICCV_2017_paper.html) | **已确认 relevant**：个人主页和 CVF 作者元数据可稳定交叉核验，且论文直接属于计算机视觉。 |
+| `l1-security-incident-responder` | Tavis Ormandy | [GitHub](https://github.com/taviso) | [Project Zero 署名漏洞复盘](https://projectzero.google/2021/12/this-shouldnt-have-happened.html) | **已确认 relevant**：公开安全工程工作与漏洞披露/复盘由本人署名。 |
+| `l1-product-analytics-builder` | Marius Andra | [GitHub](https://github.com/macobo) | [PostHog 事件管线重构提案](https://github.com/PostHog/posthog/issues/10192)；[PostHog 官方员工经历：初始 SDK](https://newsletter.posthog.com/p/what-we-learned-about-hiring-from) | **已确认 relevant**：公开身份可关联至 PostHog，且有具体事件处理与入库管线技术证据。 |
+| `l1-typescript-design-systems` | shadcn | [个人主页](https://shadcn.com/)；[GitHub](https://github.com/shadcn) | [shadcn/ui 开源仓库](https://github.com/shadcn-ui/ui) | **已确认 relevant**：本人声明创建 shadcn/ui，仓库为 TypeScript 组件与代码分发平台。 |
+| `l1-open-source-observability` | Daniel Dyla | [GitHub](https://github.com/dyladan) | [OpenTelemetry JS 维护者名单](https://github.com/open-telemetry/opentelemetry-js)；[官方成员目录中的 `dyladan` JavaScript 归属](https://opentelemetry.io/community/members/) | **已确认 relevant**：公开维护 OpenTelemetry JavaScript 及其 instrumentation 工作。 |
 
 审核时请逐条确认候选与证据链接的对应关系；确认后再单独写入评测 JSON。
