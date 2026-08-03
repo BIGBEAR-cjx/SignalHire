@@ -3,7 +3,7 @@
 状态：`partially_approved_human_review`
 创建日期：2026-08-03
 
-本文件记录研究依据与人工确认状态，不是完整黄金集，也不是招聘结论。10 条 L1 case 与 3 条 L2 case 已确认并可作为局部金标；其余 17 条 case 仍需逐项审核。
+本文件记录研究依据与人工确认状态，不是完整黄金集，也不是招聘结论。10 条 L1 case 与 5 条 L2 case 已确认并可作为局部金标；其余 15 条 case 仍需逐项审核。
 
 ## 审核规则
 
@@ -46,13 +46,13 @@ L2 必须同时满足多个硬条件。本表把可用线索和尚缺的个人�
 | --- | --- | --- | --- | --- |
 | `l2-agent-platform-founder-engineer` | Harrison Chase | [LangChain 官方介绍：共同创办 LangChain、为生产 Agent 提供运行时](https://www.langchain.com/about)；[LangGraph 生产部署说明](https://github.com/langchain-ai/langgraph) | 无 | **已确认 relevant** |
 | `l2-ai-recruiting-workflow-builder` | 暂无可靠个人候选 | [Vekt 的隐私优先招聘编排说明](https://vekt.website/)；[Calyflow 的自托管招聘 AI 工作流说明](https://www.calyflow.ai/) | 同时拥有产品工程身份、AI 招聘工作流与隐私数据处理的个人级归属 | 待补证 |
-| `l2-edge-ai-systems-engineer` | Daniel Situnayake | [个人主页：edge AI、embedded ML 与 TinyML/TFLite Micro 合著者](https://situnayake.com/)；[TFLite Micro per-op profiling 文档](https://android.googlesource.com/platform/external/tensorflow/%2Bshow/d7992c051ee/tensorflow/lite/micro/docs/profiling.md) | TFLite Micro profiling 工件是项目级证据，需人工确认其与候选人技术交付的关联是否足够直接 | **可人工确认，证据强度较低** |
+| `l2-edge-ai-systems-engineer` | Daniel Situnayake | [个人主页：edge AI、embedded ML 与 TinyML/TFLite Micro 合著者](https://situnayake.com/)；[TFLite Micro per-op profiling 文档](https://android.googlesource.com/platform/external/tensorflow/%2Bshow/d7992c051ee/tensorflow/lite/micro/docs/profiling.md) | TFLite Micro profiling 工件是项目级证据，保留其间接性以便日后复核 | **已确认 relevant** |
 | `l2-multilingual-nlp-engineer` | Matthew Honnibal | [个人主页：spaCy 作者与 Explosion 联合创办人](https://honnibal.dev/)；[spaCy 开源 Python 库](https://github.com/explosion/spaCy)；[其署名的 NLP 评测论文](https://aclanthology.org/W09-3306/) | 多语言能力来自其所创库的公开语言模型能力，保留该间接性说明以便日后复核 | **已确认 relevant** |
 | `l2-privacy-data-platform-engineer` | 暂无可靠个人候选 | [PySyft 隐私数据处理机制](https://openmined.org/pysyft/)；[安全与透明度说明](https://openmined.org/pysyft/faqs/) | 个人级 SQL 系统工作与安全技术证据，不能只以隐私项目身份替代 | 待补证 |
 | `l2-developer-tools-product-engineer` | Jan Oberhauser | [n8n 官方 Creator 身份与公开工作流](https://n8n.io/creators/jan/)；[n8n 开源工作流/API/integration 平台](https://github.com/n8n-io/n8n) | 无 | **已确认 relevant** |
 | `l2-mlops-reliability-engineer` | Bozhao Yu | [BentoCTL 部署工具的公开署名](https://bentoml.com/blog/introduction-to-bentoctl)；[BentoML 可靠性与 monitoring 配置](https://docs.bentoml.org/en/latest/reference/bentoml/configurations.html) | 候选人的 on-call 或运行可靠性直接证据；现有材料不足以进入人工确认 | 待补证 |
 | `l2-web-performance-engineer` | 暂无可靠个人候选 | 仅有项目级 React/a11y 线索，尚不足以支持个人判断 | 同一人同时具备 React 生产贡献、性能与可访问组件证据 | 待补证 |
 | `l2-fintech-backend-engineer` | 暂无可靠个人候选 | 尚未找到可公开归属的支付接入与账本正确性实现组合 | 同一人的支付集成、账本正确性及 Go/Java 代码证据 | 待补证 |
-| `l2-research-engineer-rag` | Malte Pietsch | [本人公开的 Haystack evaluation / retrieval 工程说明](https://www.linkedin.com/posts/maltepietsch_github-deepset-aihaystack-experimental-activity-7218628773187895296-7akg)；[Haystack RAG 实现仓库](https://github.com/deepset-ai/haystack)；[RAG 评测文档](https://docs.haystack.deepset.ai/docs/evaluation) | 无 | **可人工确认** |
+| `l2-research-engineer-rag` | Malte Pietsch | [本人公开的 Haystack evaluation / retrieval 工程说明](https://www.linkedin.com/posts/maltepietsch_github-deepset-aihaystack-experimental-activity-7218628773187895296-7akg)；[Haystack RAG 实现仓库](https://github.com/deepset-ai/haystack)；[RAG 评测文档](https://docs.haystack.deepset.ai/docs/evaluation) | 无 | **已确认 relevant** |
 
 下一轮按缺口最小的顺序补证：`developer-tools`、`agent-platform`、`multilingual-nlp`，再处理需要跨项目和跨来源关联的其余 7 条。

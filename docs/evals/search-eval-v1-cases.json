@@ -1,7 +1,7 @@
 {
   "schema_version": "search-eval-v1-draft",
   "review_status": "draft_pending_human_review",
-  "annotation_note": "Ten L1 cases and three L2 cases were approved by the product owner from documented public evidence; the remaining 17 cases require independent human annotation before this becomes a golden set and it is not a recruitment performance conclusion.",
+  "annotation_note": "Ten L1 cases and five L2 cases were approved by the product owner from documented public evidence; the remaining 15 cases require independent human annotation before this becomes a golden set and it is not a recruitment performance conclusion.",
   "cases": [
   {
     "id": "l1-open-source-ml-inference",
@@ -153,8 +153,9 @@
     "required_conditions": ["embedded systems", "on-device ML", "performance profiling"],
     "excluded_conditions": ["cloud-only ML"],
     "source_scaffolds": [{ "canonical_url": "https://github.com/tensorflow/tflite-micro" }],
-    "known_relevant": [],
-    "judgments": [{ "canonical_url": "https://github.com/tensorflow/tflite-micro", "relevance": "uncertain", "hard_conditions_met": true, "identity_correct": true, "evidence_verifiable": true, "reviewer": "pending-human-review", "version": "v1-draft" }, { "name": "Skyler Tan", "company": "Cloud Vision Ads", "relevance": "uncertain", "hard_conditions_met": false, "identity_correct": true, "evidence_verifiable": true, "reviewer": "pending-human-review", "version": "v1-draft" }],
+    "known_relevant": [{ "name": "Daniel Situnayake", "canonical_url": "https://situnayake.com/" }],
+    "judgments": [{ "name": "Daniel Situnayake", "canonical_url": "https://situnayake.com/", "relevance": "relevant", "hard_conditions_met": true, "identity_correct": true, "evidence_verifiable": true, "evidence_urls": ["https://situnayake.com/", "https://android.googlesource.com/platform/external/tensorflow/%2Bshow/d7992c051ee/tensorflow/lite/micro/docs/profiling.md"], "reviewer": "product-owner", "review_status": "approved_human_review", "reviewed_at": "2026-08-03T08:59:33Z", "version": "v1-human-review-1" }],
+    "review_status": "approved_human_review",
     "minimum_evidence": ["embedded code", "profiling or benchmark evidence"]
   },
   {
@@ -232,8 +233,9 @@
     "required_conditions": ["retrieval augmented generation", "evaluation", "documentation"],
     "excluded_conditions": ["generic chatbot implementation"],
     "source_scaffolds": [{ "canonical_url": "https://github.com/deepset-ai/haystack" }],
-    "known_relevant": [],
-    "judgments": [{ "canonical_url": "https://github.com/deepset-ai/haystack", "relevance": "uncertain", "hard_conditions_met": true, "identity_correct": true, "evidence_verifiable": true, "reviewer": "pending-human-review", "version": "v1-draft" }, { "name": "Ira Wong", "company": "Bot Landing Pages", "relevance": "uncertain", "hard_conditions_met": false, "identity_correct": true, "evidence_verifiable": true, "reviewer": "pending-human-review", "version": "v1-draft" }],
+    "known_relevant": [{ "name": "Malte Pietsch", "canonical_url": "https://www.linkedin.com/posts/maltepietsch_github-deepset-aihaystack-experimental-activity-7218628773187895296-7akg" }],
+    "judgments": [{ "name": "Malte Pietsch", "canonical_url": "https://www.linkedin.com/posts/maltepietsch_github-deepset-aihaystack-experimental-activity-7218628773187895296-7akg", "relevance": "relevant", "hard_conditions_met": true, "identity_correct": true, "evidence_verifiable": true, "evidence_urls": ["https://www.linkedin.com/posts/maltepietsch_github-deepset-aihaystack-experimental-activity-7218628773187895296-7akg", "https://github.com/deepset-ai/haystack", "https://docs.haystack.deepset.ai/docs/evaluation"], "reviewer": "product-owner", "review_status": "approved_human_review", "reviewed_at": "2026-08-03T08:59:33Z", "version": "v1-human-review-1" }],
+    "review_status": "approved_human_review",
     "minimum_evidence": ["RAG implementation", "evaluation or technical documentation"]
   },
   {
