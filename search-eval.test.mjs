@@ -172,7 +172,7 @@ test("does not let an unrelated relevant judgment inflate hard-constraint recall
   assert.ok(score.hard_constraint_recall <= 1);
 });
 
-test("tracks twenty approved L1 and L2 labels while the remaining cases await human review", () => {
+test("tracks twenty-eight approved labels while two L3 cases await evidence and the fixture remains draft", () => {
   const approvedCaseIds = new Set([
     "l1-open-source-ml-inference",
     "l1-github-rust-data-engineer",
@@ -194,6 +194,14 @@ test("tracks twenty approved L1 and L2 labels while the remaining cases await hu
     "l2-mlops-reliability-engineer",
     "l2-web-performance-engineer",
     "l2-fintech-backend-engineer",
+    "l3-underground-agent-evals-builder",
+    "l3-open-source-ai-safety-builder",
+    "l3-developer-education-to-platform-builder",
+    "l3-climate-data-engineer",
+    "l3-healthcare-interoperability-builder",
+    "l3-accessibility-infrastructure-engineer",
+    "l3-compiler-toolchain-engineer",
+    "l3-public-interest-security-engineer",
   ]);
   const automatedReviewCaseIds = new Set([
     "l2-ai-recruiting-workflow-builder",
@@ -201,11 +209,20 @@ test("tracks twenty approved L1 and L2 labels while the remaining cases await hu
     "l2-mlops-reliability-engineer",
     "l2-web-performance-engineer",
     "l2-fintech-backend-engineer",
+    "l3-underground-agent-evals-builder",
+    "l3-open-source-ai-safety-builder",
+    "l3-developer-education-to-platform-builder",
+    "l3-climate-data-engineer",
+    "l3-healthcare-interoperability-builder",
+    "l3-accessibility-infrastructure-engineer",
+    "l3-compiler-toolchain-engineer",
+    "l3-public-interest-security-engineer",
   ]);
 
   assert.equal(fixture.schema_version, "search-eval-v1-draft");
   assert.equal(fixture.review_status, "draft_pending_human_review");
-  assert.match(fixture.annotation_note, /remaining 10 cases/i);
+  assert.match(fixture.annotation_note, /two L3 cases remain pending/i);
+  assert.match(fixture.annotation_note, /independent human fixture review/i);
   assert.match(fixture.annotation_note, /not a recruitment performance conclusion/i);
   assert.equal(cases.length, 30);
   assert.deepEqual(
@@ -236,6 +253,9 @@ test("tracks twenty approved L1 and L2 labels while the remaining cases await hu
       assert.equal(judgment.version, automatedReviewCaseIds.has(item.id) ? "v1-automated-public-evidence-review-1" : "v1-human-review-1");
       assert.ok(Number.isFinite(Date.parse(judgment.reviewed_at)));
       assert.ok(Array.isArray(judgment.evidence_urls) && judgment.evidence_urls.length >= 2);
+      if (item.difficulty === "L3" && automatedReviewCaseIds.has(item.id)) {
+        assert.ok(judgment.evidence_urls.length >= 3, `${item.id} has three public evidence links`);
+      }
     } else {
       assert.deepEqual(item.known_relevant, []);
       for (const judgment of item.judgments) {
@@ -249,5 +269,5 @@ test("tracks twenty approved L1 and L2 labels while the remaining cases await hu
     }
   }
 
-  assert.equal(cases.filter((item) => item.review_status === "approved_human_review").length, 20);
+  assert.equal(cases.filter((item) => item.review_status === "approved_human_review").length, 28);
 });

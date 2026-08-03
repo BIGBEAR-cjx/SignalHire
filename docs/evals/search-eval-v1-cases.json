@@ -1,7 +1,7 @@
 {
   "schema_version": "search-eval-v1-draft",
   "review_status": "draft_pending_human_review",
-  "annotation_note": "Ten L1 cases and five L2 cases were approved by the product owner, and five L2 cases were approved through documented public-evidence review; the remaining 10 cases require independent human annotation before this becomes a golden set and it is not a recruitment performance conclusion.",
+  "annotation_note": "Ten L1 cases and five L2 cases were approved by the product owner, and five L2 cases plus eight L3 cases were approved through documented public-evidence review; two L3 cases remain pending because public evidence did not close their required conditions. All labels require independent human fixture review before this becomes a golden set and it is not a recruitment performance conclusion.",
   "cases": [
   {
     "id": "l1-open-source-ml-inference",
@@ -250,8 +250,9 @@
     "required_conditions": ["agent evaluation", "reproducible tooling", "hands-on maintenance"],
     "excluded_conditions": ["major-lab brand only", "unverified social claim"],
     "source_scaffolds": [{ "canonical_url": "https://github.com/confident-ai/deepeval" }],
-    "known_relevant": [],
-    "judgments": [{ "canonical_url": "https://github.com/confident-ai/deepeval", "relevance": "uncertain", "hard_conditions_met": true, "identity_correct": true, "evidence_verifiable": true, "reviewer": "pending-human-review", "version": "v1-draft" }, { "name": "Logan Yi", "company": "AI Growth Agency", "relevance": "uncertain", "hard_conditions_met": false, "identity_correct": true, "evidence_verifiable": true, "reviewer": "pending-human-review", "version": "v1-draft" }],
+    "known_relevant": [{ "name": "Jeffrey Ip", "canonical_url": "https://www.confident-ai.com/blog/how-i-closed-confident-ais-2-2m-seed-round-in-5-days" }],
+    "judgments": [{ "name": "Jeffrey Ip", "canonical_url": "https://www.confident-ai.com/blog/how-i-closed-confident-ais-2-2m-seed-round-in-5-days", "relevance": "relevant", "hard_conditions_met": true, "identity_correct": true, "evidence_verifiable": true, "evidence_urls": ["https://www.confident-ai.com/blog/how-i-closed-confident-ais-2-2m-seed-round-in-5-days", "https://github.com/confident-ai/deepeval", "https://github.com/confident-ai/deepeval/releases"], "reviewer": "automated-public-evidence-review", "review_status": "approved_human_review", "reviewed_at": "2026-08-03T10:30:00Z", "version": "v1-automated-public-evidence-review-1" }],
+    "review_status": "approved_human_review",
     "minimum_evidence": ["maintained evaluation code", "reproducible example"]
   },
   {
@@ -272,8 +273,9 @@
     "required_conditions": ["AI safety tooling", "empirical testing", "limitations documentation"],
     "excluded_conditions": ["policy commentary only"],
     "source_scaffolds": [{ "canonical_url": "https://github.com/UKGovernmentBEIS/inspect_ai" }],
-    "known_relevant": [],
-    "judgments": [{ "canonical_url": "https://github.com/UKGovernmentBEIS/inspect_ai", "relevance": "uncertain", "hard_conditions_met": true, "identity_correct": true, "evidence_verifiable": true, "reviewer": "pending-human-review", "version": "v1-draft" }, { "name": "Sasha Bell", "company": "Safety Newsletter", "relevance": "uncertain", "hard_conditions_met": false, "identity_correct": true, "evidence_verifiable": true, "reviewer": "pending-human-review", "version": "v1-draft" }],
+    "known_relevant": [{ "name": "JJ Allaire", "canonical_url": "https://github.com/jjallaire" }],
+    "judgments": [{ "name": "JJ Allaire", "canonical_url": "https://github.com/jjallaire", "relevance": "relevant", "hard_conditions_met": true, "identity_correct": true, "evidence_verifiable": true, "evidence_urls": ["https://github.com/jjallaire", "https://github.com/UKGovernmentBEIS/inspect_ai", "https://inspect.aisi.org.uk/errors-and-limits.html"], "reviewer": "automated-public-evidence-review", "review_status": "approved_human_review", "reviewed_at": "2026-08-03T10:30:00Z", "version": "v1-automated-public-evidence-review-1" }],
+    "review_status": "approved_human_review",
     "minimum_evidence": ["safety-tool code", "test or limitation documentation"]
   },
   {
@@ -283,8 +285,9 @@
     "required_conditions": ["developer education", "production platform", "code ownership"],
     "excluded_conditions": ["content creator without engineering evidence"],
     "source_scaffolds": [{ "canonical_url": "https://github.com/freeCodeCamp/freeCodeCamp" }],
-    "known_relevant": [],
-    "judgments": [{ "canonical_url": "https://github.com/freeCodeCamp/freeCodeCamp", "relevance": "uncertain", "hard_conditions_met": true, "identity_correct": true, "evidence_verifiable": true, "reviewer": "pending-human-review", "version": "v1-draft" }, { "name": "Robin Gao", "company": "Course Influencers", "relevance": "uncertain", "hard_conditions_met": false, "identity_correct": true, "evidence_verifiable": true, "reviewer": "pending-human-review", "version": "v1-draft" }],
+    "known_relevant": [{ "name": "Quincy Larson", "canonical_url": "https://github.com/QuincyLarson" }],
+    "judgments": [{ "name": "Quincy Larson", "canonical_url": "https://github.com/QuincyLarson", "relevance": "relevant", "hard_conditions_met": true, "identity_correct": true, "evidence_verifiable": true, "evidence_urls": ["https://github.com/QuincyLarson", "https://github.com/freeCodeCamp/freeCodeCamp", "https://openhub.net/p/freecodecamp/commits?page=1318"], "reviewer": "automated-public-evidence-review", "review_status": "approved_human_review", "reviewed_at": "2026-08-03T10:30:00Z", "version": "v1-automated-public-evidence-review-1" }],
+    "review_status": "approved_human_review",
     "minimum_evidence": ["production repository", "education contribution"]
   },
   {
@@ -294,8 +297,9 @@
     "required_conditions": ["climate data", "scientific data standards", "software engineering"],
     "excluded_conditions": ["climate advocacy only"],
     "source_scaffolds": [{ "canonical_url": "https://github.com/pangeo-data/pangeo" }],
-    "known_relevant": [],
-    "judgments": [{ "canonical_url": "https://github.com/pangeo-data/pangeo", "relevance": "uncertain", "hard_conditions_met": true, "identity_correct": true, "evidence_verifiable": true, "reviewer": "pending-human-review", "version": "v1-draft" }, { "name": "Kendall Ren", "company": "Green PR", "relevance": "uncertain", "hard_conditions_met": false, "identity_correct": true, "evidence_verifiable": true, "reviewer": "pending-human-review", "version": "v1-draft" }],
+    "known_relevant": [{ "name": "Anderson Banihirwe", "canonical_url": "https://github.com/andersy005" }],
+    "judgments": [{ "name": "Anderson Banihirwe", "canonical_url": "https://github.com/andersy005", "relevance": "relevant", "hard_conditions_met": true, "identity_correct": true, "evidence_verifiable": true, "evidence_urls": ["https://github.com/andersy005", "https://xarray.dev/team", "https://par.nsf.gov/servlets/purl/10284955"], "reviewer": "automated-public-evidence-review", "review_status": "approved_human_review", "reviewed_at": "2026-08-03T10:30:00Z", "version": "v1-automated-public-evidence-review-1" }],
+    "review_status": "approved_human_review",
     "minimum_evidence": ["scientific data repository", "implementation evidence"]
   },
   {
@@ -305,8 +309,9 @@
     "required_conditions": ["healthcare interoperability", "data reliability", "privacy-aware implementation"],
     "excluded_conditions": ["clinical role without software work"],
     "source_scaffolds": [{ "canonical_url": "https://github.com/hapifhir/hapi-fhir" }],
-    "known_relevant": [],
-    "judgments": [{ "canonical_url": "https://github.com/hapifhir/hapi-fhir", "relevance": "uncertain", "hard_conditions_met": true, "identity_correct": true, "evidence_verifiable": true, "reviewer": "pending-human-review", "version": "v1-draft" }, { "name": "Reese Han", "company": "Health Lead Gen", "relevance": "uncertain", "hard_conditions_met": false, "identity_correct": true, "evidence_verifiable": true, "reviewer": "pending-human-review", "version": "v1-draft" }],
+    "known_relevant": [{ "name": "James Agnew", "canonical_url": "https://github.com/jamesagnew" }],
+    "judgments": [{ "name": "James Agnew", "canonical_url": "https://github.com/jamesagnew", "relevance": "relevant", "hard_conditions_met": true, "identity_correct": true, "evidence_verifiable": true, "evidence_urls": ["https://github.com/jamesagnew", "https://hapifhir.io/hapi-fhir/docs/security/authorization_interceptor.html", "https://hapifhir.github.io/hapi-hl7v2/changes-report.html"], "reviewer": "automated-public-evidence-review", "review_status": "approved_human_review", "reviewed_at": "2026-08-03T10:30:00Z", "version": "v1-automated-public-evidence-review-1" }],
+    "review_status": "approved_human_review",
     "minimum_evidence": ["interoperability implementation", "privacy or reliability evidence"]
   },
   {
@@ -316,8 +321,9 @@
     "required_conditions": ["accessibility", "engineering infrastructure", "automated testing"],
     "excluded_conditions": ["manual audit only"],
     "source_scaffolds": [{ "canonical_url": "https://github.com/dequelabs/axe-core" }],
-    "known_relevant": [],
-    "judgments": [{ "canonical_url": "https://github.com/dequelabs/axe-core", "relevance": "uncertain", "hard_conditions_met": true, "identity_correct": true, "evidence_verifiable": true, "reviewer": "pending-human-review", "version": "v1-draft" }, { "name": "Charlie Luo", "company": "Accessibility Consulting", "relevance": "uncertain", "hard_conditions_met": false, "identity_correct": true, "evidence_verifiable": true, "reviewer": "pending-human-review", "version": "v1-draft" }],
+    "known_relevant": [{ "name": "Wilco Fiers", "canonical_url": "https://wilcofiers.github.io/presentations/build/cia.html" }],
+    "judgments": [{ "name": "Wilco Fiers", "canonical_url": "https://wilcofiers.github.io/presentations/build/cia.html", "relevance": "relevant", "hard_conditions_met": true, "identity_correct": true, "evidence_verifiable": true, "evidence_urls": ["https://wilcofiers.github.io/presentations/build/cia.html", "https://www.deque.com/axe-con/presenters/wilco-fiers-2/", "https://github.com/dequelabs/axe-core"], "reviewer": "automated-public-evidence-review", "review_status": "approved_human_review", "reviewed_at": "2026-08-03T10:30:00Z", "version": "v1-automated-public-evidence-review-1" }],
+    "review_status": "approved_human_review",
     "minimum_evidence": ["automation code", "maintainer or technical attribution"]
   },
   {
@@ -338,8 +344,9 @@
     "required_conditions": ["compiler toolchain", "performance", "sustained contribution"],
     "excluded_conditions": ["one-off toy compiler"],
     "source_scaffolds": [{ "canonical_url": "https://github.com/llvm/llvm-project" }],
-    "known_relevant": [],
-    "judgments": [{ "canonical_url": "https://github.com/llvm/llvm-project", "relevance": "uncertain", "hard_conditions_met": true, "identity_correct": true, "evidence_verifiable": true, "reviewer": "pending-human-review", "version": "v1-draft" }, { "name": "Ari Flores", "company": "Coding Tutorial Hub", "relevance": "uncertain", "hard_conditions_met": false, "identity_correct": true, "evidence_verifiable": true, "reviewer": "pending-human-review", "version": "v1-draft" }],
+    "known_relevant": [{ "name": "Nikita Popov", "canonical_url": "https://github.com/nikic" }],
+    "judgments": [{ "name": "Nikita Popov", "canonical_url": "https://github.com/nikic", "relevance": "relevant", "hard_conditions_met": true, "identity_correct": true, "evidence_verifiable": true, "evidence_urls": ["https://github.com/nikic", "https://llvm.googlesource.com/llvm-project/llvm/%2B/038cd3d86e6fda0b0f404d8c6ee3cd75cb4ec1eb", "https://developers.redhat.com/articles/2023/12/07/how-single-iteration-instcombine-improves-llvm-compile-time"], "reviewer": "automated-public-evidence-review", "review_status": "approved_human_review", "reviewed_at": "2026-08-03T10:30:00Z", "version": "v1-automated-public-evidence-review-1" }],
+    "review_status": "approved_human_review",
     "minimum_evidence": ["toolchain contribution", "performance or release evidence"]
   },
   {
@@ -349,8 +356,9 @@
     "required_conditions": ["security engineering", "public-interest infrastructure", "verification evidence"],
     "excluded_conditions": ["general cybersecurity certification"],
     "source_scaffolds": [{ "canonical_url": "https://github.com/sigstore/sigstore" }],
-    "known_relevant": [],
-    "judgments": [{ "canonical_url": "https://github.com/sigstore/sigstore", "relevance": "uncertain", "hard_conditions_met": true, "identity_correct": true, "evidence_verifiable": true, "reviewer": "pending-human-review", "version": "v1-draft" }, { "name": "Blair Song", "company": "Security Webinar Co", "relevance": "uncertain", "hard_conditions_met": false, "identity_correct": true, "evidence_verifiable": true, "reviewer": "pending-human-review", "version": "v1-draft" }],
+    "known_relevant": [{ "name": "Priya Wadhwa", "canonical_url": "https://github.com/priyawadhwa" }],
+    "judgments": [{ "name": "Priya Wadhwa", "canonical_url": "https://github.com/priyawadhwa", "relevance": "relevant", "hard_conditions_met": true, "identity_correct": true, "evidence_verifiable": true, "evidence_urls": ["https://github.com/priyawadhwa", "https://www.sigstore.dev/trust-security", "https://docs.sigstore.dev/about/threat-model/"], "reviewer": "automated-public-evidence-review", "review_status": "approved_human_review", "reviewed_at": "2026-08-03T10:30:00Z", "version": "v1-automated-public-evidence-review-1" }],
+    "review_status": "approved_human_review",
     "minimum_evidence": ["security implementation", "threat model or verification artifact"]
   }
   ]
