@@ -1,7 +1,7 @@
 {
   "schema_version": "search-eval-v1-draft",
   "review_status": "draft_pending_human_review",
-  "annotation_note": "Ten L1 cases and five L2 cases were approved by the product owner from documented public evidence; the remaining 15 cases require independent human annotation before this becomes a golden set and it is not a recruitment performance conclusion.",
+  "annotation_note": "Ten L1 cases and five L2 cases were approved by the product owner, and four L2 cases were approved through documented public-evidence review; the remaining 11 cases require independent human annotation before this becomes a golden set and it is not a recruitment performance conclusion.",
   "cases": [
   {
     "id": "l1-open-source-ml-inference",
@@ -177,8 +177,9 @@
     "required_conditions": ["data platform", "privacy tooling", "security evidence"],
     "excluded_conditions": ["policy-only privacy role"],
     "source_scaffolds": [{ "canonical_url": "https://github.com/openmined/PySyft" }],
-    "known_relevant": [],
-    "judgments": [{ "canonical_url": "https://github.com/openmined/PySyft", "relevance": "uncertain", "hard_conditions_met": true, "identity_correct": true, "evidence_verifiable": true, "reviewer": "pending-human-review", "version": "v1-draft" }, { "name": "Harper Sun", "company": "Compliance Slides", "relevance": "uncertain", "hard_conditions_met": false, "identity_correct": true, "evidence_verifiable": true, "reviewer": "pending-human-review", "version": "v1-draft" }],
+    "known_relevant": [{ "name": "Andrew Trask", "canonical_url": "https://andrewtrask.ai/" }],
+    "judgments": [{ "name": "Andrew Trask", "canonical_url": "https://andrewtrask.ai/", "relevance": "relevant", "hard_conditions_met": true, "identity_correct": true, "evidence_verifiable": true, "evidence_urls": ["https://andrewtrask.ai/", "https://pypi.org/project/syft/0.2.5/", "https://arxiv.org/abs/2110.01315"], "reviewer": "automated-public-evidence-review", "review_status": "approved_human_review", "reviewed_at": "2026-08-03T09:14:10Z", "version": "v1-automated-public-evidence-review-1" }],
+    "review_status": "approved_human_review",
     "minimum_evidence": ["privacy implementation", "technical security evidence"]
   },
   {
@@ -200,8 +201,9 @@
     "required_conditions": ["model serving", "observability", "reliability"],
     "excluded_conditions": ["notebook-only ML"],
     "source_scaffolds": [{ "canonical_url": "https://github.com/bentoml/BentoML" }],
-    "known_relevant": [],
-    "judgments": [{ "canonical_url": "https://github.com/bentoml/BentoML", "relevance": "uncertain", "hard_conditions_met": true, "identity_correct": true, "evidence_verifiable": true, "reviewer": "pending-human-review", "version": "v1-draft" }, { "name": "Rowan Hu", "company": "Model Demos", "relevance": "uncertain", "hard_conditions_met": false, "identity_correct": true, "evidence_verifiable": true, "reviewer": "pending-human-review", "version": "v1-draft" }],
+    "known_relevant": [{ "name": "Chaoyu Yang", "canonical_url": "https://github.com/parano" }],
+    "judgments": [{ "name": "Chaoyu Yang", "canonical_url": "https://github.com/parano", "relevance": "relevant", "hard_conditions_met": true, "identity_correct": true, "evidence_verifiable": true, "evidence_urls": ["https://pypi.org/user/parano/", "https://www.bentoml.com/blog/ml-requirements", "https://www.bentoml.com/"], "reviewer": "automated-public-evidence-review", "review_status": "approved_human_review", "reviewed_at": "2026-08-03T09:14:10Z", "version": "v1-automated-public-evidence-review-1" }],
+    "review_status": "approved_human_review",
     "minimum_evidence": ["serving implementation", "operational evidence"]
   },
   {
@@ -211,8 +213,9 @@
     "required_conditions": ["React", "web performance", "accessibility"],
     "excluded_conditions": ["static design portfolio only"],
     "source_scaffolds": [{ "canonical_url": "https://github.com/vercel/next.js" }],
-    "known_relevant": [],
-    "judgments": [{ "canonical_url": "https://github.com/vercel/next.js", "relevance": "uncertain", "hard_conditions_met": true, "identity_correct": true, "evidence_verifiable": true, "reviewer": "pending-human-review", "version": "v1-draft" }, { "name": "Emerson Li", "company": "Landing Pages Inc", "relevance": "uncertain", "hard_conditions_met": false, "identity_correct": true, "evidence_verifiable": true, "reviewer": "pending-human-review", "version": "v1-draft" }],
+    "known_relevant": [{ "name": "Devon Govett", "canonical_url": "https://github.com/devongovett" }],
+    "judgments": [{ "name": "Devon Govett", "canonical_url": "https://github.com/devongovett", "relevance": "relevant", "hard_conditions_met": true, "identity_correct": true, "evidence_verifiable": true, "evidence_urls": ["https://react-aria.adobe.com/blog/drag-and-drop", "https://devongovett.me/blog/parcel-rsc.html", "https://threadreaderapp.com/user/devongovett"], "reviewer": "automated-public-evidence-review", "review_status": "approved_human_review", "reviewed_at": "2026-08-03T09:14:10Z", "version": "v1-automated-public-evidence-review-1" }],
+    "review_status": "approved_human_review",
     "minimum_evidence": ["production framework contribution", "accessibility or performance evidence"]
   },
   {
@@ -222,8 +225,9 @@
     "required_conditions": ["payments integration", "ledger correctness", "Go or Java"],
     "excluded_conditions": ["consumer finance marketing"],
     "source_scaffolds": [{ "canonical_url": "https://github.com/stripe/stripe-go" }],
-    "known_relevant": [],
-    "judgments": [{ "canonical_url": "https://github.com/stripe/stripe-go", "relevance": "uncertain", "hard_conditions_met": true, "identity_correct": true, "evidence_verifiable": true, "reviewer": "pending-human-review", "version": "v1-draft" }, { "name": "Finley Rao", "company": "Payment Ads", "relevance": "uncertain", "hard_conditions_met": false, "identity_correct": true, "evidence_verifiable": true, "reviewer": "pending-human-review", "version": "v1-draft" }],
+    "known_relevant": [{ "name": "Markus Geiss", "canonical_url": "https://github.com/mgeiss" }],
+    "judgments": [{ "name": "Markus Geiss", "canonical_url": "https://github.com/mgeiss", "relevance": "relevant", "hard_conditions_met": true, "identity_correct": true, "evidence_verifiable": true, "evidence_urls": ["https://cwiki.apache.org/confluence/spaces/FINERACT/pages/61334200/Key%2BDesign%2BPrinciples", "https://apache.googlesource.com/fineract-cn-accounting/%2Blog", "https://www.mail-archive.com/issues%40fineract.apache.org/msg00578.html"], "reviewer": "automated-public-evidence-review", "review_status": "approved_human_review", "reviewed_at": "2026-08-03T09:14:10Z", "version": "v1-automated-public-evidence-review-1" }],
+    "review_status": "approved_human_review",
     "minimum_evidence": ["integration code", "correctness or API evidence"]
   },
   {

@@ -172,7 +172,7 @@ test("does not let an unrelated relevant judgment inflate hard-constraint recall
   assert.ok(score.hard_constraint_recall <= 1);
 });
 
-test("tracks fifteen approved L1 and L2 labels while the remaining cases await human review", () => {
+test("tracks nineteen approved L1 and L2 labels while the remaining cases await human review", () => {
   const approvedCaseIds = new Set([
     "l1-open-source-ml-inference",
     "l1-github-rust-data-engineer",
@@ -189,11 +189,21 @@ test("tracks fifteen approved L1 and L2 labels while the remaining cases await h
     "l2-developer-tools-product-engineer",
     "l2-edge-ai-systems-engineer",
     "l2-research-engineer-rag",
+    "l2-privacy-data-platform-engineer",
+    "l2-mlops-reliability-engineer",
+    "l2-web-performance-engineer",
+    "l2-fintech-backend-engineer",
+  ]);
+  const automatedReviewCaseIds = new Set([
+    "l2-privacy-data-platform-engineer",
+    "l2-mlops-reliability-engineer",
+    "l2-web-performance-engineer",
+    "l2-fintech-backend-engineer",
   ]);
 
   assert.equal(fixture.schema_version, "search-eval-v1-draft");
   assert.equal(fixture.review_status, "draft_pending_human_review");
-  assert.match(fixture.annotation_note, /remaining 15 cases/i);
+  assert.match(fixture.annotation_note, /remaining 11 cases/i);
   assert.match(fixture.annotation_note, /not a recruitment performance conclusion/i);
   assert.equal(cases.length, 30);
   assert.deepEqual(
@@ -219,9 +229,9 @@ test("tracks fifteen approved L1 and L2 labels while the remaining cases await h
       assert.equal(judgment.hard_conditions_met, true);
       assert.equal(judgment.identity_correct, true);
       assert.equal(judgment.evidence_verifiable, true);
-      assert.equal(judgment.reviewer, "product-owner");
+      assert.equal(judgment.reviewer, automatedReviewCaseIds.has(item.id) ? "automated-public-evidence-review" : "product-owner");
       assert.equal(judgment.review_status, "approved_human_review");
-      assert.equal(judgment.version, "v1-human-review-1");
+      assert.equal(judgment.version, automatedReviewCaseIds.has(item.id) ? "v1-automated-public-evidence-review-1" : "v1-human-review-1");
       assert.ok(Number.isFinite(Date.parse(judgment.reviewed_at)));
       assert.ok(Array.isArray(judgment.evidence_urls) && judgment.evidence_urls.length >= 2);
     } else {
@@ -237,5 +247,5 @@ test("tracks fifteen approved L1 and L2 labels while the remaining cases await h
     }
   }
 
-  assert.equal(cases.filter((item) => item.review_status === "approved_human_review").length, 15);
+  assert.equal(cases.filter((item) => item.review_status === "approved_human_review").length, 19);
 });
