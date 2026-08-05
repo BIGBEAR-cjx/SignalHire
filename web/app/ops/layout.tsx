@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "SignalHire Ops",
+  title: "SignalHire 管理后台",
   robots: { index: false, follow: false },
 };
 
