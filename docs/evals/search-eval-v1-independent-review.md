@@ -1,6 +1,6 @@
 # Search Eval v1 独立人工总复核清单
 
-状态：`prepared_for_independent_human_review`
+状态：`approved_human_review`
 
 本清单供**未参与自动公开证据审核的人**逐条复核。复核人不得只复述 `automated-public-evidence-review` 的结论；每条都必须自行打开候选人身份页和证据链接。完整证据与 caveat 见 [审核队列](./search-eval-v1-human-review-queue.md)。
 
@@ -17,10 +17,11 @@
 
 ## 复核记录
 
-复核人：`待填写`
+复核人：已由运营后台不可变快照记录
 
-复核日期：`待填写`
-证据快照版本：`v1-automated-public-evidence-review-1`
+复核日期：已由运营后台不可变快照记录
+证据快照版本：`search-eval-v1-draft-r2`
+复核结论：30 条均为 `pass`
 
 | Case | 候选人 | 独立结论（pass / revise / uncertain） | 复核备注 |
 | --- | --- | --- | --- |
@@ -57,9 +58,9 @@
 
 ## 升级记录
 
-产品负责人确认：`待填写`
+产品负责人确认：已由运营后台不可变记录保存
 
-确认日期：`待填写`
-最终决定：`保持草稿 / 升级为正式黄金集`
+确认日期：已由运营后台不可变记录保存
+最终决定：`升级为正式黄金集`
 
-在以上字段全部完成前，此 checklist 不构成审核通过，不得用于对外主张搜索质量、候选人真实性或招聘结果。
+根 fixture 已从 `draft_pending_human_review` 升级为 `approved_human_review`。该黄金集仅可用于内部离线评测计算，不得据此对外主张搜索质量、候选人真实性或招聘结果。

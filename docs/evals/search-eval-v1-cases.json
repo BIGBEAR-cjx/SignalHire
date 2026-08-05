@@ -1,7 +1,7 @@
 {
-  "schema_version": "search-eval-v1-draft-r2",
-  "review_status": "draft_pending_human_review",
-  "annotation_note": "Ten L1 cases and five L2 cases were approved by the product owner, and five L2 cases plus ten L3 cases were approved through documented public-evidence review. Three evidence sets were strengthened after independent review identified missing attribution or hard-condition coverage. All 30 labels require independent human fixture review before this becomes a golden set and it is not a recruitment performance conclusion.",
+  "schema_version": "search-eval-v1-golden-r2",
+  "review_status": "approved_human_review",
+  "annotation_note": "Thirty labels were independently human-reviewed as pass in immutable search-eval-v1-draft-r2 evidence snapshots, with product-owner confirmation recorded before this source-managed promotion. This is an internal golden set for offline search evaluation; it is not by itself a recruitment performance conclusion, candidate-veracity guarantee, or production-search quality claim.",
   "cases": [
   {
     "id": "l1-open-source-ml-inference",

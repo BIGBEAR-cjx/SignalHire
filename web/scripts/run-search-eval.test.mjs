@@ -128,5 +128,6 @@ test("keeps evaluation internal and documents the approved review boundary", asy
   assert.match(readme, /does not route or enqueue production search/i);
   assert.match(independentReviewChecklist, /未参与自动公开证据审核的人/);
   assert.match(independentReviewChecklist, /30 条均为 `pass`/);
-  assert.match(independentReviewChecklist, /draft_pending_human_review/);
+  assert.match(independentReviewChecklist, /状态：`approved_human_review`/);
+  assert.match(independentReviewChecklist, /仅可用于内部离线评测计算/);
 });

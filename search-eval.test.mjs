@@ -172,7 +172,7 @@ test("does not let an unrelated relevant judgment inflate hard-constraint recall
   assert.ok(score.hard_constraint_recall <= 1);
 });
 
-test("tracks thirty approved labels while the fixture remains draft", () => {
+test("promotes thirty independently reviewed labels into the internal golden fixture", () => {
   const approvedCaseIds = new Set([
     "l1-open-source-ml-inference",
     "l1-github-rust-data-engineer",
@@ -231,11 +231,11 @@ test("tracks thirty approved labels while the fixture remains draft", () => {
     "l2-edge-ai-systems-engineer",
   ]);
 
-  assert.equal(fixture.schema_version, "search-eval-v1-draft-r2");
-  assert.equal(fixture.review_status, "draft_pending_human_review");
-  assert.match(fixture.annotation_note, /all 30 labels require independent human fixture review/i);
-  assert.match(fixture.annotation_note, /independent human fixture review/i);
-  assert.match(fixture.annotation_note, /not a recruitment performance conclusion/i);
+  assert.equal(fixture.schema_version, "search-eval-v1-golden-r2");
+  assert.equal(fixture.review_status, "approved_human_review");
+  assert.match(fixture.annotation_note, /thirty labels were independently human-reviewed as pass/i);
+  assert.match(fixture.annotation_note, /internal golden set/i);
+  assert.match(fixture.annotation_note, /not by itself a recruitment performance conclusion/i);
   assert.equal(cases.length, 30);
   assert.deepEqual(
     Object.fromEntries(["L1", "L2", "L3"].map((difficulty) => [difficulty, cases.filter((item) => item.difficulty === difficulty).length])),
@@ -268,6 +268,7 @@ test("tracks thirty approved labels while the fixture remains draft", () => {
       if (item.difficulty === "L3" && automatedReviewCaseIds.has(item.id)) {
         assert.ok(judgment.evidence_urls.length >= 3, `${item.id} has three public evidence links`);
       }
+      assert.deepEqual(evaluationEligibility({ caseDefinition: item, fixture }), { status: "eligible" });
     } else {
       assert.deepEqual(item.known_relevant, []);
       for (const judgment of item.judgments) {

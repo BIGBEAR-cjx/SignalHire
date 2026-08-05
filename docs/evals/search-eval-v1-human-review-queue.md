@@ -74,4 +74,4 @@ L2 必须同时满足多个硬条件。本表把可用线索和尚缺的个人�
 | `l3-compiler-toolchain-engineer` | Nikita Popov | [GitHub 个人身份](https://github.com/nikic)；[LLVM 公开提交](https://llvm.googlesource.com/llvm-project/llvm/%2B/038cd3d86e6fda0b0f404d8c6ee3cd75cb4ec1eb)；[本人 LLVM 编译时性能文章](https://developers.redhat.com/articles/2023/12/07/how-single-iteration-instcombine-improves-llvm-compile-time) | **自动公开证据审核通过**：LLVM 代码、长期工具链贡献及量化编译性能工作均可复现，不是教程项目。 |
 | `l3-public-interest-security-engineer` | Priya Wadhwa | [GitHub 个人身份](https://github.com/priyawadhwa)；[Sigstore 基础设施维护者名单](https://www.sigstore.dev/trust-security)；[可复现威胁模型](https://docs.sigstore.dev/about/threat-model/) | **自动公开证据审核通过**：个人维护者身份与公共软件供应链安全基础设施可交叉验证；威胁模型作为验证工件，非证书或营销材料。 |
 
-本轮 L3 结果为 10 条自动审核通过、0 条待补证。根 fixture 固定保持 `draft_pending_human_review`；自动审核只增加可追溯候选标签，不代表搜索质量已经通过或招聘结论成立。
+本轮 L3 的 10 条自动审核记录已纳入独立人工总复核。最新 `search-eval-v1-draft-r2` 快照中 30 条均为 `pass`，并已记录产品负责人确认；根 fixture 已通过代码变更升级为 `approved_human_review`。该状态只表示内部离线评测标签可用于计算，不代表搜索质量已经通过，也不构成招聘结论。
