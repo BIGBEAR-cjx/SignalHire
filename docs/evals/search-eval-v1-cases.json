@@ -1,7 +1,7 @@
 {
-  "schema_version": "search-eval-v1-draft",
+  "schema_version": "search-eval-v1-draft-r2",
   "review_status": "draft_pending_human_review",
-  "annotation_note": "Ten L1 cases and five L2 cases were approved by the product owner, and five L2 cases plus ten L3 cases were approved through documented public-evidence review. All 30 labels require independent human fixture review before this becomes a golden set and it is not a recruitment performance conclusion.",
+  "annotation_note": "Ten L1 cases and five L2 cases were approved by the product owner, and five L2 cases plus ten L3 cases were approved through documented public-evidence review. Three evidence sets were strengthened after independent review identified missing attribution or hard-condition coverage. All 30 labels require independent human fixture review before this becomes a golden set and it is not a recruitment performance conclusion.",
   "cases": [
   {
     "id": "l1-open-source-ml-inference",
@@ -70,8 +70,8 @@
     "required_conditions": ["security engineering", "public disclosure or advisory"],
     "excluded_conditions": ["security sales"],
     "source_scaffolds": [{ "canonical_url": "https://github.com/google/security-research" }],
-    "known_relevant": [{ "name": "Tavis Ormandy", "canonical_url": "https://github.com/taviso" }],
-    "judgments": [{ "name": "Tavis Ormandy", "canonical_url": "https://github.com/taviso", "relevance": "relevant", "hard_conditions_met": true, "identity_correct": true, "evidence_verifiable": true, "evidence_urls": ["https://github.com/taviso", "https://projectzero.google/2021/12/this-shouldnt-have-happened.html"], "reviewer": "product-owner", "review_status": "approved_human_review", "reviewed_at": "2026-08-03T08:12:04Z", "version": "v1-human-review-1" }],
+    "known_relevant": [{ "name": "Tavis Ormandy", "canonical_url": "https://bughunters.google.com/blog/the-reptar-cpu-vulnerability" }],
+    "judgments": [{ "name": "Tavis Ormandy", "canonical_url": "https://bughunters.google.com/blog/the-reptar-cpu-vulnerability", "relevance": "relevant", "hard_conditions_met": true, "identity_correct": true, "evidence_verifiable": true, "evidence_urls": ["https://bughunters.google.com/blog/the-reptar-cpu-vulnerability", "https://security.googleblog.com/2023/08/downfall-and-zenbleed-googlers-helping.html", "https://blog.cloudflare.com/incident-report-on-memory-leak-caused-by-cloudflare-parser-bug/"], "reviewer": "automated-public-evidence-review", "review_status": "approved_human_review", "reviewed_at": "2026-08-05T00:00:00Z", "version": "v1-automated-public-evidence-review-2" }],
     "review_status": "approved_human_review",
     "minimum_evidence": ["advisory or disclosure", "author attribution"]
   },
@@ -131,7 +131,7 @@
     "excluded_conditions": ["agency recruiter", "prompt-only profile"],
     "source_scaffolds": [{ "canonical_url": "https://github.com/langchain-ai/langgraph" }],
     "known_relevant": [{ "name": "Harrison Chase", "canonical_url": "https://www.langchain.com/about" }],
-    "judgments": [{ "name": "Harrison Chase", "canonical_url": "https://www.langchain.com/about", "relevance": "relevant", "hard_conditions_met": true, "identity_correct": true, "evidence_verifiable": true, "evidence_urls": ["https://www.langchain.com/about", "https://github.com/langchain-ai/langgraph"], "reviewer": "product-owner", "review_status": "approved_human_review", "reviewed_at": "2026-08-03T08:41:26Z", "version": "v1-human-review-1" }],
+    "judgments": [{ "name": "Harrison Chase", "canonical_url": "https://www.langchain.com/about", "relevance": "relevant", "hard_conditions_met": true, "identity_correct": true, "evidence_verifiable": true, "evidence_urls": ["https://www.langchain.com/about", "https://www.langchain.com/blog/three-years-langchain", "https://www.langchain.com/blog/why-you-should-outsource-your-agentic-infrastructure-but-own-your-cognitive-architecture", "https://github.com/langchain-ai/langgraph"], "reviewer": "automated-public-evidence-review", "review_status": "approved_human_review", "reviewed_at": "2026-08-05T00:00:00Z", "version": "v1-automated-public-evidence-review-2" }],
     "review_status": "approved_human_review",
     "minimum_evidence": ["agent code", "production architecture evidence"]
   },
@@ -155,7 +155,7 @@
     "excluded_conditions": ["cloud-only ML"],
     "source_scaffolds": [{ "canonical_url": "https://github.com/tensorflow/tflite-micro" }],
     "known_relevant": [{ "name": "Daniel Situnayake", "canonical_url": "https://situnayake.com/" }],
-    "judgments": [{ "name": "Daniel Situnayake", "canonical_url": "https://situnayake.com/", "relevance": "relevant", "hard_conditions_met": true, "identity_correct": true, "evidence_verifiable": true, "evidence_urls": ["https://situnayake.com/", "https://android.googlesource.com/platform/external/tensorflow/%2Bshow/d7992c051ee/tensorflow/lite/micro/docs/profiling.md"], "reviewer": "product-owner", "review_status": "approved_human_review", "reviewed_at": "2026-08-03T08:59:33Z", "version": "v1-human-review-1" }],
+    "judgments": [{ "name": "Daniel Situnayake", "canonical_url": "https://situnayake.com/", "relevance": "relevant", "hard_conditions_met": true, "identity_correct": true, "evidence_verifiable": true, "evidence_urls": ["https://situnayake.com/", "https://situnayake.com/2023/03/21/nn-to-cpp.html", "https://www.edgeimpulse.com/blog/make-deep-learning-models-run-fast-on-embedded-hardware/", "https://www.edgeimpulse.com/blog/announcing-performance-calibration/"], "reviewer": "automated-public-evidence-review", "review_status": "approved_human_review", "reviewed_at": "2026-08-05T00:00:00Z", "version": "v1-automated-public-evidence-review-2" }],
     "review_status": "approved_human_review",
     "minimum_evidence": ["embedded code", "profiling or benchmark evidence"]
   },

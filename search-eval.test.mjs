@@ -206,6 +206,9 @@ test("tracks thirty approved labels while the fixture remains draft", () => {
     "l3-public-interest-security-engineer",
   ]);
   const automatedReviewCaseIds = new Set([
+    "l1-security-incident-responder",
+    "l2-agent-platform-founder-engineer",
+    "l2-edge-ai-systems-engineer",
     "l2-ai-recruiting-workflow-builder",
     "l2-privacy-data-platform-engineer",
     "l2-mlops-reliability-engineer",
@@ -222,8 +225,13 @@ test("tracks thirty approved labels while the fixture remains draft", () => {
     "l3-compiler-toolchain-engineer",
     "l3-public-interest-security-engineer",
   ]);
+  const strengthenedCaseIds = new Set([
+    "l1-security-incident-responder",
+    "l2-agent-platform-founder-engineer",
+    "l2-edge-ai-systems-engineer",
+  ]);
 
-  assert.equal(fixture.schema_version, "search-eval-v1-draft");
+  assert.equal(fixture.schema_version, "search-eval-v1-draft-r2");
   assert.equal(fixture.review_status, "draft_pending_human_review");
   assert.match(fixture.annotation_note, /all 30 labels require independent human fixture review/i);
   assert.match(fixture.annotation_note, /independent human fixture review/i);
@@ -254,7 +262,7 @@ test("tracks thirty approved labels while the fixture remains draft", () => {
       assert.equal(judgment.evidence_verifiable, true);
       assert.equal(judgment.reviewer, automatedReviewCaseIds.has(item.id) ? "automated-public-evidence-review" : "product-owner");
       assert.equal(judgment.review_status, "approved_human_review");
-      assert.equal(judgment.version, automatedReviewCaseIds.has(item.id) ? "v1-automated-public-evidence-review-1" : "v1-human-review-1");
+      assert.equal(judgment.version, strengthenedCaseIds.has(item.id) ? "v1-automated-public-evidence-review-2" : automatedReviewCaseIds.has(item.id) ? "v1-automated-public-evidence-review-1" : "v1-human-review-1");
       assert.ok(Number.isFinite(Date.parse(judgment.reviewed_at)));
       assert.ok(Array.isArray(judgment.evidence_urls) && judgment.evidence_urls.length >= 2);
       if (item.difficulty === "L3" && automatedReviewCaseIds.has(item.id)) {
@@ -274,4 +282,31 @@ test("tracks thirty approved labels while the fixture remains draft", () => {
   }
 
   assert.equal(cases.filter((item) => item.review_status === "approved_human_review").length, 30);
+
+  const strengthenedEvidence = {
+    "l1-security-incident-responder": [
+      "https://bughunters.google.com/blog/the-reptar-cpu-vulnerability",
+      "https://security.googleblog.com/2023/08/downfall-and-zenbleed-googlers-helping.html",
+      "https://blog.cloudflare.com/incident-report-on-memory-leak-caused-by-cloudflare-parser-bug/",
+    ],
+    "l2-agent-platform-founder-engineer": [
+      "https://www.langchain.com/about",
+      "https://www.langchain.com/blog/three-years-langchain",
+      "https://www.langchain.com/blog/why-you-should-outsource-your-agentic-infrastructure-but-own-your-cognitive-architecture",
+      "https://github.com/langchain-ai/langgraph",
+    ],
+    "l2-edge-ai-systems-engineer": [
+      "https://situnayake.com/",
+      "https://situnayake.com/2023/03/21/nn-to-cpp.html",
+      "https://www.edgeimpulse.com/blog/make-deep-learning-models-run-fast-on-embedded-hardware/",
+      "https://www.edgeimpulse.com/blog/announcing-performance-calibration/",
+    ],
+  };
+  for (const [caseId, evidenceUrls] of Object.entries(strengthenedEvidence)) {
+    const item = cases.find((candidate) => candidate.id === caseId);
+    assert.ok(item, `${caseId} exists`);
+    assert.deepEqual(item.judgments[0].evidence_urls, evidenceUrls);
+    assert.equal(item.judgments[0].reviewer, "automated-public-evidence-review");
+    assert.equal(item.judgments[0].version, "v1-automated-public-evidence-review-2");
+  }
 });
