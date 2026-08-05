@@ -88,6 +88,20 @@ export async function login(email: string, password: string, locale = "zh"): Pro
   }
 }
 
+// Ops pages can remain open while a reviewer works through a long checklist.
+// Refresh the InsForge browser session and rewrite this host's httpOnly cookie
+// immediately before a privileged mutation so the server does not receive an
+// expired access token from the original sign-in.
+export async function refreshSessionCookie(locale = "zh"): Promise<boolean> {
+  try {
+    const { data, error } = await client.auth.refreshSession();
+    if (error || !data?.accessToken) return false;
+    return await setSession(data.accessToken, locale);
+  } catch {
+    return false;
+  }
+}
+
 export async function sendPasswordResetEmail(email: string, next = "/", locale = "zh"): Promise<PasswordResetResult> {
   try {
     const { data, error } = await client.auth.sendResetPasswordEmail({

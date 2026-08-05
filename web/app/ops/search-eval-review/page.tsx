@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
+import { refreshSessionCookie } from "@/lib/auth";
 import {
   formatOpsDate,
   formatOpsNumber,
@@ -101,6 +102,7 @@ export default function SearchEvalReviewPage() {
     if (busy || !summary.complete) return;
     setBusy(true); setSubmitError(""); setMessage("");
     try {
+      if (!await refreshSessionCookie("zh")) throw new Error("登录已过期，请重新登录后再提交。");
       const payload = {
         reviewer_name: reviewerName,
         fixture_version: fixtureVersion,
@@ -121,6 +123,7 @@ export default function SearchEvalReviewPage() {
     if (!latestReview || !latestReview.summary.allPass || !ownerAttestation || busy) return;
     setBusy(true); setSubmitError(""); setMessage("");
     try {
+      if (!await refreshSessionCookie("zh")) throw new Error("登录已过期，请重新登录后再确认。");
       const response = await fetch("/api/ops/search-eval-review/confirm", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ review_id: latestReview.id }) });
       const result = await response.json().catch(() => null);
       if (!response.ok) throw new Error(opsApiError(result, "无法记录产品负责人确认。"));

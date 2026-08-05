@@ -80,6 +80,7 @@ test("all operations pages are fixed to Chinese copy", async () => {
     readFile(new URL("./web/app/ops/search-eval-review/page.tsx", import.meta.url), "utf8"),
   ]);
   assert.match(layout, /SignalHire 管理后台/);
+  assert.match(review, /refreshSessionCookie\("zh"\)/);
   assert.match(login, /login\(email\.trim\(\), password, "zh"\)/);
   assert.match(login, />管理后台</);
   assert.match(credits, />Credits 运营台</);
